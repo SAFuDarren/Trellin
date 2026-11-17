@@ -212,11 +212,14 @@ jobs:
           rm_workspace="$RUNNER_TEMP/rm-lean-tests"
           research-multiplier research init-workspace "$rm_workspace"
           research-multiplier --workspace "$rm_workspace" lean prepare
-          cd "$rm_workspace/lean-project"
+          # The fixture is shared by tests whose temporary workspaces are separate.
+          rm_lean_fixture="$RUNNER_TEMP/rm-lean-fixture"
+          mv "$rm_workspace/lean-project" "$rm_lean_fixture"
+          cd "$rm_lean_fixture"
           lake exe cache get Mathlib.Data.Real.Basic Mathlib.Tactic.Linarith Mathlib.Tactic.NormNum
       - name: Run required Lean regressions
         env:
-          RM_TEST_LEAN_PROJECT: ${{ runner.temp }}/rm-lean-tests/lean-project
+          RM_TEST_LEAN_PROJECT: ${{ runner.temp }}/rm-lean-fixture
         working-directory: ${{ runner.temp }}
         run: |
           unset PYTHONPATH
