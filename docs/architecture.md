@@ -178,7 +178,7 @@ The interface is English by default with a complete Chinese translation. Every u
 
 ### E7 Open community, tracked on GitHub (settled)
 
-The project is developed in a public repository as an open community project. Tasks, bugs and milestones live in GitHub Issues and a GitHub Project board, with milestones matching the roadmap phases. Contribution rules are in [engineering](engineering.md#open-community).
+The project is developed as an open community project in a public repository. The repository becomes public once the [publication gate](roadmap.md#publication-gate) in the roadmap is met. Tasks, bugs and milestones live in GitHub Issues and a GitHub Project board, with milestones matching the roadmap phases. Contribution rules are in [engineering](engineering.md#open-community).
 
 ### E8 Versioning starts at 1.0.0 (settled)
 
@@ -215,7 +215,7 @@ The [roadmap](roadmap.md) holds the detailed tasks and acceptance criteria; this
 
 ## G. Open questions
 
-Decided: Q1 → D5, Q2 → D6, Q3 → E9, Q4 → E4, Q7 → E8 (re-decided after [audit 2026-11](audits/2026-11.md), finding A-202611-04), Q8 → E9, Q9 → E7 (the repository is public).
+Decided: Q1 → D5, Q2 → D6, Q3 → E9, Q4 → E4, Q7 → E8 (re-decided after [audit 2026-11](audits/2026-11.md), finding A-202611-04), Q8 → E9, Q9 → E7 (public after the roadmap's publication gate).
 
 | No. | Question | Affects |
 | --- | --- | --- |

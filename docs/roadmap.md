@@ -16,6 +16,17 @@ Tasks within a phase may run in parallel unless a dependency is listed.
 
 ---
 
+## Publication gate
+
+The repository stays private until all of these hold; then it becomes public (E7) and branch protection is switched on (P0.4).
+
+- P0 is complete: tests in the repository (P0.2), tooling (P0.3), community basics including milestones and labels (P0.4), dependency scanning (P0.5) and the regression and handover stress tests (P0.6).
+- The React interface reaches parity (P1.4), and the function rail with its section pages is built (P1.5).
+- The 1.0.0 release is rebuilt from the current code under Apache-2.0, and the old MIT draft release is deleted.
+- An engineering audit is run just before publication, and it records no open P0 finding.
+
+---
+
 ## P0 Stabilize (now)
 
 Goal: a clean, tested baseline to build on.
@@ -66,7 +77,7 @@ Acceptance criteria:
 - Present in the repository: `CODE_OF_CONDUCT.md`, `SECURITY.md` (private reporting channel), issue and pull request templates, and `CODEOWNERS`.
 - `CONTRIBUTING.md` explains the change checklist and points to the architecture decisions.
 - The GitHub Project board and milestones P0–P6 exist, with labels as defined in [engineering](engineering.md#issues-and-planning).
-- `main` is protected: Checks, Tests and DCO must pass and a code owner must approve before merging. This needs the repository to be public, which E7 now requires (audit finding A-202611-01).
+- `main` is protected: Checks, Tests and DCO must pass and a code owner must approve before merging. This needs the repository to be public, which follows the publication gate (audit finding A-202611-01).
 
 ### P0.5 Dependency and vulnerability scanning (Backend)
 
