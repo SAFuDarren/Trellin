@@ -52,7 +52,14 @@ Development install:
 
 ```sh
 python -m venv .venv && . .venv/bin/activate
-python -m pip install -e ".[postgres]"
+python -m pip install -e ".[dev,postgres]"
+```
+
+Checks that CI runs on every push (`.github/workflows/tests.yml`):
+
+```sh
+ruff check .
+python -m pytest -m offline
 ```
 
 Build the wheel and run the offline smoke check that CI runs:
