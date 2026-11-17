@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-multiplier.dev/schemas/error.schema.json",
+  "title": "API error body",
+  "$comment": "Stable contract: docs/interfaces.md section 4.",
+  "type": "object",
+  "required": [
+    "error"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "error": {
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "request_id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "details": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-multiplier.dev/schemas/plugin-response.schema.json",
+  "title": "Plugin response v1",
+  "$comment": "Draft v1 until roadmap P2.3: docs/interfaces.md section 6. The kernel recomputes artifact hashes and derives assurance; plugins never set it.",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "request_id",
+    "status",
+    "plugin"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "rejected",
+        "failed"
+      ]
+    },
+    "verdict": {
+      "enum": [
+        "verified",
+        "refuted",
+        "inconclusive"
+      ]
+    },
+    "evidence_kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*\\.\\./).+$",
+            "maxLength": 1024
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "media_type": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 80
+          }
+        }
+      }
+    },
+    "used_basis": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      },
+      "uniqueItems": true
+    },
+    "result": {
+      "type": "object"
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "level",
+          "code"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "level": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        }
+      }
+    },
+    "plugin": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "source_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$",
+          "maxLength": 120
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "evidence_kind",
+          "used_basis"
+        ]
+      }
+    }
+  ]
+}

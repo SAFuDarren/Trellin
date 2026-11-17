@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-multiplier.dev/schemas/event.schema.json",
+  "title": "Event envelope v1",
+  "$comment": "Draft v1 until roadmap P1.3: docs/interfaces.md section 5. Each event type versions its data separately.",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "schema_version",
+    "workspace_id",
+    "occurred_at",
+    "actor",
+    "subject",
+    "data"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "actor": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "user",
+            "agent",
+            "worker",
+            "system"
+          ]
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "data": {
+      "type": "object"
+    }
+  }
+}

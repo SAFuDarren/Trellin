@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-multiplier.dev/schemas/plugin-request.schema.json",
+  "title": "Plugin request v1",
+  "$comment": "Draft v1 until roadmap P2.3: docs/interfaces.md section 6. Hashes over JSON use RFC 8785 (jcs).",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "request_id",
+    "operation",
+    "subject",
+    "inputs"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "operation": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "subject": {
+      "type": "object",
+      "required": [
+        "claim_id"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "statement": {
+          "type": "object"
+        },
+        "statement_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "required": [
+        "artifacts",
+        "basis"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*\\.\\./).+$",
+                "maxLength": 1024
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "media_type": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "role": {
+                "type": "string",
+                "maxLength": 80
+              }
+            }
+          }
+        },
+        "basis": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "version",
+              "sha256",
+              "body"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "body": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "type": "object"
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "memory_mb": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
