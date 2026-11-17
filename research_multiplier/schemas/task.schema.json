@@ -1,0 +1,539 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task",
+  "$defs": {
+    "JobRequest": {
+      "type": "object",
+      "required": [
+        "subject",
+        "kind",
+        "payload",
+        "budget"
+      ],
+      "properties": {
+        "subject": {
+          "type": "object",
+          "required": [
+            "claim_id",
+            "contract_sha256"
+          ],
+          "properties": {
+            "claim_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "contract_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "kind": {
+          "enum": [
+            "small_case",
+            "counterexample",
+            "prove",
+            "audit",
+            "verify"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        },
+        "budget": {
+          "type": "object",
+          "required": [
+            "wall_seconds",
+            "max_attempts"
+          ],
+          "properties": {
+            "wall_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_model_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "priority": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Lease": {
+      "type": "object",
+      "required": [
+        "id",
+        "subject",
+        "kind",
+        "payload",
+        "budget",
+        "generation",
+        "owner",
+        "expires_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "subject": {
+          "type": "object",
+          "required": [
+            "claim_id",
+            "contract_sha256"
+          ],
+          "properties": {
+            "claim_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "contract_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "kind": {
+          "enum": [
+            "small_case",
+            "counterexample",
+            "prove",
+            "audit",
+            "verify"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        },
+        "budget": {
+          "type": "object",
+          "required": [
+            "wall_seconds",
+            "max_attempts"
+          ],
+          "properties": {
+            "wall_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_model_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContextPackage": {
+      "type": "object",
+      "required": [
+        "subject",
+        "contract",
+        "definitions",
+        "dependencies",
+        "budget",
+        "harness_version"
+      ],
+      "properties": {
+        "subject": {
+          "type": "object",
+          "required": [
+            "claim_id",
+            "contract_sha256"
+          ],
+          "properties": {
+            "claim_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "contract_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "contract": {
+          "type": "object",
+          "required": [
+            "uri",
+            "sha256"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "definitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "uri",
+              "sha256"
+            ],
+            "properties": {
+              "uri": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "claim_id",
+              "contract_sha256"
+            ],
+            "properties": {
+              "claim_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+              },
+              "contract_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "budget": {
+          "type": "object",
+          "required": [
+            "wall_seconds",
+            "max_attempts"
+          ],
+          "properties": {
+            "wall_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_model_calls": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "harness_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate": {
+          "type": "object",
+          "required": [
+            "uri",
+            "sha256"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "formalization": {
+          "type": "object",
+          "required": [
+            "uri",
+            "sha256"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "AttemptReturn": {
+      "type": "object",
+      "required": [
+        "job_id",
+        "subject",
+        "generation",
+        "role",
+        "context_sha256",
+        "harness_version",
+        "finding"
+      ],
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "subject": {
+          "type": "object",
+          "required": [
+            "claim_id",
+            "contract_sha256"
+          ],
+          "properties": {
+            "claim_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            "contract_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "role": {
+          "enum": [
+            "small_case",
+            "counterexample",
+            "prove",
+            "audit",
+            "verify"
+          ]
+        },
+        "context_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "harness_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finding": {
+          "enum": [
+            "exact_proof",
+            "conditional_proof",
+            "weaker_result",
+            "special_case",
+            "counterexample",
+            "numeric_observation",
+            "audit_report",
+            "no_result"
+          ]
+        },
+        "artifact": {
+          "type": "object",
+          "required": [
+            "uri",
+            "sha256"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "transcript": {
+          "type": "object",
+          "required": [
+            "uri",
+            "sha256"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "failure_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "$ref": "#/$defs/model_metadata"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "finding": {
+                "const": "no_result"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "failure_reason"
+            ]
+          },
+          "else": {
+            "required": [
+              "artifact"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "finding": {
+                "const": "audit_report"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "role": {
+                "const": "audit"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "model_metadata": {
+      "type": "object",
+      "required": [
+        "provider",
+        "id",
+        "family",
+        "parameters",
+        "prompt_sha256"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "prompt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_usd": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/JobRequest"
+    },
+    {
+      "$ref": "#/$defs/Lease"
+    },
+    {
+      "$ref": "#/$defs/ContextPackage"
+    },
+    {
+      "$ref": "#/$defs/AttemptReturn"
+    }
+  ]
+}

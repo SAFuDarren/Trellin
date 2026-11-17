@@ -1,0 +1,221 @@
+name: Checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      validation_url:
+        description: HTTPS URL of the matching validation tar.gz archive
+        required: true
+        type: string
+      validation_sha256:
+        description: SHA-256 of the matching validation archive
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  package-smoke:
+    name: Installed package smoke check
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ['3.10', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Build and install the wheel
+        shell: bash
+        run: |
+          python -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/rm-dist" .
+          wheels=("$RUNNER_TEMP"/rm-dist/research_multiplier-*.whl)
+          python -m pip install "${wheels[0]}"
+      - name: Exercise offline commands outside the checkout
+        working-directory: ${{ runner.temp }}
+        env:
+          RM_SMOKE_ROOT: ${{ runner.temp }}/rm-smoke-project
+        shell: bash
+        run: |
+          unset PYTHONPATH
+          research-multiplier research init-workspace "$RM_SMOKE_ROOT"
+          research-multiplier --workspace "$RM_SMOKE_ROOT" init "$RM_SMOKE_ROOT/inputs/question.json"
+          python - <<'PYCODE'
+          import json
+          import os
+          from pathlib import Path
+
+          import research_multiplier
+
+          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          if Path(research_multiplier.__file__).resolve().is_relative_to(workspace):
+              raise SystemExit("The smoke check must run against the installed wheel.")
+          question = Path(os.environ["RM_SMOKE_ROOT"]) / "inputs" / "question.json"
+          template = json.loads(question.read_text(encoding="utf-8"))
+          template.update(title="Smoke check", question="What can this run record?", success="A replayable brief")
+          question.write_text(json.dumps(template), encoding="utf-8")
+          PYCODE
+          research-multiplier --workspace "$RM_SMOKE_ROOT" run "$RM_SMOKE_ROOT/inputs/question.json"
+          runs=("$RM_SMOKE_ROOT"/runs/offline/run-*/run.json)
+          research-multiplier replay "${runs[0]}"
+          research-multiplier --workspace "$RM_SMOKE_ROOT" lean prepare
+
+  postgres:
+    name: Required release regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Build and install the wheel
+        run: |
+          python -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/rm-dist" .
+          wheels=("$RUNNER_TEMP"/rm-dist/research_multiplier-*.whl)
+          python -m pip install "${wheels[0]}[postgres]"
+      - name: Fetch and verify the exact external regression bundle
+        working-directory: ${{ runner.temp }}
+        env:
+          RM_VALIDATION_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_url || vars.RM_VALIDATION_URL }}
+          RM_VALIDATION_SHA256: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_sha256 || vars.RM_VALIDATION_SHA256 }}
+        run: |
+          python - <<'PYCODE'
+          from hashlib import file_digest
+          from importlib.metadata import version
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import tarfile
+
+          url = os.environ["RM_VALIDATION_URL"]
+          expected = os.environ["RM_VALIDATION_SHA256"].strip().lower()
+          if not url.startswith("https://") or not re.fullmatch(r"[0-9a-f]{64}", expected):
+              raise SystemExit("Required release regressions need the matching HTTPS validation URL and SHA-256.")
+          archive = Path("rm-validation.tar.gz")
+          subprocess.run(["curl", "--fail", "--location", "--retry", "3",
+                          "--proto", "=https", "--max-filesize", "32000000",
+                          "--output", str(archive), "--", url], check=True)
+          with archive.open("rb") as stream:
+              if file_digest(stream, "sha256").hexdigest() != expected:
+                  raise SystemExit("Validation archive SHA-256 differs from the requested digest.")
+          directory = Path("rm-validation")
+          directory.mkdir()
+          with tarfile.open(archive, "r:gz") as content:
+              content.extractall(directory, filter="data")
+          required = ("PACKAGE_VERSION", "run_regressions.py", "check_cli_compatibility.py", "cli-baseline.json")
+          if not all((directory / name).is_file() for name in required) or not (directory / "tests").is_dir():
+              raise SystemExit("The archive must contain the versioned suite and CLI baseline at its root.")
+          if (directory / "PACKAGE_VERSION").read_text(encoding="ascii").strip() != version("research-multiplier"):
+              raise SystemExit("Select the external validation bundle for the installed candidate version.")
+          PYCODE
+      - name: Check existing commands against the pinned baseline
+        working-directory: ${{ runner.temp }}
+        run: |
+          unset PYTHONPATH
+          candidate=$(python -c 'from importlib.metadata import distribution; print(distribution("research-multiplier").locate_file(""))')
+          python rm-validation/check_cli_compatibility.py rm-validation/cli-baseline.json "$candidate"
+      - name: Install native PostgreSQL 18 and pgvector
+        shell: bash
+        run: |
+          pgdg_key="$RUNNER_TEMP/postgresql-pgdg.asc"
+          curl --fail --location --retry 3 --output "$pgdg_key" \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          primary_fingerprint=$(gpg --batch --show-keys --with-colons "$pgdg_key" |
+            awk -F: '$1 == "pub" { primary = 1; next } $1 == "fpr" && primary { print $10; primary = 0 }')
+          test "$primary_fingerprint" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+          sudo install -m 0644 "$pgdg_key" /usr/share/keyrings/research-multiplier-pgdg.asc
+          sudo tee /etc/apt/sources.list.d/research-multiplier-pgdg.sources >/dev/null <<'APT'
+          Types: deb
+          URIs: https://apt.postgresql.org/pub/repos/apt
+          Suites: noble-pgdg
+          Components: main
+          Signed-By: /usr/share/keyrings/research-multiplier-pgdg.asc
+          APT
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-18 postgresql-18-pgvector
+      - name: Start a disposable PostgreSQL cluster
+        shell: bash
+        run: |
+          pg_bin=/usr/lib/postgresql/18/bin
+          echo "$pg_bin" >> "$GITHUB_PATH"
+          pg_data="$RUNNER_TEMP/rm-postgres-data"
+          pg_socket="$RUNNER_TEMP/rm-postgres-socket"
+          pg_port=55439
+          mkdir -m 0700 "$pg_socket"
+          "$pg_bin/initdb" -D "$pg_data" -U postgres --locale=C --encoding=UTF8 \
+            --auth-local=trust --auth-host=scram-sha-256
+          "$pg_bin/pg_ctl" -D "$pg_data" -l "$RUNNER_TEMP/rm-postgres.log" \
+            -o "-c listen_addresses='' -k '$pg_socket' -p $pg_port" -w start
+          "$pg_bin/createdb" -h "$pg_socket" -p "$pg_port" -U postgres research_multiplier_test
+          "$pg_bin/psql" -h "$pg_socket" -p "$pg_port" -U postgres -d research_multiplier_test \
+            --no-psqlrc --set ON_ERROR_STOP=1 --command 'CREATE EXTENSION vector;' \
+            --command "SELECT version(), extversion FROM pg_extension WHERE extname = 'vector';"
+          echo "RM_TEST_DSN=postgresql:///research_multiplier_test?user=postgres&host=$pg_socket&port=$pg_port" >> "$GITHUB_ENV"
+      - name: Verify installed schema against disposable PostgreSQL
+        working-directory: ${{ runner.temp }}
+        run: |
+          unset PYTHONPATH
+          python - <<'PYCODE'
+          import os
+          from pathlib import Path
+
+          import psycopg
+
+          import research_multiplier
+          from research_multiplier.storage.migrate import migration_head, upgrade
+
+          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          if Path(research_multiplier.__file__).resolve().is_relative_to(workspace):
+              raise SystemExit("Run the schema check against the installed wheel.")
+          dsn = os.environ["RM_TEST_DSN"]
+          for revision in ("0007", "0014", "0020", "0024", "0025", "0029", "0032",
+                           "0034", "0036", "0040", "0066", "head"):
+              upgrade(dsn, revision)
+          with psycopg.connect(dsn) as connection:
+              if connection.execute("SELECT version_num FROM public.rm_alembic_version").fetchone() != (migration_head(),):
+                  raise SystemExit("The disposable database did not reach the installed schema head.")
+          PYCODE
+      - name: Run the external PostgreSQL regression suite
+        working-directory: ${{ runner.temp }}
+        run: |
+          unset PYTHONPATH
+          pg_dump --version
+          pg_restore --version
+          python rm-validation/run_regressions.py postgres
+      - name: Prepare the pinned Lean project
+        working-directory: ${{ runner.temp }}
+        run: |
+          archive="$RUNNER_TEMP/lean-4.19.0-linux.tar.zst"
+          curl --fail --location --retry 3 --output "$archive" \
+            https://github.com/leanprover/lean4/releases/download/v4.19.0/lean-4.19.0-linux.tar.zst
+          tar --zstd -xf "$archive" -C "$RUNNER_TEMP"
+          lean_bin="$RUNNER_TEMP/lean-4.19.0-linux/bin"
+          echo "$lean_bin" >> "$GITHUB_PATH"
+          export PATH="$lean_bin:$PATH"
+          rm_workspace="$RUNNER_TEMP/rm-lean-tests"
+          research-multiplier research init-workspace "$rm_workspace"
+          research-multiplier --workspace "$rm_workspace" lean prepare
+          cd "$rm_workspace/lean-project"
+          lake exe cache get Mathlib.Data.Real.Basic Mathlib.Tactic.Linarith Mathlib.Tactic.NormNum
+      - name: Run required Lean regressions
+        env:
+          RM_TEST_LEAN_PROJECT: ${{ runner.temp }}/rm-lean-tests/lean-project
+        working-directory: ${{ runner.temp }}
+        run: |
+          unset PYTHONPATH
+          python rm-validation/run_regressions.py release-lean --workers 2
+      - name: Stop the PostgreSQL cluster
+        if: always()
+        run: |
+          pg_data="$RUNNER_TEMP/rm-postgres-data"
+          if [[ -f "$pg_data/postmaster.pid" ]]; then
+            /usr/lib/postgresql/18/bin/pg_ctl -D "$pg_data" -m fast -w stop
+          fi

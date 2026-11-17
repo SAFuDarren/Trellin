@@ -1,0 +1,3 @@
+include CHANGELOG.md CONTRIBUTING.md
+recursive-include docs *.md *.json *.sql
+include lean/lakefile.toml lean/lake-manifest.json lean/lean-toolchain

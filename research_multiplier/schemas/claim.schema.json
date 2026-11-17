@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Claim",
+  "$defs": {
+    "ClaimContract": {
+      "type": "object",
+      "required": [
+        "format_version",
+        "claim_id",
+        "kind",
+        "origin",
+        "domain",
+        "title",
+        "statement",
+        "sensitivity",
+        "formal_skeleton",
+        "small_case_spec",
+        "hypotheses",
+        "conclusion",
+        "definition_ids"
+      ],
+      "properties": {
+        "format_version": {
+          "const": 1
+        },
+        "claim_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "kind": {
+          "enum": [
+            "researcher_claim",
+            "working_lemma"
+          ]
+        },
+        "origin": {
+          "enum": [
+            "human",
+            "ai",
+            "program"
+          ]
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sensitivity": {
+          "enum": [
+            "public",
+            "restricted"
+          ]
+        },
+        "formal_skeleton": {
+          "type": "object"
+        },
+        "small_case_spec": {
+          "type": "object"
+        },
+        "hypotheses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "label",
+              "statement",
+              "formal"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "pattern": "^H[1-9][0-9]*$"
+              },
+              "statement": {
+                "type": "string",
+                "minLength": 1
+              },
+              "formal": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "conclusion": {
+          "type": "object",
+          "required": [
+            "statement",
+            "quantifiers",
+            "parameters",
+            "constant_dependencies"
+          ],
+          "properties": {
+            "statement": {
+              "type": "string",
+              "minLength": 1
+            },
+            "quantifiers": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "parameters": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "constant_dependencies": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        "definition_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ClaimContract"
+    }
+  ]
+}

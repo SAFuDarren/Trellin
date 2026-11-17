@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-multiplier"
+version = "1.0.0"
+description = "Turn a research question into a checkable next step."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+postgres = [
+    "alembic>=1.13,<2",
+    "jsonschema>=4.22,<5",
+    "psycopg[binary]>=3.2.10,<4",
+]
+
+[project.scripts]
+research-multiplier = "research_multiplier.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["research_multiplier*"]
+
+[tool.setuptools.package-data]
+research_multiplier = [
+    "lean_support/*.lean",
+    "migrations/*.py",
+    "migrations/versions/*.py",
+    "migrations/sql/*.sql",
+    "schemas/*.json",
+    "_compat/*.py",
+    "proof/_pinned/*.py",
+    "domain_packages/_pinned/*.py",
+    "models/_pinned/*.py",
+    "workflows/_pinned/*.py",
+    "evaluations/_pinned/*.py",
+]
+
+[tool.setuptools.data-files]
+"share/research-multiplier/lean" = ["lean/lean-toolchain", "lean/lakefile.toml", "lean/lake-manifest.json"]
