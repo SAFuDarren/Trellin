@@ -54,6 +54,8 @@ research-multiplier setup "PATH"
 research-multiplier doctor
 ```
 
+想让 Claude Code、Codex 这类 AI 编程助手帮忙，就在项目目录里启动它。`research init-workspace` 和 `setup` 会在项目目录写一份 `AGENTS.md` 指南，外加一个指向它的 `CLAUDE.md`。指南告诉 agent 哪些命令只读、哪些会把材料发给模型，以及所有需要你签字的决定都只能由你来做。你改过的副本不会被覆盖。`research-multiplier agent-guide` 打印当前版本的指南；升级后用 `agent-guide --install` 更新未改动过的副本。
+
 ## 继续自己的研究
 
 需要保存命题、证明依赖和审阅记录时，先配置选定项目的 PostgreSQL 数据库。固定网络的最大流可以直接核验证书，也可以显式启用 Codex 和 Claude Code 做证明和独立审计。[工作区和数据库配置](research-foundation.md#set-up-the-workspace) · [固定网络流程](v0a.md)
@@ -71,6 +73,16 @@ research-multiplier doctor
 可以离线检索 Formalpedia 的公开快照。对选定结果，可用冻结命题和已确认依据重放，并在 Lean 通过后自动入库工作引理。[Formalpedia 检索和重放](literature-search.md#search-formalpedia-locally)
 
 回到一个已有 PostgreSQL 工作区时，可以运行 `research-multiplier research resume` 查看已确认的范围、当前结论、进展和待决定事项。用 [Lean 证明路线](lean-core.md#check-sufficient-conditions-for-the-frozen-goal)登记待证的中间命题。公共模型搜索的[调用额度和历史](lean-search-budget.md)随冻结目标保存。
+
+## 打开本机证明工作台
+
+选好已经绑定 PostgreSQL 的项目目录，运行下面的命令。浏览器会打开该项目的证明图谱，以及和模型的对话。
+
+```sh
+research-multiplier --workspace "PATH" workbench
+```
+
+点定理或假设可查看已记录的 Lean 陈述、实际引用和证明卡点。长陈述可展开。「假设影响」显示撤回已确认版本时哪些记录需要重验。图可以拖动和缩放，各区域之间的边界也可以拖动调整。选中节点后，下方的对话区显示这个节点上模型的进度和反馈。启用数据库版本 `0070` 后，已确认 Lean 陈述的私有课题还可以提交意见，由获授权的本机模型在下一次可用调用时读取。公开课题可选择启用 `0071`，在已批准的公开推进策略下逐条确认发送给 Codex。 [工作台说明](proof-workbench.md)
 
 ## 选用模型
 

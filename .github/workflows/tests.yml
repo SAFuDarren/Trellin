@@ -1,0 +1,37 @@
+name: Tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  offline:
+    name: Lint and offline tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install the package with development tools
+        run: python -m pip install -e ".[dev]"
+      - name: Ruff
+        run: ruff check .
+      - name: Offline tests
+        run: python -m pytest -m offline
+      - name: The wheel ships no tests
+        run: |
+          python -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/rm-wheel" .
+          python - "$RUNNER_TEMP/rm-wheel" <<'PYCODE'
+          import sys, zipfile
+          from pathlib import Path
+          wheel, = Path(sys.argv[1]).glob("research_multiplier-*.whl")
+          leaked = [name for name in zipfile.ZipFile(wheel).namelist() if name.startswith("tests/")]
+          if leaked:
+              raise SystemExit(f"Test files leaked into the wheel: {leaked[:5]}")
+          PYCODE

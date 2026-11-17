@@ -77,6 +77,8 @@ To see what is still missing, run `doctor` from the project folder. It only read
 research-multiplier doctor
 ```
 
+To work with an AI coding agent such as Claude Code or Codex, start it in the project folder. `research init-workspace` and `setup` write an `AGENTS.md` guide there, plus a `CLAUDE.md` that points to it. The guide tells the agent which commands only read, which ones send material to a model, and that every decision you sign stays yours. An edited copy is never overwritten. `research-multiplier agent-guide` prints the current guide, and `agent-guide --install` refreshes an unedited copy after an upgrade.
+
 ## Choose your next workflow
 
 - [Set up an existing or new research database](research-foundation.md#set-up-the-workspace) for persistent research scope, evidence and model budgeting.

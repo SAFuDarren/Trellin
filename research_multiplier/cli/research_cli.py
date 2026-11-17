@@ -263,7 +263,10 @@ def run(args):
                 raise ValueError("A research workspace folder is required.")
             directory = Path(value)
         root = paths.initialize_workspace(directory)
-        result = {"workspace": str(root), "directories": list(paths.WORKSPACE_DIRECTORIES)}
+        from research_multiplier.workflows import agent_guide
+
+        result = {"workspace": str(root), "directories": list(paths.WORKSPACE_DIRECTORIES),
+                  "agent_files": agent_guide.install(root)}
     elif args.research_action == "bind-workspace":
         root = paths.active_workspace()
         if root is None:

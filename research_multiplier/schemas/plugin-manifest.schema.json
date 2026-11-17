@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-multiplier.dev/schemas/plugin-manifest.schema.json",
+  "title": "Plugin manifest (rm-plugin.json) v1",
+  "$comment": "Draft v1 until roadmap P2.3: docs/interfaces.md section 6.",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "name",
+    "version",
+    "kind",
+    "description",
+    "license",
+    "entry",
+    "environment",
+    "capabilities",
+    "permissions",
+    "limits"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$",
+      "maxLength": 120
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "kind": {
+      "enum": [
+        "verifier",
+        "domain",
+        "tool",
+        "source"
+      ]
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "license": {
+      "type": "string",
+      "maxLength": 100,
+      "$comment": "SPDX license expression."
+    },
+    "entry": {
+      "type": "object",
+      "required": [
+        "command"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "uv",
+            "container",
+            "system"
+          ]
+        },
+        "lockfile": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string",
+          "pattern": "@sha256:[0-9a-f]{64}$"
+        },
+        "executables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "uv"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "lockfile"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "container"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "image"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "system"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "executables"
+            ]
+          }
+        }
+      ]
+    },
+    "capabilities": {
+      "type": "object",
+      "required": [
+        "operations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "evidence_kinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*$"
+          }
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_.-]*$"
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "required": [
+        "network",
+        "external_models",
+        "filesystem"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "network": {
+          "type": "boolean"
+        },
+        "external_models": {
+          "type": "boolean"
+        },
+        "filesystem": {
+          "enum": [
+            "workdir",
+            "workdir_and_cache"
+          ]
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "timeout_ms",
+        "memory_mb"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 86400000
+        },
+        "memory_mb": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 262144
+        }
+      }
+    }
+  }
+}

@@ -75,6 +75,11 @@ def command(args, store):
                            fingerprint(identity), store.json(identity), micros(args.maximum_usd),
                            args.max_input_bytes, args.max_output_tokens, args.actor, args.reason)
         return _usd_fields(row)
+    return status(store)
+
+
+def status(store):
+    """Report the signed monthly allowance, this month's reservations and the approved routes."""
     policy = store.query("human", "SELECT * FROM rm.project_model_limits ORDER BY sequence_no DESC LIMIT 1")
     month, = store.query("human", """
         SELECT date_trunc('month', statement_timestamp() AT TIME ZONE 'UTC')::date::text AS period,

@@ -165,7 +165,8 @@ def status(policy_id=None):
 
 def _pass_summary(step):
     keys = ("round", "action", "status", "reason", "feedback", "focus", "lemma_id", "reduction_id",
-            "model_attempt_id", "usage", "method", "route_checkpoint", "request_round")
+            "model_attempt_id", "usage", "method", "route_checkpoint", "request_round",
+            "model_provider", "workbench_focus_node_id", "workbench_reply")
     return {key: step[key][:1000] if isinstance(step[key], str) else step[key] for key in keys if key in step}
 
 
@@ -189,6 +190,8 @@ def _run_lean_policy(item: PendingLeanPass, *, lean, mathlib_project, lean_searc
             from research_multiplier.evaluations import lean_evolution
             strategy, author, route_event = lean_evolution.selection(store, needs_model=bool(rounds))
         options = {"author_config": author} if author is not None else {}
+        if rounds:
+            options["workbench_guidance_enabled"] = True
         route_width = setting.route_parallelism
         if route_width > 1:
             strategy = "ranked"

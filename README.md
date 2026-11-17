@@ -14,6 +14,8 @@ Explore more proof routes and spend more time on the questions you want to pursu
 | Verify your first Lean proof | [First-proof walkthrough](docs/quickstart.md#verify-and-reuse-a-first-lean-proof). Confirm a theorem and its assumptions, verify it, reuse it for a second claim, and withdraw it. Uses Lean 4.19.0 and PostgreSQL with pgvector on macOS or glibc Linux. |
 | Bring an existing proof | [Check a `.lean` file or Lake declaration](docs/lean-core.md#check-a-lean-source-file-or-compiled-declaration) and inspect the assumptions and theorems actually used. |
 
+For an initialized PostgreSQL research project, open the [local proof workbench](docs/proof-workbench.md) to inspect exact Lean statements, dependencies, open proof obligations, and the impact of withdrawing an assumption.
+
 ## Where files go
 
 The software checkout contains the program, generic Lean support, packaging, and documentation. Choose a separate folder for each research project. Run `research-multiplier research init-workspace` to enter your path, or pass the path explicitly. `research-multiplier --workspace PATH research paths` shows where that project's files go.
@@ -32,4 +34,4 @@ The current version supports bounded Lean search and deterministic checks for se
 
 ## License
 
-The program and project documentation are licensed under the [MIT License](LICENSE).
+The program and project documentation are licensed under the [Apache License 2.0](LICENSE); see [NOTICE](NOTICE). Your research data, proofs and results are yours and are not covered by this license. The project name and logo follow the [name and logo policy](TRADEMARKS.md).

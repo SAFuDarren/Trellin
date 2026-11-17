@@ -324,7 +324,12 @@ class Setup:
             self.execute(command, cwd=project)
 
     def run(self):
+        from research_multiplier.workflows import agent_guide
+
         problems = []
+        written = agent_guide.install(self.workspace)
+        self.say("==> Agent guide")
+        self.say(f"  AGENTS.md {written['AGENTS.md']}, CLAUDE.md {written['CLAUDE.md']}.")
         with paths.use_workspace(self.workspace, strict=True):
             credentials.load(self.workspace)
             steps = [lambda: self.postgres_packages() and self.database()]

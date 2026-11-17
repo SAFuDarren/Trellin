@@ -2,12 +2,13 @@
 
 ## Find the code
 
-The root README is the user entry point. Keep new workflow guides in [docs](docs/README.md), update both quickstarts when first-use steps change, and record release changes in [CHANGELOG.md](CHANGELOG.md).
+Read the [architecture direction and design decisions](docs/architecture.md) before adding a feature. New code follows the decisions marked settled there; ask before building on an open question. Build against the [interface contracts](docs/interfaces.md), pick up work from the [roadmap](docs/roadmap.md), sign off every commit (`git commit -s`, Developer Certificate of Origin), and follow the [engineering and project management guide](docs/engineering.md), including its change checklist, for every pull request. The root README is the user entry point. Keep new workflow guides in [docs](docs/README.md), update both quickstarts when first-use steps change, and record release changes in [CHANGELOG.md](CHANGELOG.md). When a command's decisions, model or network use, or the main research path changes, update the [agent guide](research_multiplier/agent_guide.md) that workspaces receive as `AGENTS.md`.
 
 | Area | Where to start |
 | --- | --- |
 | CLI parsing, outputs, and required roles | [`cli/`](research_multiplier/cli/) |
 | Intake, research decisions, scheduling, and proof orchestration | [`workflows/`](research_multiplier/workflows/) |
+| Local browser workbench | [Local transport and assets](research_multiplier/workbench/), [proof graph query](research_multiplier/workflows/proof_graph.py) |
 | Lean proof, scope, and dependency checking | [`proof/`](research_multiplier/proof/), [generic Lean verifier](research_multiplier/lean_support/) |
 | Workspace paths, PostgreSQL access, migrations, and snapshots | [`storage/`](research_multiplier/storage/), [`migrations/`](research_multiplier/migrations/) |
 | Scope, model budgets, and schema contracts | [`policy/`](research_multiplier/policy/), [`schemas/`](research_multiplier/schemas/), [`protocol/`](research_multiplier/protocol/) |

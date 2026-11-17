@@ -116,10 +116,12 @@ class Store:
     def query(self, role, statement, *values):
         return self._call(role, lambda conn: conn.execute(statement, values).fetchall())
 
-    def transaction(self, role, action):
+    def transaction(self, role, action, *, read_only=False):
         """Run an action using this Store's connection for the selected role."""
         def run(connection):
             with connection.transaction():
+                if read_only:
+                    connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
                 return action()
 
         return self._call(role, run)

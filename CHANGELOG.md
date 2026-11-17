@@ -17,3 +17,11 @@ theoretical research.
   from the recorded checkpoint.
 - Follow the separate first-proof walkthrough from installation through
   confirmation, verification, replay, and withdrawal.
+- Open a local proof workbench (`workbench`) to inspect the dependency graph,
+  exact Lean statements, open obligations, the impact of withdrawing an
+  assumption, and live model activity, and to leave guidance for models.
+- `init-workspace` and `setup` write an `AGENTS.md` guide for coding agents into
+  each research workspace.
+- Licensed under the Apache License 2.0. Contributions are accepted under the
+  Developer Certificate of Origin; the project name and logo follow
+  `TRADEMARKS.md`.
