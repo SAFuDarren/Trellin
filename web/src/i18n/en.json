@@ -1,0 +1,24 @@
+{
+  "app": {
+    "name": "Research Multiplier",
+    "preview": "New interface preview",
+    "language": "Language"
+  },
+  "session": {
+    "missing": "Open the workbench with the link printed by research-multiplier workbench."
+  },
+  "claims": {
+    "title": "Claims",
+    "loading": "Loading claims…",
+    "empty": "This project has no claims yet.",
+    "error": "Could not read the project: {{message}}",
+    "untitled": "Untitled claim"
+  },
+  "status": {
+    "open": "In progress",
+    "proved": "Proved",
+    "refuted": "Refuted",
+    "needs_recheck": "Needs recheck",
+    "awaiting_interpretation_review": "Awaiting interpretation review"
+  }
+}

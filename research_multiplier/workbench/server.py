@@ -24,6 +24,11 @@ _ASSETS = {
     "/workbench.css": ("workbench.css", "text/css; charset=utf-8"),
     "/workbench.js": ("workbench.js", "text/javascript; charset=utf-8"),
 }
+# The React interface (roadmap P1.4) is served under /app/ until it replaces the page above.
+_APP_TYPES = {
+    ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".json": "application/json; charset=utf-8",
+}
 _POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; "
            "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 _LOG = logging.getLogger(__name__)
@@ -53,6 +58,24 @@ def _uuid_parameters(query, *fields):
         raise _BadRequest("Supply one valid UUID for each requested reference.") from None
 
 
+def _app_assets():
+    """Map the built React interface to exact request paths; anything not built is simply absent."""
+    app = files("research_multiplier.workbench").joinpath("app")
+    if not app.is_dir():
+        return {}
+    found = {}
+    index = app.joinpath("index.html")
+    if index.is_file():
+        found["/app/"] = (index.read_bytes(), _APP_TYPES[".html"])
+    assets = app.joinpath("assets")
+    if assets.is_dir():
+        for entry in assets.iterdir():
+            suffix = "." + entry.name.rsplit(".", 1)[-1] if "." in entry.name else ""
+            if entry.is_file() and suffix in _APP_TYPES:
+                found[f"/app/assets/{entry.name}"] = (entry.read_bytes(), _APP_TYPES[suffix])
+    return found
+
+
 class WorkbenchServer(ThreadingHTTPServer):
     def __init__(self, workspace, claim_id=None, port=0):
         self.workspace = workspace
@@ -61,6 +84,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         directory = files("research_multiplier.workbench").joinpath("assets")
         self.assets = {path: (directory.joinpath(name).read_bytes(), mime)
                        for path, (name, mime) in _ASSETS.items()}
+        self.assets.update(_app_assets())
         self._doctor = (0.0, None)
         self._doctor_lock = threading.Lock()
         super().__init__(("127.0.0.1", port), _Handler)

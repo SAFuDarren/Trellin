@@ -35,3 +35,31 @@ jobs:
           if leaked:
               raise SystemExit(f"Test files leaked into the wheel: {leaked[:5]}")
           PYCODE
+
+  web:
+    name: Web interface (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Install dependencies from the lock file
+        run: npx --yes pnpm@9.15.4 install --frozen-lockfile
+      - name: Type check, lint and formatting
+        run: |
+          npx --yes pnpm@9.15.4 typecheck
+          npx --yes pnpm@9.15.4 lint
+          npx --yes pnpm@9.15.4 format:check
+      - name: Unit tests
+        run: npx --yes pnpm@9.15.4 test
+      - name: The committed build matches the source
+        run: |
+          npx --yes pnpm@9.15.4 build
+          git -C .. status --porcelain -- research_multiplier/workbench/app
+          test -z "$(git -C .. status --porcelain -- research_multiplier/workbench/app)"

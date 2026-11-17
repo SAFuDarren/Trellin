@@ -110,3 +110,25 @@ def test_writes_need_json_a_session_and_the_local_origin(server):
 def test_malformed_guidance_is_rejected(server):
     response, _ = request(server, "POST", "/api/guidance", body={"text": "hello"})
     assert response.status == 400
+
+
+def test_react_interface_is_served_under_app(server):
+    built = [path for path in server.assets if path.startswith("/app/assets/")]
+    if "/app/" not in server.assets:
+        pytest.skip("The React interface has not been built into the package.")
+    response, content = request(server, "GET", "/app/", session=False)
+    assert response.status == 200
+    assert b'<div id="root"></div>' in content
+    assert "script-src 'self'" in response.getheader("Content-Security-Policy")
+    assert b"<script>" not in content, "inline scripts would be blocked by the content security policy"
+    for path in built:
+        response, _ = request(server, "GET", path, session=False)
+        assert response.status == 200
+        assert response.getheader("Content-Type").startswith(("text/javascript", "text/css", "image/", "font/"))
+
+
+def test_unknown_app_files_are_not_found(server):
+    response, _ = request(server, "GET", "/app/assets/missing.js", session=False)
+    assert response.status == 404
+    response, _ = request(server, "GET", "/app/../server.py", session=False)
+    assert response.status in {400, 404}

@@ -1,0 +1,24 @@
+{
+  "app": {
+    "name": "Research Multiplier",
+    "preview": "新界面预览",
+    "language": "语言"
+  },
+  "session": {
+    "missing": "请用 research-multiplier workbench 打印出的链接打开工作台。"
+  },
+  "claims": {
+    "title": "课题",
+    "loading": "正在读取课题…",
+    "empty": "这个项目还没有课题。",
+    "error": "无法读取项目：{{message}}",
+    "untitled": "未命名课题"
+  },
+  "status": {
+    "open": "进行中",
+    "proved": "已证明",
+    "refuted": "已否证",
+    "needs_recheck": "待重验",
+    "awaiting_interpretation_review": "待确认含义"
+  }
+}
