@@ -39,6 +39,9 @@ research_multiplier = [
     "models/_pinned/*.py",
     "workflows/_pinned/*.py",
     "evaluations/_pinned/*.py",
+    "workbench/assets/*.html",
+    "workbench/assets/*.css",
+    "workbench/assets/*.js",
 ]
 
 [tool.setuptools.data-files]

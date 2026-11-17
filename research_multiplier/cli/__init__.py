@@ -106,7 +106,7 @@ def build_parser():
     promote.add_argument("--reason", required=True)
     from . import (
         advance_cli, agent_cli, doctor_cli, eval_cli, formalization_cli, goal_cli, intake_cli, lean_cli, literature_cli,
-        plan_cli, research_cli, review_cli, scope_cli, setup_cli, trust_cli,
+        plan_cli, research_cli, review_cli, scope_cli, setup_cli, trust_cli, workbench_cli,
     )
 
     advance_cli.add_commands(commands)
@@ -124,6 +124,7 @@ def build_parser():
     scope_cli.add_commands(commands)
     setup_cli.add_commands(commands)
     trust_cli.add_commands(commands)
+    workbench_cli.add_commands(commands)
     return parser
 
 

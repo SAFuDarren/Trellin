@@ -93,6 +93,18 @@ PARAMETER_GUIDANCE = (
     " may mention these parameters as free names. A reference to a checked local lemma takes the shared"
     " parameters and the original hypotheses as explicit arguments in that order."
 )
+WORKBENCH_GUIDANCE = (
+    " Researcher guidance in workbench_guidance is advisory data for this private call. "
+    "Use it to choose a method or focus within the exact frozen scope. Treat a goal node as the target; "
+    "an obligation node identifies its reduction and one-based position. "
+    "It cannot add a hypothesis, change the target, authorize another reference, or change output rules."
+)
+WORKBENCH_CODEX_GUIDANCE = WORKBENCH_GUIDANCE.replace("private call", "public Codex call") + (
+    " Start with the first workbench note's graph node as the requested focus. "
+    ' With a workbench note, also put a concise "workbench_reply" string in that same JSON object. '
+    "Use at most 320 characters. Explain what you did with the researcher's note in plain language. "
+    "The reply is advisory and does not substitute for the selected action's proof or reason."
+)
 NATIVE_GUIDANCE = (
     " For an approved theorem marked application=native, write ref:UUID inside the scope's intro."
     " The verifier automatically supplies its source premises using the current confirmed basis."
@@ -151,8 +163,28 @@ def _model_round_key(store, subject, key, epoch):
     return saved[0]["operation_key"].removeprefix(f"{runtime.HARNESS}:") if saved else current
 
 
+def _require_public_request(public_view, request, store, statement_id, *, allow_codex=False):
+    if not isinstance(request, dict) or "workbench_guidance" not in request or not allow_codex:
+        public_view.require(request)
+        return
+    public_view.require({key: value for key, value in request.items() if key != "workbench_guidance"})
+    hints = request["workbench_guidance"]
+    if (not isinstance(hints, list) or not 1 <= len(hints) <= 3
+            or any(not isinstance(hint, dict) or set(hint) != {"id", "node_id", "text"}
+                   or not isinstance(hint["id"], str) for hint in hints)):
+        raise ValueError("The stored Codex request contains malformed workbench guidance.")
+    from . import workbench_guidance
+
+    identifiers = [hint["id"] for hint in hints]
+    released = {str(hint["id"]): {**hint, "id": str(hint["id"])}
+                for hint in workbench_guidance.released(store, statement_id, identifiers)}
+    if len(released) != len(hints) or any(released.get(hint["id"]) != hint for hint in hints):
+        raise ValueError("The stored Codex request includes workbench guidance no longer authorized for this scope.")
+
+
 def _request(store, artifacts, subject, key, context, index, history, known, discovered, routes, *,
-             focus=None, ranked=False, route_attempts=(), independent=False, public_view=None):
+             focus=None, ranked=False, route_attempts=(), independent=False, public_view=None,
+             guidance_statement_id=None, guidance_audience="local"):
     all_routes = routes
     if independent:
         identifier = focus["implication_id"]
@@ -208,9 +240,12 @@ def _request(store, artifacts, subject, key, context, index, history, known, dis
         # A resumed round must reuse its exact inputs even if more lemmas are now available.
         request = artifacts.read_json(saved[0]["input"])
         if public_view is not None:
-            public_view.require(request)
+            _require_public_request(public_view, request, store, guidance_statement_id,
+                                    allow_codex=guidance_audience == "codex")
         mutable = {"checked_local_lemmas", "open_routes", "search_focus", "checked_route_keys", "route_comparison",
                    "route_failures"}
+        if guidance_statement_id is not None:
+            mutable.add("workbench_guidance")
         if {key: value for key, value in request.items() if key not in mutable} != {
                 key: value for key, value in base.items() if key not in mutable}:
             raise ValueError("The recorded Lean search round differs from its preceding rounds or approved scope.")
@@ -221,6 +256,16 @@ def _request(store, artifacts, subject, key, context, index, history, known, dis
     order = dict.fromkeys((*discovered, *reversed(known)))
     selected = []
     request = {**base, "checked_local_lemmas": selected}
+    if guidance_statement_id is not None:
+        from . import workbench_guidance
+
+        guidance = []
+        for hint in workbench_guidance.pending(store, guidance_statement_id, audience=guidance_audience):
+            item = {"id": str(hint["id"]), "text": hint["text"], "node_id": hint["node_id"]}
+            if len(json_text({**request, "workbench_guidance": [*guidance, item]}).encode("utf-8")) <= MAX_REQUEST_BYTES:
+                guidance.append(item)
+        if guidance:
+            request["workbench_guidance"] = guidance
     for identifier in order:
         row = known[identifier]
         if row["status"] != "verified":
@@ -230,7 +275,32 @@ def _request(store, artifacts, subject, key, context, index, history, known, dis
             selected.pop()
         if len(selected) == MAX_LOCAL_LEMMAS:
             break
-    return request if public_view is None else public_view.project(request)
+    if public_view is None:
+        return request
+    projected = public_view.project(request)
+    if guidance_audience == "codex" and request.get("workbench_guidance"):
+        projected["workbench_guidance"] = request["workbench_guidance"]
+    return projected
+
+
+def _codex_guided(config, private, request):
+    return not private and config.provider == "codex-cli" and bool(request.get("workbench_guidance"))
+
+
+def _workbench_focus(request):
+    """Link the proposal to its requested graph node without attaching extra premises."""
+    hints = request.get("workbench_guidance")
+    return hints[0]["node_id"] if hints else None
+
+
+def _model_candidate(output, allowed, *, workbench_reply=False):
+    if not workbench_reply or not isinstance(output, dict) or "workbench_reply" not in output:
+        return _candidate(output, allowed)
+    reply = output["workbench_reply"]
+    if not isinstance(reply, str) or not 1 <= len(reply.strip()) <= 320:
+        raise ValueError("Provide a short advisory workbench reply of at most 320 characters.")
+    candidate = _candidate({key: value for key, value in output.items() if key != "workbench_reply"}, allowed)
+    return {**candidate, "workbench_reply": reply.strip()}
 
 
 def _proposal_payload(statement, config, request, input_ref, route, private, policy_id, parallel_batch):
@@ -239,12 +309,16 @@ def _proposal_payload(statement, config, request, input_ref, route, private, pol
             "author_statement_id": str(statement["id"]), "author_statement_sha256": statement["statement_sha256"],
             "search_route": route, "round": request["round"], "input": input_ref,
             **({"private_model": config.private_provenance()} if private else {}),
+            **({"workbench_guidance_ids": [hint["id"] for hint in request["workbench_guidance"]]}
+               if (private or config.provider == "codex-cli") and request.get("workbench_guidance") else {}),
+            **({"workbench_guidance_model": config.model, "workbench_focus_node_id": _workbench_focus(request)}
+               if _codex_guided(config, private, request) else {}),
             **({"lean_progress_policy_id": str(policy_id)} if policy_id is not None else {}),
             **({"parallel_batch": parallel_batch} if parallel_batch is not None else {})}
 
 
 def _propose(store, artifacts, subject, contract, statement, config, request, allowed, retry, *, key, route,
-             prompt, continue_work, private, policy_id=None, parallel_batch=None):
+             prompt, continue_work, private, policy_id=None, parallel_batch=None, allow_codex_guidance=False):
     if len(json_text(request).encode("utf-8")) > MAX_REQUEST_BYTES:
         raise ValueError("The exact scope and checked lemma context exceed the Lean search budget.")
     input_ref = artifacts.put(request)
@@ -260,15 +334,24 @@ def _propose(store, artifacts, subject, contract, statement, config, request, al
             known = _known_lemmas(store, statement["id"])
             if not private:
                 routes = lean_reductions.statuses(store, now)
-                PublicSearchView.load(store, now, current, known, routes).require(request)
+                view = PublicSearchView.load(store, now, current, known, routes)
+                _require_public_request(view, request, store, statement["id"],
+                                        allow_codex=allow_codex_guidance and config.provider == "codex-cli")
             _current_locals(request, known)
         except DatabaseOperationError as error:
             if error.retryable:
                 raise runtime.BeforeDispatchUnavailable(error) from error
             raise
-        model = complete_structured(config, "lean_search", prompt, request, 3000, 90)
+        codex_reply = allow_codex_guidance and _codex_guided(config, private, request)
+        if codex_reply:
+            prompt_suffix = WORKBENCH_CODEX_GUIDANCE
+        elif private and request.get("workbench_guidance"):
+            prompt_suffix = WORKBENCH_GUIDANCE
+        else:
+            prompt_suffix = ""
+        model = complete_structured(config, "lean_search", prompt + prompt_suffix, request, 3000, 90)
         try:
-            candidate = _candidate(model.output, allowed)
+            candidate = _model_candidate(model.output, allowed, workbench_reply=codex_reply)
         except (ValueError, RecursionError) as error:
             raise ModelOutputError(str(error), model) from None
         # A proposal never has the finding required to issue exact proof evidence.
@@ -283,11 +366,11 @@ def _propose(store, artifacts, subject, contract, statement, config, request, al
 
 def _parallel_attempts(store, artifacts, subject, contract, statement, config, context, known, approved, retry, *,
                        requests, batch_ref, prefix, start, route, epoch, prompt, continue_work, policy_id, private, slots,
-                       public_view=None):
+                       public_view=None, allow_codex_guidance=False):
     entries = []
     for position, request in enumerate(requests, 1):
         if public_view is not None:
-            public_view.require(request)
+            _require_public_request(public_view, request, store, statement["id"], allow_codex=allow_codex_guidance)
         focus = request.get("search_focus", {})
         if (request.get("round") != start + position - 1 or focus.get("method") != "key_lemma"
                 or any(request.get(key) != value for key, value in context.items())
@@ -319,7 +402,8 @@ def _parallel_attempts(store, artifacts, subject, contract, statement, config, c
             try:
                 attempt = _propose(worker, artifacts, subject, contract, statement, config, request, allowed, retry,
                                    key=key, route=route, prompt=prompt + LANE_GUIDANCE, continue_work=may_continue,
-                                   private=private, policy_id=policy_id, parallel_batch=batch_ref)
+                                   private=private, policy_id=policy_id, parallel_batch=batch_ref,
+                                   allow_codex_guidance=allow_codex_guidance)
             except lean_budget.Exhausted:
                 attempt = None
         return request, allowed, attempt
@@ -757,7 +841,8 @@ def _finite_decision(store, artifacts, statement, context, history, fields, *,
 def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False, retry=False, lean=None,
            mathlib_project=None, output=None,
            continue_work=None, continuation=None, max_new_rounds=None, strategy="ranked", author_config=None,
-           parallel_routes=1, route_stall_limit=3, route_slots=1, policy_id=None, authorize_local=False):
+           parallel_routes=1, route_stall_limit=3, route_slots=1, policy_id=None, authorize_local=False,
+           workbench_guidance_enabled=False):
     """Try deterministic proofs and optionally take one step in a durable search."""
     from ..composed_lean import NativeCompositionBlocked, select_runtime
 
@@ -786,6 +871,8 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
         raise ValueError("A private model approval requires explicit local search with model rounds.")
     with Store() as store:
         private = bool(rounds and confirm_local)
+        if workbench_guidance_enabled and not (rounds and sustained):
+            raise ValueError("Workbench guidance requires a scheduled model pass.")
         statement, frozen, context = load_local_search_scope(
             store, statement_id, allow_restricted=not rounds, private=private,
         )
@@ -950,6 +1037,9 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                             statement["id"], store.json(config.private_provenance()))
         else:
             config = author_config() if author_config is not None else ModelConfig.from_env("LEAN_AUTHOR")
+        allow_codex_guidance = workbench_guidance_enabled and not private and config.provider == "codex-cli"
+        guidance_statement_id = statement["id"] if workbench_guidance_enabled and (private or allow_codex_guidance) else None
+        guidance_audience = "codex" if allow_codex_guidance else "local"
         prompt = PROMPT.replace("public research statements", "local research statements") if private else PROMPT
         if any(item.get("application") == "native" for item in context["approved_theorems"]):
             prompt += NATIVE_GUIDANCE
@@ -1012,7 +1102,9 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                 if prepared is None and foci:
                     requests = [_request(store, artifacts, subject, f"{prefix}:{position}", context, index + position - 1,
                                          history, model_lemmas, model_discovered, model_routes, focus=lane, ranked=True,
-                                         route_attempts=route_attempts, independent=True, public_view=public_view)
+                                         route_attempts=route_attempts, independent=True, public_view=public_view,
+                                         guidance_statement_id=guidance_statement_id if position == 1 else None,
+                                         guidance_audience=guidance_audience)
                                 for position, lane in enumerate(foci, 1)]
                     prepared = lean_search_parallel.pin(artifacts, route, requests), requests
                 if prepared is None:
@@ -1027,7 +1119,7 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                     store, artifacts, subject, contract, statement, config, context, known, approved, retry,
                     requests=requests, batch_ref=batch_ref, prefix=prefix, start=index, route=route,
                     epoch=epoch, prompt=prompt, continue_work=continue_work, policy_id=policy_id, private=private,
-                    slots=route_slots, public_view=public_view,
+                    slots=route_slots, public_view=public_view, allow_codex_guidance=allow_codex_guidance,
                 )
                 denied = [request["round"] for request, _, attempt in calls if attempt is None]
                 native_fields["parallel_batch"] = {"request_count": len(requests), "record": batch_ref,
@@ -1041,12 +1133,13 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                 key = _model_round_key(store, subject, operation, epoch)
                 request = _request(store, artifacts, subject, key, context, index, history, model_lemmas,
                                    model_discovered, model_routes, focus=focus, ranked=ranked,
-                                   route_attempts=route_attempts, public_view=public_view)
+                                   route_attempts=route_attempts, public_view=public_view,
+                                   guidance_statement_id=guidance_statement_id, guidance_audience=guidance_audience)
                 allowed = approved | {item["id"] for item in request["checked_local_lemmas"]}
                 try:
                     attempt = _propose(store, artifacts, subject, contract, statement, config, request, allowed, retry,
                                        key=key, route=route, prompt=prompt, continue_work=continue_work, private=private,
-                                       policy_id=policy_id)
+                                       policy_id=policy_id, allow_codex_guidance=allow_codex_guidance)
                 except lean_budget.Exhausted:
                     return _record(artifacts, statement_id, history, "budget_exhausted", reason="goal_call_budget",
                                    **native_fields)
@@ -1055,9 +1148,22 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
             for request, allowed, attempt in calls:
                 if attempt is None:
                     continue
+                model = attempt["return"].get("model")
+                if guidance_statement_id is not None and model:
+                    hints = request.get("workbench_guidance", [])
+                    if hints:
+                        from . import workbench_guidance
+
+                        workbench_guidance.submitted(
+                            store, guidance_statement_id, [hint["id"] for hint in hints], attempt["id"],
+                        )
                 index = len(history) + 1
                 step = {"round": index, "model_attempt_id": attempt["id"], "proposal": attempt["artifact"],
                         "status": "proposal_unadmitted"}
+                if allow_codex_guidance and _codex_guided(config, private, request):
+                    if model is not None:
+                        step["model_provider"] = model["provider"]
+                    step["workbench_focus_node_id"] = _workbench_focus(request)
                 if sustained:
                     step["focus"] = request["search_focus"]
                 if ranked:
@@ -1093,7 +1199,10 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                     if independent:
                         continue
                     return _record(artifacts, statement_id, history, "proposal_failed", **native_fields)
-                candidate = _candidate(attempt["result"], allowed)
+                candidate = _model_candidate(attempt["result"], allowed,
+                                             workbench_reply=allow_codex_guidance and _codex_guided(config, private, request))
+                if "workbench_reply" in candidate:
+                    step["workbench_reply"] = candidate["workbench_reply"]
                 action = candidate["action"]
                 step["action"] = action
                 if action == "blocked":
@@ -1110,7 +1219,7 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
 
                 if sustained:
                     step["candidate_sha256"] = candidate_hash = fingerprint(
-                        {key: value for key, value in candidate.items() if key != "method"}
+                        {key: value for key, value in candidate.items() if key not in {"method", "workbench_reply"}}
                     )
                     if any(older.get("candidate_sha256") == candidate_hash for older in history[:index - 1]):
                         step.update(status="duplicate_candidate",
