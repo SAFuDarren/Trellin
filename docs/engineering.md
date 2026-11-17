@@ -171,6 +171,10 @@ Rules:
 
 ---
 
+## Engineering audits
+
+At the end of every roadmap phase, run the engineering maturity audit with the project skill in `.claude/skills/engineering-audit/`. It scores 12 dimensions × 4 checks from repository evidence, runs or records six stress tests, and writes a record to [docs/audits](audits/README.md). Findings get permanent IDs. Each one becomes a roadmap task or issue, and the next audit reports its status. Use the trend between audits, not the absolute score, to decide where to invest.
+
 ## Releases
 
 Follow [Prepare a release](release.md). In addition:

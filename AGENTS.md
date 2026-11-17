@@ -33,6 +33,20 @@ Each has a Chinese version (`*.zh-CN.md`). Update both when you change one.
 - User-facing interface strings go into message catalogs, English default and Chinese (E6). This applies after the React migration (P1.4).
 - Follow the [change checklist](docs/engineering.md#change-checklist) and say in the PR why any item does not apply.
 
+## Engineering principles
+
+These come from the [engineering audit](docs/audits/README.md) and apply to every task:
+
+- **Keep the change impact radius small.** Before coding, list the modules you expect to touch. If a feature needs changes across many unrelated modules, stop and propose a design or interface change first.
+- **Evidence before "done".** A task is done only when its acceptance criteria are met and an automated test shows it. Run the tests and report their real output.
+- **Every bug fix adds a regression test** that fails before the fix.
+- **Tasks are independently acceptable.** Split work so that each piece can be reviewed, tested and merged on its own, not by file count.
+- **One implementation per behaviour.** Search for an existing function before writing a new one; extend it instead of duplicating it.
+- **Results stay reproducible.** Research outputs must be reproducible from the recorded code version, parameters, dependencies and data. Never rewrite recorded evidence or pinned verifier sources.
+- **Rules belong in CI.** When a rule keeps being missed, propose a check that enforces it instead of another paragraph of documentation.
+
+To run the periodic maturity audit, use the project skill `.claude/skills/engineering-audit/` ("run an engineering audit"). Agents without skill support can follow its `SKILL.md` directly. Audit findings are tracked in `docs/audits/` and as roadmap tasks.
+
 ## Layout
 
 | Path | Contents |

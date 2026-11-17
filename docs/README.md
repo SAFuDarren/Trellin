@@ -28,6 +28,7 @@
 - [Interface contracts](interfaces.md) · [中文](interfaces.zh-CN.md)
 - [Roadmap and acceptance criteria](roadmap.md) · [中文](roadmap.zh-CN.md)
 - [Engineering and project management](engineering.md) · [中文](engineering.zh-CN.md)
+- [Engineering audits](audits/README.md) · [中文](audits/README.zh-CN.md)
 - [Contributing and external regression suites](../CONTRIBUTING.md)
 - [Lean search trust boundaries](search-contracts.md)
 - [Release preparation](release.md) · [Version history](../CHANGELOG.md)
