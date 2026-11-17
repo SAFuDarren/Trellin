@@ -15,6 +15,6 @@ def add_commands(commands):
 def run(args):
     from research_multiplier.workflows.doctor import FAIL, diagnose, render
 
-    report = diagnose(skip_lean=args.skip_lean)
+    report = diagnose(skip_lean=args.skip_lean, credentials_error=getattr(args, "credentials_error", None))
     print(json.dumps(report, indent=2) if args.json else render(report))
     return 1 if any(check["status"] == FAIL for check in report["checks"]) else 0
