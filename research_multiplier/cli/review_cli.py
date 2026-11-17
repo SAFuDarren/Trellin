@@ -90,24 +90,7 @@ def add_commands(commands):
 def _query(store, args):
     action = args.review_action
     if action == "inbox":
-        if not 1 <= args.limit <= 1000:
-            raise ValueError("Review inbox limit must be between 1 and 1000.")
-        return store.query("human", """
-            WITH open_items AS (
-                SELECT kind, item_id, claim_id, waiting_since, question, detail,
-                       CASE WHEN kind IN ('resolve_clarification', 'decide_condition')
-                           OR (kind = 'review_evidence' AND detail ->> 'kind' = 'counterexample') THEN 1 ELSE 2 END AS priority
-                FROM rm.research_actionable_review_inbox
-                UNION ALL
-                SELECT 'checker_hold', id, NULL::uuid, recorded_at,
-                       'Review the verification change before releasing or retiring this revision.',
-                       jsonb_build_object('checker_revision', checker_revision, 'policy_id', policy_id), 0
-                FROM rm.checker_hold_status WHERE released_at IS NULL
-            )
-            SELECT * FROM open_items
-            WHERE %s::uuid IS NULL OR claim_id = %s
-            ORDER BY priority, waiting_since, kind, item_id LIMIT %s
-        """, args.claim, args.claim, args.limit)
+        return research_review.inbox(store, args.claim, args.limit)
     if action == "policy":
         return store.query("human", "SELECT * FROM rm.record_research_review_policy(%s,%s,%s,%s,%s)",
                            args.max_pending, args.weekly_minutes, args.require_understanding, args.actor, args.reason)[0]

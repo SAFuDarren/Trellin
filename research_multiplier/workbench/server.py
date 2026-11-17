@@ -6,6 +6,8 @@ from importlib.resources import files
 import json
 import logging
 import secrets
+import threading
+import time
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 import webbrowser
@@ -13,7 +15,8 @@ import webbrowser
 from research_multiplier.cli._output import json_default
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
-from research_multiplier.workflows import proof_graph, workbench_activity, workbench_guidance
+from research_multiplier.workflows import (doctor, proof_graph, workbench_activity, workbench_guidance,
+                                          workbench_sections)
 
 
 _ASSETS = {
@@ -25,6 +28,15 @@ _POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; "
            "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 _LOG = logging.getLogger(__name__)
 _MAX_GUIDANCE_BYTES = 16_384
+_DOCTOR_SECONDS = 120
+# Each workspace-wide page takes no parameters.
+_SECTIONS = {
+    "/api/inbox": workbench_sections.inbox,
+    "/api/library": workbench_sections.library,
+    "/api/team": workbench_sections.team,
+    "/api/progress": workbench_sections.progress,
+    "/api/threads": workbench_sections.threads,
+}
 
 
 class _BadRequest(ValueError):
@@ -49,6 +61,8 @@ class WorkbenchServer(ThreadingHTTPServer):
         directory = files("research_multiplier.workbench").joinpath("assets")
         self.assets = {path: (directory.joinpath(name).read_bytes(), mime)
                        for path, (name, mime) in _ASSETS.items()}
+        self._doctor = (0.0, None)
+        self._doctor_lock = threading.Lock()
         super().__init__(("127.0.0.1", port), _Handler)
         self.host = f"127.0.0.1:{self.server_port}"
         self.origin = f"http://{self.host}"
@@ -61,6 +75,20 @@ class WorkbenchServer(ThreadingHTTPServer):
         # Request threads do not inherit the CLI's workspace ContextVar.
         with paths.use_workspace(self.workspace, strict=True), Store() as store:
             return store.transaction("human", lambda: action(store, *values), read_only=True)
+
+    def write(self, action, *values):
+        with paths.use_workspace(self.workspace, strict=True), Store() as store:
+            return store.transaction("human", lambda: action(store, *values))
+
+    def doctor(self, fresh=False):
+        """Run the read-only installation check, reusing a recent report unless a fresh one is requested."""
+        with self._doctor_lock:
+            checked, report = self._doctor
+            if fresh or report is None or time.monotonic() - checked > _DOCTOR_SECONDS:
+                with paths.use_workspace(self.workspace, strict=True):
+                    report = doctor.diagnose()
+                self._doctor = (time.monotonic(), report)
+            return report
 
     def add_guidance(self, claim_id, statement_id, request_id, node_id, text, audience, confirmed):
         with paths.use_workspace(self.workspace, strict=True), Store() as store:
@@ -123,6 +151,14 @@ class _Handler(BaseHTTPRequestHandler):
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
             return self.server.read(proof_graph.atlas)
+        if route.path in _SECTIONS:
+            if route.query:
+                raise _BadRequest("This endpoint does not take parameters.")
+            return self.server.read(_SECTIONS[route.path])
+        if route.path == "/api/doctor":
+            if route.query not in ("", "fresh=1"):
+                raise _BadRequest("Use fresh=1 to repeat the check.")
+            return self.server.doctor(fresh=route.query == "fresh=1")
         if route.path == "/api/graph":
             return self.server.read(proof_graph.snapshot, *_uuid_parameters(route.query, "claim"))
         if route.path == "/api/impact":
@@ -172,7 +208,7 @@ class _Handler(BaseHTTPRequestHandler):
             _LOG.error("Workbench request failed (%s).", type(error).__name__)
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, "Could not load the workbench view.")
 
-    def _guidance_body(self):
+    def _body(self):
         if (self.headers.get_content_type() != "application/json" or self.headers.get_all("Transfer-Encoding")
                 or self.headers.get_all("Content-Encoding")):
             raise _BadRequest("Send a UTF-8 JSON message.")
@@ -181,7 +217,25 @@ class _Handler(BaseHTTPRequestHandler):
             length = int(lengths[0]) if len(lengths) == 1 and lengths[0].isascii() and lengths[0].isdigit() else 0
             if not 0 < length <= _MAX_GUIDANCE_BYTES:
                 raise ValueError
-            body = json.loads(self.rfile.read(length).decode("utf-8"))
+            return json.loads(self.rfile.read(length).decode("utf-8"))
+        except (ValueError, RecursionError):
+            raise _BadRequest("Send one UTF-8 JSON message.") from None
+
+    def _review_body(self):
+        body = self._body()
+        try:
+            if not isinstance(body, dict) or body.keys() != {"evidence_id", "action", "actor", "reason"}:
+                raise ValueError
+            actor, reason = body["actor"].strip(), body["reason"].strip()
+            if body["action"] not in ("approve", "return") or not 0 < len(actor) <= 120 or not 0 < len(reason) <= 2000:
+                raise ValueError
+            return UUID(body["evidence_id"]), body["action"], actor, reason
+        except (ValueError, AttributeError, TypeError):
+            raise _BadRequest("Supply the evidence, approve or return, your name and a reason.") from None
+
+    def _guidance_body(self):
+        body = self._body()
+        try:
             required = {"claim_id", "statement_id", "request_id", "node_id", "text"}
             if not isinstance(body, dict) or not required <= body.keys() <= required | {"audience", "confirm_release"}:
                 raise ValueError
@@ -195,17 +249,19 @@ class _Handler(BaseHTTPRequestHandler):
             if (not self._trusted() or self.headers.get_all("Origin") != [self.server.origin]
                     or not self._authorized()):
                 self._error(HTTPStatus.FORBIDDEN, "Submit guidance from the local workbench session.")
-            elif self.path != "/api/guidance":
-                self._error(HTTPStatus.NOT_FOUND, "Page unavailable.")
-            else:
+            elif self.path == "/api/guidance":
                 self._json(HTTPStatus.OK, self.server.add_guidance(*self._guidance_body()))
+            elif self.path == "/api/review":
+                self._json(HTTPStatus.OK, self.server.write(workbench_sections.review, *self._review_body()))
+            else:
+                self._error(HTTPStatus.NOT_FOUND, "Page unavailable.")
         except _BadRequest as error:
             self._error(HTTPStatus.BAD_REQUEST, str(error))
         except workbench_guidance.GuidanceError as error:
             self._error(HTTPStatus.CONFLICT, str(error))
         except DatabaseOperationError as error:
-            if error.state == "23514":
-                self._error(HTTPStatus.CONFLICT, "课题范围或请求已改变，请刷新后重试。")
+            if error.state == "23514" or (self.path == "/api/review" and not error.retryable):
+                self._error(HTTPStatus.CONFLICT, "记录已改变，请刷新后重试。")
             else:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "Could not send guidance to this project.")
         except (BrokenPipeError, ConnectionResetError, TimeoutError):

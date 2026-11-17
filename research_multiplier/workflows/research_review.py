@@ -21,6 +21,28 @@ ARXIV_ID = re.compile(r"(?:[0-9]{4}[.][0-9]{4,5}|[A-Za-z.-]+/[0-9]{7})v[1-9][0-9
 DOI_ID = re.compile(r"10[.][0-9]{4,9}/[^\s\x00-\x1f\x7f]+")
 
 
+def inbox(store, claim_id=None, limit=50):
+    """List questions and gates waiting for a researcher, most urgent first."""
+    if not 1 <= limit <= 1000:
+        raise ValueError("Review inbox limit must be between 1 and 1000.")
+    return store.query("human", """
+        WITH open_items AS (
+            SELECT kind, item_id, claim_id, waiting_since, question, detail,
+                   CASE WHEN kind IN ('resolve_clarification', 'decide_condition')
+                       OR (kind = 'review_evidence' AND detail ->> 'kind' = 'counterexample') THEN 1 ELSE 2 END AS priority
+            FROM rm.research_actionable_review_inbox
+            UNION ALL
+            SELECT 'checker_hold', id, NULL::uuid, recorded_at,
+                   'Review the verification change before releasing or retiring this revision.',
+                   jsonb_build_object('checker_revision', checker_revision, 'policy_id', policy_id), 0
+            FROM rm.checker_hold_status WHERE released_at IS NULL
+        )
+        SELECT * FROM open_items
+        WHERE %s::uuid IS NULL OR claim_id = %s
+        ORDER BY priority, waiting_since, kind, item_id LIMIT %s
+    """, claim_id, claim_id, limit)
+
+
 def normalize_identifier(value):
     prefix, colon, suffix = value.strip().partition(":")
     if colon and prefix.lower() == "arxiv" and ARXIV_ID.fullmatch(suffix):
