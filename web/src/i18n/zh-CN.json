@@ -1,24 +1,288 @@
 {
   "app": {
     "name": "Research Multiplier",
-    "preview": "新界面预览",
     "language": "语言"
   },
   "session": {
-    "missing": "请用 research-multiplier workbench 打印出的链接打开工作台。"
+    "missing": "请从本机命令启动定理图谱，再用启动时提供的链接打开。"
   },
-  "claims": {
-    "title": "课题",
-    "loading": "正在读取课题…",
-    "empty": "这个项目还没有课题。",
-    "error": "无法读取项目：{{message}}",
-    "untitled": "未命名课题"
+  "sidebar": {
+    "label": "课题",
+    "collapse": "收起侧栏",
+    "expand": "展开侧栏",
+    "search": "搜索课题",
+    "atlas": "全局图",
+    "more": "更多",
+    "resetLayout": "恢复默认布局",
+    "refresh": "刷新项目",
+    "uncategorized": "未分类",
+    "untitled": "未命名课题",
+    "awaitingReview": "{{count}} 待审阅",
+    "blocked": "{{count}} 卡点",
+    "noMatch": "没有匹配的课题。",
+    "noClaims": "这个项目还没有课题。",
+    "connected_one": "已连接 · {{count}} 个课题",
+    "connected_other": "已连接 · {{count}} 个课题",
+    "connecting": "正在连接项目…",
+    "disconnected": "未连接",
+    "readFailed": "读取失败"
+  },
+  "toolbar": {
+    "defaultTitle": "定理图谱",
+    "openReview": "待你审阅",
+    "openReviewCount": "待你审阅 {{count}}"
+  },
+  "notice": {
+    "loadingClaim": "正在读取课题与核验记录…",
+    "noNodes": "这个课题还没有已登记的图谱节点。",
+    "noClaims": "这个项目还没有课题。登记课题和形式化后，刷新即可查看。",
+    "loadingProject": "正在读取项目记录…"
+  },
+  "views": {
+    "label": "图谱视图",
+    "proof": "证明推进",
+    "references": "引用与领域",
+    "impact": "假设影响"
+  },
+  "impact": {
+    "preview": "预览改动",
+    "readOnly": "只读预览，不会改动记录",
+    "loading": "正在读取后端影响范围…",
+    "noPremise": "这个课题暂时没有可预览的已登记假设。",
+    "explain": "撤回这个版本后，用到它的记录会标为待重验。这是只读预览，不会改动记录。",
+    "previewLabel": "待重验预览",
+    "alreadyRecheck": "已待重验",
+    "needsRecheck": "待重验",
+    "waitingReduction": "等待归约重验",
+    "scopeConfirm": "范围需确认",
+    "direct": "直接重验",
+    "indirect": "间接重验",
+    "inRecheck": "已处于待重验",
+    "openSteps": "受影响的未完成步骤",
+    "frozenScope": "需要重新确认的冻结范围",
+    "effect": "影响",
+    "none": "当前没有受影响的登记记录。"
+  },
+  "stage": {
+    "label": "依赖图。拖动可平移；双指捏合或按住 Ctrl 滚动可缩放；加号、减号缩放，0 适合窗口。",
+    "roleDescription": "可缩放画布",
+    "zoom": "缩放",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "zoomReset": "缩放到 100%",
+    "fit": "适合窗口"
+  },
+  "atlas": {
+    "title": "全局位置",
+    "nodes": "{{count}} 个节点",
+    "label": "工作区全部课题的依赖树，虚线圈是当前课题的位置",
+    "move": "拖动移动全局图",
+    "resize": "拖动调整全局图大小",
+    "untitled": "未命名"
+  },
+  "legend": {
+    "label": "图例与当前情况",
+    "running": "运行中",
+    "queued": "排队中",
+    "badImpact": "待重验 / 卡点"
+  },
+  "tone": {
+    "ok": "已核验",
+    "review": "待你审阅",
+    "bad": "卡点 / 待重验",
+    "open": "待证明",
+    "planned": "已计划"
+  },
+  "edge": {
+    "actual": "实际引用",
+    "planned": "计划依赖",
+    "scope": "登记前提",
+    "context": "登记前提"
+  },
+  "kind": {
+    "goal": "原命题",
+    "hypothesis": "假设",
+    "library": "定理库",
+    "local_lemma": "中间引理",
+    "reduction": "归约",
+    "obligation": "证明义务",
+    "evidence": "Lean 核验",
+    "record": "登记记录"
+  },
+  "node": {
+    "obligation": "证明义务 {{n}}",
+    "reduction": "归约 {{n}}",
+    "lemma": "中间引理 {{n}}",
+    "blocked": "卡点",
+    "blockedReason": "卡点：{{reason}}"
   },
   "status": {
     "open": "进行中",
+    "active": "有效",
+    "confirmed": "已确认",
+    "frozen": "已冻结",
+    "approved": "已批准",
+    "verified": "已核验",
     "proved": "已证明",
-    "refuted": "已否证",
     "needs_recheck": "待重验",
+    "pending": "待处理",
+    "blocked": "卡点",
+    "failed": "失败",
+    "rejected": "已拒绝",
+    "withdrawn": "已撤回",
+    "draft": "草稿",
+    "ready": "可核验",
+    "available": "可复用",
+    "returned": "已退回",
+    "refuted": "已反驳",
+    "stale": "已过期",
+    "running": "核验中",
+    "planned": "已计划",
+    "unsolved": "待证明",
+    "proved_goal": "已证明",
+    "awaiting_review": "待你审阅",
+    "awaiting_statement_review": "待陈述审阅",
+    "awaiting_obligations": "待证明义务",
+    "waiting_for_theorems": "待依赖定理",
+    "waiting_for_reduction": "等待归约重验",
+    "lemma_verified": "引理已核验",
+    "route_checked": "归约已核验",
     "awaiting_interpretation_review": "待确认含义"
+  },
+  "review": {
+    "label": "待你审阅与节点详情",
+    "title": "待你审阅",
+    "affected": "受影响的记录",
+    "count_one": "{{count}} 项",
+    "count_other": "{{count}} 项",
+    "close": "收起审阅栏",
+    "empty": "目前没有需要你处理的记录。",
+    "detail": "节点详情"
+  },
+  "detail": {
+    "formula": "公式",
+    "statement": "原文",
+    "lean": "Lean 陈述",
+    "source": "来源",
+    "leanRecord": "Lean 记录",
+    "usedBy": "用于",
+    "full": "完整 Lean 原文",
+    "leanFull": "Lean 原文",
+    "statementFull": "完整原文",
+    "parameters": "已登记的 Lean 参数",
+    "provenance": "核对来源与版本"
+  },
+  "reference": {
+    "claim_id": "课题 ID",
+    "statement_id": "Lean 陈述 ID",
+    "statement_version": "陈述版本",
+    "statement_sha256": "陈述摘要",
+    "basis_version_id": "依据版本 ID",
+    "version": "依据版本",
+    "lemma_id": "引理 ID",
+    "check_id": "Lean 核验 ID",
+    "evidence_id": "证据 ID",
+    "verification_attempt_id": "核验尝试 ID",
+    "implication_id": "归约 ID",
+    "position": "义务序号",
+    "source_claim_id": "来源课题 ID",
+    "module": "Lean 模块",
+    "sha256": "SHA-256"
+  },
+  "chat": {
+    "title": "与模型的对话",
+    "wholeClaim": "整个课题",
+    "allNodes": "全部节点",
+    "collapse": "收起对话",
+    "expand": "展开对话",
+    "feed": "对话记录",
+    "loading": "正在读取运行记录…",
+    "running": "{{count}} 项运行中",
+    "queued": "{{count}} 项排队中",
+    "idle": "当前没有运行中的任务",
+    "waiting": "等待运行记录。",
+    "emptyClaim": "这个课题还没有运行记录或你的意见。",
+    "emptyNode": "这个节点还没有对话。可以点「全部节点」查看整个课题的记录。",
+    "you": "你",
+    "sentTo": "发给 {{audience}}",
+    "submittedCodex": "已随 Codex 请求提交",
+    "submittedLocal": "已随模型请求提交",
+    "waitingCodex": "等待 Codex 调用",
+    "waitingLocal": "等待本地模型调用",
+    "workerRunning": "正在推进证明…",
+    "taskRunning": "正在运行…",
+    "lean": "Lean 核验",
+    "record": "工作记录",
+    "mismatch": "返回的记录与当前课题不一致。",
+    "listSeparator": "、"
+  },
+  "activityKind": {
+    "worker": "证明推进",
+    "model": "模型调用",
+    "lean": "Lean 核验",
+    "task": "任务",
+    "pass": "推进结果",
+    "agent_feedback": "模型反馈",
+    "verifier_feedback": "核验反馈",
+    "guidance": "你的意见"
+  },
+  "activityState": {
+    "queued": "排队中",
+    "running": "运行中",
+    "leased": "已领取",
+    "waiting_retry": "等待重试",
+    "waiting_dependency": "等待依赖",
+    "lease_expired": "租约过期",
+    "succeeded": "已完成",
+    "finished": "已完成",
+    "completed": "已完成",
+    "failed": "失败",
+    "ready": "待处理",
+    "recorded": "已记录",
+    "cancelled": "已取消",
+    "stopped": "已停止",
+    "open": "未解决",
+    "blocked": "遇到卡点",
+    "lemma_verified": "引理已核验",
+    "route_checked": "归约已核验",
+    "awaiting_evidence_review": "待人审",
+    "budget_exhausted": "预算用完",
+    "proof_search_blocked": "路线受阻"
+  },
+  "audience": {
+    "local": "本地模型",
+    "codex": "Codex（外部服务）"
+  },
+  "composer": {
+    "label": "给模型的意见",
+    "placeholder": "回复这个节点上的模型，或者给它们一条研究建议",
+    "audience": "发给谁",
+    "unavailable": "当前不能发送",
+    "scopeCodex": "会在下一次获授权的 Codex 调用中发送到外部服务。",
+    "scopeLocal": "仅供已授权的本地模型在下次调用中读取。",
+    "viewOnly": "这个课题目前只能查看运行记录。",
+    "confirmHint": "这条意见会随公开课题发送给外部服务 Codex。再次点击确认发送。",
+    "confirm": "确认发送",
+    "confirmLabel": "确认发送给 Codex",
+    "send": "发送意见",
+    "sending": "正在发送",
+    "sentCodex": "意见已记录，等待 Codex 调用。",
+    "sentLocal": "意见已记录，等待本地模型调用。"
+  },
+  "model": {
+    "fallback": "模型"
+  },
+  "errors": {
+    "unreadable_response": "本机服务返回了无法读取的响应。",
+    "request_failed": "本机服务未能读取项目。"
+  },
+  "graph": {
+    "label": "当前课题的依赖图",
+    "queued": "{{work}} 排队中"
+  },
+  "splitter": {
+    "side": "拖动调整课题栏宽度",
+    "right": "拖动调整审阅栏宽度",
+    "chat": "拖动调整对话区高度"
   }
 }

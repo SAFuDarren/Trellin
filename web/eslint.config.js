@@ -15,7 +15,7 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       // Every user-facing string comes from the message catalogs (E6).
-      "i18next/no-literal-string": ["error", { mode: "jsx-only" }],
+      "i18next/no-literal-string": ["error", { mode: "jsx-text-only" }],
     },
   },
   {

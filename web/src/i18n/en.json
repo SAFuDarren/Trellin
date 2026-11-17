@@ -1,24 +1,288 @@
 {
   "app": {
     "name": "Research Multiplier",
-    "preview": "New interface preview",
     "language": "Language"
   },
   "session": {
-    "missing": "Open the workbench with the link printed by research-multiplier workbench."
+    "missing": "Start the proof workbench from the local command, then open it with the link it prints."
   },
-  "claims": {
-    "title": "Claims",
-    "loading": "Loading claims…",
-    "empty": "This project has no claims yet.",
-    "error": "Could not read the project: {{message}}",
-    "untitled": "Untitled claim"
+  "sidebar": {
+    "label": "Claims",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "search": "Search claims",
+    "atlas": "Global map",
+    "more": "More",
+    "resetLayout": "Reset layout",
+    "refresh": "Refresh project",
+    "uncategorized": "Uncategorized",
+    "untitled": "Untitled claim",
+    "awaitingReview": "{{count}} awaiting review",
+    "blocked": "{{count}} blocked",
+    "noMatch": "No matching claims.",
+    "noClaims": "This project has no claims yet.",
+    "connected_one": "Connected · {{count}} claim",
+    "connected_other": "Connected · {{count}} claims",
+    "connecting": "Connecting to the project…",
+    "disconnected": "Not connected",
+    "readFailed": "Could not read"
+  },
+  "toolbar": {
+    "defaultTitle": "Proof graph",
+    "openReview": "Awaiting your review",
+    "openReviewCount": "Awaiting your review {{count}}"
+  },
+  "notice": {
+    "loadingClaim": "Reading the claim and its verification records…",
+    "noNodes": "This claim has no recorded graph nodes yet.",
+    "noClaims": "This project has no claims yet. Register and formalize a claim, then refresh.",
+    "loadingProject": "Reading project records…"
+  },
+  "views": {
+    "label": "Graph view",
+    "proof": "Proof progress",
+    "references": "References and domains",
+    "impact": "Assumption impact"
+  },
+  "impact": {
+    "preview": "Preview change",
+    "readOnly": "Read-only preview; records are not changed",
+    "loading": "Reading the impact from the backend…",
+    "noPremise": "This claim has no registered assumption to preview yet.",
+    "explain": "If this version is withdrawn, records that use it are marked for recheck. This is a read-only preview; nothing is changed.",
+    "previewLabel": "Recheck preview",
+    "alreadyRecheck": "Already needs recheck",
+    "needsRecheck": "Needs recheck",
+    "waitingReduction": "Waiting for reduction recheck",
+    "scopeConfirm": "Scope needs confirmation",
+    "direct": "Direct recheck",
+    "indirect": "Indirect recheck",
+    "inRecheck": "Already awaiting recheck",
+    "openSteps": "Unfinished steps affected",
+    "frozenScope": "Frozen scope to reconfirm",
+    "effect": "Impact",
+    "none": "No recorded item is affected right now."
+  },
+  "stage": {
+    "label": "Dependency graph. Drag to pan; pinch or hold Ctrl while scrolling to zoom; plus and minus zoom; 0 fits the window.",
+    "roleDescription": "zoomable canvas",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomReset": "Zoom to 100%",
+    "fit": "Fit to window"
+  },
+  "atlas": {
+    "title": "Global position",
+    "nodes": "{{count}} nodes",
+    "label": "Dependency trees of every claim in the workspace; the dashed circle marks the current claim.",
+    "move": "Drag to move the global map",
+    "resize": "Drag to resize the global map",
+    "untitled": "Untitled"
+  },
+  "legend": {
+    "label": "Legend and current state",
+    "running": "Running",
+    "queued": "Queued",
+    "badImpact": "Needs recheck / blocked"
+  },
+  "tone": {
+    "ok": "Verified",
+    "review": "Awaiting your review",
+    "bad": "Blocked / needs recheck",
+    "open": "To prove",
+    "planned": "Planned"
+  },
+  "edge": {
+    "actual": "Actual reference",
+    "planned": "Planned dependency",
+    "scope": "Registered premise",
+    "context": "Registered premise"
+  },
+  "kind": {
+    "goal": "Original claim",
+    "hypothesis": "Assumption",
+    "library": "Library",
+    "local_lemma": "Intermediate lemma",
+    "reduction": "Reduction",
+    "obligation": "Proof obligation",
+    "evidence": "Lean check",
+    "record": "Recorded item"
+  },
+  "node": {
+    "obligation": "Proof obligation {{n}}",
+    "reduction": "Reduction {{n}}",
+    "lemma": "Intermediate lemma {{n}}",
+    "blocked": "Blocked",
+    "blockedReason": "Blocked: {{reason}}"
   },
   "status": {
     "open": "In progress",
+    "active": "Active",
+    "confirmed": "Confirmed",
+    "frozen": "Frozen",
+    "approved": "Approved",
+    "verified": "Verified",
     "proved": "Proved",
-    "refuted": "Refuted",
     "needs_recheck": "Needs recheck",
+    "pending": "Pending",
+    "blocked": "Blocked",
+    "failed": "Failed",
+    "rejected": "Rejected",
+    "withdrawn": "Withdrawn",
+    "draft": "Draft",
+    "ready": "Ready to check",
+    "available": "Reusable",
+    "returned": "Returned",
+    "refuted": "Refuted",
+    "stale": "Stale",
+    "running": "Checking",
+    "planned": "Planned",
+    "unsolved": "To prove",
+    "proved_goal": "Proved",
+    "awaiting_review": "Awaiting your review",
+    "awaiting_statement_review": "Awaiting statement review",
+    "awaiting_obligations": "Awaiting proof obligations",
+    "waiting_for_theorems": "Waiting for theorems",
+    "waiting_for_reduction": "Waiting for reduction recheck",
+    "lemma_verified": "Lemma verified",
+    "route_checked": "Reduction verified",
     "awaiting_interpretation_review": "Awaiting interpretation review"
+  },
+  "review": {
+    "label": "Awaiting your review and node details",
+    "title": "Awaiting your review",
+    "affected": "Affected records",
+    "count_one": "{{count}} item",
+    "count_other": "{{count}} items",
+    "close": "Collapse review column",
+    "empty": "Nothing needs your attention right now.",
+    "detail": "Node details"
+  },
+  "detail": {
+    "formula": "Formula",
+    "statement": "Original text",
+    "lean": "Lean statement",
+    "source": "Source",
+    "leanRecord": "Lean record",
+    "usedBy": "Used by",
+    "full": "Full Lean text",
+    "leanFull": "Lean text",
+    "statementFull": "Full original text",
+    "parameters": "Registered Lean parameters",
+    "provenance": "Check source and versions"
+  },
+  "reference": {
+    "claim_id": "Claim ID",
+    "statement_id": "Lean statement ID",
+    "statement_version": "Statement version",
+    "statement_sha256": "Statement digest",
+    "basis_version_id": "Basis version ID",
+    "version": "Basis version",
+    "lemma_id": "Lemma ID",
+    "check_id": "Lean check ID",
+    "evidence_id": "Evidence ID",
+    "verification_attempt_id": "Verification attempt ID",
+    "implication_id": "Reduction ID",
+    "position": "Obligation position",
+    "source_claim_id": "Source claim ID",
+    "module": "Lean module",
+    "sha256": "SHA-256"
+  },
+  "chat": {
+    "title": "Conversation with models",
+    "wholeClaim": "Whole claim",
+    "allNodes": "All nodes",
+    "collapse": "Collapse conversation",
+    "expand": "Expand conversation",
+    "feed": "Conversation history",
+    "loading": "Reading run records…",
+    "running": "{{count}} running",
+    "queued": "{{count}} queued",
+    "idle": "Nothing is running",
+    "waiting": "Waiting for run records.",
+    "emptyClaim": "This claim has no run records or notes from you yet.",
+    "emptyNode": "No conversation on this node yet. Choose \"All nodes\" to see the whole claim.",
+    "you": "You",
+    "sentTo": "to {{audience}}",
+    "submittedCodex": "Sent with a Codex request",
+    "submittedLocal": "Sent with a model request",
+    "waitingCodex": "Waiting for a Codex call",
+    "waitingLocal": "Waiting for a local model call",
+    "workerRunning": "Advancing the proof…",
+    "taskRunning": "Running…",
+    "lean": "Lean check",
+    "record": "Work record",
+    "mismatch": "The records returned do not match the current claim.",
+    "listSeparator": ", "
+  },
+  "activityKind": {
+    "worker": "Proof advancement",
+    "model": "Model call",
+    "lean": "Lean check",
+    "task": "Task",
+    "pass": "Advancement result",
+    "agent_feedback": "Model feedback",
+    "verifier_feedback": "Verifier feedback",
+    "guidance": "Your note"
+  },
+  "activityState": {
+    "queued": "Queued",
+    "running": "Running",
+    "leased": "Leased",
+    "waiting_retry": "Waiting to retry",
+    "waiting_dependency": "Waiting for a dependency",
+    "lease_expired": "Lease expired",
+    "succeeded": "Done",
+    "finished": "Done",
+    "completed": "Done",
+    "failed": "Failed",
+    "ready": "Pending",
+    "recorded": "Recorded",
+    "cancelled": "Cancelled",
+    "stopped": "Stopped",
+    "open": "Unresolved",
+    "blocked": "Blocked",
+    "lemma_verified": "Lemma verified",
+    "route_checked": "Reduction verified",
+    "awaiting_evidence_review": "Awaiting review",
+    "budget_exhausted": "Budget used up",
+    "proof_search_blocked": "Route blocked"
+  },
+  "audience": {
+    "local": "Local model",
+    "codex": "Codex (external service)"
+  },
+  "composer": {
+    "label": "Note for the models",
+    "placeholder": "Reply to the models on this node, or give them a research hint",
+    "audience": "Recipient",
+    "unavailable": "Cannot send now",
+    "scopeCodex": "Sent to an external service with the next authorized Codex call.",
+    "scopeLocal": "Read only by authorized local models on their next call.",
+    "viewOnly": "This claim currently only shows run records.",
+    "confirmHint": "This note will be sent with the public claim to the external service Codex. Click again to confirm.",
+    "confirm": "Confirm sending",
+    "confirmLabel": "Confirm sending to Codex",
+    "send": "Send note",
+    "sending": "Sending",
+    "sentCodex": "Note recorded; waiting for a Codex call.",
+    "sentLocal": "Note recorded; waiting for a local model call."
+  },
+  "model": {
+    "fallback": "Model"
+  },
+  "errors": {
+    "unreadable_response": "The local service returned a response that could not be read.",
+    "request_failed": "The local service could not read the project."
+  },
+  "graph": {
+    "label": "Dependency graph of the current claim",
+    "queued": "{{work}} queued"
+  },
+  "splitter": {
+    "side": "Drag to resize the claims column",
+    "right": "Drag to resize the review column",
+    "chat": "Drag to resize the conversation"
   }
 }
