@@ -178,17 +178,17 @@ The interface is English by default with a complete Chinese translation. Every u
 
 ### E7 Open community, tracked on GitHub (settled)
 
-The project is developed as an open community project. Tasks, bugs and milestones live in GitHub Issues and a GitHub Project board, with milestones matching the roadmap phases. Contribution rules are in [engineering](engineering.md#open-community).
+The project is developed in a public repository as an open community project. Tasks, bugs and milestones live in GitHub Issues and a GitHub Project board, with milestones matching the roadmap phases. Contribution rules are in [engineering](engineering.md#open-community).
 
-### E8 Versioning continues from 1.0.0 (settled)
+### E8 Versioning starts at 1.0.0 (settled)
 
-Version 1.0.0 is already public, so semantic versioning continues forward from it; a breaking change raises the major version. The HTTP API, plugin protocol and event payloads carry their own versions, and new interfaces may be marked experimental. See [engineering](engineering.md#versioning-and-compatibility).
+The first public release is 1.0.0, built from the current code under the Apache License 2.0; the earlier private 1.0.0 draft is never published. Semantic versioning continues from it; a breaking change raises the major version. The HTTP API, plugin protocol and event payloads carry their own versions, and new interfaces may be marked experimental. See [engineering](engineering.md#versioning-and-compatibility).
 
 ### E9 License and contributions (settled)
 
 Goal: people and institutions can adopt and contribute without hesitation, while a later product remains possible.
 
-- **Code license: Apache License 2.0** from the next release on. It is as permissive as MIT, adds an explicit patent grant and patent retaliation that companies and universities look for, and matches Lean 4 and Mathlib. Version 1.0.0 and earlier stay available under MIT. `LICENSE` holds the unmodified license text; the copyright notice is in `NOTICE`.
+- **Code license: Apache License 2.0** for every release, starting with 1.0.0. It is as permissive as MIT, adds an explicit patent grant and patent retaliation that companies and universities look for, and matches Lean 4 and Mathlib. `LICENSE` holds the unmodified license text; the copyright notice is in `NOTICE`. Pre-release commits in the history that predate the switch carry an MIT License file; they were never released, and `NOTICE` says so.
 - **Contributions: Developer Certificate of Origin (DCO).** Every commit carries `Signed-off-by` (`git commit -s`); contributions come in under the same Apache-2.0 terms they go out under (inbound = outbound, Apache-2.0 section 5). No separate agreement to sign.
 - **Name and logo:** not covered by the code license (Apache-2.0 section 6). `TRADEMARKS.md` lets anyone describe their work as using or extending Research Multiplier and asks forks and hosted services to use a different name. This protects the brand without restricting the code.
 - **Documentation** follows the code license. **Users' research data, proofs and results** belong to them and are not covered by the software license. **Plugins** may choose their own licenses and declare them in the manifest.
@@ -215,7 +215,7 @@ The [roadmap](roadmap.md) holds the detailed tasks and acceptance criteria; this
 
 ## G. Open questions
 
-Decided: Q1 → D5, Q2 → D6, Q3 → E9, Q4 → E4, Q7 → E8, Q8 → E9.
+Decided: Q1 → D5, Q2 → D6, Q3 → E9, Q4 → E4, Q7 → E8 (re-decided after [audit 2026-11](audits/2026-11.md), finding A-202611-04), Q8 → E9, Q9 → E7 (the repository is public).
 
 | No. | Question | Affects |
 | --- | --- | --- |

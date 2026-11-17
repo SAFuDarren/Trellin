@@ -135,7 +135,7 @@ All tasks, bugs and milestones are tracked in **GitHub Issues** and a **GitHub P
 
 ## Versioning and compatibility
 
-Version 1.0.0 is already released, so semantic versioning continues forward from it. Breaking changes to the package's public behavior raise the major version. Each public interface also carries its own version:
+Version 1.0.0 is the first public release, and semantic versioning continues forward from it. Breaking changes to the package's public behavior raise the major version. Each public interface also carries its own version:
 
 | Interface | Version marker | Rule |
 | --- | --- | --- |

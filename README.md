@@ -34,4 +34,4 @@ The current version supports bounded Lean search and deterministic checks for se
 
 ## License
 
-The program and project documentation are licensed under the [Apache License 2.0](LICENSE); see [NOTICE](NOTICE). Version 1.0.0 and earlier releases remain available under the MIT License. Your research data, proofs and results are yours and are not covered by this license. The project name and logo follow the [name and logo policy](TRADEMARKS.md).
+The program and project documentation are licensed under the [Apache License 2.0](LICENSE); see [NOTICE](NOTICE). Your research data, proofs and results are yours and are not covered by this license. The project name and logo follow the [name and logo policy](TRADEMARKS.md).

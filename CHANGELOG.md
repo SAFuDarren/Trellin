@@ -1,9 +1,5 @@
 # Changes
 
-## Unreleased
-
-- The license changes from MIT to the Apache License 2.0, which adds an explicit patent grant. Version 1.0.0 and earlier remain available under MIT. Contributions are accepted under the Developer Certificate of Origin, and the project name and logo follow `TRADEMARKS.md`.
-
 ## 1.0.0
 
 First public release of Research Multiplier, a local workspace for AI-assisted
@@ -21,3 +17,11 @@ theoretical research.
   from the recorded checkpoint.
 - Follow the separate first-proof walkthrough from installation through
   confirmation, verification, replay, and withdrawal.
+- Open a local proof workbench (`workbench`) to inspect the dependency graph,
+  exact Lean statements, open obligations, the impact of withdrawing an
+  assumption, and live model activity, and to leave guidance for models.
+- `init-workspace` and `setup` write an `AGENTS.md` guide for coding agents into
+  each research workspace.
+- Licensed under the Apache License 2.0. Contributions are accepted under the
+  Developer Certificate of Origin; the project name and logo follow
+  `TRADEMARKS.md`.
