@@ -1,0 +1,28 @@
+name: Feature or task
+description: Propose a feature or pick up a roadmap task.
+labels: ["type:feature"]
+body:
+  - type: input
+    id: roadmap
+    attributes:
+      label: Roadmap task
+      description: For example "P1.3", or "none" for a new proposal.
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: The problem this solves and who it is for.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkable conditions for "done". Copy them from docs/roadmap.md for roadmap tasks.
+    validations:
+      required: true
+  - type: textarea
+    id: decisions
+    attributes:
+      label: Decisions and contracts
+      description: Architecture decisions (for example B4, D1) and interface contracts involved. Mention any open question this depends on; such issues get the needs-decision label.

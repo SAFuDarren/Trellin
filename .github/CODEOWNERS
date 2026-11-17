@@ -1,0 +1,14 @@
+# Reviewers for each area. See docs/engineering.md (Open community).
+# Migrations, security-sensitive code, pinned sources and license files always need the maintainer.
+*                                   @SAFuDarren
+/research_multiplier/migrations/    @SAFuDarren
+/research_multiplier/**/_pinned/    @SAFuDarren
+/research_multiplier/_compat/       @SAFuDarren
+/research_multiplier/workbench/     @SAFuDarren
+/research_multiplier/schemas/       @SAFuDarren
+/docs/architecture*.md              @SAFuDarren
+/docs/interfaces*.md                @SAFuDarren
+/LICENSE                            @SAFuDarren
+/NOTICE                             @SAFuDarren
+/TRADEMARKS*.md                     @SAFuDarren
+/.github/                           @SAFuDarren
