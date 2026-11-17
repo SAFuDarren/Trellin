@@ -6,6 +6,25 @@ Research Multiplier stores confirmed meanings, executable tasks and program-issu
 
 The offline question workflow does not require PostgreSQL. For persistent research evidence or Lean review, select a project and configure its own PostgreSQL database. Install the `postgres` extra in your Python environment.
 
+### Set up in one command
+
+`research-multiplier setup PATH` prepares a project on an existing PostgreSQL 18 server with pgvector. Steps that are already complete are skipped, so you can run it again at any time.
+
+1. Initializes the workspace folder, or uses the selected workspace when you omit `PATH`.
+2. Installs the PostgreSQL Python packages into the current environment.
+3. Connects to the server as a superuser for this run only. It tries libpq defaults (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `~/.pgpass`), then the user `postgres`, then asks for a password in the terminal. Use `--host`, `--port` and `--admin-user`, or a full `RM_ADMIN_DSN`, to choose a server. The administrator password is never saved.
+4. Creates the project database, its non-superuser owner, and one login for each capability group. The database accepts connections only from this project's logins, so projects that share a server cannot reach each other's data. It then installs pgvector and creates the schema.
+5. Saves the five connection strings in `~/.config/research-multiplier/workspaces/WORKSPACE_ID.env` (or under `XDG_CONFIG_HOME`), readable only by you and kept outside the project so backups do not include them. Commands load this file when they select the workspace. `RM_*_DSN` variables already set in the environment take precedence, and the file is then not read.
+6. Binds the workspace to the database.
+7. Copies the pinned Lean project and checks for elan, Lean 4.19.0 and elan's default toolchain. Compiled Mathlib is optional; add `--mathlib` to download it (several GB).
+8. Prints the [`doctor`](quickstart.md#verify-and-reuse-a-first-lean-proof) report.
+
+When software is missing, such as a PostgreSQL server on macOS, pgvector for a Homebrew server, elan, or the Lean toolchain, setup prints the exact commands and runs them only after you confirm. `--yes` accepts these prompts for unattended runs. Without a terminal and without `--yes`, setup lists the skipped commands at the end. An existing schema is never upgraded by setup. `--skip-lean` prepares only the workspace and database.
+
+The project logins have generated passwords. A server whose `pg_hba.conf` trusts local connections ignores those passwords, so any local user can sign in as any login. Use password authentication on servers that other people or untrusted programs can reach.
+
+The steps below configure the same result by hand.
+
 Start with an empty PostgreSQL database with pgvector available. Ask the database administrator to create the database and install the extension there with `CREATE EXTENSION vector;`. Use a dedicated, non-superuser database owner for migrations. The first migration needs permission to create its four capability groups, or a database administrator can create those groups ahead of time. Set `RM_MIGRATION_DSN` to the database owner's `postgresql://` URL.
 
 ```sh

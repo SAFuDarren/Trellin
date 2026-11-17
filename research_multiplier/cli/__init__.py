@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 from research_multiplier import models
-from research_multiplier.storage import paths
+from research_multiplier.storage import credentials, paths
 from research_multiplier.workflows import workflow
 from research_multiplier.workflows.runtime import VerificationQueueError
 
@@ -106,7 +106,7 @@ def build_parser():
     promote.add_argument("--reason", required=True)
     from . import (
         advance_cli, doctor_cli, eval_cli, formalization_cli, goal_cli, intake_cli, lean_cli, literature_cli,
-        plan_cli, research_cli, review_cli, scope_cli, trust_cli,
+        plan_cli, research_cli, review_cli, scope_cli, setup_cli, trust_cli,
     )
 
     advance_cli.add_commands(commands)
@@ -121,6 +121,7 @@ def build_parser():
     research_cli.add_commands(commands)
     review_cli.add_commands(commands)
     scope_cli.add_commands(commands)
+    setup_cli.add_commands(commands)
     trust_cli.add_commands(commands)
     return parser
 
@@ -129,6 +130,13 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     try:
         with paths.use_workspace(args.workspace, strict=args._command.workspace or args.workspace is not None):
+            try:
+                credentials.load(paths.active_workspace())
+            except ValueError as error:
+                # doctor reports a broken workspace or login file instead of stopping.
+                if args.command != "doctor":
+                    raise
+                args.credentials_error = str(error)
             prepare_paths(args)
             preflight(args)
             return args._handler(args)

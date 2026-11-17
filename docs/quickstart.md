@@ -65,6 +65,12 @@ From the same release as your installation, download `research_multiplier-<versi
 
 For this walkthrough, use native Lean 4.19.0 and PostgreSQL 18 with pgvector on macOS or glibc Linux. In a fresh project folder and empty database, follow the walkthrough's instructions to install the PostgreSQL extra and bind the workspace. [Database setup](research-foundation.md#set-up-the-workspace) · [Native Lean setup](lean-core.md)
 
+To prepare a project folder for persistent research and Lean in one step, run `setup` with the folder. It uses your existing PostgreSQL 18 server with pgvector, and installs or downloads anything missing only after you confirm. [What setup does](research-foundation.md#set-up-in-one-command)
+
+```sh
+research-multiplier setup "PATH"
+```
+
 To see what is still missing, run `doctor` from the project folder. It only reads your setup. Each line that needs attention ends with the command or setting that fixes it, and the summary shows whether offline work, persistent research and Lean checks are ready. Add `--json` for scripts and agents.
 
 ```sh

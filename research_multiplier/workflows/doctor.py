@@ -11,7 +11,7 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 
-from research_multiplier.storage import paths
+from research_multiplier.storage import credentials, paths
 
 
 OK, WARN, FAIL, SKIP = "ok", "warn", "fail", "skip"
@@ -46,6 +46,14 @@ def _run(command, *, cwd=None, timeout=20):
     return completed
 
 
+def elan_default(elan):
+    """Return elan's default toolchain, which is active outside any Lean project."""
+    with TemporaryDirectory(prefix="rm-doctor-") as directory:
+        shown = _run([elan, "show"], cwd=directory, timeout=15)
+    return next((line.split()[0] for line in (shown.stdout.splitlines() if shown else ())
+                 if line.rstrip().endswith("(default)")), None)
+
+
 def _major(text):
     match = re.search(r"(\d+)(?:\.\d+)?", text or "")
     return int(match.group(1)) if match else None
@@ -57,6 +65,7 @@ class Doctor:
         self.workspace = None
         self.store = None
         self.server_major = None
+        self.credentials_error = None
 
     def add(self, id, group, title, status, detail="", fix=""):
         self.checks.append(Check(id, group, title, status, detail, fix))
@@ -113,6 +122,28 @@ class Doctor:
         else:
             self.add("postgres-extra", "Database", "PostgreSQL Python packages", OK, "psycopg, alembic, jsonschema")
 
+    def login_file(self):
+        group, title = "Database", "Project login file"
+        if self.credentials_error:
+            self.add("login-file", group, title, FAIL, self.credentials_error)
+            return
+        identifier = paths.workspace_id(self.workspace) if self.workspace is not None else None
+        try:
+            saved = credentials.read(identifier) if identifier is not None else None
+        except ValueError as error:
+            self.add("login-file", group, title, FAIL, str(error))
+            return
+        if saved and all(os.environ.get(key) == value for key, value in saved.items()):
+            self.add("login-file", group, title, OK, f"Loaded from {credentials.location(identifier)}")
+        elif saved and credentials.configured_in_environment():
+            self.add("login-file", group, title, WARN,
+                     "RM_*_DSN settings in the environment override the saved project logins.",
+                     "Unset the RM_*_DSN variables to use this project's saved logins.")
+        elif credentials.configured_in_environment():
+            self.add("login-file", group, title, OK, "Using RM_*_DSN settings from the environment")
+        else:
+            self.add("login-file", group, title, SKIP, "No saved project logins.")
+
     def connections(self):
         group, title = "Database", "Role connections"
         if self.status("postgres-extra") != OK:
@@ -121,8 +152,7 @@ class Doctor:
         missing = [f"RM_{role.upper()}_DSN" for role in ROLES if not os.environ.get(f"RM_{role.upper()}_DSN")]
         if missing:
             self.add("connections", group, title, FAIL, f"Not set: {', '.join(missing)}.",
-                     "Create the four role logins and set their connection strings "
-                     "(docs/research-foundation.md#set-up-the-workspace).")
+                     "research-multiplier setup")
             return
         from research_multiplier.storage.postgres import Store
 
@@ -175,6 +205,8 @@ class Doctor:
         except ValueError as error:
             self.add("schema", group, title, FAIL, str(error))
             return
+        row = {key: value.decode("utf-8", "replace") if isinstance(value, bytes) else value
+               for key, value in row.items()}
         self.server_major = _major(row["server"])
         if row["vector"] is None:
             self.add("schema", group, title, FAIL, f"PostgreSQL {row['server']} without pgvector.",
@@ -302,11 +334,7 @@ class Doctor:
             listing = _run([elan, "toolchain", "list"], timeout=15)
             lines = listing.stdout.splitlines() if listing and listing.returncode == 0 else []
             installed = [line.split()[0] for line in lines if line.strip()]
-            # Outside a Lean project the active toolchain is the default one.
-            with TemporaryDirectory(prefix="rm-doctor-") as directory:
-                shown = _run([elan, "show"], cwd=directory, timeout=15)
-            default = next((line.split()[0] for line in (shown.stdout.splitlines() if shown else ())
-                            if line.rstrip().endswith("(default)")), None)
+            default = elan_default(elan)
             if not any(name in (LEAN_TOOLCHAIN, LEAN_TOOLCHAIN.replace(":", "---").replace("/", "--"))
                        or name.endswith("v4.19.0") for name in installed):
                 self.add("lean-toolchain", group, title, FAIL, "elan is installed but Lean 4.19.0 is not.",
@@ -370,6 +398,7 @@ class Doctor:
             self.python()
             self.workspace_check()
             self.postgres_extra()
+            self.login_file()
             self.connections()
             self.schema()
             self.binding()
@@ -397,8 +426,10 @@ class Doctor:
         return {"capabilities": capabilities, "checks": [asdict(check) for check in self.checks]}
 
 
-def diagnose(*, skip_lean=False):
-    return Doctor().run(skip_lean=skip_lean)
+def diagnose(*, skip_lean=False, credentials_error=None):
+    check = Doctor()
+    check.credentials_error = credentials_error
+    return check.run(skip_lean=skip_lean)
 
 
 _MARKS = {OK: "ok  ", WARN: "warn", FAIL: "FAIL", SKIP: "skip"}

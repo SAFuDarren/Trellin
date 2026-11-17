@@ -42,6 +42,12 @@ research-multiplier run inputs/question.json
 
 在 macOS 或 glibc Linux 上准备本机 Lean 4.19.0 和带 pgvector 的 PostgreSQL 18，选一个空项目目录及空数据库。教程会带你安装 PostgreSQL 支持并绑定工作区。[数据库和项目设置](research-foundation.md#set-up-the-workspace)
 
+想一步准备好持久研究和 Lean，对项目目录运行 `setup`。它使用你本机已有的、带 pgvector 的 PostgreSQL 18 服务器；缺少的软件和大文件下载，都会先问你同意才安装。[setup 做了什么](research-foundation.md#set-up-in-one-command)
+
+```sh
+research-multiplier setup "PATH"
+```
+
 想知道还缺什么，在项目目录里运行自检。它只读取当前环境，不做任何改动。每个需要处理的项目后面都附有修复命令或要设置的变量，最后汇总离线使用、持久研究和 Lean 核验是否已经可用。脚本或 agent 调用时加 `--json`。
 
 ```sh
