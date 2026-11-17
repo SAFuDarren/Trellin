@@ -105,11 +105,12 @@ def build_parser():
     promote.add_argument("evidence_id")
     promote.add_argument("--reason", required=True)
     from . import (
-        advance_cli, eval_cli, formalization_cli, goal_cli, intake_cli, lean_cli, literature_cli,
+        advance_cli, doctor_cli, eval_cli, formalization_cli, goal_cli, intake_cli, lean_cli, literature_cli,
         plan_cli, research_cli, review_cli, scope_cli, trust_cli,
     )
 
     advance_cli.add_commands(commands)
+    doctor_cli.add_commands(commands)
     eval_cli.add_commands(commands)
     formalization_cli.add_commands(commands)
     goal_cli.add_commands(commands)

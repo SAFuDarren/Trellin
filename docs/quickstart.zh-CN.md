@@ -42,6 +42,12 @@ research-multiplier run inputs/question.json
 
 在 macOS 或 glibc Linux 上准备本机 Lean 4.19.0 和带 pgvector 的 PostgreSQL 18，选一个空项目目录及空数据库。教程会带你安装 PostgreSQL 支持并绑定工作区。[数据库和项目设置](research-foundation.md#set-up-the-workspace)
 
+想知道还缺什么，在项目目录里运行自检。它只读取当前环境，不做任何改动。每个需要处理的项目后面都附有修复命令或要设置的变量，最后汇总离线使用、持久研究和 Lean 核验是否已经可用。脚本或 agent 调用时加 `--json`。
+
+```sh
+research-multiplier doctor
+```
+
 ## 继续自己的研究
 
 需要保存命题、证明依赖和审阅记录时，先配置选定项目的 PostgreSQL 数据库。固定网络的最大流可以直接核验证书，也可以显式启用 Codex 和 Claude Code 做证明和独立审计。[工作区和数据库配置](research-foundation.md#set-up-the-workspace) · [固定网络流程](v0a.md)
