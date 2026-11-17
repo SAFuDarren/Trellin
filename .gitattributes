@@ -1,0 +1,2 @@
+# Preserve the audited bytes of files whose digests are pinned across platforms.
+* text=auto eol=lf

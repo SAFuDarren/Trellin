@@ -103,14 +103,14 @@ jobs:
           archive = Path("rm-validation.tar.gz")
           curl = ["curl", "--fail", "--location", "--retry", "3",
                   "--proto", "=https", "--max-filesize", "32000000"]
-          # Only authenticate requests for release assets in this repository.
+          # Read private fixtures from a pinned Git blob in this repository.
           # Curl strips the Authorization header on cross-origin redirects.
           api = os.environ["GITHUB_API_URL"].rstrip("/")
-          assets = f'{api}/repos/{os.environ["GITHUB_REPOSITORY"]}/releases/assets/'
+          blobs = f'{api}/repos/{os.environ["GITHUB_REPOSITORY"]}/git/blobs/'
           headers = None
-          if re.fullmatch(re.escape(assets) + r"[1-9][0-9]*", url):
+          if re.fullmatch(re.escape(blobs) + r"[0-9a-f]{40}", url):
               curl += ["--header", "@-"]
-              headers = f'Authorization: Bearer {os.environ["GH_TOKEN"]}\nAccept: application/octet-stream\n'
+              headers = f'Authorization: Bearer {os.environ["GH_TOKEN"]}\nAccept: application/vnd.github.raw+json\n'
           subprocess.run(curl + ["--output", str(archive), "--", url], input=headers, text=True, check=True)
           with archive.open("rb") as stream:
               if file_digest(stream, "sha256").hexdigest() != expected:
