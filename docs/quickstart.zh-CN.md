@@ -54,6 +54,8 @@ research-multiplier setup "PATH"
 research-multiplier doctor
 ```
 
+想让 Claude Code、Codex 这类 AI 编程助手帮忙，就在项目目录里启动它。`research init-workspace` 和 `setup` 会在项目目录写一份 `AGENTS.md` 指南，外加一个指向它的 `CLAUDE.md`。指南告诉 agent 哪些命令只读、哪些会把材料发给模型，以及所有需要你签字的决定都只能由你来做。你改过的副本不会被覆盖。`research-multiplier agent-guide` 打印当前版本的指南；升级后用 `agent-guide --install` 更新未改动过的副本。
+
 ## 继续自己的研究
 
 需要保存命题、证明依赖和审阅记录时，先配置选定项目的 PostgreSQL 数据库。固定网络的最大流可以直接核验证书，也可以显式启用 Codex 和 Claude Code 做证明和独立审计。[工作区和数据库配置](research-foundation.md#set-up-the-workspace) · [固定网络流程](v0a.md)

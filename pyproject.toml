@@ -27,6 +27,7 @@ include = ["research_multiplier*"]
 
 [tool.setuptools.package-data]
 research_multiplier = [
+    "agent_guide.md",
     "lean_support/*.lean",
     "migrations/*.py",
     "migrations/versions/*.py",

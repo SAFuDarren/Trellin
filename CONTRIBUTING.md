@@ -2,7 +2,7 @@
 
 ## Find the code
 
-The root README is the user entry point. Keep new workflow guides in [docs](docs/README.md), update both quickstarts when first-use steps change, and record release changes in [CHANGELOG.md](CHANGELOG.md).
+The root README is the user entry point. Keep new workflow guides in [docs](docs/README.md), update both quickstarts when first-use steps change, and record release changes in [CHANGELOG.md](CHANGELOG.md). When a command's decisions, model or network use, or the main research path changes, update the [agent guide](research_multiplier/agent_guide.md) that workspaces receive as `AGENTS.md`.
 
 | Area | Where to start |
 | --- | --- |
