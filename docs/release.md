@@ -12,7 +12,7 @@ Use the matching external `first-proof` case. Follow its README from a fresh vir
 
 Attach the matching wheel, source distribution, `research_multiplier-<version>-first-proof.tar.gz`, and `SHA256SUMS` to the same release tag. The first-proof archive starts with `first-proof/README.md`. The versioned validation bundle is a separate artifact used by CI. Verify the asset names and SHA-256 values against the quickstart before publishing.
 
-Check that the wheel and source distribution include the project [MIT License](../LICENSE) and declare it in their package metadata. Include the same license in the standalone validation and first-proof archives before generating `SHA256SUMS`.
+Check that the wheel and source distribution include the project [Apache License 2.0](../LICENSE) and [NOTICE](../NOTICE) and declare `Apache-2.0` in their package metadata. Include the same license and notice in the standalone validation and first-proof archives before generating `SHA256SUMS`.
 
 ## Record the release
 

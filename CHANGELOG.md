@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- The license changes from MIT to the Apache License 2.0, which adds an explicit patent grant. Version 1.0.0 and earlier remain available under MIT. Contributions are accepted under the Developer Certificate of Origin, and the project name and logo follow `TRADEMARKS.md`.
+
 ## 1.0.0
 
 First public release of Research Multiplier, a local workspace for AI-assisted

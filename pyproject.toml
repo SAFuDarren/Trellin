@@ -7,8 +7,8 @@ name = "research-multiplier"
 version = "1.0.0"
 description = "Turn a research question into a checkable next step."
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10"
 dependencies = []
 
