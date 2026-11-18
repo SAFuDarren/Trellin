@@ -252,6 +252,11 @@ export function GraphView(props: Props) {
               const running = nodeWork?.running.size
                 ? workLabel(nodeWork.running, t("chat.listSeparator", { defaultValue: ", " }))
                 : "";
+              // The badge shortens the agent names but always shows how many jobs run.
+              const runningNames = nodeWork?.running.size
+                ? [...nodeWork.running.keys()].join(t("chat.listSeparator", { defaultValue: ", " }))
+                : "";
+              const runningCount = nodeWork ? [...nodeWork.running.values()].reduce((sum, n) => sum + n, 0) : 0;
               const queued =
                 !running && nodeWork?.queued.size
                   ? t("graph.queued", {
@@ -283,17 +288,20 @@ export function GraphView(props: Props) {
                 >
                   <span className="node-head">
                     <Mark tone={nodeTone(node, blocked)} shape={node.kind === "hypothesis" ? "square" : undefined} />
-                    <span className="node-code">{graph.codes.get(id)}</span>
                     <span className="node-title">{title}</span>
                   </span>
                   <span className="node-sub" data-math={String(sub.math)}>
                     {sub.text}
                   </span>
-                  <span className="node-caption">{caption}</span>
+                  <span className="node-caption">
+                    <span className="node-code">{graph.codes.get(id)}</span>
+                    {caption}
+                  </span>
                   {(running || queued) && (
                     <span className="work" data-state={running ? "running" : "queued"}>
                       {running ? <Spin /> : <Clock />}
-                      {running || queued}
+                      <span className="work-text">{running ? runningNames : queued}</span>
+                      {running && runningCount > 1 && <span className="work-count">{"×" + runningCount}</span>}
                     </span>
                   )}
                 </button>

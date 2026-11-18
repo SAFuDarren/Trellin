@@ -36,7 +36,9 @@ test("claims, graph, live work, legend and details load without errors", async (
   await expect(page.locator(".claim")).toHaveCount(5);
   await expect(page.locator(".graph-node")).toHaveCount(7);
   await expect(page.locator(".graph-edge")).toHaveCount(7);
-  await expect(card(page, /^Proof obligation 2$/).locator(".work")).toContainText("GPT-5 Codex ×2");
+  const work = card(page, /^Proof obligation 2$/).locator(".work");
+  await expect(work.locator(".work-text")).toHaveText("GPT-5 Codex");
+  await expect(work.locator(".work-count")).toHaveText("×2");
   await expect(page.locator(".legend")).toContainText("Running");
   // The legend's dividers stay thin lines; a page style once turned them into cards.
   expect((await page.locator(".legend .rule").first().boundingBox())?.width ?? 99).toBeLessThan(4);
