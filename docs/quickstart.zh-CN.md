@@ -66,6 +66,8 @@ research-multiplier doctor
 
 [用已有的本机 Lean 项目验证自己确认过的命题](lean-core.md#check-a-goal-with-your-native-lean-project)。
 
+使用 PostgreSQL URL 和新建的空库[恢复项目存档](research-foundation.md#recover-and-monitor)。若数据库导入后还有步骤失败，保留已导入的库和原存档，另选空库及尚未使用的目录重试。
+
 用 [`lean reuse-theorem`](lean-core.md#replay-a-native-lean-theorem) 在同一工作区的另一课题中重放已采纳的 `.lean` 或 Lake 定理。程序以目标课题已确认的依据证明原定理所需的前提，并列出仍缺的依据。
 
 [直接核验自己的 `.lean` 证明或本机 Lake 项目中已编译的定理](lean-core.md#check-a-lean-source-file-or-compiled-declaration)。核验使用已经确认的命题和依据，全程无需调用模型。

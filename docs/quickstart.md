@@ -84,6 +84,7 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 ## Choose your next workflow
 
 - [Set up an existing or new research database](research-foundation.md#set-up-the-workspace) for persistent research scope, evidence and model budgeting.
+- [Recover a project archive](research-foundation.md#recover-and-monitor) using a PostgreSQL URL and a fresh target database. If a later step fails after import, keep the imported database and the archive, then retry with a fresh database and an unused directory.
 - [Verify a Lean proof in your own project](lean-core.md#check-a-lean-source-file-or-compiled-declaration) and see the confirmed assumptions and facts actually used.
 - [Search Formalpedia offline](literature-search.md#search-formalpedia-locally) without creating a research database. To replay a selected result within a confirmed Lean scope, follow the same guide after enabling its database feature.
 - Run `research-multiplier research resume --format text` to inspect progress and decisions in a configured project. [Resume and advancement](research-progress.md)
