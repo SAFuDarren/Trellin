@@ -107,6 +107,18 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         group.orientation = .vertical
         group.alignment = .centerX
         group.spacing = 18
+        // On entry (the welcome and loading screens), show the Trellin logo: the app icon itself.
+        if key == "welcome" || key == "loading", let icon = NSApp.applicationIconImage {
+            let logo = NSImageView(image: icon)
+            logo.imageScaling = .scaleProportionallyUpOrDown
+            logo.setAccessibilityLabel("Trellin")
+            NSLayoutConstraint.activate([
+                logo.widthAnchor.constraint(equalToConstant: 96),
+                logo.heightAnchor.constraint(equalToConstant: 96),
+            ])
+            group.insertArrangedSubview(logo, at: 0)
+            group.setCustomSpacing(22, after: logo)
+        }
         if let requested {
             let path = NSTextField(labelWithString: requested.path)
             path.textColor = .secondaryLabelColor

@@ -1,14 +1,34 @@
 import AppKit
 
-// Draw the proof branches at a single scale and rasterize for macOS icon sizes.
+// Draw the Trellin mark (brand/BRAND.md) at a single scale and rasterize for macOS icon sizes:
+// a white stepped T on a navy plate. The outline comes from brand/svg/trellin-mark-*.svg, on its
+// 64-unit grid with y pointing down; it is placed at 74% of the plate, like the app icon SVGs.
 let plate = NSBezierPath(roundedRect: NSRect(x: 8, y: 8, width: 112, height: 112), xRadius: 25, yRadius: 25)
-let ink = NSColor(srgbRed: 0.71, green: 0.83, blue: 0.70, alpha: 1)
-let nodes: [NSPoint] = [
-    NSPoint(x: 30, y: 64),
-    NSPoint(x: 62, y: 43),
-    NSPoint(x: 62, y: 85),
-    NSPoint(x: 96, y: 64),
+let navy = NSColor(srgbRed: 0x16 / 255.0, green: 0x23 / 255.0, blue: 0x3F / 255.0, alpha: 1)
+let outline: [(CGFloat, CGFloat)] = [
+    (7.82, 17.68), (7.58, 18.03), (7.51, 18.35), (7.51, 23.61),
+    (7.58, 23.92), (7.75, 24.2), (7.99, 24.41), (8.18, 24.52),
+    (8.6, 24.6), (25, 24.6), (25, 51.9), (25.08, 52.32),
+    (25.32, 52.68), (25.58, 52.87), (25.99, 52.99), (37.9, 53),
+    (38.32, 52.92), (38.68, 52.68), (38.92, 52.32), (39, 51.9),
+    (39, 31.6), (46, 24.6), (55.51, 24.59), (55.82, 24.52),
+    (56.18, 24.28), (56.37, 24.02), (56.49, 23.61), (56.49, 11.99),
+    (56.37, 11.58), (56.18, 11.32), (55.82, 11.08), (55.51, 11.01),
+    (14.85, 11.01), (14.53, 11.08), (14.18, 11.32),
 ]
+
+func markPath() -> NSBezierPath {
+    let path = NSBezierPath()
+    for (index, (x, y)) in outline.enumerated() {
+        // Scale about the grid centre, then map the 64-unit tile onto the 112-point plate (y up).
+        let u = 32 + (x - 32) * 0.74
+        let v = 32 + (y - 32) * 0.74
+        let point = NSPoint(x: 8 + u * 112 / 64, y: 8 + (64 - v) * 112 / 64)
+        if index == 0 { path.move(to: point) } else { path.line(to: point) }
+    }
+    path.close()
+    return path
+}
 
 func drawIcon(pixels: Int) throws -> Data {
     let bitmap = NSBitmapImageRep(
@@ -25,28 +45,10 @@ func drawIcon(pixels: Int) throws -> Data {
     context.clear(bounds)
     context.scaleBy(x: CGFloat(pixels) / 128, y: CGFloat(pixels) / 128)
 
-    NSColor(srgbRed: 0.11, green: 0.16, blue: 0.15, alpha: 1).setFill()
+    navy.setFill()
     plate.fill()
-
-    let branches = NSBezierPath()
-    branches.lineWidth = 4.5
-    branches.lineCapStyle = .round
-    for (start, end) in [(0, 1), (0, 2), (1, 3), (2, 3)] {
-        let a = nodes[start]
-        let b = nodes[end]
-        let mid = (a.x + b.x) / 2
-        branches.move(to: a)
-        branches.curve(to: b, controlPoint1: NSPoint(x: mid, y: a.y), controlPoint2: NSPoint(x: mid, y: b.y))
-    }
-    ink.withAlphaComponent(0.72).setStroke()
-    branches.stroke()
-    for (index, point) in nodes.enumerated() {
-        let radius: CGFloat = index == nodes.count - 1 ? 8 : 6
-        ink.setFill()
-        NSBezierPath(ovalIn: NSRect(
-            x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2
-        )).fill()
-    }
+    NSColor.white.setFill()
+    markPath().fill()
 
     guard let png = bitmap.representation(using: .png, properties: [:]) else {
         throw CocoaError(.fileWriteUnknown)

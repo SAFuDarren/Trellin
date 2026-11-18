@@ -24,7 +24,7 @@ _APP_TYPES = {
     ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
     ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".json": "application/json; charset=utf-8",
 }
-_POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; "
+_POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
            "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 _LOG = logging.getLogger(__name__)
 _MAX_GUIDANCE_BYTES = 16_384

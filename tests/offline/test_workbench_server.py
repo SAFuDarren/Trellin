@@ -45,6 +45,8 @@ def test_page_is_served_with_strict_security_headers(server):
     assert b'<div id="root"></div>' in content
     policy = response.getheader("Content-Security-Policy")
     assert "default-src 'none'" in policy and "script-src 'self'" in policy
+    # Same-origin images only, so the packaged favicon loads and nothing else does.
+    assert "img-src 'self'" in policy and "img-src *" not in policy
     assert response.getheader("Cache-Control") == "no-store"
     assert response.getheader("X-Content-Type-Options") == "nosniff"
     assert response.getheader("X-Frame-Options") == "DENY"

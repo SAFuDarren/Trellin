@@ -8,6 +8,8 @@
   cannot open, and offers another folder from the same window.
 - Open a research folder in Trellin. On first open it sets up a `Trellin`
   subfolder with its own local PostgreSQL database.
+- Trellin uses the Trellin logo for its app icon and on the screen shown while
+  it opens a workspace; the workbench shows it as the browser tab icon.
 
 ## 1.0.0
 
