@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.2
+
+- The Task link pull-request check uses the effective issue claim and rejects
+  blocked or unclaimed work issues.
+
 ## 1.0.1
 
 - Build and open Trellin on Apple Silicon Macs. Pick an existing research
