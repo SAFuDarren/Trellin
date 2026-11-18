@@ -23,15 +23,26 @@ def migration_head():
         return ScriptDirectory.from_config(config).get_current_head()
 
 
+def migration_url(dsn):
+    """Validate the DSN and return the URL used by Alembic."""
+    from sqlalchemy.engine import make_url
+    from sqlalchemy.exc import ArgumentError
+
+    invalid = "Use a postgresql:// or postgresql+psycopg:// migration DSN."
+    try:
+        url = make_url(dsn)
+    except (ArgumentError, ValueError):
+        raise ValueError(invalid) from None
+    if url.drivername not in {"postgresql", "postgresql+psycopg"}:
+        raise ValueError(invalid)
+    return url.set(drivername="postgresql+psycopg")
+
+
 def migration(dsn, command, revision):
     from alembic import command as alembic_command
-    from sqlalchemy.engine import make_url
 
-    url = make_url(dsn)
-    if url.drivername not in {"postgresql", "postgresql+psycopg"}:
-        raise ValueError("Use a postgresql:// or postgresql+psycopg:// migration DSN.")
     with _migration_config() as config:
-        config.attributes["rm_url"] = url.set(drivername="postgresql+psycopg")
+        config.attributes["rm_url"] = migration_url(dsn)
         getattr(alembic_command, command)(config, revision)
 
 
