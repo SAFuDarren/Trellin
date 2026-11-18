@@ -1,19 +1,25 @@
 name: Checks
 on:
   push:
+    branches: [main]
   pull_request:
+  schedule:
+    - cron: '21 18 * * 1'
   workflow_dispatch:
     inputs:
       validation_url:
-        description: HTTPS URL of the matching validation tar.gz archive
-        required: true
+        description: Optional HTTPS URL of a historical matching validation archive
+        required: false
         type: string
       validation_sha256:
-        description: SHA-256 of the matching validation archive
-        required: true
+        description: SHA-256 required when overriding the checked-in validation source
+        required: false
         type: string
 permissions:
   contents: read
+concurrency:
+  group: checks-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   package-smoke:
     name: Installed package smoke check
@@ -68,7 +74,7 @@ jobs:
   postgres:
     name: Required release regressions
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:
@@ -80,12 +86,12 @@ jobs:
         run: |
           python -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/rm-dist" .
           wheels=("$RUNNER_TEMP"/rm-dist/research_multiplier-*.whl)
-          python -m pip install "${wheels[0]}[postgres]"
-      - name: Fetch and verify the exact external regression bundle
+          python -m pip install "${wheels[0]}[dev,postgres]"
+      - name: Select the version-matched compatibility tests
         working-directory: ${{ runner.temp }}
         env:
-          RM_VALIDATION_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_url || vars.RM_VALIDATION_URL }}
-          RM_VALIDATION_SHA256: ${{ github.event_name == 'workflow_dispatch' && inputs.validation_sha256 || vars.RM_VALIDATION_SHA256 }}
+          RM_VALIDATION_URL: ${{ inputs.validation_url }}
+          RM_VALIDATION_SHA256: ${{ inputs.validation_sha256 }}
           GH_TOKEN: ${{ github.token }}
         run: |
           python - <<'PYCODE'
@@ -97,41 +103,44 @@ jobs:
           import subprocess
           import tarfile
 
-          url = os.environ["RM_VALIDATION_URL"]
+          url = os.environ["RM_VALIDATION_URL"].strip()
           expected = os.environ["RM_VALIDATION_SHA256"].strip().lower()
-          if not url.startswith("https://") or not re.fullmatch(r"[0-9a-f]{64}", expected):
-              raise SystemExit("Required release regressions need the matching HTTPS validation URL and SHA-256.")
-          archive = Path("rm-validation.tar.gz")
-          curl = ["curl", "--fail", "--location", "--retry", "3",
-                  "--proto", "=https", "--max-filesize", "32000000"]
-          # Read private fixtures from a pinned Git blob in this repository.
-          # Curl strips the Authorization header on cross-origin redirects.
-          api = os.environ["GITHUB_API_URL"].rstrip("/")
-          blobs = f'{api}/repos/{os.environ["GITHUB_REPOSITORY"]}/git/blobs/'
-          headers = None
-          if re.fullmatch(re.escape(blobs) + r"[0-9a-f]{40}", url):
-              curl += ["--header", "@-"]
-              headers = f'Authorization: Bearer {os.environ["GH_TOKEN"]}\nAccept: application/vnd.github.raw+json\n'
-          subprocess.run(curl + ["--output", str(archive), "--", url], input=headers, text=True, check=True)
-          with archive.open("rb") as stream:
-              if file_digest(stream, "sha256").hexdigest() != expected:
-                  raise SystemExit("Validation archive SHA-256 differs from the requested digest.")
-          directory = Path("rm-validation")
-          directory.mkdir()
-          with tarfile.open(archive, "r:gz") as content:
-              content.extractall(directory, filter="data")
+          directory = Path(os.environ["GITHUB_WORKSPACE"]) / "tests" / "compat_validation"
+          if url or expected:
+              if not url.startswith("https://") or not re.fullmatch(r"[0-9a-f]{64}", expected):
+                  raise SystemExit("An archive override needs both a matching HTTPS URL and SHA-256.")
+              archive = Path("rm-validation.tar.gz")
+              curl = ["curl", "--fail", "--location", "--retry", "3", "--max-time", "120",
+                      "--proto", "=https", "--max-filesize", "32000000"]
+              # Authenticate only to the same repository's pinned Git blob.
+              api = os.environ["GITHUB_API_URL"].rstrip("/")
+              blobs = f'{api}/repos/{os.environ["GITHUB_REPOSITORY"]}/git/blobs/'
+              headers = None
+              if re.fullmatch(re.escape(blobs) + r"[0-9a-f]{40}", url):
+                  curl += ["--header", "@-"]
+                  headers = f'Authorization: Bearer {os.environ["GH_TOKEN"]}\nAccept: application/vnd.github.raw+json\n'
+              subprocess.run(curl + ["--output", str(archive), "--", url], input=headers, text=True, check=True)
+              with archive.open("rb") as stream:
+                  if file_digest(stream, "sha256").hexdigest() != expected:
+                      raise SystemExit("Validation archive SHA-256 differs from the requested digest.")
+              directory = Path("rm-validation").resolve()
+              directory.mkdir()
+              with tarfile.open(archive, "r:gz") as content:
+                  content.extractall(directory, filter="data")
           required = ("PACKAGE_VERSION", "run_regressions.py", "check_cli_compatibility.py", "cli-baseline.json")
           if not all((directory / name).is_file() for name in required) or not (directory / "tests").is_dir():
-              raise SystemExit("The archive must contain the versioned suite and CLI baseline at its root.")
+              raise SystemExit("The selected suite must contain its version, runner and CLI baseline.")
           if (directory / "PACKAGE_VERSION").read_text(encoding="ascii").strip() != version("research-multiplier"):
-              raise SystemExit("Select the external validation bundle for the installed candidate version.")
+              raise SystemExit("Select the validation source for the installed candidate version.")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as env:
+              env.write(f"RM_VALIDATION_DIR={directory.resolve()}\n")
           PYCODE
       - name: Check existing commands against the pinned baseline
         working-directory: ${{ runner.temp }}
         run: |
           unset PYTHONPATH
           candidate=$(python -c 'from importlib.metadata import distribution; print(distribution("research-multiplier").locate_file(""))')
-          python rm-validation/check_cli_compatibility.py rm-validation/cli-baseline.json "$candidate"
+          python "$RM_VALIDATION_DIR/check_cli_compatibility.py" "$RM_VALIDATION_DIR/cli-baseline.json" "$candidate"
       - name: Install native PostgreSQL 18 and pgvector
         shell: bash
         run: |
@@ -193,13 +202,20 @@ jobs:
               if connection.execute("SELECT version_num FROM public.rm_alembic_version").fetchone() != (migration_head(),):
                   raise SystemExit("The disposable database did not reach the installed schema head.")
           PYCODE
-      - name: Run the external PostgreSQL regression suite
+      - name: Run the in-repository PostgreSQL tests
+        timeout-minutes: 8
+        working-directory: ${{ runner.temp }}
+        run: |
+          unset PYTHONPATH
+          python -m pytest --import-mode=importlib -p no:cacheprovider -m postgres "$GITHUB_WORKSPACE/tests"
+      - name: Run the compatibility PostgreSQL suite
+        timeout-minutes: 15
         working-directory: ${{ runner.temp }}
         run: |
           unset PYTHONPATH
           pg_dump --version
           pg_restore --version
-          python rm-validation/run_regressions.py postgres
+          python "$RM_VALIDATION_DIR/run_regressions.py" postgres
       - name: Prepare the pinned Lean project
         working-directory: ${{ runner.temp }}
         run: |
@@ -218,13 +234,20 @@ jobs:
           mv "$rm_workspace/lean-project" "$rm_lean_fixture"
           cd "$rm_lean_fixture"
           lake exe cache get Mathlib.Data.Real.Basic Mathlib.Tactic.Linarith Mathlib.Tactic.NormNum
+      - name: Run the in-repository Lean tests
+        timeout-minutes: 8
+        working-directory: ${{ runner.temp }}
+        run: |
+          unset PYTHONPATH
+          python -m pytest --import-mode=importlib -p no:cacheprovider -m lean "$GITHUB_WORKSPACE/tests"
       - name: Run required Lean regressions
+        timeout-minutes: 22
         env:
           RM_TEST_LEAN_PROJECT: ${{ runner.temp }}/rm-lean-fixture
         working-directory: ${{ runner.temp }}
         run: |
           unset PYTHONPATH
-          python rm-validation/run_regressions.py release-lean --workers 2
+          python "$RM_VALIDATION_DIR/run_regressions.py" release-lean --workers 2
       - name: Stop the PostgreSQL cluster
         if: always()
         run: |
