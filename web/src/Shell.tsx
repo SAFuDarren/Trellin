@@ -49,7 +49,7 @@ export function Shell({ session }: { session: string }) {
       ) : section === "help" ? (
         <HelpPage />
       ) : (
-        <Workbench session={session} focus={focus} />
+        <Workbench session={session} focus={focus} onFocusHandled={setFocus} />
       )}
     </div>
   );

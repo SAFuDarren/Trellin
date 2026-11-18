@@ -1,5 +1,10 @@
 # Changes
 
+## Unreleased
+
+- Build and open Trellin on Apple Silicon Macs. Pick an existing research
+  workspace and return to its last graph node when reopening the app.
+
 ## 1.0.0
 
 First public release of Research Multiplier, a local workspace for AI-assisted

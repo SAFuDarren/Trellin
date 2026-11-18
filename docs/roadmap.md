@@ -340,6 +340,7 @@ Goal: release readiness beyond self-hosting.
 Acceptance criteria:
 
 - A desktop app bundles the Python runtime and the built interface, and registers the local machine as a runtime.
+  The [Trellin macOS daily-use build](desktop.md) tracks local Launchpad, workspace selection and graph resume in [#44](https://github.com/SAFuDarren/research-multiplier/issues/44).
 - Readiness for a hosted service: any paid extensions are separated from the Apache-2.0 core (E9); metering and multi-organization limits work; the security review is completed.
 - A documentation site is published in English and Chinese.
 - Releases are automated, with signed artifacts and published SHA-256 sums.

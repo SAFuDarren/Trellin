@@ -29,6 +29,7 @@ _POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; "
 _LOG = logging.getLogger(__name__)
 _MAX_GUIDANCE_BYTES = 16_384
 _DOCTOR_SECONDS = 120
+_SCHEMA_SQLSTATES = {"42883", "42P01", "42703"}
 # Each workspace-wide page takes no parameters.
 _SECTIONS = {
     "/api/inbox": workbench_sections.inbox,
@@ -40,6 +41,14 @@ _SECTIONS = {
 
 
 class _BadRequest(ValueError):
+    pass
+
+
+class _MissingAssets(ValueError):
+    pass
+
+
+class _MissingSchema(ValueError):
     pass
 
 
@@ -78,7 +87,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self.session = secrets.token_urlsafe(32)
         self.assets = _app_assets()
         if "/" not in self.assets:
-            raise ValueError("The workbench interface is missing from this installation. Reinstall the package.")
+            raise _MissingAssets("The workbench interface is missing from this installation. Reinstall the package.")
         self._doctor = (0.0, None)
         self._doctor_lock = threading.Lock()
         super().__init__(("127.0.0.1", port), _Handler)
@@ -214,7 +223,7 @@ class _Handler(BaseHTTPRequestHandler):
         except _BadRequest as error:
             self._error(HTTPStatus.BAD_REQUEST, str(error))
         except DatabaseOperationError as error:
-            if error.state in {"42883", "42P01", "42703"}:
+            if error.state in _SCHEMA_SQLSTATES:
                 self._error(HTTPStatus.CONFLICT, "This project database needs the workbench schema. See the workbench guide.")
             else:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "Could not read the selected research database.")
@@ -294,7 +303,7 @@ def _check_schema(store):
         SELECT to_regprocedure('rm.proof_graph_basis_impact(uuid,uuid)') IS NOT NULL AS installed
     """)[0]["installed"]
     if not installed:
-        raise ValueError("The workbench requires database revision 0069. See docs/proof-workbench.md.")
+        raise _MissingSchema("The workbench requires database revision 0069. See docs/proof-workbench.md.")
 
 
 def serve(workspace, *, claim_id=None, port=0, open_browser=True):
