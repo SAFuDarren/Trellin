@@ -26,6 +26,7 @@ theoretical research.
   translation, chosen in Settings.
 - `init-workspace` and `setup` write an `AGENTS.md` guide for coding agents into
   each research workspace.
+- Setup can initialize a local PostgreSQL project through a Unix socket.
 - Licensed under the Apache License 2.0. Contributions are accepted under the
   Developer Certificate of Origin; the project name and logo follow
   `TRADEMARKS.md`.
