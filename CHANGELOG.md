@@ -1,5 +1,18 @@
 # Changes
 
+## 1.0.1
+
+- Build and open Trellin on Apple Silicon Macs. Pick an existing research
+  workspace and return to its last graph node when reopening the app.
+- Trellin identifies the workspace and missing setup when a saved project
+  cannot open, and offers another folder from the same window.
+- Open a research folder in Trellin. On first open it sets up a `Trellin`
+  subfolder with its own local PostgreSQL database.
+- Trellin uses the Trellin logo for its app icon and on the screen shown while
+  it opens a workspace; the workbench shows it as the browser tab icon.
+- Organize selected project notes with an on-device model before the first
+  claim, and enter a known Lean theorem or a target to prove by hand.
+
 ## 1.0.0
 
 First public release of Research Multiplier, a local workspace for AI-assisted

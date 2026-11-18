@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 APP = Path(__file__).resolve().parents[2] / "research_multiplier" / "workbench" / "app"
-TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css"}
+TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png"}
 CLAIM = "11111111-1111-4111-8111-111111111111"
 STATEMENT = "22222222-2222-4222-8222-222222222222"
 H1 = "33333333-3333-4333-8333-333333333333"
@@ -195,7 +195,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", kind)
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Security-Policy",
-                         "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'")
+                         "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'")
         self.end_headers()
         self.wfile.write(body)
 

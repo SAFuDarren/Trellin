@@ -1,4 +1,4 @@
-# Research Multiplier 1.0.0 regression suite
+# Research Multiplier compatibility regression suite
 
 This bundle contains software regression code for the exact version in `PACKAGE_VERSION`. Keep it outside both the program checkout and real research workspaces. Temporary test projects and database data use separate disposable locations. Public case materials, historical runs and release evidence have their own external locations.
 

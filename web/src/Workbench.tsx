@@ -5,9 +5,11 @@ import type { TFunction } from "i18next";
 import { api, type ClaimsResponse } from "./api/client";
 import { ChatPanel } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
+import { ProjectActions } from "./components/project/ProjectActions";
 import { queueEntries, ReviewPanel } from "./components/ReviewPanel";
 import { Sidebar } from "./components/Sidebar";
 import { Splitter } from "./components/Splitter";
+import { desktopPosition, saveDesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type View } from "./workbench/graph";
 import { nodeTitle, statusText } from "./workbench/text";
 import type { ActivitySnapshot, Atlas, GraphSnapshot, ImpactPreview } from "./workbench/types";
@@ -22,13 +24,22 @@ function errorText(t: TFunction, error: unknown): string {
 
 export type Focus = { claimId: string; nodeId?: string; nonce: number };
 
-export function Workbench({ session, focus }: { session: string; focus?: Focus | null }) {
+export function Workbench({
+  session,
+  focus,
+  onFocusHandled,
+}: {
+  session: string;
+  focus?: Focus | null;
+  onFocusHandled: (focus: null) => void;
+}) {
   const { t } = useTranslation();
   const queries = useQueryClient();
   const layout = useLayout();
   const { sizes, clamped } = layout;
-  const [claimId, setClaimId] = useState<string | null>(focus?.claimId ?? null);
-  const pendingNode = useRef<string | undefined>(focus?.nodeId);
+  const [initial] = useState(() => focus ?? desktopPosition());
+  const [claimId, setClaimId] = useState<string | null>(initial?.claimId ?? null);
+  const pendingNode = useRef(initial?.nodeId);
   const [view, setView] = useState<View>("proof");
   const [selected, setSelected] = useState<string | null>(null);
   const [assumption, setAssumption] = useState<string | null>(null);
@@ -55,7 +66,7 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
 
   const snapshot = useQuery({
     queryKey: ["graph", claimId],
-    enabled: Boolean(claimId),
+    enabled: Boolean(claims.data?.claims.some((claim) => claim.id === claimId)),
     queryFn: ({ signal }) =>
       api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId!), { signal }),
   });
@@ -67,20 +78,16 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
     setClaimId(focus.claimId);
     setView("proof");
     pendingNode.current = focus.nodeId;
-  }, [focus]);
+    onFocusHandled(null);
+  }, [focus, onFocusHandled]);
 
   // A newly loaded claim starts at its focus (or goal) and its first assumption; a reload keeps the selection.
   useEffect(() => {
-    if (!graph) return;
+    if (!graph || graph.claim.id !== claimId) return;
     const wanted = pendingNode.current;
-    if (wanted && graph.claim.id === claimId) {
-      pendingNode.current = undefined;
-      if (graph.nodes.has(wanted)) {
-        setSelected(wanted);
-        return;
-      }
-    }
+    pendingNode.current = undefined;
     setSelected((current) => {
+      if (wanted && graph.nodes.has(wanted)) return wanted;
       if (current && graph.nodes.has(current)) return current;
       const focus = graph.focusId && graph.nodes.has(graph.focusId) ? graph.focusId : null;
       return focus ?? [...graph.nodes.values()].find((node) => node.kind === "goal")?.id ?? graph.order[0] ?? null;
@@ -89,6 +96,12 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
       current && graph.hypotheses.some((node) => node.id === current) ? current : (graph.hypotheses[0]?.id ?? null),
     );
   }, [graph, claimId]);
+
+  useEffect(() => {
+    if (claimId && selected && graph?.claim.id === claimId && graph.nodes.has(selected)) {
+      saveDesktopPosition({ claimId, nodeId: selected });
+    }
+  }, [claimId, graph, selected]);
 
   const basis = assumption ? graph?.nodes.get(assumption)?.reference?.basis_version_id : undefined;
   const impact = useQuery({
@@ -143,6 +156,10 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
   };
   const refresh = () => {
     void queries.invalidateQueries();
+  };
+  const openRecorded = async (claimId?: string) => {
+    await queries.invalidateQueries();
+    if (claimId) selectClaim(claimId);
   };
 
   const notice = !session
@@ -217,16 +234,19 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
             <h1>{claimTitle}</h1>
             {meta && <span className="claim-meta">{meta}</span>}
           </div>
-          {!layout.reviewOpen && graph && (
-            <button
-              type="button"
-              className="chip"
-              aria-controls="review"
-              onClick={() => layout.update({ reviewOpen: true })}
-            >
-              {reviewCount ? t("toolbar.openReviewCount", { count: reviewCount }) : t("toolbar.openReview")}
-            </button>
-          )}
+          <div className="project-toolbar-actions">
+            <ProjectActions session={session} onRecorded={openRecorded} />
+            {!layout.reviewOpen && graph && (
+              <button
+                type="button"
+                className="chip"
+                aria-controls="review"
+                onClick={() => layout.update({ reviewOpen: true })}
+              >
+                {reviewCount ? t("toolbar.openReviewCount", { count: reviewCount }) : t("toolbar.openReview")}
+              </button>
+            )}
+          </div>
         </header>
         {view === "impact" && graph && (
           <div className="impact-bar">

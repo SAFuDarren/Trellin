@@ -50,6 +50,8 @@ export async function api<T>(
     method: init.data === undefined ? "GET" : "POST",
     cache: "no-store",
     mode: "same-origin",
+    // Retain the origin on local writes without sending a full referrer URL.
+    referrerPolicy: init.data === undefined ? "no-referrer" : "origin",
     credentials: "omit",
     redirect: "error",
     headers: {
