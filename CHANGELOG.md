@@ -19,7 +19,9 @@ theoretical research.
   confirmation, verification, replay, and withdrawal.
 - Open a local proof workbench (`workbench`) to inspect the dependency graph,
   exact Lean statements, open obligations, the impact of withdrawing an
-  assumption, and live model activity, and to leave guidance for models.
+  assumption, and live model activity, and to leave guidance for models. The
+  interface is in English with a complete Chinese translation, switchable
+  under More.
 - `init-workspace` and `setup` write an `AGENTS.md` guide for coding agents into
   each research workspace.
 - Licensed under the Apache License 2.0. Contributions are accepted under the
