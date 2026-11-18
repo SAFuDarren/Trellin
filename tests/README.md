@@ -24,6 +24,6 @@ python -m pytest --import-mode=importlib -p no:cacheprovider \
   -m 'postgres or lean' /path/to/repository/tests
 ```
 
-The [external validation bundle](../CONTRIBUTING.md#run-the-external-regression-suite)
-continues to run the full release regressions. Roadmap task P0.2 tracks their
-migration to the repository.
+The [preserved compatibility suite](compat_validation/PROVENANCE.md) runs through
+its own runner. See the [contributor guide](../CONTRIBUTING.md#run-the-compatibility-regressions)
+for the complete release checks and optional external test data.

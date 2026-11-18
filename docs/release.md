@@ -4,15 +4,15 @@ A release includes the Python package, the generic Lean verifier and Mathlib con
 
 ## Verify the distribution
 
-Build the wheel and source package in a separate working area. Install the wheel with the PostgreSQL extra in a clean environment and run the [matching external regressions](../CONTRIBUTING.md#run-the-external-regression-suite) with a disposable database and the pinned Lean environment. From outside the checkout, verify that the installed command can prepare the generic Lean environment. Run database upgrade checks from the previous supported revisions and replay a previous immutable run. Run both the PostgreSQL suite and the required `release-lean` cases against the installed candidate. Record the broader `lean` lane separately with its optional inputs and any omitted tests.
+Build the wheel and source package in a separate working area. Install the wheel with the PostgreSQL extra in a clean environment and run the [repository and compatibility regressions](../CONTRIBUTING.md#run-the-compatibility-regressions) with a disposable database and the pinned Lean environment. From outside the checkout, verify that the installed command can prepare the generic Lean environment. Run database upgrade checks from the previous supported revisions and replay a previous immutable run. Run both the PostgreSQL suite and the required `release-lean` cases against the installed candidate. Record the broader `lean` lane separately with its optional inputs and any omitted tests.
 
 ## Verify first use
 
 Use the matching external `first-proof` case. Follow its README from a fresh virtual environment, empty PostgreSQL database and distinct project directory. Review the exact premise and theorem, verify and adopt the proof, reuse it under a second claim's approved basis, and verify that withdrawal invalidates the dependent evidence. The case uses no model service. Keep the case inputs and run records outside the software distribution.
 
-Attach the matching wheel, source distribution, `research_multiplier-<version>-first-proof.tar.gz`, and `SHA256SUMS` to the same release tag. The first-proof archive starts with `first-proof/README.md`. The versioned validation bundle is a separate artifact used by CI. Verify the asset names and SHA-256 values against the quickstart before publishing.
+Attach the matching wheel, source distribution, `research_multiplier-<version>-first-proof.tar.gz`, and `SHA256SUMS` to the same release tag. The first-proof archive starts with `first-proof/README.md`. CI uses the matching compatibility source in the repository. A historical candidate may use its separately verified validation archive. Verify the asset names and SHA-256 values against the quickstart before publishing.
 
-Check that the wheel and source distribution include the project [Apache License 2.0](../LICENSE) and [NOTICE](../NOTICE) and declare `Apache-2.0` in their package metadata. Include the same license and notice in the standalone validation and first-proof archives before generating `SHA256SUMS`.
+Check that the wheel and source distribution include the project [Apache License 2.0](../LICENSE) and [NOTICE](../NOTICE) and declare `Apache-2.0` in their package metadata. Include the first-proof archive's license and notice before generating `SHA256SUMS`. Preserve the compatibility suite's original MIT license when archiving its unchanged sources.
 
 ## Record the release
 
