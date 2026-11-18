@@ -81,7 +81,8 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
         picker.canChooseFiles = false
         picker.canCreateDirectories = false
         picker.allowsMultipleSelection = false
-        picker.directoryURL = requested?.deletingLastPathComponent()
+        picker.directoryURL = webView == nil ? FileManager.default.homeDirectoryForCurrentUser
+                                            : requested?.deletingLastPathComponent()
         picker.beginSheetModal(for: window) { [weak self] result in
             if result == .OK, let url = picker.url { self?.open(url) }
         }
@@ -99,27 +100,40 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
         let detail = NSTextField(wrappingLabelWithString: localized("\(key).detail"))
         detail.alignment = .center
         detail.textColor = .secondaryLabelColor
-        detail.preferredMaxLayoutWidth = 430
-        let choices = NSStackView()
-        choices.orientation = .horizontal
-        choices.spacing = 12
-        if retry {
-            choices.addArrangedSubview(NSButton(title: localized("retry"), target: self, action: #selector(retryWorkspace)))
-        }
-        if key != "loading" {
-            choices.addArrangedSubview(NSButton(title: localized("choose"), target: self, action: #selector(chooseWorkspace)))
-        }
-        let group = NSStackView(views: [title, detail, choices])
+        detail.preferredMaxLayoutWidth = 470
+        let group = NSStackView(views: [title])
         group.orientation = .vertical
         group.alignment = .centerX
         group.spacing = 18
+        if let requested {
+            let path = NSTextField(labelWithString: requested.path)
+            path.textColor = .secondaryLabelColor
+            path.toolTip = requested.path
+            path.lineBreakMode = .byTruncatingMiddle
+            path.widthAnchor.constraint(lessThanOrEqualToConstant: 520).isActive = true
+            group.addArrangedSubview(path)
+        }
+        group.addArrangedSubview(detail)
+        let choices = NSStackView()
+        choices.orientation = .horizontal
+        choices.spacing = 12
+        if key != "loading" {
+            let choose = NSButton(title: localized("choose"), target: self, action: #selector(chooseWorkspace))
+            choose.bezelStyle = .rounded
+            choose.keyEquivalent = "\r"
+            choices.addArrangedSubview(choose)
+        }
+        if retry {
+            choices.addArrangedSubview(NSButton(title: localized("retry"), target: self, action: #selector(retryWorkspace)))
+        }
+        if !choices.arrangedSubviews.isEmpty { group.addArrangedSubview(choices) }
         let view = NSView()
         group.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(group)
         NSLayoutConstraint.activate([
             group.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             group.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            detail.widthAnchor.constraint(equalToConstant: 430),
+            detail.widthAnchor.constraint(equalToConstant: 470),
         ])
         window.contentView = view
     }
@@ -145,9 +159,8 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
                     self.showWorkbench(url: url, workspace: workspace, leanMissing: result.warnings?.contains("lean") == true)
                 } else {
                     self.stop()
-                    let known = ["workspace", "postgres", "schema", "install"]
-                    let code = result?.code.flatMap { known.contains($0) ? $0 : nil } ?? "startup"
-                    self.showStatus(code, retry: code == "postgres" || code == "startup")
+                    let failure = result?.failure ?? .startup
+                    self.showStatus(failure.rawValue, retry: failure.canRetry)
                 }
             }, onExit: { [weak self, weak process] in
                 guard let self, let process, self.child === process, !self.starting else { return }
@@ -181,7 +194,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
         let web = WKWebView(frame: .zero, configuration: configuration)
         web.navigationDelegate = self
         webView = web
-        window.subtitle = leanMissing ? localized("lean") : ""
+        window.subtitle = leanMissing ? localized("lean") : workspace.lastPathComponent
         window.contentView = web
         web.load(URLRequest(url: url))
     }

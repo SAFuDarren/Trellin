@@ -4,6 +4,8 @@
 
 - Build and open Trellin on Apple Silicon Macs. Pick an existing research
   workspace and return to its last graph node when reopening the app.
+- Trellin identifies the workspace and missing setup when a saved project
+  cannot open, and offers another folder from the same window.
 
 ## 1.0.0
 

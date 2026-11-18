@@ -28,6 +28,11 @@ struct WorkbenchReadiness: Decodable {
     let warnings: [String]?
     let code: String?
 
+    var failure: WorkbenchStartFailure {
+        guard version == 1, status == "error", let code else { return .startup }
+        return WorkbenchStartFailure(rawValue: code) ?? .startup
+    }
+
     var sessionURL: URL? {
         guard version == 1, status == "ready", let url, url.scheme == "http",
               url.host == "127.0.0.1", let port = url.port, (1...65535).contains(port),
@@ -37,6 +42,14 @@ struct WorkbenchReadiness: Decodable {
         else { return nil }
         return url
     }
+}
+
+enum WorkbenchStartFailure: String {
+    case workspace, unbound, postgres, schema, install, startup
+    case loginMissing = "login-missing"
+    case loginInvalid = "login-invalid"
+
+    var canRetry: Bool { self == .postgres || self == .startup }
 }
 
 /// One child owns one project's loopback service and its in-memory session.

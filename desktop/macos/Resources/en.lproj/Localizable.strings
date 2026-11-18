@@ -11,6 +11,12 @@
 "loading.detail" = "Connecting to the workspace’s database.";
 "workspace.title" = "Choose a research workspace";
 "workspace.detail" = "Select the folder previously initialized by Research Multiplier. For a new project, follow the workspace setup instructions.";
+"unbound.title" = "This workspace needs database setup";
+"unbound.detail" = "Finish setting up PostgreSQL for this workspace in Research Multiplier, then open the folder again.";
+"login-missing.title" = "No database login saved";
+"login-missing.detail" = "This Mac has no saved database login for this workspace. Save the connection settings for its PostgreSQL database, or open another workspace.";
+"login-invalid.title" = "Cannot read the saved database login";
+"login-invalid.detail" = "Check the workspace’s saved connection file and its access permissions, or open another workspace.";
 "postgres.title" = "Cannot connect to PostgreSQL";
 "postgres.detail" = "Start the workspace’s PostgreSQL server and check its saved connection settings, then try again.";
 "schema.title" = "The workbench needs a newer database";

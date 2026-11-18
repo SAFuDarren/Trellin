@@ -2,6 +2,7 @@
 
 from contextlib import ExitStack
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -17,6 +18,26 @@ class _StartError(Exception):
     pass
 
 
+def _configure_database(workspace):
+    try:
+        workspace_id = paths.workspace_id(workspace)
+        database_id = paths.database_id(workspace)
+    except (OSError, ValueError):
+        raise _StartError("unbound") from None
+    if workspace_id is None or database_id is None:
+        raise _StartError("unbound")
+
+    # Only the selected workspace supplies connections for this process.
+    for key in credentials.KEYS:
+        os.environ.pop(key, None)
+    try:
+        login_file = credentials.load(workspace)
+    except (OSError, ValueError):
+        raise _StartError("login-invalid") from None
+    if login_file is None or not os.environ.get("RM_HUMAN_DSN", "").strip():
+        raise _StartError("login-missing")
+
+
 def _open(workspace_path, resources):
     try:
         if not Path(workspace_path).is_absolute():
@@ -26,11 +47,7 @@ def _open(workspace_path, resources):
     except (OSError, ValueError):
         raise _StartError("workspace") from None
 
-    try:
-        credentials.load(workspace)
-    except (OSError, ValueError):
-        raise _StartError("postgres") from None
-
+    _configure_database(workspace)
     server = resources.enter_context(WorkbenchServer(workspace))
     # Stop accepting requests when the launcher leaves, then drain handlers
     # before the process exits so a review or guidance write can complete.

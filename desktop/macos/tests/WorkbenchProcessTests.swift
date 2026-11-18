@@ -5,9 +5,21 @@ struct WorkbenchProcessTests {
     static func main() throws {
         try readiness()
         try readLiveService()
+        try startFailures()
         try position()
         environment()
-        print("4 Trellin native boundary checks passed.")
+        print("5 Trellin native boundary checks passed.")
+    }
+
+    private static func startFailures() throws {
+        func response(_ code: String, status: String = "error") throws -> WorkbenchStartFailure {
+            let data = try JSONSerialization.data(withJSONObject: ["version": 1, "status": status, "code": code])
+            return try JSONDecoder().decode(WorkbenchReadiness.self, from: data).failure
+        }
+        let failures = try [response("login-missing"), response("login-invalid"), response("unbound"),
+                            response("postgres"), response("unknown"), response("login-missing", status: "ready")]
+        precondition(failures == [.loginMissing, .loginInvalid, .unbound, .postgres, .startup, .startup])
+        precondition(!WorkbenchStartFailure.loginMissing.canRetry && WorkbenchStartFailure.postgres.canRetry)
     }
 
     private static func readLiveService() throws {

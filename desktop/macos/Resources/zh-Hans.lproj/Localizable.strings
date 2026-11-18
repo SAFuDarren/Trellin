@@ -11,6 +11,12 @@
 "loading.detail" = "正在连接课题的数据库。";
 "workspace.title" = "请选择课题目录";
 "workspace.detail" = "请选择已经用 Research Multiplier 初始化的目录。新课题请先按使用指南完成设置。";
+"unbound.title" = "此课题尚未设置数据库";
+"unbound.detail" = "请先用 Research Multiplier 完成该课题的 PostgreSQL 设置，再打开这个目录。";
+"login-missing.title" = "此课题未保存数据库登录信息";
+"login-missing.detail" = "这台 Mac 没有保存该课题的数据库登录信息。请保存该课题的 PostgreSQL 连接设置，或打开其他课题。";
+"login-invalid.title" = "无法读取已保存的数据库登录信息";
+"login-invalid.detail" = "请检查该课题的连接文件和访问权限，或打开其他课题。";
 "postgres.title" = "无法连接 PostgreSQL";
 "postgres.detail" = "启动课题对应的 PostgreSQL 服务，检查已保存的连接设置后重试。";
 "schema.title" = "工作台需要更新的数据库版本";
