@@ -128,7 +128,7 @@
 - **标签：**
   - 按层：`layer:kernel`、`layer:plugin`、`layer:collab`、`layer:ai`、`layer:entry`
   - 按模块：`area:web`、`area:migrations`、`area:lean`、`area:docs`
-  - 按类型：`type:bug`、`type:feature`、`type:refactor`、`type:docs`、`type:chore`
+  - 按类型：`type:bug`、`type:feature`、`type:refactor`、`type:docs`、`type:chore`、`type:incident`
   - 其他：`needs-decision`（卡在待定问题上）、`status:in-progress`（已认领，见[并行开发](#并行开发)）、`good first issue`、`help wanted`
 - **看板列：** 待分诊 → 可开工（已写验收标准）→ 进行中 → 评审中 → 已完成。
 - **分诊：** 维护者每周过一遍新 issue：打标签，归入里程碑或关闭，并关联卡住它的决定。
@@ -220,7 +220,7 @@
 
 | 记录 | 唯一依据 | 何时更新 |
 | --- | --- | --- |
-| 任务状态（未开始、已认领、已完成） | GitHub issue 及其里程碑 | 用 `status:in-progress` 认领。PR 里写 `Closes #N`，合并时自动关闭 issue。工作中止时去掉标签 |
+| 任务状态（未开始、已认领、已完成） | GitHub issue 及其里程碑 | 用 `status:in-progress` 认领。一旦解决就关闭，见[关闭 issue](#关闭-issue)。工作中止时去掉标签 |
 | 计划和验收标准 | `docs/roadmap.md` 和 `.zh-CN.md` | 只在新增、拆分、调整任务顺序或修改验收标准时更新，不用它标记进度。同一个 PR 里同步更新 issue |
 | 跟踪类 issue（例如公开条件，#18） | 该 issue 里的勾选清单 | 完成某项的 PR 合并后，勾掉对应条目 |
 | 架构决定和待定问题 | `docs/architecture.md` 和 `.zh-CN.md` | 某个问题有了结论时：把它从 G 节移到「已决定」那一行，新增或修改对应编号的决定，并关闭它的 `needs-decision` issue |
@@ -231,6 +231,48 @@
 | 审计发现 | `docs/audits/` 里的审计记录（写完后不再修改） | 由下一次审计报告每条发现的进展；实际进展记在该发现指向的 issue 或任务里 |
 
 一个里程碑的所有 issue 都关闭、并且满足该阶段的出口标准后，关闭这个里程碑。
+
+## 关闭 issue
+
+issue 的每一条验收标准都满足、并且有测试或 CI 检查能证明时，这个 issue 就算完成，应该马上关闭。已经解决却还开着的 issue，会误导所有看任务板的人。
+
+- **由 PR 关闭。** 只有当 PR 满足全部验收标准时，才在 PR 描述里写 `Closes #N`，合并后 issue 会自动关闭。如果只满足了一部分，写 `Refs #N`，并在 PR 里列出还剩什么。
+- **手动关闭。** 如果验收标准是由几个 PR 共同完成的、是在做别的 issue 时顺带完成的，或者不需要写代码，就手动关闭，并留言写明是哪些 PR 或提交、每条标准怎么证明：`gh issue close N --comment "..."`。
+- **每次合并之后**，检查这个 PR 涉及的 issue：关联的 issue 已关闭，`status:in-progress` 标签已去掉，跟踪类 issue（例如 #18）里的勾选项已勾上。再看看这次合并还顺带解决了哪些其他 issue，一并留言关闭。
+- **没做完。** 有任何一条标准没满足，就不要关闭。在 issue 里写明还剩什么，或者把剩下的部分拆成新 issue 并互相链接。
+- **不再做。** 决定不做的 issue，以 "not planned" 关闭，并写明原因。
+- **重新打开。** 如果出现回归，说明其实没有完成，就重新打开 issue，并链接到回归问题。
+
+## CI 运行
+
+- **每个任务都有时间上限。** 每个 job 都设置 `timeout-minutes`，取平时耗时的两到三倍。新增 job 必须设置。GitHub 默认是六个小时，一次卡住就会白白耗掉一个下午。
+
+  | 任务 | 平时耗时 | 上限 |
+  | --- | --- | --- |
+  | Lint and offline tests | 1 分钟 | 15 分钟 |
+  | Web interface (React) | 2 分钟 | 20 分钟（端到端测试这一步 10 分钟） |
+  | Installed package smoke check | 1 分钟 | 20 分钟 |
+  | Required release regressions | 14 分钟 | 30 分钟 |
+  | DCO | 不到 1 分钟 | 5 分钟 |
+
+- **卡住了就别等。** 一个 job 远远超过平时耗时、日志又没有新输出，就是卡住了。取消这次运行（`gh run cancel ID`），读日志（`gh run view ID --log`），然后修掉原因，或者重跑一次（`gh run rerun ID --failed`）。如果重跑又卡住，按下面的事故复盘处理，修好原因再合并。
+- **运行环境里已有的东西不要再下载。** 优先用 runner 镜像自带的工具（例如端到端测试用镜像里的 Google Chrome），并固定版本，不要在运行时下载。
+- **全绿才合并。** 有必需的检查还在等待或已失败时，不要合并；也不要为了通过而关闭、跳过或放宽检查。时好时坏的检查要开 issue 修好。
+
+## 工程事故复盘
+
+工程流程出了问题、耽误了时间或可能再次发生时（CI 卡住或失败、发布出错、合并出错、工作丢失、密钥泄露），在一天之内用 **Incident review** 模板开一个 issue。写得简短，对事不对人。它和研究上的[可信事件](trust-incidents.md)是两回事，后者针对已记录的核验结果。
+
+| 部分 | 写什么 |
+| --- | --- |
+| 发生了什么 | 一两句话，日期和时间用 UTC |
+| 影响 | 什么被耽误、出错或面临风险，持续了多久 |
+| 发现 | 怎么发现的，怎样能更早发现 |
+| 根本原因 | 底层原因，不只是触发点 |
+| 修复 | 修复它的 PR 或提交 |
+| 后续 | 防止再次发生的事项，各开一个 issue：测试、CI 检查或 `AGENTS.md` 里的规则 |
+
+修复合并、每个后续事项都有了自己的 issue 之后，关闭这条复盘。反复出现的原因写进下一次[工程审计](#工程审计)。
 
 ## 发布
 

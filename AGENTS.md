@@ -32,6 +32,8 @@ Each has a Chinese version (`*.zh-CN.md`). Update both when you change one.
 - Never print, log or commit credentials, DSNs or research content. Use temporary workspaces and disposable databases; never a real research project.
 - User-facing interface strings go into message catalogs, English default and Chinese (E6). This applies after the React migration (P1.4).
 - Follow the [change checklist](docs/engineering.md#change-checklist) and say in the PR why any item does not apply.
+- CI: merge only when every required check passes. A job far past its usual time with no new log output is hung: cancel it, read the log, fix the cause or rerun once; do not wait it out. Every job sets `timeout-minutes`. See [CI runs](docs/engineering.md#ci-runs).
+- When something in the engineering process fails (a hung CI run, a bad merge, lost work), open an **Incident review** issue. See [engineering incident reviews](docs/engineering.md#engineering-incident-reviews).
 
 ## Engineering principles
 
@@ -65,7 +67,7 @@ Several agents and people may work on this repository at the same time. Follow t
    - Keep temporary files in your worktree or the system temp directory.
    - Never stop a process you did not start.
 6. **Integrate small and often.** Rebase on `origin/main` before asking for review and again before merging. Keep each PR to one task.
-7. **Finish cleanly.** Link the PR in the issue (`Closes #N`) and remove `status:in-progress` once it is merged or handed back. In the same PR, update every record the change affects: the `CHANGELOG.md` line, user guides in both languages, tracking-issue checkboxes, decisions. The table in [keeping status and records current](docs/engineering.md#keeping-status-and-records-current) lists where each record lives. Never edit the roadmap to mark progress. Report problems outside your task as new issues; do not fix them in your branch.
+7. **Finish cleanly.** Write `Closes #N` in the PR only when it meets every acceptance criterion, otherwise `Refs #N`. After the merge, check that the issue is closed and `status:in-progress` is removed, and close any other issue the merge resolved, with a comment naming the PR. Never close an issue with an unmet criterion; see [closing issues](docs/engineering.md#closing-issues). In the same PR, update every record the change affects: the `CHANGELOG.md` line, user guides in both languages, tracking-issue checkboxes, decisions. The table in [keeping status and records current](docs/engineering.md#keeping-status-and-records-current) lists where each record lives. Never edit the roadmap to mark progress. Report problems outside your task as new issues; do not fix them in your branch.
 
 ## Layout
 

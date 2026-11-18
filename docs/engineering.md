@@ -125,7 +125,7 @@ All tasks, bugs and milestones are tracked in **GitHub Issues** and a **GitHub P
 - **Labels:**
   - `layer:kernel`, `layer:plugin`, `layer:collab`, `layer:ai`, `layer:entry`
   - `area:web`, `area:migrations`, `area:lean`, `area:docs`
-  - `type:bug`, `type:feature`, `type:refactor`, `type:docs`, `type:chore`
+  - `type:bug`, `type:feature`, `type:refactor`, `type:docs`, `type:chore`, `type:incident`
   - `needs-decision` (blocked on an open question), `status:in-progress` (claimed; see [parallel work](#parallel-work)), `good first issue`, `help wanted`
 - **Board columns:** Triage → Ready (has acceptance criteria) → In progress → In review → Done.
 - **Triage:** the maintainer reviews new issues weekly, applies labels, assigns a milestone or closes them, and links any decision that blocks them.
@@ -217,7 +217,7 @@ Each kind of record has one home. Update it in the same pull request that change
 
 | Record | Single source of truth | When to update it |
 | --- | --- | --- |
-| Task status (open, claimed, done) | The GitHub issue and its milestone | Claim with `status:in-progress`. The PR says `Closes #N`, which closes the issue on merge. Remove the label if work stops |
+| Task status (open, claimed, done) | The GitHub issue and its milestone | Claim with `status:in-progress`. Close it as soon as it is resolved; see [closing issues](#closing-issues). Remove the label if work stops |
 | Plan and acceptance criteria | `docs/roadmap.md` and `.zh-CN.md` | Only when a task is added, split, reordered or its criteria change. Never edit it to mark progress. Update the issue in the same PR |
 | Tracking issues (for example the publication gate, #18) | The checklist in that issue | Tick an item when the PR that completes it is merged |
 | Decisions and open questions | `docs/architecture.md` and `.zh-CN.md` | When a question is answered: move it from section G to the "Decided" line, add or change the numbered decision, close its `needs-decision` issue |
@@ -228,6 +228,48 @@ Each kind of record has one home. Update it in the same pull request that change
 | Audit findings | The audit record in `docs/audits/` (never edited afterwards) | The next audit reports each finding's status. Progress happens in the issue or task the finding names |
 
 A milestone is closed when all its issues are closed and its phase exit criteria hold.
+
+## Closing issues
+
+An issue is done when every acceptance criterion holds and a test or a check in CI shows it. Close it as soon as that is true; an open issue that is already resolved misleads everyone who reads the board.
+
+- **Closed by its pull request.** Write `Closes #N` in the PR description only when the PR meets every criterion. Merging then closes the issue. If the PR meets only some criteria, write `Refs #N` and list in the PR what remains.
+- **Closed by hand.** When the criteria are met by several PRs, by work done for another issue, or without code, close the issue yourself with a comment that names the PRs or commits and how each criterion is shown: `gh issue close N --comment "..."`.
+- **After every merge**, check the issues the PR touched: the linked issue is closed, `status:in-progress` is removed, and tracking-issue checkboxes (for example #18) are ticked. Also look for other open issues the merge resolved, and close them with a comment.
+- **Not done.** Never close an issue with an unmet criterion. Comment on what remains instead, or split the rest into a new issue and link it.
+- **Not planned.** Close an issue that will not be done as "not planned", with the reason.
+- **Reopen** an issue when a regression shows it was not done, and link the regression.
+
+## CI runs
+
+- **Every job has a time limit.** Each job sets `timeout-minutes` at two to three times its usual duration. A new job must set one. GitHub's default of six hours turns a hang into a lost afternoon.
+
+  | Job | Usual time | Limit |
+  | --- | --- | --- |
+  | Lint and offline tests | 1 min | 15 min |
+  | Web interface (React) | 2 min | 20 min (end-to-end step 10 min) |
+  | Installed package smoke check | 1 min | 20 min |
+  | Required release regressions | 14 min | 30 min |
+  | DCO | under 1 min | 5 min |
+
+- **Do not wait on a hung job.** A job that runs well past its usual time with no new log output is hung. Cancel the run (`gh run cancel ID`), read its log (`gh run view ID --log`), and either fix the cause or rerun once (`gh run rerun ID --failed`). If it hangs again, treat it as an incident (below) and fix the cause before merging.
+- **Do not download what the runner already has.** Prefer tools on the runner image (for example its Google Chrome for the end-to-end tests) and pinned versions over downloads during the run.
+- **Merge only on green.** Never merge with a required check pending or failed, and never disable, skip or loosen a check to make it pass. A flaky check gets an issue and a fix.
+
+## Engineering incident reviews
+
+When something in the engineering process fails in a way that cost time or could recur (a hung or broken CI run, a broken release, a bad merge, lost work, a leaked secret), open an issue with the **Incident review** template within a day. Keep it short and blameless. This is separate from research [trust incidents](trust-incidents.md), which concern recorded verification results.
+
+| Section | What to write |
+| --- | --- |
+| What happened | One or two sentences, with dates and times in UTC |
+| Impact | What was delayed, broken or put at risk, and for how long |
+| Detection | How it was noticed, and how it could have been noticed sooner |
+| Root cause | The underlying cause, not only the trigger |
+| Fix | The PR or commit that fixed it |
+| Follow-up | Issues for anything that prevents a repeat: a test, a CI check, a rule in `AGENTS.md` |
+
+Close the review when its fix is merged and every follow-up is an issue of its own. Recurring causes go into the next [engineering audit](#engineering-audits).
 
 ## Releases
 
