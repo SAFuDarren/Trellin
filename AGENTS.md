@@ -53,7 +53,12 @@ To run the periodic maturity audit, use the project skill `.claude/skills/engine
 
 Several agents and people may work on this repository at the same time. Follow these rules so their work does not collide. Details are in [engineering](docs/engineering.md#parallel-work).
 
-1. **Claim before you start.** Work only on an open GitHub issue for a roadmap task. Check that it is not assigned or labelled `status:in-progress`. Then add that label and comment with your branch name. If no issue exists, ask the maintainer instead of starting.
+1. **Claim before you start, with the claim tool.** Every agent uses the same GitHub account, so pick a short name for this session (for example `claude-web` or `codex-backend-1`) and use it for every claim.
+   - See who holds what: `python scripts/tasks.py board`.
+   - Claim: `python scripts/tasks.py claim <issue> --agent <name> --branch <type>/<issue>-<topic> --scope <paths>`. The tool refuses issues that someone else holds or that need a decision. If two agents claim at the same moment, the later one withdraws automatically: start work only when the tool says `Claimed`.
+   - Release when you stop: `python scripts/tasks.py release <issue> --agent <name> --reason "..."`.
+   - Work only on an open issue. If no issue exists for what you were asked to do, ask the maintainer instead of starting.
+   - The PR description must say `Closes #<issue>`. CI checks that the issue is held by the PR's branch.
 2. **One task, one branch, one worktree:** `git worktree add ../rm-<topic> -b <type>/<topic> origin/main`. Never edit another agent's worktree or branch.
 3. **Stay inside your scope.** List the files you expect to change in the issue. If you need a file that another open PR changes (`gh pr list`, then check its files), stop and coordinate in the issues instead of editing it.
 4. **Shared hot spots:**
