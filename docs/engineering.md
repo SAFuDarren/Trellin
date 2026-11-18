@@ -126,10 +126,10 @@ All tasks, bugs and milestones are tracked in **GitHub Issues** and a **GitHub P
   - `layer:kernel`, `layer:plugin`, `layer:collab`, `layer:ai`, `layer:entry`
   - `area:web`, `area:migrations`, `area:lean`, `area:docs`
   - `type:bug`, `type:feature`, `type:refactor`, `type:docs`, `type:chore`
-  - `needs-decision` (blocked on an open question), `good first issue`, `help wanted`
+  - `needs-decision` (blocked on an open question), `status:in-progress` (claimed; see [parallel work](#parallel-work)), `good first issue`, `help wanted`
 - **Board columns:** Triage → Ready (has acceptance criteria) → In progress → In review → Done.
 - **Triage:** the maintainer reviews new issues weekly, applies labels, assigns a milestone or closes them, and links any decision that blocks them.
-- **Roadmap upkeep:** when a task is added, split or reordered, update `roadmap.md` and `roadmap.zh-CN.md` together with the issues.
+- **Roadmap upkeep:** when a task is added, split or reordered, update `roadmap.md` and `roadmap.zh-CN.md` together with the issues. Progress is tracked in the issues, not the roadmap; see [keeping status and records current](#keeping-status-and-records-current).
 
 ---
 
@@ -174,6 +174,60 @@ Rules:
 ## Engineering audits
 
 At the end of every roadmap phase, run the engineering maturity audit with the project skill in `.claude/skills/engineering-audit/`. It scores 12 dimensions × 4 checks from repository evidence, runs or records six stress tests, and writes a record to [docs/audits](audits/README.md). Findings get permanent IDs. Each one becomes a roadmap task or issue, and the next audit reports its status. Use the trend between audits, not the absolute score, to decide where to invest.
+
+## Parallel work
+
+Several people and coding agents may work on the repository at once. The rules below keep their work from colliding; `AGENTS.md` carries the short version that every agent reads.
+
+**Assigning work**
+- Every task is a GitHub issue for a roadmap task. A worker claims an issue by labelling it `status:in-progress` and commenting with the branch name. Only one worker holds an issue at a time.
+- The maintainer starts parallel tasks only when their areas do not overlap, for example backend tests (P0.2) and the web interface (P1.4). Tasks that touch the same files run one after the other.
+- Limit work in progress to one task per worker.
+
+**Isolation**
+- One task, one branch from `origin/main`, one git worktree. Nobody edits another worker's branch or worktree.
+- Local resources are per worker:
+  - each test database gets a unique name;
+  - servers start on `--port 0` or a checked free port;
+  - temporary files stay in the worker's worktree or the system temp directory.
+
+**Hot spots that conflict easily**
+
+| Hot spot | Rule | Enforced by |
+| --- | --- | --- |
+| Alembic migrations | Maintainer approval. Number the revision when the PR opens; renumber and fix `down_revision` if `main` moved | `tests/offline/test_migrations.py` (unique revisions, a single head, numbering matches file names) |
+| Built interface `research_multiplier/workbench/app/` | Regenerate after every rebase; never merge by hand | Web CI job (the committed build must match the source) |
+| Generated API types (after P1.2) | Regenerate after every rebase | CI diff check (P1.2) |
+| Translation catalogs | Keep both sides' keys on conflict | Catalog parity test |
+| Architecture decisions, interface contracts, schemas | Changed only in their own PR, approved by the maintainer | CODEOWNERS; branch protection once the repository is public |
+
+**Integration**
+- Rebase on `origin/main` before review and before merging, and rerun the checks.
+- Keep each PR to one task.
+- Squash-merge with a Conventional Commit title.
+- Issues found outside the task become new issues, not extra changes in the branch.
+
+**Stress tests**
+
+Stress tests 3 (parallel development) and 6 (handover) in the [engineering audit](audits/README.md) check that these rules work in practice. Run them before relying on several agents for a whole phase.
+
+## Keeping status and records current
+
+Each kind of record has one home. Update it in the same pull request that changes the facts.
+
+| Record | Single source of truth | When to update it |
+| --- | --- | --- |
+| Task status (open, claimed, done) | The GitHub issue and its milestone | Claim with `status:in-progress`. The PR says `Closes #N`, which closes the issue on merge. Remove the label if work stops |
+| Plan and acceptance criteria | `docs/roadmap.md` and `.zh-CN.md` | Only when a task is added, split, reordered or its criteria change. Never edit it to mark progress. Update the issue in the same PR |
+| Tracking issues (for example the publication gate, #18) | The checklist in that issue | Tick an item when the PR that completes it is merged |
+| Decisions and open questions | `docs/architecture.md` and `.zh-CN.md` | When a question is answered: move it from section G to the "Decided" line, add or change the numbered decision, close its `needs-decision` issue |
+| Interface contracts | `docs/interfaces.md` and the schemas | Follow "Changing a contract" in that document |
+| User-visible changes | `CHANGELOG.md` | Every user- or plugin-author-visible change adds a line under **Unreleased** at the top. Until the first public release, add it to the 1.0.0 entry instead. The release PR renames Unreleased to the version |
+| Package version | `pyproject.toml` | Only in a release PR, following [Prepare a release](release.md) and the versioning rules above |
+| User guides | `docs/` (both languages), both quickstarts, `research_multiplier/agent_guide.md` | Whenever a command, screen, decision, model use or network use that researchers see changes |
+| Audit findings | The audit record in `docs/audits/` (never edited afterwards) | The next audit reports each finding's status. Progress happens in the issue or task the finding names |
+
+A milestone is closed when all its issues are closed and its phase exit criteria hold.
 
 ## Releases
 

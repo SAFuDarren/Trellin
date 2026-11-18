@@ -129,10 +129,10 @@
   - 按层：`layer:kernel`、`layer:plugin`、`layer:collab`、`layer:ai`、`layer:entry`
   - 按模块：`area:web`、`area:migrations`、`area:lean`、`area:docs`
   - 按类型：`type:bug`、`type:feature`、`type:refactor`、`type:docs`、`type:chore`
-  - 其他：`needs-decision`（卡在待定问题上）、`good first issue`、`help wanted`
+  - 其他：`needs-decision`（卡在待定问题上）、`status:in-progress`（已认领，见[并行开发](#并行开发)）、`good first issue`、`help wanted`
 - **看板列：** 待分诊 → 可开工（已写验收标准）→ 进行中 → 评审中 → 已完成。
 - **分诊：** 维护者每周过一遍新 issue：打标签，归入里程碑或关闭，并关联卡住它的决定。
-- **维护路线图：** 新增、拆分或调整任务顺序时，`roadmap.md` 和 `roadmap.zh-CN.md` 要与 issue 一起更新。
+- **维护路线图：** 新增、拆分或调整任务顺序时，`roadmap.md` 和 `roadmap.zh-CN.md` 要与 issue 一起更新。进度记在 issue 里，不记在路线图里；见[及时更新状态和记录](#及时更新状态和记录)。
 
 ---
 
@@ -177,6 +177,60 @@
 ## 工程审计
 
 每个路线图阶段结束时，用项目内的 skill（`.claude/skills/engineering-audit/`）做一次工程成熟度审计：根据仓库里的证据给 12 个维度 × 4 项检查打分，运行或记录六项压力测试，结果写进 [docs/audits](audits/README.zh-CN.md)。每条发现有固定编号，并转成路线图任务或 issue，下一次审计报告它的进展。决定把精力投在哪里，看审计之间的变化趋势，而不是某一次的绝对分数。
+
+## 并行开发
+
+可能有多个人和多个编码 agent 同时在这个仓库里工作。以下规则用来避免彼此冲突；`AGENTS.md` 里有每个 agent 都会读到的简版。
+
+**分配工作**
+- 每个任务对应一个路线图任务的 GitHub issue。认领方式：给 issue 加上 `status:in-progress` 标签，并留言写明分支名。同一时间只能有一人持有一个 issue。
+- 只有当几个任务涉及的模块互不重叠时，维护者才让它们并行，例如后端测试（P0.2）和网页界面（P1.4）。会改同一批文件的任务按顺序做。
+- 每个人或 agent 同一时间只做一个任务。
+
+**隔离**
+- 一个任务对应一个从 `origin/main` 开出的分支，以及一个 git worktree。谁都不改别人的分支或 worktree。
+- 本地资源各用各的：
+  - 测试数据库名称不能重复；
+  - 服务用 `--port 0` 启动，或者先确认端口空闲；
+  - 临时文件放在自己的 worktree 或系统临时目录里。
+
+**容易冲突的地方**
+
+| 位置 | 规则 | 由什么强制 |
+| --- | --- | --- |
+| Alembic 迁移 | 需要维护者批准。开 PR 时再确定编号；如果 `main` 已经有了新迁移，就改用下一个编号并更新 `down_revision` | `tests/offline/test_migrations.py`（版本号不重复、只有一个最新版本、编号与文件名一致） |
+| 构建好的界面 `research_multiplier/workbench/app/` | 每次 rebase 后重新生成，不手动合并 | 前端 CI 任务（提交的构建必须与源码一致） |
+| 生成的 API 类型（P1.2 之后） | 每次 rebase 后重新生成 | CI 差异检查（P1.2） |
+| 翻译文件 | 冲突时双方的条目都保留 | 中英文条目一致性测试 |
+| 架构决定、接口契约、schema | 只能在单独的 PR 里修改，并经维护者批准 | CODEOWNERS；仓库公开后加上分支保护 |
+
+**合并**
+- 申请评审前、合并前，都要 rebase 到 `origin/main` 并重新跑检查。
+- 每个 PR 只做一个任务。
+- 用 squash 合并，标题采用 Conventional Commits 格式。
+- 在任务范围之外发现的问题，另开 issue，不要顺手改在当前分支里。
+
+**压力测试**
+
+[工程审计](audits/README.zh-CN.md)里的压力测试 3（并行开发）和 6（交接）用来检验这些规则在实际中是否有效。在依赖多个 agent 完成整个阶段之前，先跑一遍这两项测试。
+
+## 及时更新状态和记录
+
+每类记录只有一个存放位置。哪个 PR 改变了事实，就在同一个 PR 里更新对应记录。
+
+| 记录 | 唯一依据 | 何时更新 |
+| --- | --- | --- |
+| 任务状态（未开始、已认领、已完成） | GitHub issue 及其里程碑 | 用 `status:in-progress` 认领。PR 里写 `Closes #N`，合并时自动关闭 issue。工作中止时去掉标签 |
+| 计划和验收标准 | `docs/roadmap.md` 和 `.zh-CN.md` | 只在新增、拆分、调整任务顺序或修改验收标准时更新，不用它标记进度。同一个 PR 里同步更新 issue |
+| 跟踪类 issue（例如公开条件，#18） | 该 issue 里的勾选清单 | 完成某项的 PR 合并后，勾掉对应条目 |
+| 架构决定和待定问题 | `docs/architecture.md` 和 `.zh-CN.md` | 某个问题有了结论时：把它从 G 节移到「已决定」那一行，新增或修改对应编号的决定，并关闭它的 `needs-decision` issue |
+| 接口契约 | `docs/interfaces.md` 和 schema | 按该文档「修改契约」一节的流程办 |
+| 用户能感知的变化 | `CHANGELOG.md` | 每个用户或插件作者能感知的变化，都在顶部的 **Unreleased** 下加一行。首次公开发布之前，改为加进 1.0.0 条目。发布 PR 负责把 Unreleased 改成版本号 |
+| 包版本号 | `pyproject.toml` | 只在发布 PR 里改，遵循[发布准备](release.md)和上面的版本规则 |
+| 用户文档 | `docs/`（中英文）、两份快速入门、`research_multiplier/agent_guide.md` | 研究者能看到的命令、界面、决策、模型使用或联网行为有变化时 |
+| 审计发现 | `docs/audits/` 里的审计记录（写完后不再修改） | 由下一次审计报告每条发现的进展；实际进展记在该发现指向的 issue 或任务里 |
+
+一个里程碑的所有 issue 都关闭、并且满足该阶段的出口标准后，关闭这个里程碑。
 
 ## 发布
 
