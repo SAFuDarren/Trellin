@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
-import { LANGUAGES, setLanguage, type Language } from "../i18n";
 import type { AtlasClaim } from "../workbench/types";
 import { statusText } from "../workbench/text";
 
@@ -15,7 +14,6 @@ export function Sidebar({
   onSelect,
   onToggle,
   onToggleAtlas,
-  onResetLayout,
   onRefresh,
   refreshing,
 }: {
@@ -28,22 +26,11 @@ export function Sidebar({
   onSelect: (id: string) => void;
   onToggle: () => void;
   onToggleAtlas: () => void;
-  onResetLayout: () => void;
   onRefresh: () => void;
   refreshing: boolean;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const more = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (event: MouseEvent) => {
-      if (!more.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [menuOpen]);
 
   const counts = new Map(atlasClaims.map((claim) => [claim.id, claim]));
   const needle = query.trim().toLowerCase();
@@ -63,7 +50,20 @@ export function Sidebar({
   return (
     <nav className="sidebar" id="sidebar" aria-label={t("sidebar.label")}>
       <div className="brand">
-        <span className="brand-name">{t("app.name")}</span>
+        <span className="brand-name">{t("sidebar.label")}</span>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={t("sidebar.refresh")}
+          title={t("sidebar.refresh")}
+          disabled={refreshing}
+          onClick={onRefresh}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+            <path d="M20 4v7h-7" />
+          </svg>
+        </button>
         <button
           type="button"
           className="icon-button"
@@ -106,60 +106,6 @@ export function Sidebar({
           </svg>
           <span className="menu-label">{t("sidebar.atlas")}</span>
         </button>
-        <div className="more" ref={more}>
-          <button
-            type="button"
-            className="menu-item"
-            aria-expanded={menuOpen}
-            aria-controls="more-menu"
-            title={t("sidebar.more")}
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="6" cy="12" r="1" />
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="18" cy="12" r="1" />
-            </svg>
-            <span className="menu-label">{t("sidebar.more")}</span>
-          </button>
-          <div id="more-menu" className="popover" hidden={!menuOpen}>
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                onResetLayout();
-              }}
-            >
-              {t("sidebar.resetLayout")}
-            </button>
-            <button
-              type="button"
-              disabled={refreshing}
-              onClick={() => {
-                setMenuOpen(false);
-                onRefresh();
-              }}
-            >
-              {t("sidebar.refresh")}
-            </button>
-            <div role="group" aria-label={t("app.language")} className="popover-group">
-              {(Object.entries(LANGUAGES) as [Language, string][]).map(([code, name]) => (
-                <button
-                  key={code}
-                  type="button"
-                  lang={code}
-                  aria-pressed={i18n.language === code}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setLanguage(code);
-                  }}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
       <div className="claim-list">
         {sorted.length === 0 && (

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Workbench } from "./Workbench";
+import { Shell } from "./Shell";
 
 export function App({ session }: { session: string | null }) {
   const { t } = useTranslation();
@@ -10,5 +10,5 @@ export function App({ session }: { session: string | null }) {
       </p>
     );
   }
-  return <Workbench session={session} />;
+  return <Shell session={session} />;
 }

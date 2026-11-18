@@ -4,7 +4,7 @@
     "language": "语言"
   },
   "session": {
-    "missing": "请从本机命令启动定理图谱，再用启动时提供的链接打开。"
+    "missing": "请用 `research-multiplier workbench` 打印的链接打开工作台。"
   },
   "sidebar": {
     "label": "课题",
@@ -12,8 +12,6 @@
     "expand": "展开侧栏",
     "search": "搜索课题",
     "atlas": "全局图",
-    "more": "更多",
-    "resetLayout": "恢复默认布局",
     "refresh": "刷新项目",
     "uncategorized": "未分类",
     "untitled": "未命名课题",
@@ -28,40 +26,40 @@
     "readFailed": "读取失败"
   },
   "toolbar": {
-    "defaultTitle": "定理图谱",
+    "defaultTitle": "证明图",
     "openReview": "待你审阅",
     "openReviewCount": "待你审阅 {{count}}"
   },
   "notice": {
-    "loadingClaim": "正在读取课题与核验记录…",
-    "noNodes": "这个课题还没有已登记的图谱节点。",
-    "noClaims": "这个项目还没有课题。登记课题和形式化后，刷新即可查看。",
-    "loadingProject": "正在读取项目记录…"
+    "loadingClaim": "正在加载课题…",
+    "noNodes": "这个课题还没有任何记录。",
+    "noClaims": "这个项目还没有课题。添加并形式化一个课题后刷新即可。",
+    "loadingProject": "正在加载项目…"
   },
   "views": {
     "label": "图谱视图",
-    "proof": "证明推进",
-    "references": "引用与领域",
-    "impact": "假设影响"
+    "proof": "证明进展",
+    "references": "引用关系",
+    "impact": "撤回影响"
   },
   "impact": {
-    "preview": "预览改动",
-    "readOnly": "只读预览，不会改动记录",
-    "loading": "正在读取后端影响范围…",
-    "noPremise": "这个课题暂时没有可预览的已登记假设。",
-    "explain": "撤回这个版本后，用到它的记录会标为待重验。这是只读预览，不会改动记录。",
-    "previewLabel": "待重验预览",
-    "alreadyRecheck": "已待重验",
-    "needsRecheck": "待重验",
-    "waitingReduction": "等待归约重验",
-    "scopeConfirm": "范围需确认",
-    "direct": "直接重验",
-    "indirect": "间接重验",
-    "inRecheck": "已处于待重验",
+    "preview": "撤回",
+    "readOnly": "仅预览，不会改动任何记录",
+    "loading": "正在计算哪些记录依赖它…",
+    "noPremise": "这个课题还没有可以预览的假设。",
+    "explain": "如果撤回这个版本，所有依赖它的记录都需要重新核验。这里只是预览，不会改动任何记录。",
+    "previewLabel": "将被撤回",
+    "alreadyRecheck": "已经待重验",
+    "needsRecheck": "将需要重验",
+    "waitingReduction": "归约将需要重验",
+    "scopeConfirm": "需重新确认范围",
+    "direct": "直接受影响",
+    "indirect": "间接受影响",
+    "inRecheck": "已在等待重验",
     "openSteps": "受影响的未完成步骤",
-    "frozenScope": "需要重新确认的冻结范围",
+    "frozenScope": "需重新确认的冻结范围",
     "effect": "影响",
-    "none": "当前没有受影响的登记记录。"
+    "none": "目前没有记录依赖这个版本。"
   },
   "stage": {
     "label": "依赖图。拖动可平移；双指捏合或按住 Ctrl 滚动可缩放；加号、减号缩放，0 适合窗口。",
@@ -73,18 +71,18 @@
     "fit": "适合窗口"
   },
   "atlas": {
-    "title": "全局位置",
+    "title": "全局概览",
     "nodes": "{{count}} 个节点",
-    "label": "工作区全部课题的依赖树，虚线圈是当前课题的位置",
-    "move": "拖动移动全局图",
-    "resize": "拖动调整全局图大小",
+    "label": "工作区里所有课题的依赖树，虚线圈标出当前课题。",
+    "move": "拖动可移动概览图",
+    "resize": "拖动可调整概览图大小",
     "untitled": "未命名"
   },
   "legend": {
     "label": "图例与当前情况",
     "running": "运行中",
     "queued": "排队中",
-    "badImpact": "待重验 / 卡点"
+    "badImpact": "将需重验 / 卡点"
   },
   "tone": {
     "ok": "已核验",
@@ -94,25 +92,25 @@
     "planned": "已计划"
   },
   "edge": {
-    "actual": "实际引用",
-    "planned": "计划依赖",
-    "scope": "登记前提",
-    "context": "登记前提"
+    "actual": "证明中用到",
+    "planned": "计划中的步骤",
+    "scope": "允许使用的前提",
+    "context": "允许使用的前提"
   },
   "kind": {
     "goal": "原命题",
     "hypothesis": "假设",
     "library": "定理库",
-    "local_lemma": "中间引理",
+    "local_lemma": "引理",
     "reduction": "归约",
     "obligation": "证明义务",
     "evidence": "Lean 核验",
-    "record": "登记记录"
+    "record": "记录"
   },
   "node": {
     "obligation": "证明义务 {{n}}",
     "reduction": "归约 {{n}}",
-    "lemma": "中间引理 {{n}}",
+    "lemma": "引理 {{n}}",
     "blocked": "卡点",
     "blockedReason": "卡点：{{reason}}"
   },
@@ -131,7 +129,7 @@
     "rejected": "已拒绝",
     "withdrawn": "已撤回",
     "draft": "草稿",
-    "ready": "可核验",
+    "ready": "待核验",
     "available": "可复用",
     "returned": "已退回",
     "refuted": "已反驳",
@@ -142,9 +140,9 @@
     "proved_goal": "已证明",
     "awaiting_review": "待你审阅",
     "awaiting_statement_review": "待陈述审阅",
-    "awaiting_obligations": "待证明义务",
+    "awaiting_obligations": "等待子目标",
     "waiting_for_theorems": "待依赖定理",
-    "waiting_for_reduction": "等待归约重验",
+    "waiting_for_reduction": "归约需重验",
     "lemma_verified": "引理已核验",
     "route_checked": "归约已核验",
     "awaiting_interpretation_review": "待确认含义"
@@ -152,102 +150,128 @@
   "review": {
     "label": "待你审阅与节点详情",
     "title": "待你审阅",
-    "affected": "受影响的记录",
+    "affected": "将受影响的记录",
     "count_one": "{{count}} 项",
     "count_other": "{{count}} 项",
     "close": "收起审阅栏",
     "empty": "目前没有需要你处理的记录。",
-    "detail": "节点详情"
+    "detail": "节点详情",
+    "waiting": "等你处理 · {{count}}",
+    "none": "没有待处理的事项。",
+    "allDone": "都处理完了。有需要你确认的核验或问题时，会出现在这里。",
+    "kinds": {
+      "review_evidence": "待审阅的核验结果",
+      "counterexample": "待审阅的反例",
+      "resolve_clarification": "待回答的问题",
+      "clarify_formalization": "待澄清的含义",
+      "decide_condition": "待决定的条件",
+      "checker_hold": "待审阅的核验器变更",
+      "review_formalpedia_basis": "待审阅的定理库前提",
+      "review_lean_scope_change": "待审阅的 Lean 范围变更"
+    },
+    "evidenceExplain": "Lean 已经核验通过这个结果。批准后，它会作为这个课题的证据记录下来；如果需要修改，可以附上说明退回。",
+    "reviewer": "你的名字",
+    "reason": "理由",
+    "reasonHint": "例如：范围一致，只用到了假设 H₁",
+    "approve": "批准",
+    "return": "退回",
+    "approved": "已批准并记录。",
+    "returned": "已附上说明退回。",
+    "needNameAndReason": "请先填写名字和理由。",
+    "identityNote": "名字会保存在这个浏览器里。之后的版本会改用登录身份。",
+    "context": "上下文",
+    "status": "状态",
+    "cliNote": "这类事项目前在命令行里处理："
   },
   "detail": {
     "formula": "公式",
-    "statement": "原文",
+    "statement": "陈述",
     "lean": "Lean 陈述",
     "source": "来源",
-    "leanRecord": "Lean 记录",
+    "leanRecord": "Lean 状态",
     "usedBy": "用于",
-    "full": "完整 Lean 原文",
-    "leanFull": "Lean 原文",
-    "statementFull": "完整原文",
-    "parameters": "已登记的 Lean 参数",
-    "provenance": "核对来源与版本"
+    "full": "展开全文",
+    "leanFull": "完整 Lean 文本",
+    "statementFull": "完整陈述",
+    "parameters": "Lean 参数",
+    "provenance": "来源与版本"
   },
   "reference": {
     "claim_id": "课题 ID",
     "statement_id": "Lean 陈述 ID",
     "statement_version": "陈述版本",
     "statement_sha256": "陈述摘要",
-    "basis_version_id": "依据版本 ID",
-    "version": "依据版本",
+    "basis_version_id": "前提版本 ID",
+    "version": "前提版本",
     "lemma_id": "引理 ID",
     "check_id": "Lean 核验 ID",
     "evidence_id": "证据 ID",
     "verification_attempt_id": "核验尝试 ID",
     "implication_id": "归约 ID",
-    "position": "义务序号",
+    "position": "义务编号",
     "source_claim_id": "来源课题 ID",
     "module": "Lean 模块",
     "sha256": "SHA-256"
   },
   "chat": {
-    "title": "与模型的对话",
+    "title": "模型对话",
     "wholeClaim": "整个课题",
     "allNodes": "全部节点",
     "collapse": "收起对话",
     "expand": "展开对话",
     "feed": "对话记录",
-    "loading": "正在读取运行记录…",
+    "loading": "正在加载…",
     "running": "{{count}} 项运行中",
     "queued": "{{count}} 项排队中",
-    "idle": "当前没有运行中的任务",
-    "waiting": "等待运行记录。",
-    "emptyClaim": "这个课题还没有运行记录或你的意见。",
-    "emptyNode": "这个节点还没有对话。可以点「全部节点」查看整个课题的记录。",
+    "idle": "空闲",
+    "waiting": "正在加载对话…",
+    "emptyClaim": "这个课题还没有任何动态。",
+    "emptyNode": "这里还没有内容。点「全部节点」可查看整个课题。",
     "you": "你",
     "sentTo": "发给 {{audience}}",
-    "submittedCodex": "已随 Codex 请求提交",
-    "submittedLocal": "已随模型请求提交",
-    "waitingCodex": "等待 Codex 调用",
-    "waitingLocal": "等待本地模型调用",
-    "workerRunning": "正在推进证明…",
-    "taskRunning": "正在运行…",
+    "submittedCodex": "已发给 Codex",
+    "submittedLocal": "本地模型已读取",
+    "waitingCodex": "等 Codex 下次运行",
+    "waitingLocal": "等本地模型下次运行",
+    "workerRunning": "正在搜索证明…",
+    "taskRunning": "正在处理…",
     "lean": "Lean 核验",
-    "record": "工作记录",
+    "record": "动态",
     "mismatch": "返回的记录与当前课题不一致。",
     "listSeparator": "、"
   },
   "activityKind": {
-    "worker": "证明推进",
-    "model": "模型调用",
+    "worker": "证明搜索",
+    "model": "模型运行",
     "lean": "Lean 核验",
     "task": "任务",
-    "pass": "推进结果",
+    "pass": "搜索结果",
     "agent_feedback": "模型反馈",
-    "verifier_feedback": "核验反馈",
+    "verifier_feedback": "Lean 反馈",
     "guidance": "你的意见"
   },
   "activityState": {
     "queued": "排队中",
     "running": "运行中",
-    "leased": "已领取",
+    "leased": "已开始",
     "waiting_retry": "等待重试",
     "waiting_dependency": "等待依赖",
-    "lease_expired": "租约过期",
+    "lease_expired": "已中断",
     "succeeded": "已完成",
     "finished": "已完成",
     "completed": "已完成",
     "failed": "失败",
-    "ready": "待处理",
-    "recorded": "已记录",
+    "ready": "就绪",
+    "recorded": "已保存",
     "cancelled": "已取消",
     "stopped": "已停止",
     "open": "未解决",
     "blocked": "遇到卡点",
     "lemma_verified": "引理已核验",
     "route_checked": "归约已核验",
-    "awaiting_evidence_review": "待人审",
+    "awaiting_evidence_review": "待你审阅",
     "budget_exhausted": "预算用完",
-    "proof_search_blocked": "路线受阻"
+    "proof_search_blocked": "这条路线卡住了"
   },
   "audience": {
     "local": "本地模型",
@@ -255,19 +279,19 @@
   },
   "composer": {
     "label": "给模型的意见",
-    "placeholder": "回复这个节点上的模型，或者给它们一条研究建议",
-    "audience": "发给谁",
-    "unavailable": "当前不能发送",
-    "scopeCodex": "会在下一次获授权的 Codex 调用中发送到外部服务。",
-    "scopeLocal": "仅供已授权的本地模型在下次调用中读取。",
-    "viewOnly": "这个课题目前只能查看运行记录。",
-    "confirmHint": "这条意见会随公开课题发送给外部服务 Codex。再次点击确认发送。",
-    "confirm": "确认发送",
-    "confirmLabel": "确认发送给 Codex",
+    "placeholder": "回复在这个节点上工作的模型，或者提个思路",
+    "audience": "发给",
+    "unavailable": "暂时不能发送",
+    "scopeCodex": "会在 Codex 下一次获授权运行时，发给这个外部服务。",
+    "scopeLocal": "只有你授权的本地模型会在下次运行时读到。",
+    "viewOnly": "这个课题只能查看动态，不能发送意见。",
+    "confirmHint": "这条意见会和公开课题一起发给外部服务 Codex。再点一次即可发送。",
+    "confirm": "发给 Codex",
+    "confirmLabel": "发给 Codex",
     "send": "发送意见",
     "sending": "正在发送",
-    "sentCodex": "意见已记录，等待 Codex 调用。",
-    "sentLocal": "意见已记录，等待本地模型调用。"
+    "sentCodex": "已保存，Codex 下次运行时会读到。",
+    "sentLocal": "已保存，本地模型下次运行时会读到。"
   },
   "model": {
     "fallback": "模型"
@@ -284,5 +308,261 @@
     "side": "拖动调整课题栏宽度",
     "right": "拖动调整审阅栏宽度",
     "chat": "拖动调整对话区高度"
+  },
+  "common": {
+    "loading": "正在加载…",
+    "openInWorkbench": "在工作台中打开"
+  },
+  "rail": {
+    "label": "功能",
+    "workbench": "工作台",
+    "review": "审阅",
+    "claims": "课题",
+    "library": "定理库",
+    "chat": "对话",
+    "team": "团队",
+    "progress": "推进",
+    "help": "帮助",
+    "settings": "设置",
+    "badge": {
+      "review": "{{count}} 项待审阅",
+      "team": "{{count}} 项运行中"
+    }
+  },
+  "claimsPage": {
+    "filter": {
+      "all": "全部课题",
+      "review": "有待审阅",
+      "blocked": "有卡点",
+      "running": "有模型在运行"
+    },
+    "domains": "领域",
+    "byStatus": "按状态分组",
+    "none": "没有符合条件的课题。",
+    "verified": "已核验 {{done}}/{{total}}",
+    "running_one": "{{count}} 个模型在运行",
+    "running_other": "{{count}} 个模型在运行"
+  },
+  "library": {
+    "all": "全部",
+    "byKind": "类型",
+    "bySource": "来源",
+    "attention": "需要处理",
+    "needsRecheck": "待重验",
+    "withdrawn": "已撤回",
+    "admitted": "可使用",
+    "notAdmitted": "尚未纳入",
+    "count_one": "{{count}} 条",
+    "count_other": "{{count}} 条",
+    "search": "按名称或陈述搜索，例如 n + 0",
+    "none": "没有符合条件的条目。",
+    "name": "名称",
+    "statement": "陈述",
+    "version": "版本",
+    "usedBy": "被引用",
+    "source": "来源",
+    "state": "状态",
+    "unused": "还没有被任何核验用到",
+    "kinds": {
+      "theorem": "定理",
+      "definition": "定义",
+      "hypothesis": "假设",
+      "goal": "课题陈述",
+      "lemma": "引理",
+      "item": "条目"
+    },
+    "origins": {
+      "human": "你登记的",
+      "packet": "来自课题",
+      "formalpedia": "Formalpedia",
+      "derivation": "推导所得"
+    }
+  },
+  "threads": {
+    "active": "正在进行",
+    "noneActive": "目前没有模型在运行。",
+    "recent": "最近",
+    "none": "还没有对话。模型开始处理某个节点、或你留下意见后，这里就会出现对话。",
+    "running_one": "{{count}} 个运行中",
+    "running_other": "{{count}} 个运行中",
+    "reply": "去工作台回复",
+    "filter": "显示",
+    "allModels": "全部",
+    "yourNotes": "你的意见",
+    "empty": "这个筛选条件下没有内容。"
+  },
+  "team": {
+    "groups": {
+      "agents": "Agent",
+      "resources": "资源"
+    },
+    "pages": {
+      "runtimes": "运行环境",
+      "agents": "模型",
+      "usage": "用量",
+      "jobs": "任务队列"
+    },
+    "notes": {
+      "runtimes": "模型和 Lean 在哪里运行",
+      "agents": "在这个项目里工作过的模型",
+      "usage": "模型费用与额度",
+      "jobs": "运行中、排队中和最近的任务"
+    },
+    "online_one": "{{count}} 在线",
+    "online_other": "{{count}} 在线",
+    "name": "名称",
+    "channel": "通道",
+    "runs": "运行次数",
+    "load": "负载",
+    "status": "状态",
+    "machines": "机器",
+    "services": "模型服务",
+    "thisMachine": "本机",
+    "runningNow_one": "{{count}} 项运行中",
+    "runningNow_other": "{{count}} 项运行中",
+    "idle": "空闲",
+    "remoteSoon": "把其他电脑接入为运行环境，会随组内服务器一起提供。",
+    "ready": "就绪",
+    "notConfigured": "未配置",
+    "unchecked": "未检测",
+    "providers": {
+      "codex-cli": "Codex",
+      "claude-code": "Claude Code",
+      "openai": "OpenAI API",
+      "anthropic": "Anthropic API",
+      "deepseek": "DeepSeek API",
+      "ollama": "Ollama（本地）"
+    },
+    "check": {
+      "title": "环境检查",
+      "hint": "检查 Python、数据库、四个登录角色、Lean 和 Mathlib。只读取，不做修改。",
+      "running": "正在检查…包含 Lean 时可能需要一分钟。",
+      "allGood": "{{count}} 项检查全部通过。",
+      "problems_one": "{{count}} 项检查需要处理。",
+      "problems_other": "{{count}} 项检查需要处理。",
+      "run": "开始检查",
+      "again": "重新检查"
+    },
+    "lastRun": "最近一次",
+    "average": "平均耗时",
+    "failures": "失败",
+    "verifier": "Lean 核验器",
+    "noModels": "这个项目里还没有模型运行过。",
+    "seconds_one": "{{count}} 秒",
+    "seconds_other": "{{count}} 秒",
+    "minutes": "{{minutes}} 分 {{seconds}} 秒",
+    "usage": {
+      "month": "本月已用",
+      "limit": "月度额度 {{limit}}",
+      "noLimit": "未设置月度额度",
+      "tokens": "Token 数",
+      "allTime": "全部已记录的运行",
+      "cost": "已记录费用",
+      "recorded": "以模型报告为准",
+      "howToLimit": "在命令行里设置月度额度："
+    },
+    "noJobs": "还没有任务。",
+    "what": "内容",
+    "claim": "课题",
+    "when": "时间",
+    "took": "耗时",
+    "targets": {
+      "goal": "原命题",
+      "local_lemma": "引理",
+      "refutation": "反驳"
+    },
+    "via": {
+      "command": "命令 {{name}}",
+      "environment": "环境变量 {{name}}",
+      "local": "本地服务",
+      "endpoint": "自定义地址"
+    },
+    "unnamedMachine": "本机"
+  },
+  "progressPage": {
+    "filter": {
+      "all": "全部规则",
+      "active": "运行中",
+      "proposed": "待批准",
+      "stopped": "已停止"
+    },
+    "note": "你不在时系统做什么",
+    "explain": "推进规则让 worker 在你批准的预算内继续搜索证明。规则只负责排队任务；记录结果、新增假设和调用外部模型仍然需要你确认。",
+    "none": "还没有推进规则。",
+    "summary": "目标：{{metric}} · 每轮最多 {{rounds}} 次模型尝试",
+    "state": {
+      "active": "运行中",
+      "proposed": "待批准",
+      "stopped": "已停止"
+    },
+    "states": {
+      "waiting_review": "等你审阅"
+    },
+    "now": "当前",
+    "lastRun": "最近一次",
+    "never": "还没运行过",
+    "approved": "批准",
+    "notApproved": "尚未批准",
+    "stopped": "停止",
+    "cli": "规则目前在命令行里提议和批准："
+  },
+  "settings": {
+    "general": "通用",
+    "language": "语言",
+    "languageNote": "默认英文。研究内容始终保持原文。",
+    "layout": "工作台布局",
+    "layoutNote": "各栏宽度、概览图位置和收起的面板会记在这个浏览器里。",
+    "resetLayout": "恢复默认布局",
+    "environment": "运行环境",
+    "environmentNote": "检查数据库、登录角色、Lean 和模型服务。",
+    "openRuntimes": "查看运行环境与检查"
+  },
+  "help": {
+    "basics": "使用指南",
+    "intro": "Research Multiplier 把每个课题、它的证明和背后的证据都记录在你的项目里。工作台查看单个课题；其他栏目查看整个项目。",
+    "sections": "栏目",
+    "about": {
+      "workbench": "单个课题的证明图、详情和模型对话。",
+      "review": "等你决定的结果和问题。",
+      "claims": "按状态分组，一览所有课题。",
+      "library": "可以直接复用的定义、假设和定理。",
+      "chat": "所有课题里与模型的对话。",
+      "team": "模型、运行环境、用量和任务队列。",
+      "progress": "你不在时让工作继续推进的规则。"
+    },
+    "canvas": "证明图画布",
+    "keys": {
+      "drag": {
+        "key": "拖动",
+        "what": "平移画布"
+      },
+      "zoom": {
+        "key": "Ctrl 或 ⌘ + 滚动，或双指捏合",
+        "what": "以指针为中心缩放"
+      },
+      "keys": {
+        "key": "方向键、+ 和 −",
+        "what": "画布获得焦点时平移和缩放"
+      },
+      "fit": {
+        "key": "0",
+        "what": "让整张图适合窗口"
+      },
+      "borders": {
+        "key": "拖动边界",
+        "what": "调整面板大小；边界获得焦点时也可用方向键"
+      },
+      "select": {
+        "key": "点击卡片",
+        "what": "查看详情和对话"
+      }
+    },
+    "guides": "docs 目录里的指南",
+    "docs": {
+      "workbench": "proof-workbench.md：工作台，以及给模型发送意见",
+      "quickstart": "quickstart.zh-CN.md：安装和入门",
+      "review": "research-review.md：审阅证据和来源",
+      "progress": "research-progress.md：推进规则和 worker"
+    }
   }
 }
