@@ -1,0 +1,45 @@
+name: Incident review
+description: Something in the engineering process failed (CI, release, merge, lost work). See docs/engineering.md#engineering-incident-reviews.
+title: "Incident: "
+labels: ["type:incident"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Short and blameless. Do not include credentials, connection strings or unpublished research content. Research verification problems use the trust-incident procedure instead (docs/trust-incidents.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: One or two sentences, with dates and times in UTC.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What was delayed, broken or put at risk, and for how long.
+    validations:
+      required: true
+  - type: textarea
+    id: detection
+    attributes:
+      label: Detection
+      description: How it was noticed, and how it could have been noticed sooner.
+  - type: textarea
+    id: cause
+    attributes:
+      label: Root cause
+      description: The underlying cause, not only the trigger.
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Fix
+      description: The PR or commit that fixed it.
+  - type: textarea
+    id: follow-up
+    attributes:
+      label: Follow-up
+      description: One issue per item that prevents a repeat (a test, a CI check, a rule in AGENTS.md).
