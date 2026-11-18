@@ -63,3 +63,7 @@ jobs:
           npx --yes pnpm@9.15.4 build
           git -C .. status --porcelain -- research_multiplier/workbench/app
           test -z "$(git -C .. status --porcelain -- research_multiplier/workbench/app)"
+      - name: End-to-end parity tests (Playwright)
+        run: |
+          npx --yes pnpm@9.15.4 exec playwright install --with-deps chromium
+          npx --yes pnpm@9.15.4 e2e

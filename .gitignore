@@ -10,3 +10,5 @@ runs/
 .DS_Store
 .lake/
 node_modules/
+test-results/
+playwright-report/
