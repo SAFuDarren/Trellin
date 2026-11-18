@@ -47,7 +47,7 @@ These come from the [engineering audit](docs/audits/README.md) and apply to ever
 - **Results stay reproducible.** Research outputs must be reproducible from the recorded code version, parameters, dependencies and data. Never rewrite recorded evidence or pinned verifier sources.
 - **Rules belong in CI.** When a rule keeps being missed, propose a check that enforces it instead of another paragraph of documentation.
 
-To run the periodic maturity audit, use the project skill `.claude/skills/engineering-audit/` ("run an engineering audit"). Agents without skill support can follow its `SKILL.md` directly. Audit findings are tracked in `docs/audits/` and as roadmap tasks.
+For a periodic maturity audit, use the rubric provided by the maintainer outside the checkout. Track shared findings as issues and link the reviewed audit summaries from `docs/audits/`.
 
 ## Working in parallel with other agents
 

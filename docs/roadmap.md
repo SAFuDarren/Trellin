@@ -91,7 +91,7 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- Stress test 4 from the [engineering audit](audits/README.md): each injected fault in the audit skill's list makes an offline test fail. Any fault that slips through gets a new test.
+- Stress test 4 from the [engineering audit](audits/README.md): each injected fault in the maintainer's audit plan makes an offline test fail. Any fault that slips through gets a new test.
 - Stress test 6: a fresh agent with only the repository completes an ordinary task, following `AGENTS.md` without extra explanation. Every rule it missed is fixed in `AGENTS.md` or enforced in CI.
 - Both results are recorded in the next audit (audit finding A-202611-13).
 

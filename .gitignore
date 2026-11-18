@@ -12,3 +12,8 @@ runs/
 node_modules/
 test-results/
 playwright-report/
+
+# Personal tools and Agent skills live outside this checkout.
+/.claude/skills/
+/.agents/skills/
+/.codex/skills/
