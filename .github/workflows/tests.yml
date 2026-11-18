@@ -8,6 +8,7 @@ jobs:
   offline:
     name: Lint and offline tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         python: ['3.10', '3.14']
@@ -40,6 +41,7 @@ jobs:
     name: Web interface (React)
     # Pinned: the Playwright version in web/package.json supports Ubuntu 24.04 but not later runner images.
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: web
@@ -64,7 +66,10 @@ jobs:
           npx --yes pnpm@9.15.4 build
           git -C .. status --porcelain -- research_multiplier/workbench/app
           test -z "$(git -C .. status --porcelain -- research_multiplier/workbench/app)"
+      # Uses the Google Chrome that the runner image already has. Downloading Playwright's
+      # Chromium has hung after the download finished, so CI no longer depends on it.
       - name: End-to-end parity tests (Playwright)
-        run: |
-          npx --yes pnpm@9.15.4 exec playwright install --with-deps chromium
-          npx --yes pnpm@9.15.4 e2e
+        timeout-minutes: 10
+        env:
+          PW_CHANNEL: chrome
+        run: npx --yes pnpm@9.15.4 e2e
