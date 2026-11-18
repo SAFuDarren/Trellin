@@ -16,7 +16,7 @@ import shutil
 import subprocess
 import sys
 from time import monotonic, sleep
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from research_multiplier.storage import credentials, paths
 from research_multiplier.workflows import doctor
@@ -366,13 +366,16 @@ def _existing(path):
 
 
 def _dsn(user, password, host, port, database):
+    login = f"{quote(user, safe='')}:{quote(password, safe='')}"
+    database = quote(database, safe="")
     if host and host.startswith("/"):
-        location = quote(host, safe="")
-    elif host and ":" in host:
-        location = f"[{host}]"
-    else:
-        location = host or "localhost"
-    return f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}@{location}:{port}/{quote(database, safe='')}"
+        # libpq and SQLAlchemy both decode a socket directory supplied as a query parameter.
+        query = urlencode({"host": host, "port": port}, quote_via=quote)
+        return f"postgresql://{login}@/{database}?{query}"
+    location = host or "localhost"
+    if ":" in location:
+        location = f"[{location}]"
+    return f"postgresql://{login}@{location}:{port}/{database}"
 
 
 def choose_workspace(location):
