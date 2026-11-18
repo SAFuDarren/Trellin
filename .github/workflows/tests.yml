@@ -38,7 +38,8 @@ jobs:
 
   web:
     name: Web interface (React)
-    runs-on: ubuntu-latest
+    # Pinned: the Playwright version in web/package.json supports Ubuntu 24.04 but not later runner images.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: web
