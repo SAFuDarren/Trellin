@@ -65,7 +65,7 @@ Several agents and people may work on this repository at the same time. Follow t
    - Keep temporary files in your worktree or the system temp directory.
    - Never stop a process you did not start.
 6. **Integrate small and often.** Rebase on `origin/main` before asking for review and again before merging. Keep each PR to one task.
-7. **Finish cleanly.** Link the PR in the issue and remove `status:in-progress` once it is merged or handed back. Report problems outside your task as new issues; do not fix them in your branch.
+7. **Finish cleanly.** Link the PR in the issue (`Closes #N`) and remove `status:in-progress` once it is merged or handed back. In the same PR, update every record the change affects: the `CHANGELOG.md` line, user guides in both languages, tracking-issue checkboxes, decisions. The table in [keeping status and records current](docs/engineering.md#keeping-status-and-records-current) lists where each record lives. Never edit the roadmap to mark progress. Report problems outside your task as new issues; do not fix them in your branch.
 
 ## Layout
 

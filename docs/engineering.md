@@ -129,7 +129,7 @@ All tasks, bugs and milestones are tracked in **GitHub Issues** and a **GitHub P
   - `needs-decision` (blocked on an open question), `status:in-progress` (claimed; see [parallel work](#parallel-work)), `good first issue`, `help wanted`
 - **Board columns:** Triage → Ready (has acceptance criteria) → In progress → In review → Done.
 - **Triage:** the maintainer reviews new issues weekly, applies labels, assigns a milestone or closes them, and links any decision that blocks them.
-- **Roadmap upkeep:** when a task is added, split or reordered, update `roadmap.md` and `roadmap.zh-CN.md` together with the issues.
+- **Roadmap upkeep:** when a task is added, split or reordered, update `roadmap.md` and `roadmap.zh-CN.md` together with the issues. Progress is tracked in the issues, not the roadmap; see [keeping status and records current](#keeping-status-and-records-current).
 
 ---
 
@@ -210,6 +210,24 @@ Several people and coding agents may work on the repository at once. The rules b
 **Stress tests**
 
 Stress tests 3 (parallel development) and 6 (handover) in the [engineering audit](audits/README.md) check that these rules work in practice. Run them before relying on several agents for a whole phase.
+
+## Keeping status and records current
+
+Each kind of record has one home. Update it in the same pull request that changes the facts.
+
+| Record | Single source of truth | When to update it |
+| --- | --- | --- |
+| Task status (open, claimed, done) | The GitHub issue and its milestone | Claim with `status:in-progress`. The PR says `Closes #N`, which closes the issue on merge. Remove the label if work stops |
+| Plan and acceptance criteria | `docs/roadmap.md` and `.zh-CN.md` | Only when a task is added, split, reordered or its criteria change. Never edit it to mark progress. Update the issue in the same PR |
+| Tracking issues (for example the publication gate, #18) | The checklist in that issue | Tick an item when the PR that completes it is merged |
+| Decisions and open questions | `docs/architecture.md` and `.zh-CN.md` | When a question is answered: move it from section G to the "Decided" line, add or change the numbered decision, close its `needs-decision` issue |
+| Interface contracts | `docs/interfaces.md` and the schemas | Follow "Changing a contract" in that document |
+| User-visible changes | `CHANGELOG.md` | Every user- or plugin-author-visible change adds a line under **Unreleased** at the top. Until the first public release, add it to the 1.0.0 entry instead. The release PR renames Unreleased to the version |
+| Package version | `pyproject.toml` | Only in a release PR, following [Prepare a release](release.md) and the versioning rules above |
+| User guides | `docs/` (both languages), both quickstarts, `research_multiplier/agent_guide.md` | Whenever a command, screen, decision, model use or network use that researchers see changes |
+| Audit findings | The audit record in `docs/audits/` (never edited afterwards) | The next audit reports each finding's status. Progress happens in the issue or task the finding names |
+
+A milestone is closed when all its issues are closed and its phase exit criteria hold.
 
 ## Releases
 
