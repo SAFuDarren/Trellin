@@ -106,6 +106,26 @@ def test_model_failures_are_sanitized(monkeypatch, failure, code):
     assert str(rejected.value) == code
 
 
+@pytest.mark.parametrize(("sensitivity", "confirm_local"), [("public", False), ("restricted", True)])
+def test_environment_adapter_uses_the_existing_intake_scope(monkeypatch, sensitivity, confirm_local):
+    configured = object()
+    candidate = {"kind": "theorem", "natural": _NOTES.strip(), "formal": None}
+    reply = SimpleNamespace(output={"items": [candidate]}, metadata={}, transcript={})
+
+    def from_env(role, *, private):
+        assert (role, private) == ("EXPLORE", confirm_local)
+        return configured
+
+    def complete(config, *args):
+        assert config is configured
+        return reply
+
+    monkeypatch.setattr(intake.ModelConfig, "from_env", from_env)
+    monkeypatch.setattr(intake, "complete_structured", complete)
+    _, items = intake._extract({**_DRAFT, "sensitivity": sensitivity}, confirm_local=confirm_local)
+    assert items == [{**candidate, "origin": "model"}]
+
+
 def test_injected_adapter_must_match_intake_scope(monkeypatch):
     monkeypatch.setattr(intake, "complete_structured", lambda *args, **kwargs: pytest.fail("public model in private intake"))
     remote_route = ModelConfig("ollama-native", "test:latest", "family", "http://127.0.0.1:11434")

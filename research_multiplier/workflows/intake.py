@@ -106,8 +106,10 @@ def _extract(data, target=None, *, explicit=(), confirm_local=False, model_confi
             key: target[key] for key in ("statement", "formal", "quantifiers", "parameters", "constant_dependencies")
         }
     prompt = EXTRACT_PROMPT if target is None else TARGET_PROMPT
-    config = model_config or ModelConfig.from_env("EXPLORE", private=confirm_local)
-    if config.private != confirm_local:
+    config = model_config
+    if config is None:
+        config = ModelConfig.from_env("EXPLORE", private=confirm_local)
+    elif config.private != confirm_local:
         raise ValueError("The model configuration must match the selected intake scope.")
     model = complete_structured(config, "intake-notes", prompt, context, 2400, 90)
     try:
