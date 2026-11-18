@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "screenshots": "node scripts/readme-screenshots.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.81.5",
