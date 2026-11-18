@@ -38,6 +38,8 @@ test("claims, graph, live work, legend and details load without errors", async (
   await expect(page.locator(".graph-edge")).toHaveCount(7);
   await expect(card(page, /^Proof obligation 2$/).locator(".work")).toContainText("gpt-5-codex ×2");
   await expect(page.locator(".legend")).toContainText("Running");
+  // The legend's dividers stay thin lines; a page style once turned them into cards.
+  expect((await page.locator(".legend .rule").first().boundingBox())?.width ?? 99).toBeLessThan(4);
   await expect(page.locator(".atlas")).toBeVisible();
   await expect(page.locator(".node-detail h2")).toHaveText("reverseZeroAdd");
   expect(errors).toEqual([]);

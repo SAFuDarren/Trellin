@@ -2023,13 +2023,13 @@ select {
   color: var(--sub);
   overflow-wrap: anywhere;
 }
-.rules {
+.policy-cards {
   display: flex;
   flex-direction: column;
   gap: 10px;
   max-width: 920px;
 }
-.rule {
+.policy-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2038,27 +2038,27 @@ select {
   border-radius: 12px;
   background: var(--node);
 }
-.rule header {
+.policy-card header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
 }
-.rule header .name {
+.policy-card header .name {
   flex: 1;
   min-width: 200px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.rule header .name strong {
+.policy-card header .name strong {
   font-size: 14px;
 }
-.rule header .name span {
+.policy-card header .name span {
   font-size: 12.5px;
   color: var(--sub);
 }
-.rule .facts {
+.policy-card .facts {
   padding-top: 10px;
   border-top: 1px solid var(--hair);
   font-size: 13px;

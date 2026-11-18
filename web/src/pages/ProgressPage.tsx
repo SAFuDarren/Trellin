@@ -49,11 +49,11 @@ export function ProgressPage({
         ) : shown.length === 0 ? (
           <Empty>{progress.isPending ? t("common.loading") : t("progressPage.none")}</Empty>
         ) : (
-          <div className="rules">
+          <div className="policy-cards">
             {shown.map((policy) => {
               const state = bucket(policy);
               return (
-                <article className="rule" key={policy.id}>
+                <article className="policy-card" key={policy.id}>
                   <header>
                     <div className="name">
                       <strong>{policy.claim_title || t("sidebar.untitled")}</strong>
