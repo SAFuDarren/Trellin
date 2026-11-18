@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import WebKit
 
 private func localized(_ key: String) -> String {
@@ -11,7 +12,7 @@ private struct LastWorkspace: Codable {
 }
 
 @main
-final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     private let defaults = UserDefaults.standard
     private let lastKey = "lastWorkspaceV1"
     private let bridge = "trellinPosition"
@@ -199,6 +200,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
         }
         let web = WKWebView(frame: .zero, configuration: configuration)
         web.navigationDelegate = self
+        web.uiDelegate = self
         webView = web
         let folderName = workspace.lastPathComponent == "Trellin"
             ? workspace.deletingLastPathComponent().lastPathComponent : workspace.lastPathComponent
@@ -245,11 +247,38 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
         showStatus("disconnected", retry: true)
     }
 
+    func webView(_ web: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        guard web === webView, trusted(frame), window.attachedSheet == nil else {
+            completionHandler(nil)
+            return
+        }
+        let picker = NSOpenPanel()
+        picker.canChooseFiles = true
+        picker.canChooseDirectories = false
+        picker.allowsMultipleSelection = false
+        picker.allowedContentTypes = [.plainText] + ["md", "lean"].compactMap { UTType(filenameExtension: $0) }
+        if let requested {
+            picker.directoryURL = requested.lastPathComponent == "Trellin" ? requested.deletingLastPathComponent() : requested
+        }
+        picker.beginSheetModal(for: window) { [weak self, weak web] result in
+            guard let self, let web, web === self.webView, result == .OK else {
+                completionHandler(nil)
+                return
+            }
+            completionHandler(picker.urls)
+        }
+    }
+
+    private func trusted(_ frame: WKFrameInfo) -> Bool {
+        guard frame.isMainFrame, let serverURL else { return false }
+        let origin = frame.securityOrigin
+        return origin.protocol == serverURL.scheme && origin.host == serverURL.host && origin.port == serverURL.port
+    }
+
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        let origin = message.frameInfo.securityOrigin
-        guard message.name == bridge, message.webView === webView, message.frameInfo.isMainFrame,
-              let serverURL, origin.protocol == serverURL.scheme, origin.host == serverURL.host,
-              origin.port == serverURL.port, let position = WorkbenchPosition(message: message.body),
+        guard message.name == bridge, message.webView === webView, trusted(message.frameInfo),
+              let position = WorkbenchPosition(message: message.body),
               last?.position != position else { return }
         last?.position = position
         saveLast()
