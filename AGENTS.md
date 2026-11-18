@@ -58,8 +58,8 @@ Several agents and people may work on this repository at the same time. Follow t
    - Claim: `python scripts/tasks.py claim <issue> --agent <name> --branch <type>/<issue>-<topic> --scope <paths>`. The tool refuses issues that someone else holds or that need a decision. If two agents claim at the same moment, the later one withdraws automatically: start work only when the tool says `Claimed`.
    - Release when you stop: `python scripts/tasks.py release <issue> --agent <name> --reason "..."`.
    - Work only on an open issue. If no issue exists for what you were asked to do, ask the maintainer instead of starting.
-   - The PR description must say `Closes #<issue>`. CI checks that the issue is held by the PR's branch.
-2. **One task, one branch, one worktree:** `git worktree add ../rm-<topic> -b <type>/<topic> origin/main`. Never edit another agent's worktree or branch.
+   - Link the claimed issue in the PR with `Closes #N` when all criteria are met, or `Refs #N` for a partial change. CI checks the linked task and branch.
+2. **One task, one branch, one worktree:** `git worktree add ../rm-<issue>-<topic> -b <type>/<issue>-<topic> origin/main`. Use the exact branch name from your claim. Never edit another agent's worktree or branch.
 3. **Stay inside your scope.** List the files you expect to change in the issue. If you need a file that another open PR changes (`gh pr list`, then check its files), stop and coordinate in the issues instead of editing it.
 4. **Shared hot spots:**
    - **Migrations**: need the maintainer's approval. Take the next number only when you open the PR. If `main` gains a migration first, renumber yours and update `down_revision`; CI rejects duplicate revisions and multiple heads.
@@ -69,19 +69,24 @@ Several agents and people may work on this repository at the same time. Follow t
 5. **Local resources are not shared:**
    - Give every test database a unique name, such as `rm_test_<branch>_<random>`.
    - Start servers with `--port 0` or a port you checked is free.
-   - Keep temporary files in your worktree or the system temp directory.
+   - Put case copies, logs and build output in a temporary location outside the source tree. See [file placement](docs/engineering.md#repository-layout).
    - Never stop a process you did not start.
 6. **Integrate small and often.** Rebase on `origin/main` before asking for review and again before merging. Keep each PR to one task.
 7. **Finish cleanly.** Write `Closes #N` in the PR only when it meets every acceptance criterion, otherwise `Refs #N`. After the merge, check that the issue is closed and `status:in-progress` is removed, and close any other issue the merge resolved, with a comment naming the PR. Never close an issue with an unmet criterion; see [closing issues](docs/engineering.md#closing-issues). In the same PR, update every record the change affects: the `CHANGELOG.md` line, user guides in both languages, tracking-issue checkboxes, decisions. The table in [keeping status and records current](docs/engineering.md#keeping-status-and-records-current) lists where each record lives. Never edit the roadmap to mark progress. Report problems outside your task as new issues; do not fix them in your branch.
+8. **Retire only your own branch and worktree.** Follow [branch retirement](docs/engineering.md#retire-a-branch-and-worktree) after review and integration. Check for unpublished commits, local files and dependent PRs before removing anything.
 
 ## Layout
+
+Use the [repository layout and artifact rules](docs/engineering.md#repository-layout) when adding or moving files.
 
 | Path | Contents |
 | --- | --- |
 | `research_multiplier/cli/` | Argument parsing and output only |
 | `research_multiplier/workflows/` | Research logic shared by the CLI and the API |
-| `research_multiplier/storage/`, `migrations/` | PostgreSQL access, Alembic revisions and their SQL |
-| `research_multiplier/workbench/` | Local workbench server and built interface assets |
+| `research_multiplier/storage/`, `research_multiplier/migrations/` | PostgreSQL access, Alembic revisions and their SQL |
+| `research_multiplier/workbench/` | Local workbench server and its generated `app/` |
+| `web/` | React source, build configuration and browser tests |
+| `tests/` | Python checks and small shared test fixtures |
 | `research_multiplier/schemas/` | JSON Schemas for records and interface contracts |
 | `research_multiplier/*/_pinned/`, `_compat/` | Fingerprinted verifier and adapter sources (do not edit) |
 | `lean/` | Pinned Lean and Mathlib setup |
@@ -114,15 +119,22 @@ npx pnpm@9.15.4 build   # writes research_multiplier/workbench/app; commit the r
 
 `research-multiplier workbench` serves the built interface. Interface strings live in `web/src/i18n/en.json` and `zh-CN.json`; lint rejects literal text in JSX.
 
-Build the wheel and run the offline smoke check that CI runs:
+Build and install the wheel in a clean environment, then check offline initialization. This example uses a POSIX shell and virtual environment paths.
 
 ```sh
-python -m pip wheel --no-deps --wheel-dir dist .
-research-multiplier research init-workspace /tmp/rm-smoke
-research-multiplier doctor --skip-lean
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/rm-smoke.XXXXXX")
+python -m pip wheel --no-deps --wheel-dir "$scratch/wheels" .
+python -m venv "$scratch/venv"
+"$scratch/venv/bin/python" -m pip install "$scratch"/wheels/research_multiplier-*.whl
+(
+  cd "$scratch" || exit
+  unset PYTHONPATH
+  ./venv/bin/research-multiplier research init-workspace "$scratch/workspace"
+  ./venv/bin/research-multiplier --workspace "$scratch/workspace" init "$scratch/workspace/inputs/question.json"
+)
 ```
 
-Regression lanes currently live in the external validation bundle. See [CONTRIBUTING.md](CONTRIBUTING.md#run-the-external-regression-suite). Run them from outside the checkout with an installed wheel, `PYTHONPATH` unset, and a disposable database for the PostgreSQL lanes. Roadmap task P0.2 moves the tests into `tests/`.
+See [tests/README.md](tests/README.md) and the [contributor guide](CONTRIBUTING.md#run-the-external-regression-suite) for the regression lanes. Follow the lane instructions for an installed wheel and a disposable workspace or database.
 
 Open the workbench on a test project:
 
@@ -134,5 +146,5 @@ research-multiplier --workspace /path/to/test-project workbench
 
 - Conventional Commits: `type(scope): summary`, one purpose per commit.
 - Sign off every commit with `git commit -s` (Developer Certificate of Origin, E9).
-- Branch from `main` as `type/short-topic`. Do not commit to `main` directly, and do not push or open a PR unless asked.
+- Branch from `origin/main` using the name recorded in your issue claim. Do not commit to `main` directly, and do not push or open a PR unless asked.
 - Commands, decisions, model or network use that researchers will see also need updates to `research_multiplier/agent_guide.md`, both quickstarts, and `CHANGELOG.md`.

@@ -17,20 +17,24 @@
 
 ## 仓库结构
 
-下表是目标结构，标「以后」的目录现在还没有。
+新增文件时按下表选择位置。根目录留给全项目的入口、贡献和许可文件，以及共用的工具、打包和发布配置。只服务于某个组件的文件放回该组件的目录。目录职责变化时，同步更新中英文两份表格。
 
 | 路径 | 内容 | 语言 |
 | --- | --- | --- |
 | `research_multiplier/` | Python 包：CLI、各类流程、存储、策略、模型适配、随核心发布的插件、工作台服务端 | Python |
-| `research_multiplier/migrations/` | Alembic 迁移版本，以及它们执行的 SQL | Python、SQL |
-| `research_multiplier/workbench/app/` | 由 `web/` 构建生成的界面文件，不要手改 | 生成文件 |
-| `research_multiplier/_pinned/`、`*/_pinned/`、`_compat/` | 已记录指纹对应的验证器和适配器源码（B7） | Python |
-| `lean/` | 通用的 Lean 支持文件，以及固定版本的 Lean 和 Mathlib 配置 | Lean |
-| `web/`（以后） | React 界面源码（P1.4） | TypeScript |
-| `plugins/`（以后） | 参考插件和一致性测试（P2.3） | 任意语言 |
-| `tests/`（以后） | 所有测试线（P0.2） | Python、TypeScript |
-| `deploy/`（以后） | Docker Compose 和部署文件（P3.5） | YAML、shell |
-| `docs/` | 用户文档和设计文档，英文为主，配中文版 | Markdown |
+| `research_multiplier/storage/`、`research_multiplier/migrations/` | 持久化代码、Alembic 迁移版本及其执行的 SQL | Python、SQL |
+| `research_multiplier/schemas/` | 记录和接口的机器可读 schema | JSON |
+| `research_multiplier/workbench/app/` | 从 `web/` 构建并提交到软件包里的界面文件。前端改动时从源码重新生成 | 生成文件 |
+| `research_multiplier/*/_pinned/`、`research_multiplier/_compat/` | 已记录指纹对应的验证器和适配器源码（B7） | Python |
+| `lean/` | 通用 Lean 支持文件，以及固定版本的 Lean 和 Mathlib 配置 | Lean |
+| `web/` | `src/` 中的 React 源码、`e2e/` 中的浏览器测试、前端配置和锁文件 | TypeScript |
+| `tests/` | Python 测试源码和供测试共用的小型合成夹具。新增回归测试线由 P0.2 跟踪 | Python |
+| `scripts/`、`.github/` | 维护脚本、CI 工作流、issue 和 PR 模板 | Python、YAML |
+| `docs/` | 用户文档和工程文档。指南通过 `docs/README.md` 索引，带日期的审计记录归入 `docs/audits/` | Markdown |
+
+实际科研项目和公开示例项目放在软件仓库之外，各用独立目录。测试输出、运行日志和截图、数据库转储、外部验证包，以及 wheel 或源码分发包也放在仓库之外。每条测试线都使用独立的临时工作区和数据库，CI 输出放到 `RUNNER_TEMP` 一类的临时目录。Git 忽略的本地依赖环境或缓存可以留在 worktree。送审前通过 PR 差异检查文件路径。
+
+路线图里还有未来的 `plugins/` 和 `deploy/` 目录。对应任务引入这些目录之前，按现有目录分工开发。
 
 ---
 
@@ -49,7 +53,7 @@
 
 - **Python**
   - 基础安装保持零运行时依赖。需要第三方包的功能放进额外依赖组，比如 `postgres`。
-  - 开发环境用 uv 管理，`uv.lock` 提交进仓库。
+  - 开发环境先按 AGENTS 的安装步骤配置。P0.3 会引入提交到仓库的 `uv.lock`。
   - `_pinned/` 里已经产生过证据的代码，一律不能修改；需要改动时，新增一个固定版本（B7）。
   - 脚本优先用 Python 写，不用 shell，因为 CI 也在 Windows 上跑。
 - **SQL 与迁移**
@@ -88,7 +92,7 @@
 ## 开发流程
 
 1. **先开 issue。** 稍有规模的改动都从一个 GitHub issue 开始。issue 写明要解决的问题、验收标准和相关决定的编号。小修小补可以直接提 PR。
-2. **建分支。** 分支命名为 `类型/简短主题`，例如 `feat/event-log`、`fix/inbox-order`。不要直接往 `main` 提交。
+2. **建分支。** 有对应任务时，使用认领时记录的 `type/issue-short-topic` 分支名，例如 `feat/12-event-log`。从 `origin/main` 创建，在任务分支提交。
 3. **写提交说明。** 采用 Conventional Commits 格式：`类型(范围): 摘要`。
    - 类型有：`feat`、`fix`、`docs`、`refactor`、`test`、`build`、`ci`、`chore`。
    - 范围填所属的层或模块，例如 `kernel`、`lean`、`web`、`migrations`。
@@ -185,7 +189,7 @@
 **分配工作**
 - 每个任务对应一个路线图任务的 GitHub issue，用 `scripts/tasks.py` 认领和释放。所有 agent 都通过同一个 GitHub 账号操作，所以认领记录是一条带隐藏标记的留言（写明 agent 名称和分支），再加上 `status:in-progress` 标签。认领后工具会重新读取 issue，如果发现有更早的认领就自动撤回；即使两个 agent 同时认领，最终也只有一个持有者。
 - `python scripts/tasks.py board` 列出所有未关闭的 issue：持有者、分支、认领时长（超过 48 小时标记为可能已停滞）、关联的 PR。停滞的认领由维护者释放。
-- CI 的 **Task link** 检查要求每个 PR 关联它的 issue（`Closes #N`）；如果该 issue 被别的分支持有，检查失败。没有对应任务的小改动 PR 加 `no-issue` 标签。
+- CI 的 **Task link** 检查要求每个 PR 关联它的 issue（`Closes #N` 或 `Refs #N`）；如果该 issue 被别的分支持有，检查失败。没有对应任务的小改动 PR 加 `no-issue` 标签。
 - 只有当几个任务涉及的模块互不重叠时，维护者才让它们并行，例如后端测试（P0.2）和网页界面（P1.4）。会改同一批文件的任务按顺序做。
 - 每个人或 agent 同一时间只做一个任务。
 
@@ -194,7 +198,7 @@
 - 本地资源各用各的：
   - 测试数据库名称不能重复；
   - 服务用 `--port 0` 启动，或者先确认端口空闲；
-  - 临时文件放在自己的 worktree 或系统临时目录里。
+  - 案例副本、日志和构建输出放在源码树之外的临时位置，详见[仓库结构](#仓库结构)。
 
 **容易冲突的地方**
 
@@ -212,9 +216,20 @@
 - 用 squash 合并，标题采用 Conventional Commits 格式。
 - 在任务范围之外发现的问题，另开 issue，不要顺手改在当前分支里。
 
-**压力测试**
+### 清理分支和 worktree
+
+分支和 worktree 由原负责人清理，或在 issue 里明确交接给别人。GitHub 自动删除分支等仓库设置由维护者决定。按以下顺序清理任务分支。
+
+1. 用任务 PR 的编号运行 `gh pr view "$pr" --json state,headRefName,headRefOid`，确认状态为 `MERGED`，再记下评审过的分支头。Squash 合并会替换提交，因此只看 `git branch --merged` 无法判断 PR 是否已合入。如果工作暂停、放弃或仍待评审，在 issue 里记录分支和剩余工作，并在适当时释放认领。保留分支，直到改动合入，或任务已明确关闭且维护者批准清理。
+2. 确认任务认领已关闭或释放，再运行 `gh pr list --state open --head "$branch"` 和 `gh pr list --state open --base "$branch"`。还有打开的 PR 使用该分支时，先保留分支。堆叠 PR 的父 PR 合入后，由依赖方负责人把 PR 改为指向 `main`，只把各自的提交移到最新 `origin/main` 上，再验证差异和必需检查。后续 PR 已合入或在新基线上通过这些检查后，才能清理父分支。
+3. 拉取 `origin` 的最新信息，用 `git worktree list` 找到正确的检出目录，再用 `git -C "$worktree" status --short --untracked-files=all --ignored=matching` 检查文件。用 `git log --oneline "$reviewed_head..$branch"` 对照本地分支与评审过的分支头，并检查远端头有无新提交。若存在未纳入评审的提交，先保存。需要保留的本地编辑、未跟踪文件和被忽略的产物，也先保存并记录去向。
+4. 检查通过后，从另一个检出目录运行 `git worktree remove "$worktree"` 和 `git branch -d "$branch"`。如果 squash 合并导致本地删除被拒绝，且已拉取的远端跟踪分支仍指向已核对的评审提交，运行 `git branch --set-upstream-to="origin/$branch" "$branch"`，再重试受保护的删除。其他情况保留分支交维护者处理。本地清理和最后一次依赖检查完成后，原负责人才能移除已核对的远端分支。禁止强制移除、操作别人的分支或 worktree，或借清理清除仍有效的认领。
+
+### 压力测试
 
 [工程审计](audits/README.zh-CN.md)里的压力测试 3（并行开发）和 6（交接）用来检验这些规则在实际中是否有效。在依赖多个 agent 完成整个阶段之前，先跑一遍这两项测试。
+
+只使用仓库内容的[交接演练 #9](https://github.com/SAFuDarren/research-multiplier/issues/9)应让下一位 agent 从 `AGENTS.md` 找到源码、生成界面、测试和输出的位置，并指出哪些情况会阻止清理任务分支。把结果记录到 issue。
 
 ## 及时更新状态和记录
 
