@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.4
+
+- Document the release recovery drill and record a tested rollback between
+  installed versions.
+
 ## 1.0.3
 
 - Project restore checks the PostgreSQL connection format before writing to
