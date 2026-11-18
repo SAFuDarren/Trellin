@@ -122,11 +122,18 @@ def _native(directory, dsn, names, *, workers, required):
         drop(template)
 
 
+def _inside_app(path):
+    return any(parent.name == "Contents" and parent.parent.suffix.lower() == ".app" for parent in path.parents)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("offline", "postgres", "lean", "release-lean"))
     parser.add_argument("--workers", type=int, choices=range(1, 5), default=1, help="Isolated Lean test processes.")
     args = parser.parse_args()
+    app_error = "Run compatibility regressions in a separate wheel environment outside the signed app."
+    if _inside_app(Path(sys.executable).resolve()):
+        parser.error(app_error)
     root = Path(__file__).resolve().parent
     expected = (root / "PACKAGE_VERSION").read_text(encoding="ascii").strip()
     try:
@@ -136,10 +143,13 @@ def main():
     if installed.version != expected:
         parser.error(f"This suite requires Research Multiplier {expected}; found {installed.version}.")
 
+    package = Path(installed.locate_file("research_multiplier/__init__.py")).resolve()
+    if _inside_app(package):
+        parser.error(app_error)
+
     sys.dont_write_bytecode = True
     import research_multiplier
 
-    package = Path(installed.locate_file("research_multiplier/__init__.py")).resolve()
     if Path(research_multiplier.__file__).resolve() != package:
         parser.error("The suite must import the package from the selected wheel installation.")
     print(f"Research Multiplier {installed.version} from {package}", flush=True)

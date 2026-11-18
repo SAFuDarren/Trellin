@@ -29,4 +29,14 @@ python -m pytest -m offline
 desktop/macos/tests/run-swift-tests.sh
 ```
 
-For the interactive check, use a disposable directory with [local Lean and PostgreSQL](research-foundation.md). From Launchpad, cancel the picker once and check that the directory has no `Trellin` subfolder. Then open it, verify that the subfolder and database are created, and select the same directory again to check that it opens the existing workspace. In an isolated public example with an existing graph, select a noninitial node and restart Trellin to check that it restores the same node and persisted verification result.
+## Validate the signed build
+
+Use a fresh virtual environment outside the checkout and the app for the [installed-wheel compatibility suite](../tests/compat_validation/README.md). Install the wheel with the exact version declared in `tests/compat_validation/PACKAGE_VERSION` and keep test projects, databases and logs in disposable locations. The runner rejects a Python interpreter or package installed inside a macOS app before it starts the tests.
+
+Use the signed app for startup and workspace checks. For the interactive check, use a disposable directory with [local Lean and PostgreSQL](research-foundation.md). From Launchpad, cancel the picker once and check that the directory has no `Trellin` subfolder. Then open it, verify that the subfolder and database are created, and select the same directory again to check that it opens the existing workspace. In an isolated public example with an existing graph, select a noninitial node and restart Trellin to check that it restores the same node and persisted verification result.
+
+After quitting the app, verify the same bundle’s signature.
+
+```sh
+codesign --verify --deep --strict /absolute/path/to/local-review/Trellin.app
+```

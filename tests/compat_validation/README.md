@@ -1,8 +1,8 @@
 # Research Multiplier compatibility regression suite
 
-This bundle contains software regression code for the exact version in `PACKAGE_VERSION`. Keep it outside both the program checkout and real research workspaces. Temporary test projects and database data use separate disposable locations. Public case materials, historical runs and release evidence have their own external locations.
+This suite checks the installed wheel for the exact version in `PACKAGE_VERSION`. Create a clean virtual environment outside the checkout and real research workspaces. Install the matching wheel with the `postgres` extra and run from outside the checkout with `PYTHONPATH` unset.
 
-Install the matching wheel with the `postgres` extra in a clean virtual environment. Run from outside the software checkout with `PYTHONPATH` unset.
+Trellin's signed macOS bundle uses its own Python for normal app startup. Use a separate wheel environment for this suite, its subprocesses, disposable databases and test records. See [validating the macOS build](../../docs/desktop.md#validate-the-signed-build).
 
 ```sh
 python /path/to/validation/run_regressions.py offline

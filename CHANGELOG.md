@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.5
+
+- The full compatibility suite requires a separate installed wheel environment
+  and rejects Python or package metadata inside signed Trellin builds.
+
 ## 1.0.4
 
 - Document the release recovery drill and record a tested rollback between
