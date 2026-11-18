@@ -180,7 +180,9 @@ At the end of every roadmap phase, run the engineering maturity audit with the p
 Several people and coding agents may work on the repository at once. The rules below keep their work from colliding; `AGENTS.md` carries the short version that every agent reads.
 
 **Assigning work**
-- Every task is a GitHub issue for a roadmap task. A worker claims an issue by labelling it `status:in-progress` and commenting with the branch name. Only one worker holds an issue at a time.
+- Every task is a GitHub issue for a roadmap task. Workers claim and release issues with `scripts/tasks.py`. All agents act through one GitHub account, so a claim is a comment with a hidden marker naming the agent and branch, plus the `status:in-progress` label. After claiming, the tool reads the issue back and withdraws if an earlier claim exists, so only one worker holds an issue even when two claim at once.
+- `python scripts/tasks.py board` lists every open issue with its holder, branch, claim age (flagged after 48 hours as possibly stale) and linked PRs. The maintainer releases stale claims.
+- The **Task link** CI check requires each PR to link its issue (`Closes #N`) and fails if another branch holds that issue. A trivial PR without a task carries the `no-issue` label.
 - The maintainer starts parallel tasks only when their areas do not overlap, for example backend tests (P0.2) and the web interface (P1.4). Tasks that touch the same files run one after the other.
 - Limit work in progress to one task per worker.
 

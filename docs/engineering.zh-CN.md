@@ -183,7 +183,9 @@
 可能有多个人和多个编码 agent 同时在这个仓库里工作。以下规则用来避免彼此冲突；`AGENTS.md` 里有每个 agent 都会读到的简版。
 
 **分配工作**
-- 每个任务对应一个路线图任务的 GitHub issue。认领方式：给 issue 加上 `status:in-progress` 标签，并留言写明分支名。同一时间只能有一人持有一个 issue。
+- 每个任务对应一个路线图任务的 GitHub issue，用 `scripts/tasks.py` 认领和释放。所有 agent 都通过同一个 GitHub 账号操作，所以认领记录是一条带隐藏标记的留言（写明 agent 名称和分支），再加上 `status:in-progress` 标签。认领后工具会重新读取 issue，如果发现有更早的认领就自动撤回；即使两个 agent 同时认领，最终也只有一个持有者。
+- `python scripts/tasks.py board` 列出所有未关闭的 issue：持有者、分支、认领时长（超过 48 小时标记为可能已停滞）、关联的 PR。停滞的认领由维护者释放。
+- CI 的 **Task link** 检查要求每个 PR 关联它的 issue（`Closes #N`）；如果该 issue 被别的分支持有，检查失败。没有对应任务的小改动 PR 加 `no-issue` 标签。
 - 只有当几个任务涉及的模块互不重叠时，维护者才让它们并行，例如后端测试（P0.2）和网页界面（P1.4）。会改同一批文件的任务按顺序做。
 - 每个人或 agent 同一时间只做一个任务。
 

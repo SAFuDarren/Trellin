@@ -1,0 +1,22 @@
+name: Task link
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+jobs:
+  claimed-task:
+    name: PR links a task its branch holds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check the linked issue and its claim
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 scripts/tasks.py check-pr ${{ github.event.pull_request.number }}
