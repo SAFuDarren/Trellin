@@ -29,4 +29,14 @@ python -m pytest -m offline
 desktop/macos/tests/run-swift-tests.sh
 ```
 
-交互验收时，用[本机 Lean 和 PostgreSQL](research-foundation.zh-CN.md)准备一次性目录。从 Launchpad 打开应用，先取消选择，检查目录下没有 `Trellin`。再打开该目录，核对新子目录和数据库，然后重新选择该目录确认打开的是同一课题。在已有图谱的独立公开案例中另选一个非默认节点，重开后核对节点和已保存的核验结果。
+## 核验签名构建
+
+在软件目录和 App 之外新建虚拟环境，运行[已安装 wheel 的兼容回归](../tests/compat_validation/README.md)。安装与 `tests/compat_validation/PACKAGE_VERSION` 一致的 wheel，课题、数据库和日志都使用临时位置。若 Python 或软件包来自 macOS App 内部，回归入口会在启动测试前拒绝执行。
+
+用签名 App 检查启动和课题恢复。交互验收时，用[本机 Lean 和 PostgreSQL](research-foundation.zh-CN.md)准备一次性目录。从 Launchpad 打开应用，先取消选择，检查目录下没有 `Trellin`。再打开该目录，核对新子目录和数据库，然后重新选择该目录确认打开的是同一课题。在已有图谱的独立公开案例中另选一个非默认节点，重开后核对节点和已保存的核验结果。
+
+退出后，对同一个 App 重新检查签名。
+
+```sh
+codesign --verify --deep --strict /absolute/path/to/local-review/Trellin.app
+```
