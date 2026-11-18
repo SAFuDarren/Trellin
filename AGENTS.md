@@ -47,6 +47,26 @@ These come from the [engineering audit](docs/audits/README.md) and apply to ever
 
 To run the periodic maturity audit, use the project skill `.claude/skills/engineering-audit/` ("run an engineering audit"). Agents without skill support can follow its `SKILL.md` directly. Audit findings are tracked in `docs/audits/` and as roadmap tasks.
 
+## Working in parallel with other agents
+
+Several agents and people may work on this repository at the same time. Follow these rules so their work does not collide. Details are in [engineering](docs/engineering.md#parallel-work).
+
+1. **Claim before you start.** Work only on an open GitHub issue for a roadmap task. Check that it is not assigned or labelled `status:in-progress`. Then add that label and comment with your branch name. If no issue exists, ask the maintainer instead of starting.
+2. **One task, one branch, one worktree:** `git worktree add ../rm-<topic> -b <type>/<topic> origin/main`. Never edit another agent's worktree or branch.
+3. **Stay inside your scope.** List the files you expect to change in the issue. If you need a file that another open PR changes (`gh pr list`, then check its files), stop and coordinate in the issues instead of editing it.
+4. **Shared hot spots:**
+   - **Migrations**: need the maintainer's approval. Take the next number only when you open the PR. If `main` gains a migration first, renumber yours and update `down_revision`; CI rejects duplicate revisions and multiple heads.
+   - **Generated files** (the built interface in `research_multiplier/workbench/app/`, and later generated API types): never merge them by hand. After rebasing, regenerate them and commit the result.
+   - **Translation catalogs**: on a conflict keep both sides' keys; the catalog test checks that English and Chinese match.
+   - **Decisions, contracts and schemas**: change them only in a PR of their own that the maintainer approves.
+5. **Local resources are not shared:**
+   - Give every test database a unique name, such as `rm_test_<branch>_<random>`.
+   - Start servers with `--port 0` or a port you checked is free.
+   - Keep temporary files in your worktree or the system temp directory.
+   - Never stop a process you did not start.
+6. **Integrate small and often.** Rebase on `origin/main` before asking for review and again before merging. Keep each PR to one task.
+7. **Finish cleanly.** Link the PR in the issue and remove `status:in-progress` once it is merged or handed back. Report problems outside your task as new issues; do not fix them in your branch.
+
 ## Layout
 
 | Path | Contents |

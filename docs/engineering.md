@@ -126,7 +126,7 @@ All tasks, bugs and milestones are tracked in **GitHub Issues** and a **GitHub P
   - `layer:kernel`, `layer:plugin`, `layer:collab`, `layer:ai`, `layer:entry`
   - `area:web`, `area:migrations`, `area:lean`, `area:docs`
   - `type:bug`, `type:feature`, `type:refactor`, `type:docs`, `type:chore`
-  - `needs-decision` (blocked on an open question), `good first issue`, `help wanted`
+  - `needs-decision` (blocked on an open question), `status:in-progress` (claimed; see [parallel work](#parallel-work)), `good first issue`, `help wanted`
 - **Board columns:** Triage → Ready (has acceptance criteria) → In progress → In review → Done.
 - **Triage:** the maintainer reviews new issues weekly, applies labels, assigns a milestone or closes them, and links any decision that blocks them.
 - **Roadmap upkeep:** when a task is added, split or reordered, update `roadmap.md` and `roadmap.zh-CN.md` together with the issues.
@@ -174,6 +174,42 @@ Rules:
 ## Engineering audits
 
 At the end of every roadmap phase, run the engineering maturity audit with the project skill in `.claude/skills/engineering-audit/`. It scores 12 dimensions × 4 checks from repository evidence, runs or records six stress tests, and writes a record to [docs/audits](audits/README.md). Findings get permanent IDs. Each one becomes a roadmap task or issue, and the next audit reports its status. Use the trend between audits, not the absolute score, to decide where to invest.
+
+## Parallel work
+
+Several people and coding agents may work on the repository at once. The rules below keep their work from colliding; `AGENTS.md` carries the short version that every agent reads.
+
+**Assigning work**
+- Every task is a GitHub issue for a roadmap task. A worker claims an issue by labelling it `status:in-progress` and commenting with the branch name. Only one worker holds an issue at a time.
+- The maintainer starts parallel tasks only when their areas do not overlap, for example backend tests (P0.2) and the web interface (P1.4). Tasks that touch the same files run one after the other.
+- Limit work in progress to one task per worker.
+
+**Isolation**
+- One task, one branch from `origin/main`, one git worktree. Nobody edits another worker's branch or worktree.
+- Local resources are per worker:
+  - each test database gets a unique name;
+  - servers start on `--port 0` or a checked free port;
+  - temporary files stay in the worker's worktree or the system temp directory.
+
+**Hot spots that conflict easily**
+
+| Hot spot | Rule | Enforced by |
+| --- | --- | --- |
+| Alembic migrations | Maintainer approval. Number the revision when the PR opens; renumber and fix `down_revision` if `main` moved | `tests/offline/test_migrations.py` (unique revisions, a single head, numbering matches file names) |
+| Built interface `research_multiplier/workbench/app/` | Regenerate after every rebase; never merge by hand | Web CI job (the committed build must match the source) |
+| Generated API types (after P1.2) | Regenerate after every rebase | CI diff check (P1.2) |
+| Translation catalogs | Keep both sides' keys on conflict | Catalog parity test |
+| Architecture decisions, interface contracts, schemas | Changed only in their own PR, approved by the maintainer | CODEOWNERS; branch protection once the repository is public |
+
+**Integration**
+- Rebase on `origin/main` before review and before merging, and rerun the checks.
+- Keep each PR to one task.
+- Squash-merge with a Conventional Commit title.
+- Issues found outside the task become new issues, not extra changes in the branch.
+
+**Stress tests**
+
+Stress tests 3 (parallel development) and 6 (handover) in the [engineering audit](audits/README.md) check that these rules work in practice. Run them before relying on several agents for a whole phase.
 
 ## Releases
 
