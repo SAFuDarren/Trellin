@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.3
+
+- Project restore checks the PostgreSQL connection format before writing to
+  the target, so users can correct the configuration and retry safely.
+
 ## 1.0.2
 
 - The Task link pull-request check uses the effective issue claim and rejects
