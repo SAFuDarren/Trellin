@@ -102,29 +102,29 @@ ACTIVITY = {
     "claim_id": CLAIM,
     "activity": [
         {"id": "job:1", "kind": "model", "state": "running", "text": "Model proposal leased to a worker.", "at": at(3),
-         "node_id": SEMISTABLE, "fallback_node_id": GOAL, "provider": "codex-cli", "model": "gpt-5-codex"},
+         "node_id": SEMISTABLE, "fallback_node_id": GOAL, "provider": "codex-cli", "model": "gpt-6.2-sol", "effort": "xhigh"},
         {"id": "job:2", "kind": "model", "state": "running", "text": "Model proposal leased to a worker.", "at": at(2),
-         "node_id": SEMISTABLE, "fallback_node_id": GOAL, "provider": "codex-cli", "model": "gpt-5-codex"},
+         "node_id": SEMISTABLE, "fallback_node_id": GOAL, "provider": "codex-cli", "model": "gpt-6.2-sol", "effort": "xhigh"},
         {"id": "job:3", "kind": "lean", "state": "queued", "text": "Lean verification (local lemma) queued.", "at": at(1),
          "node_id": LEVEL_TWO, "fallback_node_id": GOAL},
         {"id": "model:a:method", "kind": "agent_feedback", "state": "recorded", "at": at(14), "node_id": SEMISTABLE,
-         "fallback_node_id": GOAL, "provider": "codex-cli", "model": "gpt-5-codex",
+         "fallback_node_id": GOAL, "provider": "codex-cli", "model": "gpt-6.2-sol", "effort": "xhigh",
          "text": "Plan: normalise the solution so that a ≡ −1 (mod 4) and b is even. Then the minimal model of "
                  "y² = x(x − aᵖ)(x + bᵖ) has discriminant 2⁻⁸(abc)²ᵖ, and every odd bad prime divides abc "
                  "exactly once in the conductor."},
         {"id": "job:0", "kind": "lean", "state": "failed", "at": at(11), "node_id": SEMISTABLE, "fallback_node_id": GOAL,
          "text": "Lean verification failed: `Nat.Coprime a b` is not available at this step."},
         {"id": "model:a:reply", "kind": "agent_feedback", "state": "recorded", "at": at(8), "node_id": SEMISTABLE,
-         "fallback_node_id": GOAL, "provider": "codex-cli", "model": "gpt-5-codex",
+         "fallback_node_id": GOAL, "provider": "codex-cli", "model": "gpt-6.2-sol", "effort": "xhigh",
          "text": "The check failed because the solution was not yet primitive. I added a step that divides out "
                  "gcd(a, b, c) first, and two attempts on the reduction at 2 are running now."},
     ],
     "guidance": [{"id": "g2", "text": "Keep this as an assumption until the Lean FLT project (Imperial College London) "
                                        "proves modularity and level lowering; then replace it with the library theorems.",
-                   "audience": "local", "node_id": f"item:{MOD}", "created_at": at(40), "submitted_at": at(40)},
+                   "audience": "codex", "node_id": f"item:{MOD}", "created_at": at(40), "submitted_at": at(40)},
                   {"id": "g1", "text": "Reduce to a primitive solution before building the curve; the descent for n = 4 does the same.",
-                  "audience": "local", "node_id": SEMISTABLE, "created_at": at(13), "submitted_at": at(12)}],
-    "guidance_channels": ["local", "codex"],
+                  "audience": "codex", "node_id": SEMISTABLE, "created_at": at(13), "submitted_at": at(12)}],
+    "guidance_channels": ["codex"],
 }
 
 OTHER = [
@@ -186,13 +186,17 @@ LIBRARY = {"items": [
 
 def job(ident, kind, state, node, minutes, model=True, **extra):
     return {"id": ident, "claim_id": CLAIM, "claim_title": TITLE, "kind": kind, "state": state,
-            "provider": "codex-cli" if model else None, "model": "gpt-5-codex" if model else None, "model_job": model,
+            "provider": "codex-cli" if model else None, "model": "gpt-6.2-sol" if model else None,
+            "effort": "xhigh" if model else None, "model_job": model,
             "target": None if model else "local_lemma", "node_id": node, "enqueued_at": at(minutes + 1),
             "submitted_at": None, "running_since": at(minutes) if state == "running" else None,
             "execution_ms": None, "failure_code": None, **extra}
 
 
-TEAM = {**fx.TEAM, "jobs": [
+TEAM = {**fx.TEAM, "agents": [
+    {"provider": "codex-cli", "model": "gpt-6.2-sol", "effort": "xhigh", "runs": 14, "last_at": at(2), "failures": 3,
+     "average_ms": "318000", "input_tokens": "412870", "output_tokens": "38214", "cost_usd": "6.84"}],
+    "jobs": [
     job("j1", "prove", "running", SEMISTABLE, 3), job("j2", "prove", "running", SEMISTABLE, 2),
     job("j3", "verify", "queued", LEVEL_TWO, 1, model=False),
     job("j0", "verify", "succeeded", REDUCTION, 25, model=False, execution_ms=41200, submitted_at=at(24)),
@@ -207,7 +211,7 @@ THREADS = {"threads": [
     {"claim_id": CLAIM, "claim_title": TITLE, "node_id": SEMISTABLE,
      "node": {"id": SEMISTABLE, "kind": "obligation", "title": "The Frey curve is semistable",
               "proposition": GRAPH["nodes"][8]["proposition"], "status": "open"},
-     "live": 2, "models": ["gpt-5-codex"], "last_at": at(2),
+     "live": 2, "models": ["gpt-6.2-sol"], "last_at": at(2),
      "events": [e for e in ACTIVITY["activity"] if e["node_id"] == SEMISTABLE]},
 ]}
 
