@@ -170,23 +170,31 @@ def cmd_board(args: argparse.Namespace) -> int:
 
 def cmd_check_pr(args: argparse.Namespace) -> int:
     pull = json.loads(gh("pr", "view", str(args.pr), "--json", "number,headRefName,body,labels"))
-    if "no-issue" in {label["name"] for label in pull.get("labels", [])}:
+    if "no-issue" in label_names(pull):
         print("Labelled no-issue; skipping the claim check.")
         return 0
-    numbers = linked_issues(pull.get("body", ""))
-    if not numbers:
-        print("The PR description must link its task, for example 'Closes #14' (or carry the no-issue label).", file=sys.stderr)
-        return 1
+    branch = pull["headRefName"]
+    open_issues = []
     problems = []
-    for number in numbers:
+    for number in linked_issues(pull.get("body", "")):
         data = issue(number)
-        claims = active_claims(data["comments"])
-        if data["state"] == "OPEN" and claims and not any(claim.branch == pull["headRefName"] for claim in claims):
-            problems.append(f"#{number} is claimed by {claims[0].agent} on {claims[0].branch}, not this branch.")
+        if data["state"] != "OPEN":
+            continue
+        open_issues.append(number)
+        blocked = label_names(data) & BLOCKING_LABELS
+        current = holder(data["comments"])
+        if blocked:
+            problems.append(f"#{number} is labelled {', '.join(sorted(blocked))}; the maintainer must decide first.")
+        elif current is None:
+            problems.append(f"#{number} has no active claim; claim it for this branch with scripts/tasks.py.")
+        elif current.branch != branch:
+            problems.append(f"#{number} is claimed by {current.agent} on {current.branch}; coordinate a handover.")
+    if not open_issues:
+        problems.append("Link an open issue using 'Closes #N' or 'Refs #N', or use no-issue for a trivial PR.")
     for problem in problems:
         print(problem, file=sys.stderr)
     if not problems:
-        print(f"Linked: {', '.join(f'#{number}' for number in numbers)}.")
+        print(f"Linked: {', '.join(f'#{number}' for number in open_issues)}.")
     return 1 if problems else 0
 
 
