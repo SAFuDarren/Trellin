@@ -24,6 +24,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
     private var webView: WKWebView?
     private var serverURL: URL?
     private var starting = false
+    private var creating = false
 
     static func main() {
         let app = NSApplication.shared
@@ -64,6 +65,8 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
 
         let fileItem = NSMenuItem()
         let fileMenu = NSMenu(title: localized("file"))
+        let create = fileMenu.addItem(withTitle: localized("new"), action: #selector(chooseNewWorkspace), keyEquivalent: "n")
+        create.target = self
         let choose = fileMenu.addItem(withTitle: localized("choose"), action: #selector(chooseWorkspace), keyEquivalent: "o")
         choose.target = self
         fileMenu.addItem(withTitle: localized("close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
@@ -73,10 +76,24 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
     }
 
     @objc private func chooseWorkspace() {
-        guard window.attachedSheet == nil else { return }
+        pickDirectory(for: .open)
+    }
+
+    @objc private func chooseNewWorkspace() {
+        pickDirectory(for: .create)
+    }
+
+    @objc private func createHere() {
+        if let requested { confirmCreation(in: requested) }
+    }
+
+    private func pickDirectory(for launch: WorkbenchLaunch) {
+        guard !creating, window.attachedSheet == nil else { return }
         let picker = NSOpenPanel()
-        picker.title = localized("choose")
-        picker.prompt = localized("open")
+        let isNew = launch == .create
+        picker.title = localized(isNew ? "new" : "choose")
+        picker.prompt = localized(isNew ? "location.select" : "open")
+        if isNew { picker.message = localized("location.detail") }
         picker.canChooseDirectories = true
         picker.canChooseFiles = false
         picker.canCreateDirectories = false
@@ -84,12 +101,44 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
         picker.directoryURL = webView == nil ? FileManager.default.homeDirectoryForCurrentUser
                                             : requested?.deletingLastPathComponent()
         picker.beginSheetModal(for: window) { [weak self] result in
-            if result == .OK, let url = picker.url { self?.open(url) }
+            guard result == .OK, let self, let url = picker.url else { return }
+            if isNew { DispatchQueue.main.async { self.confirmCreation(in: url) } }
+            else { self.open(url) }
+        }
+    }
+
+    private func confirmCreation(in location: URL) {
+        guard !creating, window.attachedSheet == nil else { return }
+        let parent = location.standardizedFileURL.resolvingSymlinksInPath()
+        let alert = NSAlert()
+        alert.messageText = localized("new.confirm.title")
+        alert.informativeText = String(format: localized("new.confirm.detail"), parent.path)
+        let name = NSTextField(frame: NSRect(x: 0, y: 0, width: 390, height: 24))
+        name.placeholderString = localized("new.folderName")
+        name.setAccessibilityLabel(localized("new.folderName"))
+        alert.accessoryView = name
+        alert.addButton(withTitle: localized("new.confirm"))
+        alert.addButton(withTitle: localized("cancel")).keyEquivalent = "\u{1b}"
+        alert.window.initialFirstResponder = name
+        alert.beginSheetModal(for: window) { [weak self] result in
+            guard result == .alertFirstButtonReturn, let self else { return }
+            guard let workspace = newWorkspaceURL(in: parent, folderName: name.stringValue) else {
+                let warning = NSAlert()
+                warning.messageText = localized("new.invalidName")
+                warning.addButton(withTitle: localized("okay"))
+                DispatchQueue.main.async {
+                    warning.beginSheetModal(for: self.window) { [weak self] _ in
+                        DispatchQueue.main.async { self?.confirmCreation(in: parent) }
+                    }
+                }
+                return
+            }
+            self.open(workspace, launch: .create)
         }
     }
 
     @objc private func retryWorkspace() {
-        if let requested { open(requested) }
+        if !creating, let requested { open(requested) }
     }
 
     private func showStatus(_ key: String, retry: Bool) {
@@ -117,11 +166,18 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
         let choices = NSStackView()
         choices.orientation = .horizontal
         choices.spacing = 12
-        if key != "loading" {
+        if key != "loading" && key != "creating" {
+            let newHere = key == "workspace"
+            let create = NSButton(title: localized(newHere ? "new.here" : "new"), target: self,
+                                  action: newHere ? #selector(createHere) : #selector(chooseNewWorkspace))
             let choose = NSButton(title: localized("choose"), target: self, action: #selector(chooseWorkspace))
-            choose.bezelStyle = .rounded
-            choose.keyEquivalent = "\r"
-            choices.addArrangedSubview(choose)
+            let startNew = key == "welcome" || newHere || key.hasPrefix("create-")
+            let buttons = startNew ? [create, choose] : [choose, create]
+            buttons.first?.keyEquivalent = "\r"
+            for button in buttons {
+                button.bezelStyle = .rounded
+                choices.addArrangedSubview(button)
+            }
         }
         if retry {
             choices.addArrangedSubview(NSButton(title: localized("retry"), target: self, action: #selector(retryWorkspace)))
@@ -138,7 +194,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
         window.contentView = view
     }
 
-    private func open(_ folder: URL) {
+    private func open(_ folder: URL, launch: WorkbenchLaunch = .open) {
         stop()
         let workspace = folder.standardizedFileURL.resolvingSymlinksInPath()
         requested = workspace
@@ -147,14 +203,16 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
             showStatus("install", retry: false)
             return
         }
-        showStatus("loading", retry: false)
+        creating = launch == .create
+        showStatus(creating ? "creating" : "loading", retry: false)
         let process = WorkbenchProcess()
         child = process
         starting = true
         do {
-            try process.start(workspace: workspace, runtime: runtime, onReady: { [weak self, weak process] result in
+            try process.start(workspace: workspace, runtime: runtime, launch: launch, onReady: { [weak self, weak process] result in
                 guard let self, let process, self.child === process else { return }
                 self.starting = false
+                self.creating = false
                 if let result, let url = result.sessionURL {
                     self.showWorkbench(url: url, workspace: workspace, leanMissing: result.warnings?.contains("lean") == true)
                 } else {
@@ -172,6 +230,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
             showStatus("install", retry: false)
             return
         }
+        guard launch == .open else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self, weak process] in
             guard let self, let process, self.child === process, self.starting else { return }
             self.stop()
@@ -205,10 +264,11 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKSc
     }
 
     private func stop() {
-        if starting { child?.cancelStartup() }
+        if starting && !creating { child?.cancelStartup() }
         else { child?.stop() }
         child = nil
         starting = false
+        creating = false
         serverURL = nil
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: bridge)
         webView?.stopLoading()

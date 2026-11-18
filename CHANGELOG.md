@@ -6,6 +6,8 @@
   workspace and return to its last graph node when reopening the app.
 - Trellin identifies the workspace and missing setup when a saved project
   cannot open, and offers another folder from the same window.
+- Create a Trellin workspace in a user-named folder with its own local
+  PostgreSQL database from the macOS app.
 
 ## 1.0.0
 

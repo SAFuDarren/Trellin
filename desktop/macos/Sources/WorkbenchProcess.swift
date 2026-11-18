@@ -48,8 +48,28 @@ enum WorkbenchStartFailure: String {
     case workspace, unbound, postgres, schema, install, startup
     case loginMissing = "login-missing"
     case loginInvalid = "login-invalid"
+    case createPath = "create-path"
+    case createPostgres = "create-postgres"
+    case createFailed = "create-failed"
 
     var canRetry: Bool { self == .postgres || self == .startup }
+}
+
+enum WorkbenchLaunch {
+    case open, create
+
+    func arguments(workspace: URL) -> [String] {
+        let base = ["-I", "-B", "-m", "research_multiplier.workbench.desktop"]
+        return base + (self == .create ? ["--create", workspace.path] : [workspace.path])
+    }
+}
+
+func newWorkspaceURL(in parent: URL, folderName: String) -> URL? {
+    let name = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let forbidden = CharacterSet(charactersIn: "/:\\").union(.controlCharacters)
+    guard parent.isFileURL, parent.path.hasPrefix("/"), !name.isEmpty, !name.hasPrefix("."),
+          name.utf8.count <= 255, name.rangeOfCharacter(from: forbidden) == nil else { return nil }
+    return parent.appendingPathComponent(name, isDirectory: true)
 }
 
 /// One child owns one project's loopback service and its in-memory session.
@@ -58,10 +78,10 @@ final class WorkbenchProcess {
     private let lifetime = Pipe()
     private let response = Pipe()
 
-    func start(workspace: URL, runtime: URL, onReady: @escaping (WorkbenchReadiness?) -> Void,
+    func start(workspace: URL, runtime: URL, launch: WorkbenchLaunch, onReady: @escaping (WorkbenchReadiness?) -> Void,
                onExit: @escaping () -> Void) throws {
         process.executableURL = runtime
-        process.arguments = ["-I", "-B", "-m", "research_multiplier.workbench.desktop", workspace.path]
+        process.arguments = launch.arguments(workspace: workspace)
         process.environment = Self.environment(ProcessInfo.processInfo.environment, home: NSHomeDirectory())
         process.standardInput = lifetime
         process.standardOutput = response

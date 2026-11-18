@@ -5,6 +5,8 @@ and run only after confirmation (or --yes). Administrator credentials are used f
 this run only and are never written to disk.
 """
 
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from getpass import getpass
 from importlib import invalidate_caches
 from importlib.metadata import requires
@@ -29,6 +31,12 @@ ELAN_SCRIPT = "https://raw.githubusercontent.com/leanprover/elan/master/elan-ini
 
 class SetupError(ValueError):
     pass
+
+
+@dataclass
+class _CreatedDatabase:
+    roles: list[str] = field(default_factory=list)
+    database: str | None = None
 
 
 class Setup:
@@ -215,10 +223,26 @@ class Setup:
             raise SetupError("This PostgreSQL server does not have pgvector. Install pgvector for this server, "
                              "then run setup again.")
 
-    def provision(self, admin):
+    @contextmanager
+    def fresh_database(self, admin):
+        """Create only new project objects using an already checked local connection."""
         from psycopg import sql
 
-        self.check_server(admin)
+        created = _CreatedDatabase()
+        try:
+            yield self.provision(admin, created=created)
+        except BaseException:
+            if created.database is not None:
+                admin.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(created.database)))
+            for name in reversed(created.roles):
+                admin.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(name)))
+            raise
+
+    def provision(self, admin, *, created=None):
+        from psycopg import sql
+
+        if created is None:
+            self.check_server(admin)
         short = str(paths.workspace_id(self.workspace)).replace("-", "")[:12]
         database = f"rm_{short}"
         owner = f"rm_{short}_owner"
@@ -228,18 +252,28 @@ class Setup:
         def role_exists(name):
             return admin.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (name,)).fetchone() is not None
 
+        def database_exists():
+            return admin.execute("SELECT 1 FROM pg_database WHERE datname = %s", (database,)).fetchone() is not None
+
+        if created is not None and (database_exists() or any(role_exists(name) for name in passwords)):
+            raise SetupError("A database or login with this project identifier already exists.")
+
         for group in GROUPS:
             if not role_exists(f"rm_{group}"):
                 admin.execute(sql.SQL("CREATE ROLE {} NOLOGIN").format(sql.Identifier(f"rm_{group}")))
         for name in (owner, *logins.values()):
-            verb = "ALTER" if role_exists(name) else "CREATE"
+            verb = "ALTER" if created is None and role_exists(name) else "CREATE"
             admin.execute(sql.SQL(verb + " ROLE {} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD {}")
                           .format(sql.Identifier(name), sql.Literal(passwords[name])))
+            if created is not None:
+                created.roles.append(name)
         for group, login in logins.items():
             admin.execute(sql.SQL("GRANT {} TO {}").format(sql.Identifier(f"rm_{group}"), sql.Identifier(login)))
-        if admin.execute("SELECT 1 FROM pg_database WHERE datname = %s", (database,)).fetchone() is None:
+        if created is not None or not database_exists():
             admin.execute(sql.SQL("CREATE DATABASE {} OWNER {} ENCODING 'UTF8' TEMPLATE template0")
                           .format(sql.Identifier(database), sql.Identifier(owner)))
+            if created is not None:
+                created.database = database
             self.say(f"  Created database {database}.")
         else:
             self.say(f"  Reusing database {database}.")
@@ -257,9 +291,11 @@ class Setup:
             connection.execute("CREATE EXTENSION IF NOT EXISTS vector")
         from research_multiplier.storage.migrate import migration_head, upgrade
 
-        with psycopg.connect(dsn(owner), connect_timeout=5) as connection:
-            migrated = connection.execute("SELECT to_regclass('public.rm_alembic_version')").fetchone()[0]
-            revision = migrated and connection.execute("SELECT version_num FROM public.rm_alembic_version").fetchone()
+        migrated = revision = None
+        if created is None:
+            with psycopg.connect(dsn(owner), connect_timeout=5) as connection:
+                migrated = connection.execute("SELECT to_regclass('public.rm_alembic_version')").fetchone()[0]
+                revision = migrated and connection.execute("SELECT version_num FROM public.rm_alembic_version").fetchone()
         if not migrated:
             self.say("  Creating the research schema...")
             upgrade(dsn(owner))

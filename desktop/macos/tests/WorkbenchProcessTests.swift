@@ -6,9 +6,10 @@ struct WorkbenchProcessTests {
         try readiness()
         try readLiveService()
         try startFailures()
+        launchDestination()
         try position()
         environment()
-        print("5 Trellin native boundary checks passed.")
+        print("6 Trellin native boundary checks passed.")
     }
 
     private static func startFailures() throws {
@@ -17,9 +18,22 @@ struct WorkbenchProcessTests {
             return try JSONDecoder().decode(WorkbenchReadiness.self, from: data).failure
         }
         let failures = try [response("login-missing"), response("login-invalid"), response("unbound"),
+                            response("create-path"), response("create-postgres"), response("create-failed"),
                             response("postgres"), response("unknown"), response("login-missing", status: "ready")]
-        precondition(failures == [.loginMissing, .loginInvalid, .unbound, .postgres, .startup, .startup])
+        precondition(failures == [.loginMissing, .loginInvalid, .unbound, .createPath, .createPostgres,
+                                  .createFailed, .postgres, .startup, .startup])
         precondition(!WorkbenchStartFailure.loginMissing.canRetry && WorkbenchStartFailure.postgres.canRetry)
+    }
+
+    private static func launchDestination() {
+        let parent = URL(fileURLWithPath: "/Studies", isDirectory: true)
+        let folder = newWorkspaceURL(in: parent, folderName: "  量子图 Proofs  ")!
+        precondition(folder.path == "/Studies/量子图 Proofs")
+        precondition(WorkbenchLaunch.open.arguments(workspace: folder).suffix(1) == [folder.path])
+        precondition(WorkbenchLaunch.create.arguments(workspace: folder).suffix(2) == ["--create", folder.path])
+        for name in ["", ".", "..", ".dot", "../another", "a/b", "a:b", "a\\b", "a\nb"] {
+            precondition(newWorkspaceURL(in: parent, folderName: name) == nil)
+        }
     }
 
     private static func readLiveService() throws {

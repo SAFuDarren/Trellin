@@ -81,7 +81,18 @@ def _stop_on_disconnect(server, lifetime):
         server.shutdown()
 
 
-def run(workspace_path, lifetime, output):
+def run(workspace_path, lifetime, output, *, create=False):
+    if create:
+        from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace
+
+        try:
+            workspace_path = create_workspace(workspace_path)
+        except WorkspaceCreationError as error:
+            _reply(output, "error", code=error.args[0])
+            return 2
+        except Exception:
+            _reply(output, "error", code="create-failed")
+            return 2
     with ExitStack() as resources:
         try:
             server = _open(workspace_path, resources)
@@ -105,11 +116,14 @@ def run(workspace_path, lifetime, output):
 
 
 def main():
-    if len(sys.argv) != 2:
-        _reply(sys.stdout, "error", code="workspace")
+    args = sys.argv[1:]
+    create = bool(args and args[0] == "--create")
+    folders = args[1:] if create else args
+    if len(folders) != 1:
+        _reply(sys.stdout, "error", code="create-path" if create else "workspace")
         return 2
     try:
-        return run(sys.argv[1], sys.stdin.buffer, sys.stdout)
+        return run(folders[0], sys.stdin.buffer, sys.stdout, create=create)
     except Exception:
         # The launcher observes process termination after a successful
         # handshake. Never emit a second reply or dump a traceback.
