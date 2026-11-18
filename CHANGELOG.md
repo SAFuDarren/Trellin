@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 1.0.1
 
 - Build and open Trellin on Apple Silicon Macs. Pick an existing research
   workspace and return to its last graph node when reopening the app.
