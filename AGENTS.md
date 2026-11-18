@@ -96,7 +96,8 @@ python -m venv .venv && . .venv/bin/activate
 python -m pip install -e ".[dev,postgres]"
 ```
 
-Checks that CI runs on every push (`.github/workflows/tests.yml`):
+The [Tests workflow](.github/workflows/tests.yml) runs on pull requests and
+pushes to `main`. Run its Python checks locally with these commands.
 
 ```sh
 ruff check .
