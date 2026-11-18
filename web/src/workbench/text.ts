@@ -95,7 +95,7 @@ const PROVIDERS: Record<string, string> = { "codex-cli": "Codex", codex: "Codex"
 const STOP_WORDS = new Set(["a", "an", "and", "for", "in", "of", "on", "the", "to", "with"]);
 
 /** The harness an agent runs in, for example "Codex". */
-export function harnessName(provider: string | undefined): string {
+export function harnessName(provider: string | null | undefined): string {
   return (provider && PROVIDERS[provider]) ?? provider ?? "";
 }
 
@@ -116,7 +116,7 @@ function capitalize(word: string): string {
 /** An agent as people name it: model and reasoning effort, for example "GPT-6.2 Sol xhigh". */
 export function modelName(
   t: TFunction,
-  record: { model?: string; provider?: string; model_provider?: string; effort?: string },
+  record: { model?: string | null; provider?: string | null; model_provider?: string | null; effort?: string | null },
 ): string {
   const effort = typeof record.effort === "string" && record.effort ? " " + record.effort : "";
   if (typeof record.model === "string" && record.model) return prettyModel(record.model) + effort;

@@ -7,7 +7,7 @@ import { useTeam, type Doctor, type Job, type Team } from "../api/sections";
 import { Clock, Mark, Spin } from "../components/Icons";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
-import { timeText } from "../workbench/text";
+import { harnessName, modelName, timeText } from "../workbench/text";
 
 const PAGES = ["runtimes", "agents", "usage", "jobs"] as const;
 type Page = (typeof PAGES)[number];
@@ -24,7 +24,7 @@ function duration(t: TFunction, ms: string | number | null | undefined): string 
 }
 
 function jobLabel(t: TFunction, job: Job): string {
-  if (job.model_job || job.model) return job.model || job.provider || t("model.fallback");
+  if (job.model_job || job.model) return modelName(t, job);
   if (job.kind === "verify")
     return (
       t("activityKind.lean") + (job.target ? " · " + t(`team.targets.${job.target}`, { defaultValue: job.target }) : "")
@@ -260,8 +260,8 @@ function Agents({ data }: { data: Team }) {
           <tbody>
             {data.agents.map((agent) => (
               <tr key={agent.provider + (agent.model ?? "")}>
-                <td className="mono">{agent.model || agent.provider}</td>
-                <td className="muted">{agent.provider}</td>
+                <td className="mono">{modelName(t, agent)}</td>
+                <td className="muted">{harnessName(agent.provider)}</td>
                 <td className="num">{agent.runs}</td>
                 <td className="muted">{timeText(i18n.language, agent.last_at, true)}</td>
                 <td className="num">{duration(t, agent.average_ms)}</td>
