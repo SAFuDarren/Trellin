@@ -36,7 +36,7 @@ test("claims, graph, live work, legend and details load without errors", async (
   await expect(page.locator(".claim")).toHaveCount(5);
   await expect(page.locator(".graph-node")).toHaveCount(7);
   await expect(page.locator(".graph-edge")).toHaveCount(7);
-  await expect(card(page, /^Proof obligation 2$/).locator(".work")).toContainText("gpt-5-codex ×2");
+  await expect(card(page, /^Proof obligation 2$/).locator(".work")).toContainText("GPT-5 Codex ×2");
   await expect(page.locator(".legend")).toContainText("Running");
   // The legend's dividers stay thin lines; a page style once turned them into cards.
   expect((await page.locator(".legend .rule").first().boundingBox())?.width ?? 99).toBeLessThan(4);
@@ -52,6 +52,7 @@ test("selecting a node shows its details and conversation", async ({ page }) => 
   await expect(page.locator(".node-detail")).toContainText("Blocked:");
   await expect(page.locator("#chat-target")).toHaveText("Proof obligation 2");
   await expect(page.locator(".chat-feed .live")).toHaveCount(2);
+  await expect(page.locator("#guidance-audience option").first()).toHaveText(/^[A-Z0-9]+-\d\d · Local$/);
   await page.getByRole("button", { name: "All nodes" }).click();
   await expect(page.locator("#chat-target")).toHaveText("Whole claim");
 });

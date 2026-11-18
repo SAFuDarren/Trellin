@@ -27,7 +27,7 @@ Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around
 
 ## Work with the models
 
-A node whose recorded job is running shows the model and the number of parallel jobs, for example `gpt-5-codex ×2`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
+Every node has a short code made of the claim's initials and a number, for example `FLT-09`, so you can refer to it in notes and discussions. A node whose recorded job is running shows the agent (model and reasoning effort) and the number of parallel jobs, for example `GPT-6.2 Sol xhigh ×2`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
 
 The conversation under the graph shows your notes, the models' recorded methods and reasons, and the Lean results for the selected node. Choose **All nodes** to see the whole claim, with a link from each entry back to its node.
 
@@ -45,6 +45,6 @@ export RESEARCH_MULTIPLIER_LEAN_AUTHOR_MODEL=YOUR_CODEX_MODEL
 research-multiplier --workspace "/path/to/my-research" advance worker --policy POLICY_UUID --watch 5
 ```
 
-In the workbench, select a node, choose **Codex (external service)** as the recipient and send the note. The send button then asks for a second click, which confirms that this individual note may be sent to Codex with the released scope. The next eligible Codex request reads it within the signed budget. The note stays bound to the selected Lean version. The running job names the model and links to the selected node. A recorded response appears in the conversation alongside the separate Lean verification result.
+In the workbench, select a node, choose the **Codex** recipient (for example `FLT-09 · Codex · GPT-6.2 Sol xhigh`) and send the note. The send button then asks for a second click, which confirms that this individual note may be sent to Codex with the released scope. The next eligible Codex request reads it within the signed budget. The note stays bound to the selected Lean version. The running job names the model and links to the selected node. A recorded response appears in the conversation alongside the separate Lean verification result.
 
 Private claims expose only the local guidance channel. Codex requests require public authorization for the exact statement, existing proof context and individual note. The same worker still governs scheduled retries and verifies candidates through Lean.

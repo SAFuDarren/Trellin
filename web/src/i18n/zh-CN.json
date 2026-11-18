@@ -178,7 +178,6 @@
     "approved": "已批准并记录。",
     "returned": "已附上说明退回。",
     "needNameAndReason": "请先填写名字和理由。",
-    "identityNote": "名字会保存在这个浏览器里。之后的版本会改用登录身份。",
     "context": "上下文",
     "status": "状态",
     "cliNote": "这类事项目前在命令行里处理："
@@ -274,18 +273,16 @@
     "proof_search_blocked": "这条路线卡住了"
   },
   "audience": {
-    "local": "本地模型",
-    "codex": "Codex（外部服务）"
+    "local": "本地",
+    "codex": "Codex"
   },
   "composer": {
     "label": "给模型的意见",
     "placeholder": "回复在这个节点上工作的模型，或者提个思路",
     "audience": "发给",
     "unavailable": "暂时不能发送",
-    "scopeCodex": "会在 Codex 下一次获授权运行时，发给这个外部服务。",
-    "scopeLocal": "只有你授权的本地模型会在下次运行时读到。",
     "viewOnly": "这个课题只能查看动态，不能发送意见。",
-    "confirmHint": "这条意见会和公开课题一起发给外部服务 Codex。再点一次即可发送。",
+    "confirmHint": "会和公开课题一起发给 Codex。再点一次发送。",
     "confirm": "发给 Codex",
     "confirmLabel": "发给 Codex",
     "send": "发送意见",

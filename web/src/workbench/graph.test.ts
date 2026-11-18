@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import i18n from "../i18n";
 import { buildGraph, CARD, highlights, impactItems, layoutGraph, liveWork } from "./graph";
 import { atlasShape } from "./atlas";
-import { nodeTitle, nodeTone } from "./text";
+import { claimCode, modelName, nodeTitle, nodeTone, prettyModel } from "./text";
 import type { GraphSnapshot } from "./types";
 
 const t = i18n.getFixedT("en");
@@ -102,7 +102,7 @@ describe("graph model", () => {
     );
     expect(work.running).toBe(2);
     expect(work.queued).toBe(1);
-    expect(work.byNode.get("obligation:r:2")!.running.get("gpt-5-codex")).toBe(2);
+    expect(work.byNode.get("obligation:r:2")!.running.get("GPT-5 Codex")).toBe(2);
     expect(work.byNode.get("goal:c")!.queued.get("Lean check")).toBe(1);
   });
 });
@@ -130,5 +130,38 @@ describe("atlas", () => {
     expect(shape.groups.find((group) => group.claimId === "a")!.current).toBe(true);
     expect(shape.here).not.toBeNull();
     expect(shape.keys.map((key) => key.claimId)).toEqual(["a", "b"]);
+  });
+});
+
+describe("codes and agent names", () => {
+  it("numbers nodes from the claim down, with the claim's initials", () => {
+    const graph = buildGraph(t, snapshot);
+    expect(graph.codes.get("goal:c")).toBe("ZS-01");
+    expect(new Set(graph.codes.values()).size).toBe(snapshot.nodes.length);
+  });
+
+  it("prefers codes the server sends", () => {
+    const graph = buildGraph(t, {
+      ...snapshot,
+      claim: { ...snapshot.claim, code: "FLT" },
+      nodes: snapshot.nodes.map((node) => (node.id === "goal:c" ? { ...node, code: "FLT-00" } : node)),
+    });
+    expect(graph.codes.get("goal:c")).toBe("FLT-00");
+    expect(graph.codes.get("local-lemma:r")).toMatch(/^FLT-\d\d$/);
+  });
+
+  it("derives claim codes from titles, with a fallback for titles without Latin words", () => {
+    expect(claimCode({ id: "x", title: "Fermat's Last Theorem" })).toBe("FLT");
+    expect(claimCode({ id: "x", title: "Sums of two squares" })).toBe("STS");
+    expect(claimCode({ id: "abcdef12-0000", title: "自然数加零的对称性" })).toBe("CABC");
+  });
+
+  it("names agents by model and effort", () => {
+    expect(prettyModel("gpt-6.2-sol")).toBe("GPT-6.2 Sol");
+    expect(prettyModel("gpt-5-codex")).toBe("GPT-5 Codex");
+    expect(prettyModel("claude-opus-5-5")).toBe("Claude Opus 5.5");
+    expect(prettyModel("Qwen 3 Max")).toBe("Qwen 3 Max");
+    expect(modelName(t, { provider: "codex-cli", model: "gpt-6.2-sol", effort: "xhigh" })).toBe("GPT-6.2 Sol xhigh");
+    expect(modelName(t, { provider: "codex-cli" })).toBe("Codex");
   });
 });

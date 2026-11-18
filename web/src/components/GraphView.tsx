@@ -283,6 +283,7 @@ export function GraphView(props: Props) {
                 >
                   <span className="node-head">
                     <Mark tone={nodeTone(node, blocked)} shape={node.kind === "hypothesis" ? "square" : undefined} />
+                    <span className="node-code">{graph.codes.get(id)}</span>
                     <span className="node-title">{title}</span>
                   </span>
                   <span className="node-sub" data-math={String(sub.math)}>

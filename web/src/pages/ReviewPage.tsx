@@ -207,7 +207,6 @@ function EvidenceReview({
                 </span>
               )}
             </div>
-            <p className="inline-note">{t("review.identityNote")}</p>
           </form>
         </div>
         <aside className="aside">

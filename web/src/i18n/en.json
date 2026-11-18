@@ -178,7 +178,6 @@
     "approved": "Approved and recorded.",
     "returned": "Returned with your note.",
     "needNameAndReason": "Add your name and a reason first.",
-    "identityNote": "Your name is saved in this browser. Signed-in identity replaces it in a later version.",
     "context": "Context",
     "status": "Status",
     "cliNote": "Items of this kind are handled from the command line for now:"
@@ -274,18 +273,16 @@
     "proof_search_blocked": "Stuck on this route"
   },
   "audience": {
-    "local": "Local model",
-    "codex": "Codex (external service)"
+    "local": "Local",
+    "codex": "Codex"
   },
   "composer": {
     "label": "Note for the models",
     "placeholder": "Reply to the models working on this node, or suggest an approach",
     "audience": "Send to",
     "unavailable": "Can't send right now",
-    "scopeCodex": "Goes to Codex, an external service, on its next authorized run.",
-    "scopeLocal": "Only your authorized local models will read this, on their next run.",
     "viewOnly": "You can read the activity on this claim but not send notes.",
-    "confirmHint": "This note will go to Codex, an external service, together with the public claim. Click again to send.",
+    "confirmHint": "Goes to Codex with the public claim. Click again to send.",
     "confirm": "Send to Codex",
     "confirmLabel": "Send to Codex",
     "send": "Send note",
