@@ -10,6 +10,8 @@
   subfolder with its own local PostgreSQL database.
 - Trellin uses the Trellin logo for its app icon and on the screen shown while
   it opens a workspace; the workbench shows it as the browser tab icon.
+- Organize selected project notes with an on-device model before the first
+  claim, and enter a known Lean theorem or a target to prove by hand.
 
 ## 1.0.0
 

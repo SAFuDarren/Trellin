@@ -5,6 +5,7 @@ import type { TFunction } from "i18next";
 import { api, type ClaimsResponse } from "./api/client";
 import { ChatPanel } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
+import { ProjectActions } from "./components/project/ProjectActions";
 import { queueEntries, ReviewPanel } from "./components/ReviewPanel";
 import { Sidebar } from "./components/Sidebar";
 import { Splitter } from "./components/Splitter";
@@ -156,6 +157,10 @@ export function Workbench({
   const refresh = () => {
     void queries.invalidateQueries();
   };
+  const openRecorded = async (claimId?: string) => {
+    await queries.invalidateQueries();
+    if (claimId) selectClaim(claimId);
+  };
 
   const notice = !session
     ? t("session.missing")
@@ -229,16 +234,19 @@ export function Workbench({
             <h1>{claimTitle}</h1>
             {meta && <span className="claim-meta">{meta}</span>}
           </div>
-          {!layout.reviewOpen && graph && (
-            <button
-              type="button"
-              className="chip"
-              aria-controls="review"
-              onClick={() => layout.update({ reviewOpen: true })}
-            >
-              {reviewCount ? t("toolbar.openReviewCount", { count: reviewCount }) : t("toolbar.openReview")}
-            </button>
-          )}
+          <div className="project-toolbar-actions">
+            <ProjectActions session={session} onRecorded={openRecorded} />
+            {!layout.reviewOpen && graph && (
+              <button
+                type="button"
+                className="chip"
+                aria-controls="review"
+                onClick={() => layout.update({ reviewOpen: true })}
+              >
+                {reviewCount ? t("toolbar.openReviewCount", { count: reviewCount }) : t("toolbar.openReview")}
+              </button>
+            )}
+          </div>
         </header>
         {view === "impact" && graph && (
           <div className="impact-bar">

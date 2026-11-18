@@ -16,7 +16,7 @@ from research_multiplier.cli._output import json_default
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workflows import (doctor, proof_graph, workbench_activity, workbench_guidance,
-                                          workbench_sections)
+                                          workbench_intake, workbench_sections, workbench_theorems)
 
 
 # The interface is built from web/ into the package (docs/engineering.md); only its exact files are served.
@@ -28,6 +28,7 @@ _POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'se
            "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 _LOG = logging.getLogger(__name__)
 _MAX_GUIDANCE_BYTES = 16_384
+_MAX_PROJECT_BYTES = 240_000
 _DOCTOR_SECONDS = 120
 _SCHEMA_SQLSTATES = {"42883", "42P01", "42703"}
 # Each workspace-wide page takes no parameters.
@@ -37,6 +38,14 @@ _SECTIONS = {
     "/api/team": workbench_sections.team,
     "/api/progress": workbench_sections.progress,
     "/api/threads": workbench_sections.threads,
+    "/api/project-intake": workbench_intake.recent,
+    "/api/theorems": workbench_theorems.recent,
+}
+_PROJECT_WRITES = {
+    "/api/project-intake": workbench_intake.draft,
+    "/api/project-intake/confirm": workbench_intake.confirm,
+    "/api/theorems": workbench_theorems.add,
+    "/api/theorems/confirm": workbench_theorems.confirm,
 }
 
 
@@ -90,6 +99,7 @@ class WorkbenchServer(ThreadingHTTPServer):
             raise _MissingAssets("The workbench interface is missing from this installation. Reinstall the package.")
         self._doctor = (0.0, None)
         self._doctor_lock = threading.Lock()
+        self._intake_lock = threading.Lock()
         super().__init__(("127.0.0.1", port), _Handler)
         self.host = f"127.0.0.1:{self.server_port}"
         self.origin = f"http://{self.host}"
@@ -106,6 +116,19 @@ class WorkbenchServer(ThreadingHTTPServer):
     def write(self, action, *values):
         with paths.use_workspace(self.workspace, strict=True), Store() as store:
             return store.transaction("human", lambda: action(store, *values))
+
+    def write_project(self, action, document):
+        if action is not workbench_intake.draft:
+            return self.write(action, document)
+        if not self._intake_lock.acquire(blocking=False):
+            raise workbench_intake.IntakeError("intake.busy")
+        try:
+            # Intake makes one durable database write after inference. A slow
+            # local model need not hold a database transaction open.
+            with paths.use_workspace(self.workspace, strict=True), Store() as store:
+                return action(store, document)
+        finally:
+            self._intake_lock.release()
 
     def doctor(self, fresh=False):
         """Run the read-only installation check, reusing a recent report unless a fresh one is requested."""
@@ -170,6 +193,10 @@ class _Handler(BaseHTTPRequestHandler):
                 and secrets.compare_digest(tokens[0], self.server.session))
 
     def _read_api(self, route):
+        if route.path == "/api/project-intake/models":
+            if route.query:
+                raise _BadRequest("This endpoint does not take parameters.")
+            return workbench_intake.models()
         if route.path == "/api/claims":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -235,14 +262,14 @@ class _Handler(BaseHTTPRequestHandler):
             _LOG.error("Workbench request failed (%s).", type(error).__name__)
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, "Could not load the workbench view.")
 
-    def _body(self):
+    def _body(self, limit=_MAX_GUIDANCE_BYTES):
         if (self.headers.get_content_type() != "application/json" or self.headers.get_all("Transfer-Encoding")
                 or self.headers.get_all("Content-Encoding")):
             raise _BadRequest("Send a UTF-8 JSON message.")
         lengths = self.headers.get_all("Content-Length", ())
         try:
             length = int(lengths[0]) if len(lengths) == 1 and lengths[0].isascii() and lengths[0].isdigit() else 0
-            if not 0 < length <= _MAX_GUIDANCE_BYTES:
+            if not 0 < length <= limit:
                 raise ValueError
             return json.loads(self.rfile.read(length).decode("utf-8"))
         except (ValueError, RecursionError):
@@ -280,22 +307,32 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.add_guidance(*self._guidance_body()))
             elif self.path == "/api/review":
                 self._json(HTTPStatus.OK, self.server.write(workbench_sections.review, *self._review_body()))
+            elif self.path in _PROJECT_WRITES:
+                document = self._body(_MAX_PROJECT_BYTES)
+                if not isinstance(document, dict):
+                    raise _BadRequest("intake.invalid")
+                self._json(HTTPStatus.OK, self.server.write_project(_PROJECT_WRITES[self.path], document))
             else:
                 self._error(HTTPStatus.NOT_FOUND, "Page unavailable.")
         except _BadRequest as error:
             self._error(HTTPStatus.BAD_REQUEST, str(error))
         except workbench_guidance.GuidanceError as error:
             self._error(HTTPStatus.CONFLICT, str(error))
+        except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:
+            self._error(HTTPStatus.CONFLICT, str(error))
         except DatabaseOperationError as error:
-            if error.state == "23514" or (self.path == "/api/review" and not error.retryable):
+            if self.path in _PROJECT_WRITES:
+                self._error(HTTPStatus.CONFLICT, "intake.save_failed")
+            elif error.state == "23514" or (self.path == "/api/review" and not error.retryable):
                 self._error(HTTPStatus.CONFLICT, "The record has changed; refresh and try again.")
             else:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "Could not send guidance to this project.")
         except (BrokenPipeError, ConnectionResetError, TimeoutError):
             return
         except Exception as error:
-            _LOG.error("Workbench guidance failed (%s).", type(error).__name__)
-            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, "Could not send guidance to this project.")
+            _LOG.error("Workbench write failed (%s).", type(error).__name__)
+            message = "intake.save_failed" if self.path in _PROJECT_WRITES else "Could not send guidance to this project."
+            self._error(HTTPStatus.INTERNAL_SERVER_ERROR, message)
 
 
 def _check_schema(store):

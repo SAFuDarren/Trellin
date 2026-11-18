@@ -114,6 +114,37 @@ def test_malformed_guidance_is_rejected(server):
     assert response.status == 400
 
 
+@pytest.mark.parametrize("path", [
+    "/api/project-intake", "/api/project-intake/confirm", "/api/theorems", "/api/theorems/confirm",
+])
+def test_project_entry_writes_require_the_local_session_and_a_json_object(server, path):
+    response, _ = request(server, "POST", path, body={}, origin=False)
+    assert response.status == 403
+    response, _ = request(server, "POST", path, body={}, session=False)
+    assert response.status == 403
+    response, _ = request(server, "POST", path, body=[])
+    assert response.status == 400
+
+
+def test_parallel_intake_is_refused_before_starting_a_second_model_call(server):
+    with server._intake_lock:
+        response, content = request(server, "POST", "/api/project-intake", body={})
+    assert response.status == 409
+    assert json.loads(content) == {"error": "intake.busy"}
+
+
+def test_local_model_inventory_requires_project_session(server, monkeypatch):
+    from research_multiplier.workflows import workbench_intake
+
+    monkeypatch.setattr(workbench_intake, "models", lambda: {"models": ["test-local:4b"]})
+    route = "/api/project-intake/models"
+    assert request(server, "GET", route, session=False)[0].status == 403
+    assert request(server, "GET", route + "?endpoint=invalid")[0].status == 400
+    response, content = request(server, "GET", route)
+    assert response.status == 200
+    assert json.loads(content) == {"models": ["test-local:4b"]}
+
+
 def test_built_interface_is_served(server):
     built = [path for path in server.assets if path.startswith("/assets/")]
     assert built, "the built interface ships its script and styles"

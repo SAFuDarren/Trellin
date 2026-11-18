@@ -33,7 +33,7 @@
   "notice": {
     "loadingClaim": "Loading the claim…",
     "noNodes": "Nothing has been recorded for this claim yet.",
-    "noClaims": "This project has no claims yet. Add and formalize one, then refresh.",
+    "noClaims": "Start from research notes or add a theorem directly.",
     "loadingProject": "Loading the project…"
   },
   "views": {
@@ -295,7 +295,18 @@
   },
   "errors": {
     "unreadable_response": "The local service returned a response that could not be read.",
-    "request_failed": "The local service could not read the project."
+    "request_failed": "The local service could not read the project.",
+    "project.theorem.invalid": "Review the theorem fields and their lengths.",
+    "project.theorem.confirmation": "Confirm the exact statement and provide a review name and reason.",
+    "project.theorem.missing": "This theorem draft is no longer available. Refresh the list.",
+    "intake.invalid_input": "Review your notes and select a decision for each candidate.",
+    "intake.model_unavailable": "The selected on-device model is unavailable. Start Ollama and refresh the model list.",
+    "intake.model_output": "The model could not produce source-grounded items from these notes. Try a shorter excerpt or another model.",
+    "intake.model_failed": "The on-device model did not finish. Check Ollama or try another model.",
+    "intake.review_conflict": "This draft changed during review. Reopen its latest version.",
+    "intake.busy": "The current model request is still running.",
+    "intake.save_failed": "The project database could not save this entry. Check the connection and try again.",
+    "intake.formalization_required": "Provide the exact Lean proposition for each item you confirm."
   },
   "graph": {
     "label": "Dependency graph of the current claim",
@@ -560,6 +571,65 @@
       "quickstart": "quickstart.md: install and first steps",
       "review": "research-review.md: reviewing evidence and sources",
       "progress": "research-progress.md: automation rules and workers"
+    }
+  },
+  "projectEntry": {
+    "organize": "Organize with AI",
+    "addTheorem": "Add theorem",
+    "close": "Close",
+    "title": "Title",
+    "lean": "Lean proposition",
+    "failed": "The request could not be completed. Try again.",
+    "theorem": {
+      "kind": "How to record it",
+      "goal": "Theorem to prove",
+      "library": "Library theorem",
+      "wording": "Mathematical statement in your own words",
+      "source": "Source or citation (optional)",
+      "goalReview": "The Lean proposition expresses my intended theorem, including its premises.",
+      "libraryReview": "Confirm the wording and formalization. The library record does not establish a proof.",
+      "saveGoal": "Confirm statement and add goal",
+      "saveDraft": "Save theorem draft",
+      "saved": "The theorem draft was saved.",
+      "confirmed": "The theorem was confirmed in the library.",
+      "confirm": "Confirm library theorem",
+      "pending": "Theorem drafts to review",
+      "back": "Back to adding a theorem"
+    },
+    "intake": {
+      "localHint": "Choose material you want to organize. The selected model runs on this Mac and proposes items for your review.",
+      "defaultTitle": "Research notes",
+      "objective": "Research objective (optional)",
+      "objectiveDefault": "Organize existing statements before choosing a theorem to prove.",
+      "notes": "Research notes or Lean text",
+      "readFile": "Read a text, Markdown or Lean file",
+      "model": "On-device model",
+      "noModels": "No on-device models found",
+      "connectModel": "Start Ollama with a local text model, then refresh the list.",
+      "refreshModels": "Refresh models",
+      "tooLarge": "Use up to 18 KB of research text per request.",
+      "fileError": "This file could not be read as text.",
+      "analyze": "Analyze selected notes",
+      "analyzing": "Analyzing…",
+      "running": "The local model is extracting statements from your notes.",
+      "reviewHint": "Check the exact quote and formalization for each item before confirming your decisions.",
+      "kinds": {
+        "definition": "Definition",
+        "hypothesis": "Hypothesis",
+        "theorem": "Theorem"
+      },
+      "exactMatch": "Matches an already confirmed item exactly.",
+      "decision": "Decision",
+      "decisionFor": "Decision for {{id}}",
+      "chooseDecision": "Choose a decision",
+      "accept": "Confirm item",
+      "omit": "Omit item",
+      "supplyLean": "Supply a Lean proposition if confirming this item",
+      "noCandidates": "The model found no items in these notes. You can supply more context or add a theorem directly.",
+      "confirm": "Record review decisions",
+      "reviewed": "Your decisions were recorded.",
+      "pending": "Intake notes to review",
+      "back": "Back to notes"
     }
   }
 }

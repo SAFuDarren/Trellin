@@ -17,6 +17,8 @@ python -m pip install "/path/to/research_multiplier-<version>-py3-none-any.whl"
 
 ## 用自己的问题开始
 
+在本地工作台里，可以先用「和 AI 梳理资料」整理选中的资料，也可以用「手动添加定理」自行录入。参见[课题开始与定理录入](project-intake.zh-CN.md)。
+
 先运行选址命令，输入你为这个课题选的目录。程序会打印实际地址。在下列命令中把 `PATH` 换成该地址后进入项目。PowerShell 用 `Set-Location "PATH"`。
 
 ```sh
