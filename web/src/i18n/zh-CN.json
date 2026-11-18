@@ -304,6 +304,8 @@
     "intake.model_output": "模型没有生成能对应原文的条目。可以改用较短的段落或另一个模型。",
     "intake.model_failed": "本机模型未完成。请检查 Ollama，或换一个模型重试。",
     "intake.review_conflict": "这份草稿已变化，请重新打开最新版本。",
+    "intake.busy": "当前模型请求还在运行。",
+    "intake.save_failed": "课题数据库未能保存这条记录。请检查连接后重试。",
     "intake.formalization_required": "请给每条要确认的条目填写精确的 Lean 命题。"
   },
   "graph": {

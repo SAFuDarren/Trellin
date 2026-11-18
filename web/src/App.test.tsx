@@ -196,6 +196,8 @@ describe("App", () => {
     expect(await dialog.findByText(en.projectEntry.theorem.confirmed)).toBeTruthy();
     expect(submission).toMatchObject({ kind: "library", title: "Reflexivity over Nat", lean: "∀ n : Nat, n = n" });
     expect(fetch.mock.calls.every(([path]) => !path.startsWith("/api/project-intake"))).toBe(true);
+    const write = fetch.mock.calls.find(([path, init]) => path === "/api/theorems" && init?.method === "POST");
+    expect(write?.[1]).toMatchObject({ mode: "same-origin", referrerPolicy: "origin", redirect: "error" });
   });
 });
 

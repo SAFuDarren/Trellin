@@ -304,6 +304,8 @@
     "intake.model_output": "The model could not produce source-grounded items from these notes. Try a shorter excerpt or another model.",
     "intake.model_failed": "The on-device model did not finish. Check Ollama or try another model.",
     "intake.review_conflict": "This draft changed during review. Reopen its latest version.",
+    "intake.busy": "The current model request is still running.",
+    "intake.save_failed": "The project database could not save this entry. Check the connection and try again.",
     "intake.formalization_required": "Provide the exact Lean proposition for each item you confirm."
   },
   "graph": {
