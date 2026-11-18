@@ -19,12 +19,7 @@ from research_multiplier.workflows import (doctor, proof_graph, workbench_activi
                                           workbench_sections)
 
 
-_ASSETS = {
-    "/": ("index.html", "text/html; charset=utf-8"),
-    "/workbench.css": ("workbench.css", "text/css; charset=utf-8"),
-    "/workbench.js": ("workbench.js", "text/javascript; charset=utf-8"),
-}
-# The React interface (roadmap P1.4) is served under /app/ until it replaces the page above.
+# The interface is built from web/ into the package (docs/engineering.md); only its exact files are served.
 _APP_TYPES = {
     ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
     ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".json": "application/json; charset=utf-8",
@@ -59,20 +54,20 @@ def _uuid_parameters(query, *fields):
 
 
 def _app_assets():
-    """Map the built React interface to exact request paths; anything not built is simply absent."""
+    """Map the built interface to exact request paths; anything not built is simply absent."""
     app = files("research_multiplier.workbench").joinpath("app")
     if not app.is_dir():
         return {}
     found = {}
     index = app.joinpath("index.html")
     if index.is_file():
-        found["/app/"] = (index.read_bytes(), _APP_TYPES[".html"])
+        found["/"] = (index.read_bytes(), _APP_TYPES[".html"])
     assets = app.joinpath("assets")
     if assets.is_dir():
         for entry in assets.iterdir():
             suffix = "." + entry.name.rsplit(".", 1)[-1] if "." in entry.name else ""
             if entry.is_file() and suffix in _APP_TYPES:
-                found[f"/app/assets/{entry.name}"] = (entry.read_bytes(), _APP_TYPES[suffix])
+                found[f"/assets/{entry.name}"] = (entry.read_bytes(), _APP_TYPES[suffix])
     return found
 
 
@@ -81,10 +76,9 @@ class WorkbenchServer(ThreadingHTTPServer):
         self.workspace = workspace
         self.claim_id = claim_id
         self.session = secrets.token_urlsafe(32)
-        directory = files("research_multiplier.workbench").joinpath("assets")
-        self.assets = {path: (directory.joinpath(name).read_bytes(), mime)
-                       for path, (name, mime) in _ASSETS.items()}
-        self.assets.update(_app_assets())
+        self.assets = _app_assets()
+        if "/" not in self.assets:
+            raise ValueError("The workbench interface is missing from this installation. Reinstall the package.")
         self._doctor = (0.0, None)
         self._doctor_lock = threading.Lock()
         super().__init__(("127.0.0.1", port), _Handler)

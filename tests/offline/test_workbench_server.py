@@ -42,7 +42,7 @@ def request(server, method, path, *, body=None, headers=None, session=True, orig
 def test_page_is_served_with_strict_security_headers(server):
     response, content = request(server, "GET", "/", session=False)
     assert response.status == 200
-    assert b"<html" in content
+    assert b'<div id="root"></div>' in content
     policy = response.getheader("Content-Security-Policy")
     assert "default-src 'none'" in policy and "script-src 'self'" in policy
     assert response.getheader("Cache-Control") == "no-store"
@@ -112,11 +112,10 @@ def test_malformed_guidance_is_rejected(server):
     assert response.status == 400
 
 
-def test_react_interface_is_served_under_app(server):
-    built = [path for path in server.assets if path.startswith("/app/assets/")]
-    if "/app/" not in server.assets:
-        pytest.skip("The React interface has not been built into the package.")
-    response, content = request(server, "GET", "/app/", session=False)
+def test_built_interface_is_served(server):
+    built = [path for path in server.assets if path.startswith("/assets/")]
+    assert built, "the built interface ships its script and styles"
+    response, content = request(server, "GET", "/", session=False)
     assert response.status == 200
     assert b'<div id="root"></div>' in content
     assert "script-src 'self'" in response.getheader("Content-Security-Policy")
@@ -127,8 +126,8 @@ def test_react_interface_is_served_under_app(server):
         assert response.getheader("Content-Type").startswith(("text/javascript", "text/css", "image/", "font/"))
 
 
-def test_unknown_app_files_are_not_found(server):
-    response, _ = request(server, "GET", "/app/assets/missing.js", session=False)
+def test_unknown_interface_files_are_not_found(server):
+    response, _ = request(server, "GET", "/assets/missing.js", session=False)
     assert response.status == 404
-    response, _ = request(server, "GET", "/app/../server.py", session=False)
+    response, _ = request(server, "GET", "/assets/../server.py", session=False)
     assert response.status in {400, 404}

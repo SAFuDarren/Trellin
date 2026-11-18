@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | `research_multiplier/` | Python 包：CLI、各类流程、存储、策略、模型适配、随核心发布的插件、工作台服务端 | Python |
 | `research_multiplier/migrations/` | Alembic 迁移版本，以及它们执行的 SQL | Python、SQL |
-| `research_multiplier/workbench/assets/` | 由 `web/` 构建生成的界面文件；P1.4 之后不要手改 | 生成文件 |
+| `research_multiplier/workbench/app/` | 由 `web/` 构建生成的界面文件，不要手改 | 生成文件 |
 | `research_multiplier/_pinned/`、`*/_pinned/`、`_compat/` | 已记录指纹对应的验证器和适配器源码（B7） | Python |
 | `lean/` | 通用的 Lean 支持文件，以及固定版本的 Lean 和 Mathlib 配置 | Lean |
 | `web/`（以后） | React 界面源码（P1.4） | TypeScript |

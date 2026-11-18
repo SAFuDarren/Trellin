@@ -8,7 +8,7 @@ async function open(page: Page) {
     if (message.type() === "error") errors.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/app/#session=fixture");
+  await page.goto("/#session=fixture");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("自然数加零的对称性");
   return errors;
 }

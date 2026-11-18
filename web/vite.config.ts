@@ -2,10 +2,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// The built interface ships inside the Python package and is served by the
-// local workbench under /app/ while it replaces the old interface (roadmap P1.4).
+// The built interface ships inside the Python package and is served by the local workbench.
 export default defineConfig({
-  base: "/app/",
+  base: "/",
   plugins: [react()],
   build: {
     outDir: "../research_multiplier/workbench/app",

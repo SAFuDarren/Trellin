@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Serve the built React workbench with fixed API data for end-to-end tests and visual checks.
 
-Usage: python tests/fixtures/workbench_fixture.py [--port 4174]
+Usage: python tests/fixtures/workbench_fixture.py [--port 4174], then open /#session=fixture
 
 The data is synthetic: five claims, one graph with running model work, a blocker, an assumption with an
 impact preview, conversation records and guidance channels for both local models and Codex. Guidance
@@ -135,8 +135,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         route = urlsplit(self.path)
-        if route.path == "/app/" or route.path.startswith("/app/assets/"):
-            target = APP / ("index.html" if route.path == "/app/" else route.path[len("/app/"):])
+        if route.path == "/" or route.path.startswith("/assets/"):
+            target = APP / ("index.html" if route.path == "/" else route.path[1:])
             if target.is_file() and target.suffix in TYPES and APP in target.resolve().parents:
                 self.send(target.read_bytes(), TYPES[target.suffix])
             else:
@@ -167,5 +167,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", type=int, default=4174)
     port = parser.parse_args().port
-    print(f"Workbench fixture: http://127.0.0.1:{port}/app/#session=fixture", flush=True)
+    print(f"Workbench fixture: http://127.0.0.1:{port}/#session=fixture", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

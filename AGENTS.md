@@ -85,7 +85,7 @@ npx pnpm@9.15.4 typecheck && npx pnpm@9.15.4 lint && npx pnpm@9.15.4 test
 npx pnpm@9.15.4 build   # writes research_multiplier/workbench/app; commit the result
 ```
 
-The built interface is served at `/app/` by `research-multiplier workbench` until it replaces the current page (roadmap P1.4). Interface strings live in `web/src/i18n/en.json` and `zh-CN.json`; lint rejects literal text in JSX.
+`research-multiplier workbench` serves the built interface. Interface strings live in `web/src/i18n/en.json` and `zh-CN.json`; lint rejects literal text in JSX.
 
 Build the wheel and run the offline smoke check that CI runs:
 
