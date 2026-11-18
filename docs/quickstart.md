@@ -38,6 +38,8 @@ $RmPython = Join-Path $RmEnv "Scripts\python.exe"
 
 ## Start with your own question
 
+In the local proof workbench, use **Organize with AI** to review selected notes before creating a claim, or **Add theorem** to enter a theorem yourself. See [Project intake](project-intake.md).
+
 Choose the project folder when prompted. The first command prints its actual path. In the remaining commands, replace `PATH` with that folder and run from there.
 
 ```sh

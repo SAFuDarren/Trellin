@@ -1,5 +1,10 @@
 # Changes
 
+## Unreleased
+
+- Organize selected project notes with an on-device model before the first
+  claim, and enter a known Lean theorem or a target to prove by hand.
+
 ## 1.0.0
 
 First public release of Research Multiplier, a local workspace for AI-assisted
