@@ -81,12 +81,12 @@ def _stop_on_disconnect(server, lifetime):
         server.shutdown()
 
 
-def run(workspace_path, lifetime, output, *, create=False):
-    if create:
-        from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace
+def run(workspace_path, lifetime, output, *, select=False):
+    if select:
+        from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, select_workspace
 
         try:
-            workspace_path = create_workspace(workspace_path)
+            workspace_path = select_workspace(workspace_path)
         except WorkspaceCreationError as error:
             _reply(output, "error", code=error.args[0])
             return 2
@@ -109,7 +109,8 @@ def run(workspace_path, lifetime, output, *, create=False):
             _reply(output, "error", code="startup")
             return 2
 
-        _reply(output, "ready", url=server.launch_url, warnings=warnings)
+        selection = {"workspace": str(server.workspace)} if select else {}
+        _reply(output, "ready", url=server.launch_url, warnings=warnings, **selection)
         Thread(target=_stop_on_disconnect, args=(server, lifetime), daemon=True).start()
         server.serve_forever(poll_interval=0.2)
         return 0
@@ -117,13 +118,13 @@ def run(workspace_path, lifetime, output, *, create=False):
 
 def main():
     args = sys.argv[1:]
-    create = bool(args and args[0] == "--create")
-    folders = args[1:] if create else args
+    select = bool(args and args[0] == "--select")
+    folders = args[1:] if select else args
     if len(folders) != 1:
-        _reply(sys.stdout, "error", code="create-path" if create else "workspace")
+        _reply(sys.stdout, "error", code="workspace")
         return 2
     try:
-        return run(folders[0], sys.stdin.buffer, sys.stdout, create=create)
+        return run(folders[0], sys.stdin.buffer, sys.stdout, select=select)
     except Exception:
         # The launcher observes process termination after a successful
         # handshake. Never emit a second reply or dump a traceback.

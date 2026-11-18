@@ -20,6 +20,37 @@ class _DesktopSetup(Setup):
         pass
 
 
+def select_workspace(location):
+    """Open the selected workspace or the dedicated child of a research folder."""
+    try:
+        selected = Path(location)
+        if not selected.is_absolute() or ".." in selected.parts:
+            raise ValueError
+        parent = selected.resolve(strict=True)
+        if not parent.is_dir():
+            raise ValueError
+        marker = parent / paths.WORKSPACE_FILE
+        if marker.exists() or marker.is_symlink():
+            # An explicitly selected workspace must pass the normal open checks.
+            if marker.is_symlink() or not marker.is_file():
+                raise ValueError
+            return parent
+        child = parent / "Trellin"
+        occupied = child.is_symlink() or child.exists()
+    except (OSError, RuntimeError, ValueError):
+        raise WorkspaceCreationError("workspace") from None
+
+    if occupied:
+        try:
+            if (child.is_symlink() or not (child / paths.WORKSPACE_FILE).is_file()
+                    or paths.workspace_details(child) != child):
+                raise ValueError
+        except (OSError, ValueError):
+            raise WorkspaceCreationError("workspace-occupied") from None
+        return child
+    return create_workspace(child)
+
+
 def _new_destination(location):
     selected = Path(location)
     name = selected.name

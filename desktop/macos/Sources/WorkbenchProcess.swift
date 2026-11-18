@@ -27,6 +27,12 @@ struct WorkbenchReadiness: Decodable {
     let url: URL?
     let warnings: [String]?
     let code: String?
+    let workspace: String?
+
+    var workspaceURL: URL? {
+        guard let workspace, workspace.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: workspace, isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
+    }
 
     var failure: WorkbenchStartFailure {
         guard version == 1, status == "error", let code else { return .startup }
@@ -48,28 +54,21 @@ enum WorkbenchStartFailure: String {
     case workspace, unbound, postgres, schema, install, startup
     case loginMissing = "login-missing"
     case loginInvalid = "login-invalid"
+    case workspaceOccupied = "workspace-occupied"
     case createPath = "create-path"
     case createPostgres = "create-postgres"
     case createFailed = "create-failed"
 
-    var canRetry: Bool { self == .postgres || self == .startup }
+    var canRetry: Bool { self == .postgres || self == .createPostgres || self == .startup }
 }
 
 enum WorkbenchLaunch {
-    case open, create
+    case restore, select
 
     func arguments(workspace: URL) -> [String] {
         let base = ["-I", "-B", "-m", "research_multiplier.workbench.desktop"]
-        return base + (self == .create ? ["--create", workspace.path] : [workspace.path])
+        return base + (self == .select ? ["--select", workspace.path] : [workspace.path])
     }
-}
-
-func newWorkspaceURL(in parent: URL, folderName: String) -> URL? {
-    let name = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
-    let forbidden = CharacterSet(charactersIn: "/:\\").union(.controlCharacters)
-    guard parent.isFileURL, parent.path.hasPrefix("/"), !name.isEmpty, !name.hasPrefix("."),
-          name.utf8.count <= 255, name.rangeOfCharacter(from: forbidden) == nil else { return nil }
-    return parent.appendingPathComponent(name, isDirectory: true)
 }
 
 /// One child owns one project's loopback service and its in-memory session.
