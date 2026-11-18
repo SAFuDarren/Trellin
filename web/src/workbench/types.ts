@@ -7,6 +7,8 @@ export type Reference = Partial<Record<string, string | number>> & {
 
 export type GraphNode = {
   id: string;
+  /** Short display code such as FLT-03; derived in the interface when the server sends none. */
+  code?: string;
   kind: string;
   title?: string;
   status?: string;
@@ -25,7 +27,14 @@ export type GraphEdge = { source: string; target: string; kind: string };
 export type Blocker = { node_id: string; kind?: string; reason?: string; detail?: string; status?: string };
 
 export type GraphSnapshot = {
-  claim: { id: string; title: string | null; status: string; domain: string | null; statement_id?: string | null };
+  claim: {
+    id: string;
+    title: string | null;
+    status: string;
+    domain: string | null;
+    statement_id?: string | null;
+    code?: string | null;
+  };
   focus_id?: string | null;
   nodes: GraphNode[];
   edges: GraphEdge[];
@@ -57,6 +66,8 @@ export type ActivityRecord = {
   provider?: string;
   model_provider?: string;
   model?: string;
+  /** Reasoning effort the agent ran with, for example "xhigh". */
+  effort?: string;
   audience?: string;
 };
 export type GuidanceNote = {

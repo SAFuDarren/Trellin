@@ -40,7 +40,7 @@ def _channels(store, anchor, codex_schema):
 def activity(store, claim_id):
     if not installed(store, "human"):
         return {"guidance": [], "guidance_available": False, "guidance_channels": [],
-                "guidance_reason": "提交意见需要显式启用数据库版本 0070。"}
+                "guidance_reason": "Notes need database version 0070 to be enabled."}
     anchor = _anchor(store, claim_id)
     codex_schema = _codex_installed(store, "human")
     channels = _channels(store, anchor, codex_schema)
@@ -57,11 +57,11 @@ def activity(store, claim_id):
     if channels:
         reason = ""
     elif anchor is None:
-        reason = "请先确认当前课题的 Lean 陈述和依据。"
+        reason = "Confirm the Lean statement and its basis for this claim first."
     elif not codex_schema:
-        reason = "Codex 意见通道需要显式启用数据库版本 0071。"
+        reason = "Notes to Codex need database version 0071 to be enabled."
     else:
-        reason = "Codex 意见通道需要可外发的公开依据和已批准的公开推进策略。"
+        reason = "Notes to Codex need a public basis that may be shared and an approved public automation policy."
     return {"guidance": rows, "guidance_available": bool(channels),
             "guidance_channels": channels, "guidance_reason": reason}
 
@@ -72,18 +72,18 @@ class GuidanceError(ValueError):
 
 def add(store, claim_id, statement_id, request_id, node_id, text, *, audience="local", confirm_release=False):
     if not isinstance(node_id, str) or not 1 <= len(node_id) <= 128:
-        raise GuidanceError("请选择图上的一个节点。")
+        raise GuidanceError("Choose a node on the graph.")
     if not isinstance(text, str) or not 1 <= len(text.strip()) <= 1500 or "\x00" in text:
-        raise GuidanceError("请输入 1 到 1500 个字符。")
+        raise GuidanceError("Enter 1 to 1500 characters.")
     if audience not in ("local", "codex") or type(confirm_release) is not bool:
-        raise GuidanceError("请选择有效的意见接收方。")
+        raise GuidanceError("Choose who should receive the note.")
     if confirm_release != (audience == "codex"):
-        raise GuidanceError("向 Codex 发送本条意见需要明确确认。")
+        raise GuidanceError("Sending this note to Codex needs an explicit confirmation.")
     if not installed(store, "human"):
-        raise GuidanceError("提交意见需要显式启用数据库版本 0070。")
+        raise GuidanceError("Notes need database version 0070 to be enabled.")
     codex_schema = _codex_installed(store, "human")
     if audience == "codex" and not codex_schema:
-        raise GuidanceError("Codex 意见通道需要显式启用数据库版本 0071。")
+        raise GuidanceError("Notes to Codex need database version 0071 to be enabled.")
     text = text.strip()
     # A retry must find the original receipt even if the scope subsequently changed.
     audience_field = "n.audience" if codex_schema else "'local'::text AS audience"
@@ -95,16 +95,16 @@ def add(store, claim_id, statement_id, request_id, node_id, text, *, audience="l
     """, claim_id, statement_id, request_id)
     if saved:
         if (saved[0]["node_id"], saved[0]["text"], saved[0]["audience"]) != (node_id, text, audience):
-            raise GuidanceError("这个请求已用于另一条意见，请提交新请求。")
+            raise GuidanceError("This request was already used for another note; send a new one.")
         return saved[0]
     anchor = _anchor(store, claim_id)
     if anchor is None or anchor["id"] != statement_id:
-        raise GuidanceError("当前 Lean 陈述未确认或已经变更，请刷新后重试。")
+        raise GuidanceError("The Lean statement is unconfirmed or has changed; refresh and try again.")
     if audience not in _channels(store, anchor, codex_schema):
-        raise GuidanceError("该课题没有启用此意见通道。")
+        raise GuidanceError("This claim does not accept notes on this channel.")
     graph = proof_graph.snapshot(store, claim_id)
     if graph["claim"]["statement_id"] != str(statement_id) or not any(node["id"] == node_id for node in graph["nodes"]):
-        raise GuidanceError("此节点已变更，请先刷新课题。")
+        raise GuidanceError("This node has changed; refresh the claim first.")
     if codex_schema:
         return store.query("human", """
             SELECT id, node_id, text, created_at, audience FROM rm.add_workbench_guidance(%s,%s,%s,%s,%s,%s,%s)

@@ -279,7 +279,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.CONFLICT, str(error))
         except DatabaseOperationError as error:
             if error.state == "23514" or (self.path == "/api/review" and not error.retryable):
-                self._error(HTTPStatus.CONFLICT, "记录已改变，请刷新后重试。")
+                self._error(HTTPStatus.CONFLICT, "The record has changed; refresh and try again.")
             else:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "Could not send guidance to this project.")
         except (BrokenPipeError, ConnectionResetError, TimeoutError):

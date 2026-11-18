@@ -101,14 +101,14 @@ def _services(agents):
     services = []
     for name, (transport, location, _family, key) in PROVIDERS.items():
         if transport == "cli":
-            ready, detail = bool(shutil.which(location)), f"命令 {location}"
+            ready, via, detail = bool(shutil.which(location)), "command", location
         elif key:
-            ready, detail = bool(os.environ.get(key)), f"环境变量 {key}"
+            ready, via, detail = bool(os.environ.get(key)), "environment", key
         else:
-            ready, detail = None, "本地服务" if location and "127.0.0.1" in location else "自定义地址"
+            ready, via, detail = None, "local" if location and "127.0.0.1" in location else "endpoint", ""
         if ready is None and not usage.get(name):
             continue
-        services.append({"provider": name, "transport": transport, "ready": ready, "detail": detail,
+        services.append({"provider": name, "transport": transport, "ready": ready, "via": via, "detail": detail,
                          "runs": usage.get(name, 0)})
     services.sort(key=lambda service: (-service["runs"], not service["ready"], service["provider"]))
     return services
@@ -123,7 +123,7 @@ def team(store):
         "agents": agents,
         "verifier": verifier,
         "services": _services(agents),
-        "machine": {"name": platform.node() or "本机", "system": platform.system(), "arch": platform.machine(),
+        "machine": {"name": platform.node() or "", "system": platform.system(), "arch": platform.machine(),
                     "python": platform.python_version()},
         "budget": project_budget.status(store),
     }

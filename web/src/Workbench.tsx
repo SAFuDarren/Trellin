@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -20,12 +20,15 @@ function errorText(t: TFunction, error: unknown): string {
   return t(`errors.${error.message}`, { defaultValue: error.message });
 }
 
-export function Workbench({ session }: { session: string }) {
+export type Focus = { claimId: string; nodeId?: string; nonce: number };
+
+export function Workbench({ session, focus }: { session: string; focus?: Focus | null }) {
   const { t } = useTranslation();
   const queries = useQueryClient();
   const layout = useLayout();
   const { sizes, clamped } = layout;
-  const [claimId, setClaimId] = useState<string | null>(null);
+  const [claimId, setClaimId] = useState<string | null>(focus?.claimId ?? null);
+  const pendingNode = useRef<string | undefined>(focus?.nodeId);
   const [view, setView] = useState<View>("proof");
   const [selected, setSelected] = useState<string | null>(null);
   const [assumption, setAssumption] = useState<string | null>(null);
@@ -58,9 +61,25 @@ export function Workbench({ session }: { session: string }) {
   });
   const graph = useMemo(() => (snapshot.data ? buildGraph(t, snapshot.data) : null), [snapshot.data, t]);
 
+  // Another page asked to open a claim (and maybe a node).
+  useEffect(() => {
+    if (!focus) return;
+    setClaimId(focus.claimId);
+    setView("proof");
+    pendingNode.current = focus.nodeId;
+  }, [focus]);
+
   // A newly loaded claim starts at its focus (or goal) and its first assumption; a reload keeps the selection.
   useEffect(() => {
     if (!graph) return;
+    const wanted = pendingNode.current;
+    if (wanted && graph.claim.id === claimId) {
+      pendingNode.current = undefined;
+      if (graph.nodes.has(wanted)) {
+        setSelected(wanted);
+        return;
+      }
+    }
     setSelected((current) => {
       if (current && graph.nodes.has(current)) return current;
       const focus = graph.focusId && graph.nodes.has(graph.focusId) ? graph.focusId : null;
@@ -69,7 +88,7 @@ export function Workbench({ session }: { session: string }) {
     setAssumption((current) =>
       current && graph.hypotheses.some((node) => node.id === current) ? current : (graph.hypotheses[0]?.id ?? null),
     );
-  }, [graph]);
+  }, [graph, claimId]);
 
   const basis = assumption ? graph?.nodes.get(assumption)?.reference?.basis_version_id : undefined;
   const impact = useQuery({
@@ -182,7 +201,6 @@ export function Workbench({ session }: { session: string }) {
         onSelect={selectClaim}
         onToggle={() => layout.update({ sidebarOpen: !layout.sidebarOpen })}
         onToggleAtlas={() => layout.update({ atlasOpen: !sizes.atlasOpen })}
-        onResetLayout={layout.reset}
         onRefresh={refresh}
         refreshing={claims.isFetching}
       />

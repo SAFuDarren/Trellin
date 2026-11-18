@@ -182,7 +182,7 @@ function NodeDetail({
   return (
     <>
       <div className="detail-head">
-        <span>{[kindText(t, node.kind), node.domain].filter(Boolean).join(" · ")}</span>
+        <span>{[graph.codes.get(node.id), kindText(t, node.kind), node.domain].filter(Boolean).join(" · ")}</span>
         <span className="detail-state">
           <Mark tone={tone} />
           {stateLabel}

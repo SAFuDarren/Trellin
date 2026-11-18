@@ -13,19 +13,21 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 ## Read a graph
 
-- **Proof progress** shows the frozen goal, checked steps, reductions and open obligations. Choose a node to see the stored statement and its current status. Long Lean statements start folded. The fold opens the exact stored text, including any binders already in the record.
+- **Proof** shows the frozen goal, checked steps, reductions and open obligations. Choose a node to see the stored statement and its current status. Long Lean statements start folded. The fold opens the exact stored text, including any binders already in the record.
 - **References** distinguish recorded proof uses from confirmed scope premises and planned edges. The source and version identify the record behind each node. Archived or stale proof evidence retains its status.
-- **Assumption impact** previews the consequences of withdrawing the selected approved version. It uses the same dependency closure as the withdrawal command. Existing evidence requiring recheck, affected obligations, and frozen scopes requiring review appear separately. It does not evaluate a new assumption or determine whether a theorem would become false.
+- **If withdrawn** previews the consequences of withdrawing the selected approved version. It uses the same dependency closure as the withdrawal command. Existing evidence requiring recheck, affected obligations, and frozen scopes requiring review appear separately. It does not evaluate a new assumption or determine whether a theorem would become false.
 
 Some projects have no Lean statement for a record. The workbench shows its recorded wording and indicates the Lean text is unavailable. It does not invent a formula or infer a mathematical field from the checker name.
 
-The window has four areas. The left column lists the project's claims by domain, with a search field. The centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **Assumption impact**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser. The interface is in English by default; choose **简体中文** under **More** in the left column to switch to Chinese, and the choice is remembered too. The map can be dragged by its title and resized from its corner.
+The narrow bar on the far left switches between sections: **Workbench**, **Review** (results and questions waiting for you, with approve and return), **Claims** (every claim by status), **Library** (theorems and hypotheses, and where each is used), **Chats** (model conversations across claims), **Team** (runtimes, model agents, usage and jobs), and **Automation** (advancement policies). Counts on the bar show items waiting for review and jobs running now. **Help** and **Settings** sit at the bottom of the bar.
+
+The workbench has four areas. The left column lists the project's claims by domain, with a search field. The centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **If withdrawn**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser; **Settings** can reset them. The interface is in English by default; choose **简体中文** in **Settings** to switch to Chinese, and the choice is remembered too. The map can be dragged by its title and resized from its corner.
 
 Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. The small **Global position** map in the corner shows the recorded nodes of recent claims, with a dashed circle at the current claim.
 
 ## Work with the models
 
-A node whose recorded job is running shows the model and the number of parallel jobs, for example `gpt-5-codex ×2`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
+Every node has a short code made of the claim's initials and a number, for example `FLT-09`, so you can refer to it in notes and discussions. A node whose recorded job is running shows the agent (model and reasoning effort) and the number of parallel jobs, for example `GPT-6.2 Sol xhigh ×2`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
 
 The conversation under the graph shows your notes, the models' recorded methods and reasons, and the Lean results for the selected node. Choose **All nodes** to see the whole claim, with a link from each entry back to its node.
 
@@ -43,6 +45,6 @@ export RESEARCH_MULTIPLIER_LEAN_AUTHOR_MODEL=YOUR_CODEX_MODEL
 research-multiplier --workspace "/path/to/my-research" advance worker --policy POLICY_UUID --watch 5
 ```
 
-In the workbench, select a node, choose **Codex (external service)** as the recipient and send the note. The send button then asks for a second click, which confirms that this individual note may be sent to Codex with the released scope. The next eligible Codex request reads it within the signed budget. The note stays bound to the selected Lean version. The running job names the model and links to the selected node. A recorded response appears in the conversation alongside the separate Lean verification result.
+In the workbench, select a node, choose the **Codex** recipient (for example `FLT-09 · Codex · GPT-6.2 Sol xhigh`) and send the note. The send button then asks for a second click, which confirms that this individual note may be sent to Codex with the released scope. The next eligible Codex request reads it within the signed budget. The note stays bound to the selected Lean version. The running job names the model and links to the selected node. A recorded response appears in the conversation alongside the separate Lean verification result.
 
 Private claims expose only the local guidance channel. Codex requests require public authorization for the exact statement, existing proof context and individual note. The same worker still governs scheduled retries and verifies candidates through Lean.

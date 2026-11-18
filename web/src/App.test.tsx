@@ -24,6 +24,15 @@ const responses: Record<string, unknown> = {
     edges: [],
   },
   "/api/activity": { claim_id: CLAIM, activity: [], guidance: [], guidance_channels: ["local"] },
+  "/api/inbox": { items: [] },
+  "/api/team": {
+    jobs: [],
+    agents: [],
+    verifier: { runs: 0, last_at: null, failures: 0, average_ms: null },
+    services: [],
+    machine: { name: "test", system: "", arch: "", python: "" },
+    budget: { policy: null, month: { period: "" }, routes: [] },
+  },
 };
 
 function renderApp(session: string | null) {

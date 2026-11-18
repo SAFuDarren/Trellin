@@ -4,7 +4,7 @@
     "language": "Language"
   },
   "session": {
-    "missing": "Start the proof workbench from the local command, then open it with the link it prints."
+    "missing": "Open the workbench with the link printed by `research-multiplier workbench`."
   },
   "sidebar": {
     "label": "Claims",
@@ -12,8 +12,6 @@
     "expand": "Expand sidebar",
     "search": "Search claims",
     "atlas": "Global map",
-    "more": "More",
-    "resetLayout": "Reset layout",
     "refresh": "Refresh project",
     "uncategorized": "Uncategorized",
     "untitled": "Untitled claim",
@@ -33,35 +31,35 @@
     "openReviewCount": "Awaiting your review {{count}}"
   },
   "notice": {
-    "loadingClaim": "Reading the claim and its verification records…",
-    "noNodes": "This claim has no recorded graph nodes yet.",
-    "noClaims": "This project has no claims yet. Register and formalize a claim, then refresh.",
-    "loadingProject": "Reading project records…"
+    "loadingClaim": "Loading the claim…",
+    "noNodes": "Nothing has been recorded for this claim yet.",
+    "noClaims": "This project has no claims yet. Add and formalize one, then refresh.",
+    "loadingProject": "Loading the project…"
   },
   "views": {
     "label": "Graph view",
-    "proof": "Proof progress",
-    "references": "References and domains",
-    "impact": "Assumption impact"
+    "proof": "Proof",
+    "references": "References",
+    "impact": "If withdrawn"
   },
   "impact": {
-    "preview": "Preview change",
-    "readOnly": "Read-only preview; records are not changed",
-    "loading": "Reading the impact from the backend…",
-    "noPremise": "This claim has no registered assumption to preview yet.",
-    "explain": "If this version is withdrawn, records that use it are marked for recheck. This is a read-only preview; nothing is changed.",
-    "previewLabel": "Recheck preview",
+    "preview": "Withdraw",
+    "readOnly": "Preview only; nothing is changed",
+    "loading": "Working out what depends on it…",
+    "noPremise": "This claim has no assumption to preview yet.",
+    "explain": "If you withdraw this version, everything that relies on it will need to be checked again. This is only a preview; nothing is changed.",
+    "previewLabel": "Would be withdrawn",
     "alreadyRecheck": "Already needs recheck",
-    "needsRecheck": "Needs recheck",
-    "waitingReduction": "Waiting for reduction recheck",
-    "scopeConfirm": "Scope needs confirmation",
-    "direct": "Direct recheck",
-    "indirect": "Indirect recheck",
-    "inRecheck": "Already awaiting recheck",
+    "needsRecheck": "Would need recheck",
+    "waitingReduction": "Reduction would need recheck",
+    "scopeConfirm": "Scope to reconfirm",
+    "direct": "Directly affected",
+    "indirect": "Indirectly affected",
+    "inRecheck": "Already waiting for recheck",
     "openSteps": "Unfinished steps affected",
     "frozenScope": "Frozen scope to reconfirm",
     "effect": "Impact",
-    "none": "No recorded item is affected right now."
+    "none": "Nothing relies on this version right now."
   },
   "stage": {
     "label": "Dependency graph. Drag to pan; pinch or hold Ctrl while scrolling to zoom; plus and minus zoom; 0 fits the window.",
@@ -73,18 +71,18 @@
     "fit": "Fit to window"
   },
   "atlas": {
-    "title": "Global position",
+    "title": "Overview",
     "nodes": "{{count}} nodes",
-    "label": "Dependency trees of every claim in the workspace; the dashed circle marks the current claim.",
-    "move": "Drag to move the global map",
-    "resize": "Drag to resize the global map",
+    "label": "Every claim in the workspace as a tree; the dashed circle marks this claim.",
+    "move": "Drag to move the overview",
+    "resize": "Drag to resize the overview",
     "untitled": "Untitled"
   },
   "legend": {
     "label": "Legend and current state",
     "running": "Running",
     "queued": "Queued",
-    "badImpact": "Needs recheck / blocked"
+    "badImpact": "Would need recheck / blocked"
   },
   "tone": {
     "ok": "Verified",
@@ -94,25 +92,25 @@
     "planned": "Planned"
   },
   "edge": {
-    "actual": "Actual reference",
-    "planned": "Planned dependency",
-    "scope": "Registered premise",
-    "context": "Registered premise"
+    "actual": "Used in the proof",
+    "planned": "Planned step",
+    "scope": "Allowed premise",
+    "context": "Allowed premise"
   },
   "kind": {
-    "goal": "Original claim",
+    "goal": "Claim",
     "hypothesis": "Assumption",
     "library": "Library",
-    "local_lemma": "Intermediate lemma",
+    "local_lemma": "Lemma",
     "reduction": "Reduction",
     "obligation": "Proof obligation",
     "evidence": "Lean check",
-    "record": "Recorded item"
+    "record": "Record"
   },
   "node": {
     "obligation": "Proof obligation {{n}}",
     "reduction": "Reduction {{n}}",
-    "lemma": "Intermediate lemma {{n}}",
+    "lemma": "Lemma {{n}}",
     "blocked": "Blocked",
     "blockedReason": "Blocked: {{reason}}"
   },
@@ -142,9 +140,9 @@
     "proved_goal": "Proved",
     "awaiting_review": "Awaiting your review",
     "awaiting_statement_review": "Awaiting statement review",
-    "awaiting_obligations": "Awaiting proof obligations",
+    "awaiting_obligations": "Waiting on subgoals",
     "waiting_for_theorems": "Waiting for theorems",
-    "waiting_for_reduction": "Waiting for reduction recheck",
+    "waiting_for_reduction": "Reduction needs recheck",
     "lemma_verified": "Lemma verified",
     "route_checked": "Reduction verified",
     "awaiting_interpretation_review": "Awaiting interpretation review"
@@ -152,122 +150,145 @@
   "review": {
     "label": "Awaiting your review and node details",
     "title": "Awaiting your review",
-    "affected": "Affected records",
+    "affected": "Would be affected",
     "count_one": "{{count}} item",
     "count_other": "{{count}} items",
     "close": "Collapse review column",
     "empty": "Nothing needs your attention right now.",
-    "detail": "Node details"
+    "detail": "Node details",
+    "waiting": "Waiting for you · {{count}}",
+    "none": "Nothing is waiting.",
+    "allDone": "You're all caught up. New items appear here when a check or question needs you.",
+    "kinds": {
+      "review_evidence": "Verified result to review",
+      "counterexample": "Counterexample to review",
+      "resolve_clarification": "Question to answer",
+      "clarify_formalization": "Meaning to clarify",
+      "decide_condition": "Condition to decide",
+      "checker_hold": "Checker change to review",
+      "review_formalpedia_basis": "Library premise to review",
+      "review_lean_scope_change": "Lean scope change to review"
+    },
+    "evidenceExplain": "Lean has verified this result. Approve it to record it as evidence for the claim, or return it with a note on what should change.",
+    "reviewer": "Your name",
+    "reason": "Reason",
+    "reasonHint": "For example: the scope matches, and the only premise used is H₁",
+    "approve": "Approve",
+    "return": "Return",
+    "approved": "Approved and recorded.",
+    "returned": "Returned with your note.",
+    "needNameAndReason": "Add your name and a reason first.",
+    "context": "Context",
+    "status": "Status",
+    "cliNote": "Items of this kind are handled from the command line for now:"
   },
   "detail": {
     "formula": "Formula",
-    "statement": "Original text",
+    "statement": "Statement",
     "lean": "Lean statement",
     "source": "Source",
-    "leanRecord": "Lean record",
+    "leanRecord": "Lean status",
     "usedBy": "Used by",
-    "full": "Full Lean text",
-    "leanFull": "Lean text",
-    "statementFull": "Full original text",
-    "parameters": "Registered Lean parameters",
-    "provenance": "Check source and versions"
+    "full": "Show full text",
+    "leanFull": "Full Lean text",
+    "statementFull": "Full statement",
+    "parameters": "Lean parameters",
+    "provenance": "Sources and versions"
   },
   "reference": {
     "claim_id": "Claim ID",
     "statement_id": "Lean statement ID",
     "statement_version": "Statement version",
     "statement_sha256": "Statement digest",
-    "basis_version_id": "Basis version ID",
-    "version": "Basis version",
+    "basis_version_id": "Premise version ID",
+    "version": "Premise version",
     "lemma_id": "Lemma ID",
     "check_id": "Lean check ID",
     "evidence_id": "Evidence ID",
     "verification_attempt_id": "Verification attempt ID",
     "implication_id": "Reduction ID",
-    "position": "Obligation position",
+    "position": "Obligation number",
     "source_claim_id": "Source claim ID",
     "module": "Lean module",
     "sha256": "SHA-256"
   },
   "chat": {
-    "title": "Conversation with models",
+    "title": "Model conversation",
     "wholeClaim": "Whole claim",
     "allNodes": "All nodes",
     "collapse": "Collapse conversation",
     "expand": "Expand conversation",
     "feed": "Conversation history",
-    "loading": "Reading run records…",
+    "loading": "Loading…",
     "running": "{{count}} running",
     "queued": "{{count}} queued",
-    "idle": "Nothing is running",
-    "waiting": "Waiting for run records.",
-    "emptyClaim": "This claim has no run records or notes from you yet.",
-    "emptyNode": "No conversation on this node yet. Choose \"All nodes\" to see the whole claim.",
+    "idle": "Idle",
+    "waiting": "Loading the conversation…",
+    "emptyClaim": "No activity on this claim yet.",
+    "emptyNode": "Nothing here yet. Choose \"All nodes\" to see the whole claim.",
     "you": "You",
     "sentTo": "to {{audience}}",
-    "submittedCodex": "Sent with a Codex request",
-    "submittedLocal": "Sent with a model request",
-    "waitingCodex": "Waiting for a Codex call",
-    "waitingLocal": "Waiting for a local model call",
-    "workerRunning": "Advancing the proof…",
-    "taskRunning": "Running…",
+    "submittedCodex": "Sent to Codex",
+    "submittedLocal": "Read by a local model",
+    "waitingCodex": "Waiting for Codex's next run",
+    "waitingLocal": "Waiting for the next local run",
+    "workerRunning": "Searching for a proof…",
+    "taskRunning": "Working…",
     "lean": "Lean check",
-    "record": "Work record",
+    "record": "Activity",
     "mismatch": "The records returned do not match the current claim.",
     "listSeparator": ", "
   },
   "activityKind": {
-    "worker": "Proof advancement",
-    "model": "Model call",
+    "worker": "Proof search",
+    "model": "Model run",
     "lean": "Lean check",
     "task": "Task",
-    "pass": "Advancement result",
+    "pass": "Search result",
     "agent_feedback": "Model feedback",
-    "verifier_feedback": "Verifier feedback",
+    "verifier_feedback": "Lean feedback",
     "guidance": "Your note"
   },
   "activityState": {
     "queued": "Queued",
     "running": "Running",
-    "leased": "Leased",
+    "leased": "Started",
     "waiting_retry": "Waiting to retry",
     "waiting_dependency": "Waiting for a dependency",
-    "lease_expired": "Lease expired",
+    "lease_expired": "Stopped responding",
     "succeeded": "Done",
     "finished": "Done",
     "completed": "Done",
     "failed": "Failed",
-    "ready": "Pending",
-    "recorded": "Recorded",
+    "ready": "Ready",
+    "recorded": "Saved",
     "cancelled": "Cancelled",
     "stopped": "Stopped",
     "open": "Unresolved",
     "blocked": "Blocked",
     "lemma_verified": "Lemma verified",
     "route_checked": "Reduction verified",
-    "awaiting_evidence_review": "Awaiting review",
+    "awaiting_evidence_review": "Awaiting your review",
     "budget_exhausted": "Budget used up",
-    "proof_search_blocked": "Route blocked"
+    "proof_search_blocked": "Stuck on this route"
   },
   "audience": {
-    "local": "Local model",
-    "codex": "Codex (external service)"
+    "local": "Local",
+    "codex": "Codex"
   },
   "composer": {
     "label": "Note for the models",
-    "placeholder": "Reply to the models on this node, or give them a research hint",
-    "audience": "Recipient",
-    "unavailable": "Cannot send now",
-    "scopeCodex": "Sent to an external service with the next authorized Codex call.",
-    "scopeLocal": "Read only by authorized local models on their next call.",
-    "viewOnly": "This claim currently only shows run records.",
-    "confirmHint": "This note will be sent with the public claim to the external service Codex. Click again to confirm.",
-    "confirm": "Confirm sending",
-    "confirmLabel": "Confirm sending to Codex",
+    "placeholder": "Reply to the models working on this node, or suggest an approach",
+    "audience": "Send to",
+    "unavailable": "Can't send right now",
+    "viewOnly": "You can read the activity on this claim but not send notes.",
+    "confirmHint": "Goes to Codex with the public claim. Click again to send.",
+    "confirm": "Send to Codex",
+    "confirmLabel": "Send to Codex",
     "send": "Send note",
     "sending": "Sending",
-    "sentCodex": "Note recorded; waiting for a Codex call.",
-    "sentLocal": "Note recorded; waiting for a local model call."
+    "sentCodex": "Saved. Codex will read it on its next run.",
+    "sentLocal": "Saved. Your local models will read it on their next run."
   },
   "model": {
     "fallback": "Model"
@@ -284,5 +305,261 @@
     "side": "Drag to resize the claims column",
     "right": "Drag to resize the review column",
     "chat": "Drag to resize the conversation"
+  },
+  "common": {
+    "loading": "Loading…",
+    "openInWorkbench": "Open in workbench"
+  },
+  "rail": {
+    "label": "Sections",
+    "workbench": "Workbench",
+    "review": "Review",
+    "claims": "Claims",
+    "library": "Library",
+    "chat": "Chats",
+    "team": "Team",
+    "progress": "Automation",
+    "help": "Help",
+    "settings": "Settings",
+    "badge": {
+      "review": "{{count}} waiting for review",
+      "team": "{{count}} running"
+    }
+  },
+  "claimsPage": {
+    "filter": {
+      "all": "All claims",
+      "review": "Waiting for review",
+      "blocked": "Blocked",
+      "running": "Models working"
+    },
+    "domains": "Domains",
+    "byStatus": "Grouped by status",
+    "none": "No claims match.",
+    "verified": "{{done}} of {{total}} verified",
+    "running_one": "{{count}} model working",
+    "running_other": "{{count}} models working"
+  },
+  "library": {
+    "all": "Everything",
+    "byKind": "Kind",
+    "bySource": "Source",
+    "attention": "Needs attention",
+    "needsRecheck": "Needs recheck",
+    "withdrawn": "Withdrawn",
+    "admitted": "In use",
+    "notAdmitted": "Not yet admitted",
+    "count_one": "{{count}} item",
+    "count_other": "{{count}} items",
+    "search": "Search by name or statement, for example n + 0",
+    "none": "Nothing matches.",
+    "name": "Name",
+    "statement": "Statement",
+    "version": "Version",
+    "usedBy": "Used by",
+    "source": "Source",
+    "state": "State",
+    "unused": "Not used by any check yet",
+    "kinds": {
+      "theorem": "Theorem",
+      "definition": "Definition",
+      "hypothesis": "Assumption",
+      "goal": "Claim statement",
+      "lemma": "Lemma",
+      "item": "Item"
+    },
+    "origins": {
+      "human": "Added by you",
+      "packet": "From a claim",
+      "formalpedia": "Formalpedia",
+      "derivation": "Derived"
+    }
+  },
+  "threads": {
+    "active": "Working now",
+    "noneActive": "No model is working right now.",
+    "recent": "Recent",
+    "none": "No conversations yet. They start when a model works on a node or you leave a note.",
+    "running_one": "{{count}} working",
+    "running_other": "{{count}} working",
+    "reply": "Reply in workbench",
+    "filter": "Show",
+    "allModels": "Everyone",
+    "yourNotes": "Your notes",
+    "empty": "Nothing to show with this filter."
+  },
+  "team": {
+    "groups": {
+      "agents": "Agents",
+      "resources": "Resources"
+    },
+    "pages": {
+      "runtimes": "Runtimes",
+      "agents": "Models",
+      "usage": "Usage",
+      "jobs": "Jobs"
+    },
+    "notes": {
+      "runtimes": "Where models and Lean run",
+      "agents": "Every model that has worked in this project",
+      "usage": "Model spending and allowance",
+      "jobs": "Running, waiting and recent jobs"
+    },
+    "online_one": "{{count}} online",
+    "online_other": "{{count}} online",
+    "name": "Name",
+    "channel": "Through",
+    "runs": "Runs",
+    "load": "Load",
+    "status": "Status",
+    "machines": "Machines",
+    "services": "Model services",
+    "thisMachine": "this computer",
+    "runningNow_one": "{{count}} running",
+    "runningNow_other": "{{count}} running",
+    "idle": "Idle",
+    "remoteSoon": "Connecting other computers as runtimes comes with the group server.",
+    "ready": "Ready",
+    "notConfigured": "Not set up",
+    "unchecked": "Not checked",
+    "providers": {
+      "codex-cli": "Codex",
+      "claude-code": "Claude Code",
+      "openai": "OpenAI API",
+      "anthropic": "Anthropic API",
+      "deepseek": "DeepSeek API",
+      "ollama": "Ollama (local)"
+    },
+    "check": {
+      "title": "Environment check",
+      "hint": "Checks Python, the database, the four logins, Lean and Mathlib. It only reads.",
+      "running": "Checking… this can take a minute when Lean is included.",
+      "allGood": "All {{count}} checks passed.",
+      "problems_one": "{{count}} check needs attention.",
+      "problems_other": "{{count}} checks need attention.",
+      "run": "Run check",
+      "again": "Check again"
+    },
+    "lastRun": "Last run",
+    "average": "Average time",
+    "failures": "Failures",
+    "verifier": "Lean verifier",
+    "noModels": "No model has run in this project yet.",
+    "seconds_one": "{{count}} s",
+    "seconds_other": "{{count}} s",
+    "minutes": "{{minutes}} min {{seconds}} s",
+    "usage": {
+      "month": "Spent this month",
+      "limit": "of a {{limit}} monthly allowance",
+      "noLimit": "No monthly allowance set",
+      "tokens": "Tokens",
+      "allTime": "All recorded runs",
+      "cost": "Recorded cost",
+      "recorded": "As reported by the models",
+      "howToLimit": "Set a monthly allowance from the command line:"
+    },
+    "noJobs": "No jobs yet.",
+    "what": "What",
+    "claim": "Claim",
+    "when": "When",
+    "took": "Took",
+    "targets": {
+      "goal": "claim",
+      "local_lemma": "lemma",
+      "refutation": "refutation"
+    },
+    "via": {
+      "command": "Command {{name}}",
+      "environment": "Environment variable {{name}}",
+      "local": "Local service",
+      "endpoint": "Custom endpoint"
+    },
+    "unnamedMachine": "This computer"
+  },
+  "progressPage": {
+    "filter": {
+      "all": "All rules",
+      "active": "Running",
+      "proposed": "Waiting for approval",
+      "stopped": "Stopped"
+    },
+    "note": "What runs while you are away",
+    "explain": "An automation rule lets workers keep searching for a proof within a budget you approved. Rules only queue work; recording results, adding assumptions and calling external models still need you.",
+    "none": "No automation rules yet.",
+    "summary": "Goal: {{metric}} · up to {{rounds}} model rounds per pass",
+    "state": {
+      "active": "Running",
+      "proposed": "Waiting for approval",
+      "stopped": "Stopped"
+    },
+    "states": {
+      "waiting_review": "Waiting for your review"
+    },
+    "now": "Now",
+    "lastRun": "Last run",
+    "never": "Not run yet",
+    "approved": "Approved",
+    "notApproved": "Not approved yet",
+    "stopped": "Stopped",
+    "cli": "Rules are proposed and approved from the command line for now:"
+  },
+  "settings": {
+    "general": "General",
+    "language": "Language",
+    "languageNote": "English is the default. Research content always stays as written.",
+    "layout": "Workbench layout",
+    "layoutNote": "Panel sizes, the overview position and collapsed panels are remembered in this browser.",
+    "resetLayout": "Reset layout",
+    "environment": "Environment",
+    "environmentNote": "Check the database, logins, Lean and model services.",
+    "openRuntimes": "Open runtimes and checks"
+  },
+  "help": {
+    "basics": "Getting around",
+    "intro": "Research Multiplier keeps every claim, its proof and the evidence behind it in your project. The workbench shows one claim; the other sections look across the whole project.",
+    "sections": "Sections",
+    "about": {
+      "workbench": "One claim's proof graph, details and model conversation.",
+      "review": "Results and questions waiting for your decision.",
+      "claims": "Every claim at a glance, grouped by status.",
+      "library": "Definitions, assumptions and theorems you can build on.",
+      "chat": "Conversations with models, across all claims.",
+      "team": "Models, runtimes, usage and the job queue.",
+      "progress": "Rules that keep work going while you are away."
+    },
+    "canvas": "Graph canvas",
+    "keys": {
+      "drag": {
+        "key": "Drag",
+        "what": "Pan the graph"
+      },
+      "zoom": {
+        "key": "Ctrl or ⌘ + scroll, or pinch",
+        "what": "Zoom around the pointer"
+      },
+      "keys": {
+        "key": "Arrow keys, + and −",
+        "what": "Pan and zoom when the canvas is focused"
+      },
+      "fit": {
+        "key": "0",
+        "what": "Fit the graph to the window"
+      },
+      "borders": {
+        "key": "Drag a border",
+        "what": "Resize panels; arrow keys work when a border is focused"
+      },
+      "select": {
+        "key": "Click a card",
+        "what": "Show its details and conversation"
+      }
+    },
+    "guides": "Guides in the docs folder",
+    "docs": {
+      "workbench": "proof-workbench.md: the workbench and sending notes to models",
+      "quickstart": "quickstart.md: install and first steps",
+      "review": "research-review.md: reviewing evidence and sources",
+      "progress": "research-progress.md: automation rules and workers"
+    }
   }
 }
