@@ -10,6 +10,7 @@ import pytest
 
 from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workbench.server import WorkbenchServer
+from research_multiplier.workflows import release_updates
 
 pytestmark = pytest.mark.offline
 
@@ -67,6 +68,35 @@ def test_foreign_host_and_origin_are_refused(server):
     assert response.status == 403
     response, _ = request(server, "GET", "/api/claims", headers={"Origin": "http://evil.example"})
     assert response.status == 403
+
+
+def test_release_updates_are_local_and_separate_from_research(server, tmp_path, monkeypatch):
+    def unexpected(*args, **kwargs):
+        pytest.fail("An unauthorized or read-only settings request must not use the research DB or network.")
+
+    settings = tmp_path / "local-config" / "release-updates.sqlite3"
+    monkeypatch.setattr(server, "release_updates", release_updates.ReleaseUpdates(
+        settings, installed_version=lambda: "1.0.18",
+    ))
+    monkeypatch.setattr(server, "read", unexpected)
+    monkeypatch.setattr(server, "write", unexpected)
+    monkeypatch.setattr(release_updates, "HTTPSConnection", unexpected)
+    path = "/api/release-updates"
+    body = {"action": "check"}
+    assert request(server, "GET", path, session=False)[0].status == 403
+    assert request(server, "POST", path, body=body, session=False)[0].status == 403
+    assert request(server, "POST", path, body=body, origin=False)[0].status == 403
+    assert request(server, "POST", path, body=body, headers={"Origin": "https://elsewhere.test"})[0].status == 403
+    assert request(server, "GET", path + "?action=check")[0].status == 400
+    assert request(server, "POST", path, body={**body, "workspace_id": "project"})[0].status == 400
+    assert request(server, "POST", path, body={**body, "url": "https://elsewhere.test"})[0].status == 400
+    response, content = request(server, "GET", path)
+    assert response.status == 200 and json.loads(content)["installed_version"] == "1.0.18"
+    assert request(server, "POST", path, body={"action": "auto_check"})[0].status == 200
+    assert not settings.exists()
+    response, content = request(server, "POST", path, body={"action": "automatic", "enabled": True})
+    assert response.status == 200 and json.loads(content)["automatic"] is True
+    assert settings.is_file()
 
 
 def test_versioned_claims_rejects_unauthorized_and_invalid_requests(server, monkeypatch, capsys):

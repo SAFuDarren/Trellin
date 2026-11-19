@@ -2182,6 +2182,12 @@ select {
 .settings p {
   color: var(--sub);
 }
+.update-preference {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+}
 .keys {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -2236,4 +2242,17 @@ select {
   border-radius: 6px;
   color: var(--ink);
   font-size: 13px;
+}
+.release-update-notice {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  max-width: calc(100vw - 92px);
+  margin: 0;
+  border-color: var(--hair);
+  border-left-color: var(--live);
+  background: var(--main);
 }

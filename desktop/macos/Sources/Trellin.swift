@@ -239,8 +239,17 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
 
     func webView(_ web: WKWebView, decidePolicyFor action: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard web === webView, action.targetFrame?.isMainFrame == true,
-              let destination = action.request.url, let serverURL,
+        guard web === webView, let destination = action.request.url, let serverURL else {
+            decisionHandler(.cancel)
+            return
+        }
+        if action.navigationType == .linkActivated, action.targetFrame?.isMainFrame ?? true,
+           trusted(action.sourceFrame), ReleaseNotesLink.isOfficial(destination) {
+            decisionHandler(.cancel)
+            NSWorkspace.shared.open(destination)
+            return
+        }
+        guard action.targetFrame?.isMainFrame == true,
               destination.scheme == serverURL.scheme, destination.host == serverURL.host,
               destination.port == serverURL.port, destination.user == nil, destination.password == nil
         else { decisionHandler(.cancel); return }

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./i18n";
+import type { ReleaseUpdateState } from "./api/releaseUpdates";
 import { App } from "./App";
 import en from "./i18n/en.json";
 import zhCN from "./i18n/zh-CN.json";
@@ -127,6 +128,67 @@ describe("App", () => {
     expect(node.getAttribute("aria-pressed")).toBe("true");
     const detail = screen.getByLabelText(en.review.detail);
     expect(within(detail).getByText("∀ n : Nat, 0 + n = n")).toBeTruthy();
+  });
+
+  it("checks for releases by request, opens official notes, and remembers the dismissed notice", async () => {
+    window.history.replaceState(null, "", "#settings");
+    const path = "/api/release-updates";
+    const url = "https://github.com/SAFuDarren/research-multiplier/releases/tag/v1.10.0";
+    let state: ReleaseUpdateState = {
+      installed_version: "1.9.0",
+      status: "not_checked",
+      automatic: false,
+      last_checked_at: null,
+      available: null,
+    };
+    const actions: unknown[] = [];
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input !== path) return Response.json(responses[input.split("?")[0]!] ?? {});
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        actions.push(body);
+        if (body.action === "check") {
+          state = {
+            ...state,
+            status: "available",
+            last_checked_at: Math.floor(Date.now() / 1000),
+            available: { version: "1.10.0", url, dismissed: false },
+          };
+        } else if (body.action === "dismiss" && state.available?.version === body.version) {
+          state = { ...state, available: { ...state.available!, dismissed: true } };
+        } else if (body.action === "automatic") {
+          state = { ...state, automatic: body.enabled };
+        }
+      }
+      return Response.json(state);
+    });
+    vi.stubGlobal("fetch", fetch);
+    const { unmount } = renderApp("token");
+    const settings = await screen.findByRole("region", { name: en.settings.updates.title });
+    expect(within(settings).getByText("Installed version 1.9.0")).toBeTruthy();
+    const automatic = within(settings).getByRole<HTMLInputElement>("checkbox", { name: en.settings.updates.automatic });
+    expect(automatic.checked).toBe(false);
+    expect(actions).toEqual([]);
+    fireEvent.click(within(settings).getByRole("button", { name: en.settings.updates.check }));
+    const notice = await screen.findByRole("complementary", { name: en.settings.updates.title });
+    expect(within(notice).getByText("Version 1.10.0 is available.")).toBeTruthy();
+    const link = within(notice).getByRole("link", { name: en.settings.updates.notes });
+    expect(link.getAttribute("href")).toBe(url);
+    expect(link.getAttribute("rel")).toContain("noreferrer");
+    fireEvent.click(within(notice).getByRole("button", { name: en.settings.updates.dismiss }));
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: en.settings.updates.title })).toBeNull());
+    expect(within(settings).getByRole("link", { name: en.settings.updates.notes })).toBeTruthy();
+    fireEvent.click(automatic);
+    await waitFor(() => expect(automatic.checked).toBe(true));
+    expect(actions).toEqual([
+      { action: "check" },
+      { action: "dismiss", version: "1.10.0" },
+      { action: "automatic", enabled: true },
+    ]);
+    unmount();
+    renderApp("other-local-session");
+    expect(await screen.findByText("Installed version 1.9.0")).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: en.settings.updates.title })).toBeNull();
   });
 
   it("shows the server's error", async () => {
