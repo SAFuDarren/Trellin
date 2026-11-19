@@ -200,4 +200,4 @@ def threads(store):
 
 def review(store, evidence_id, action, actor, reason):
     """Record the researcher's decision on one verified result from the review page."""
-    return {"id": store.review(evidence_id, action, actor, reason)}
+    return workbench_review.legacy(store, evidence_id, action, actor, reason)

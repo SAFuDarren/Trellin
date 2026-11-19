@@ -459,14 +459,17 @@ class _Handler(BaseHTTPRequestHandler):
     def _review_body(self):
         body = self._body()
         try:
-            if not isinstance(body, dict) or body.keys() != {"evidence_id", "action", "actor", "reason"}:
+            required = {"evidence_id", "action", "reason"}
+            if not isinstance(body, dict) or not required <= body.keys() <= required | {"actor"}:
                 raise ValueError
-            actor, reason = body["actor"].strip(), body["reason"].strip()
-            if body["action"] not in ("approve", "return") or not 0 < len(actor) <= 120 or not 0 < len(reason) <= 2000:
+            actor = body["actor"].strip() if "actor" in body else None
+            reason = body["reason"].strip()
+            if (body["action"] not in ("approve", "return") or not 0 < len(reason) <= 2000
+                    or (actor is not None and not 0 < len(actor) <= 120)):
                 raise ValueError
             return UUID(body["evidence_id"]), body["action"], actor, reason
         except (ValueError, AttributeError, TypeError):
-            raise _BadRequest("Supply the evidence, approve or return, your name and a reason.") from None
+            raise _BadRequest("Supply the evidence, approve or return, and a reason.") from None
 
     def _v1_error(self, code):
         status, message = _V1_ERRORS[code]
@@ -553,6 +556,11 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(HTTPStatus.NOT_FOUND, "Page unavailable.")
         except _BadRequest as error:
             self._error(HTTPStatus.BAD_REQUEST, str(error))
+        except workbench_review.ReviewError as error:
+            if str(error) == "review.legacy_name_required":
+                self._error(HTTPStatus.BAD_REQUEST, "Supply the evidence, approve or return, your name and a reason.")
+            else:
+                self._error(*_V1_ERRORS[str(error)])
         except workbench_guidance.GuidanceError as error:
             self._error(HTTPStatus.CONFLICT, str(error))
         except workbench_proof_tasks.ProofTaskError as error:

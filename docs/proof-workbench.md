@@ -35,6 +35,8 @@ The narrow bar on the far left switches between sections: **Workbench**, **Revie
 
 On database revision `0073` or later, **Review** records the local researcher's ID from the bound workspace for each new evidence decision. Enter the reason and choose **Approve** or **Return**. Workspaces with an older database still use the earlier review form. Previous decisions retain their recorded names.
 
+Database revision `0077` also records the bound researcher's ID on new clarification decisions, plan cancellations, literature confirmations, and other human-authored records. Entries made before the upgrade retain their existing attribution.
+
 Database revision `0074` adds a workspace event stream for evidence reviews. An approval or return from the workbench or CLI records an event with the committed decision. Clients can resume from a prior event ID. The event carries identifiers and the decision type. Review reasons stay in the research record.
 
 Database revision `0075` also records confirmed claims and premises, confirmed Lean statements, retirements of premises and verification inputs, proof task activity, new evidence, and adopted conclusions. Clients can use these events to refresh existing views. The dependency rules still determine which proofs need recheck, including claims that reused a retired result. Event frames carry IDs and operation types, without exposing proof text or review notes.
