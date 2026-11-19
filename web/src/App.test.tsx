@@ -288,6 +288,7 @@ describe("App", () => {
       ["inbox", "active"],
       ["atlas"],
       ["graph", CLAIM],
+      ["threads"],
       ["progress"],
       ["proof-task", "active", CLAIM],
       ["activity", CLAIM],
@@ -408,6 +409,205 @@ describe("App", () => {
       [otherPath, "2"],
     ]);
     expect(feeds[0]?.[1]?.signal?.aborted).toBe(true);
+  });
+
+  it("stops online polling, handles durable and runtime changes, and resumes fallback for a stalled stream", async () => {
+    vi.useFakeTimers();
+    const advance = (ms: number) =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(ms);
+      });
+    const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
+    const proofPath = "/api/proof-task?claim=" + CLAIM;
+    const graphPath = "/api/graph?claim=" + CLAIM;
+    let state = "authorized";
+    let head = "3";
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/inbox") {
+        return Response.json({
+          items: [],
+          workspace_events: { workspace_id: WORKSPACE, cursor: head, coverage: "workspace-writes-v1" },
+        });
+      }
+      if (input === proofPath) return Response.json({ ...PROOF_TASK, state, can_start: state === "authorized" });
+      if (input === EVENT_PATH && init?.method === "GET") {
+        return new Response(new ReadableStream<Uint8Array>({ start: (stream) => streams.push(stream) }), {
+          headers: { "Content-Type": "text/event-stream; charset=utf-8" },
+        });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    const app = renderApp("active");
+    try {
+      await advance(40);
+      await advance(40);
+      expect(streams).toHaveLength(1);
+      const encoder = new TextEncoder();
+      const emit = (index: number, text: string) => streams[index]!.enqueue(encoder.encode(text));
+      const count = (path: string) => fetch.mock.calls.filter(([url]) => url === path).length;
+      const countLiveReads = () => ["/api/inbox", "/api/team", "/api/activity?claim=" + CLAIM, proofPath].map(count);
+      const feeds = () => fetch.mock.calls.filter(([url]) => url === EVENT_PATH);
+      const firstHeaders = new Headers(feeds()[0]?.[1]?.headers);
+      expect(firstHeaders.get("X-RM-Workbench-Updates")).toBe("workspace-writes-v1");
+      expect(firstHeaders.get("Last-Event-ID")).toBe("3");
+
+      emit(0, ": connected\n\n");
+      fireEvent.click(screen.getByRole("button", { name: en.proofTask.title }));
+      await advance(50);
+      const modal = within(screen.getByRole("dialog", { name: en.proofTask.title }));
+      expect(modal.getByText(en.proofTask.states.authorized)).toBeTruthy();
+      const beforeIdle = countLiveReads();
+      await advance(8_200);
+      expect(countLiveReads()).toEqual(beforeIdle);
+
+      state = "running";
+      head = "4";
+      const write = {
+        id: "4",
+        type: "workspace.changed",
+        schema_version: 1,
+        workspace_id: WORKSPACE,
+        occurred_at: "2026-11-19T00:00:00Z",
+        actor: { kind: "system", id: null },
+        subject: { kind: "workspace", id: WORKSPACE },
+        data: { area: "proof", claim_id: CLAIM },
+      };
+      emit(0, `id: 4\nevent: workspace.changed\ndata: ${JSON.stringify(write)}\n\n`);
+      await advance(60);
+      expect(modal.getByText(en.proofTask.states.running)).toBeTruthy();
+
+      state = "waiting";
+      const beforeRuntime = count(graphPath);
+      emit(0, ": workbench-runtime-changed\n\n");
+      await advance(60);
+      expect(modal.getByText(en.proofTask.states.waiting)).toBeTruthy();
+      expect(count(graphPath)).toBe(beforeRuntime);
+
+      // No more valid signals. The watchdog should reopen the stream at the
+      // applied durable cursor while polling the still-visible window.
+      const beforeStall = countLiveReads();
+      await advance(26_000);
+      expect(feeds()[0]?.[1]?.signal?.aborted).toBe(true);
+      expect(streams).toHaveLength(2);
+      expect(new Headers(feeds()[1]?.[1]?.headers).get("Last-Event-ID")).toBe("4");
+      head = "5";
+      state = "stopped";
+      await advance(8_200);
+      expect(countLiveReads().every((reads, i) => reads > beforeStall[i]!)).toBe(true);
+      expect(modal.getByText(en.proofTask.states.stopped)).toBeTruthy();
+      expect(count(graphPath)).toBeGreaterThan(beforeRuntime);
+
+      const graphBeforeReconnect = count(graphPath);
+      emit(1, ": connected\n\n");
+      await advance(60);
+      expect(count(graphPath)).toBe(graphBeforeReconnect);
+      const afterReconnect = countLiveReads();
+      await advance(8_200);
+      expect(countLiveReads()).toEqual(afterReconnect);
+    } finally {
+      app.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps polling with a connected older stream that has no comprehensive capability", async () => {
+    vi.useFakeTimers();
+    const advance = (ms: number) =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(ms);
+      });
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/inbox") {
+        return Response.json({ items: [], workspace_events: { workspace_id: WORKSPACE, cursor: "1" } });
+      }
+      if (input === EVENT_PATH && init?.method === "GET") {
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(stream) {
+              stream.enqueue(new TextEncoder().encode(": connected\n\n"));
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        );
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    const app = renderApp("old");
+    try {
+      await advance(40);
+      await advance(40);
+      const initial = fetch.mock.calls.filter(([path]) => path === "/api/inbox").length;
+      const eventRequest = fetch.mock.calls.find(([path]) => path === EVENT_PATH);
+      expect(eventRequest).toBeDefined();
+      expect(new Headers(eventRequest?.[1]?.headers).has("X-RM-Workbench-Updates")).toBe(false);
+      await advance(8_200);
+      expect(fetch.mock.calls.filter(([path]) => path === "/api/inbox").length).toBeGreaterThan(initial);
+    } finally {
+      app.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it("reconciles an in-flight view that started before the first comprehensive cursor", async () => {
+    const graphPath = "/api/graph?claim=" + CLAIM;
+    const graph = (title: string) => ({
+      claim: { id: CLAIM, title, status: "open", domain: "lean-core" },
+      nodes: [{ id: `goal:${CLAIM}`, kind: "goal", title: "Original claim", status: "open" }],
+      edges: [],
+    });
+    const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
+    const graphReads: (AbortSignal | null | undefined)[] = [];
+    let resolveInbox!: (response: Response) => void;
+    const initialInbox = new Promise<Response>((resolve) => {
+      resolveInbox = resolve;
+    });
+    let resolveOldGraph!: (response: Response) => void;
+    const oldGraph = new Promise<Response>((resolve) => {
+      resolveOldGraph = resolve;
+    });
+    let bootstrapped = false;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/inbox") {
+        const data = {
+          items: [],
+          workspace_events: { workspace_id: WORKSPACE, cursor: "7", coverage: "workspace-writes-v1" },
+        };
+        return bootstrapped ? Response.json(data) : initialInbox;
+      }
+      if (input === graphPath) {
+        graphReads.push(init?.signal);
+        return graphReads.length === 1 ? oldGraph : Response.json(graph("Committed before the cursor"));
+      }
+      if (input === EVENT_PATH) {
+        return new Response(new ReadableStream<Uint8Array>({ start: (stream) => streams.push(stream) }), {
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("active");
+    await waitFor(() => expect(graphReads).toHaveLength(1));
+    bootstrapped = true;
+    resolveInbox(
+      Response.json({
+        items: [],
+        workspace_events: { workspace_id: WORKSPACE, cursor: "7", coverage: "workspace-writes-v1" },
+      }),
+    );
+    await waitFor(() => expect(streams).toHaveLength(1));
+    const request = fetch.mock.calls.find(([path]) => path === EVENT_PATH)?.[1];
+    expect(new Headers(request?.headers).get("Last-Event-ID")).toBe("7");
+    streams[0]!.enqueue(new TextEncoder().encode(": connected\n\n"));
+    expect(await screen.findByRole("heading", { level: 1, name: "Committed before the cursor" })).toBeTruthy();
+    expect(graphReads).toHaveLength(2);
+    expect(graphReads[0]?.aborted).toBe(true);
+    await act(async () => {
+      resolveOldGraph(Response.json(graph("Obsolete initial result")));
+    });
+    expect(screen.queryByRole("heading", { level: 1, name: "Obsolete initial result" })).toBeNull();
   });
 
   it("restores the desktop node and reports subsequent workbench selections", async () => {
