@@ -232,6 +232,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     private func open(_ launch: WorkbenchLaunch) {
+        let worker = child
         stop()
         requested = launch.location
         requestedLaunch = launch
@@ -240,9 +241,19 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
             return
         }
         showStatus("loading", retry: false)
+        starting = true
+        let start = { [weak self] in
+            guard let self, self.starting else { return }
+            self.start(launch, runtime: runtime)
+        }
+        // The previous workbench can still hold a library lease while draining.
+        if let worker { worker.waitForExit(start) }
+        else { start() }
+    }
+
+    private func start(_ launch: WorkbenchLaunch, runtime: URL) {
         let process = WorkbenchProcess()
         child = process
-        starting = true
         do {
             try process.start(runtime: runtime, launch: launch, onReady: { [weak self, weak process] result in
                 guard let self, let process, self.child === process else { return }

@@ -237,10 +237,15 @@ class Library:
                 "managed": "slot" in row}
 
     def status(self):
+        with self._locked(exclusive=False):
+            if (self.anchor / LOCATION_FILE).exists():
+                return self._status(*self._state())
         with self._locked():
-            root, data = self._state(initialize=True)
-            return {"root": str(root), "default_id": data["default_id"],
-                    "projects": [self._project(root, row) for row in data["projects"]]}
+            return self._status(*self._state(initialize=True))
+
+    def _status(self, root, data):
+        return {"root": str(root), "default_id": data["default_id"],
+                "projects": [self._project(root, row) for row in data["projects"]]}
 
     def _create(self, root, data, name, slot, *, default=False):
         workspace = root / "Workspaces" / slot

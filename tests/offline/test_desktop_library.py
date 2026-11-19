@@ -234,6 +234,15 @@ def test_move_refuses_stale_plan_busy_workspace_link_and_failed_binding(monkeypa
     assert library.open_default() == workspace
 
 
+def test_initialized_status_preview_and_describe_share_active_workspace_lease(library, tmp_path):
+    workspace = library.open_default()
+    target = tmp_path / "moved"
+    with paths.use_workspace(workspace, strict=True):
+        state = library.status()
+        assert state["projects"] == [library.describe(workspace)]
+        assert library.preview(target)["project_count"] == 1
+
+
 def test_move_does_not_use_nonempty_nested_or_program_destination(library, tmp_path):
     workspace = library.open_default()
     occupied = tmp_path / "already exists"
