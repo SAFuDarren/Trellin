@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.6
+
+- CI checks for new reverse imports between entry points and shared workflows.
+
 ## 1.0.5
 
 - The full compatibility suite requires a separate installed wheel environment
