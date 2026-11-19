@@ -140,6 +140,22 @@ without a target, the result is a confirmed frame for the
 
 ## Answer an unresolved interpretation
 
+On database revision `0077` or later, open **Review** in Trellin and choose the
+clarification. Read the original statement, answer each question, and save
+with a reason. The saved answers remain available if you quit the app.
+
+Choose **Prepare revised formalization** when you are ready. For public
+material, confirm sending the statement and answers to the configured
+model. Restricted material uses the configured private local model.
+If another interpretation needs a decision, Review opens the new question.
+
+Compare the updated Lean statement and its parameters with the original
+wording. **Confirm exact target** freezes the reviewed target so you can
+review its starting basis. **Confirm exact conjecture** selects it in the
+existing reviewed frame. Proof starts through its normal authorization.
+
+### Answer from the command line
+
 Use `research resume --format text` to find material questions raised while
 drafting a target or formalizing a discussed conjecture. Each request is linked
 to the exact saved input and, for a conjecture, to its confirmed frame.

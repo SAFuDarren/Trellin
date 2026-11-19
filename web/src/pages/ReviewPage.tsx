@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
+import { ClarificationReview } from "../components/ClarificationReview";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
 import { nodeFormula, nodeTitle, statusText, timeText } from "../workbench/text";
@@ -36,7 +37,20 @@ export function ReviewPage({
 }) {
   const { t, i18n } = useTranslation();
   const inbox = useInbox(session);
-  const items = inbox.data?.items ?? [];
+  const clarification = inbox.data?.clarification_review;
+  const items: InboxItem[] = [
+    ...(inbox.data?.items ?? []),
+    ...(clarification?.followups ?? []).map((followup) => ({
+      item_id: followup.id,
+      kind: "clarify_formalization",
+      claim_id: null,
+      claim_title: followup.title,
+      waiting_since: followup.waiting_since,
+      question: "",
+      detail: { clarification_status: followup.status },
+      priority: 1,
+    })),
+  ];
   const selected = items.find((item) => item.item_id === sub) ?? items[0];
   // A decided item leaves the inbox, so its confirmation is kept here rather than on the item.
   const [notice, setNotice] = useState("");
@@ -50,8 +64,16 @@ export function ReviewPage({
           empty: inbox.isPending ? t("common.loading") : t("review.none"),
           entries: items.map((item) => ({
             key: item.item_id,
-            label: item.claim_title || t("sidebar.untitled"),
-            sub: `${kindLabel(t, item)} · ${timeText(i18n.language, item.waiting_since, true)}`,
+            label:
+              item.claim_title ||
+              (item.kind === "clarify_formalization" && typeof item.detail?.title === "string"
+                ? item.detail.title
+                : t("sidebar.untitled")),
+            sub: `${
+              typeof item.detail?.clarification_status === "string"
+                ? t(`clarifications.status.${item.detail.clarification_status}`)
+                : kindLabel(t, item)
+            } · ${timeText(i18n.language, item.waiting_since, true)}`,
             href: href("review", item.item_id),
             current: item === selected,
             dot: item.priority <= 1 ? "bad" : "warn",
@@ -71,6 +93,14 @@ export function ReviewPage({
           <PageHead title={t("rail.review")} />
           <Empty>{inbox.isPending ? t("common.loading") : t("review.allDone")}</Empty>
         </>
+      ) : selected.kind === "clarify_formalization" && clarification ? (
+        <ClarificationReview
+          key={selected.item_id}
+          session={session}
+          workspace={clarification.workspace_id}
+          id={selected.item_id}
+          onConfirmed={(kind) => setNotice(t(`clarifications.confirmed.${kind}`))}
+        />
       ) : selected.kind === "review_evidence" && selected.claim_id ? (
         <EvidenceReview
           key={selected.item_id}

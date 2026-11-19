@@ -21,6 +21,7 @@ describe("Workspace event read models", () => {
       ["impact", "claim"],
       ["proof-task", "session", "claim"],
       ["threads"],
+      ["clarification", "session"],
     ]);
   });
 

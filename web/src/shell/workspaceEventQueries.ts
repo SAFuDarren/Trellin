@@ -16,6 +16,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
   const keys = new Map<string, string[]>();
   const add = (...key: string[]) => keys.set(JSON.stringify(key), key);
   const inbox = () => add("inbox", session);
+  const clarifications = () => add("clarification", session);
   const intake = () => {
     add("project-intake-drafts", session);
     add("manual-theorems", session);
@@ -42,6 +43,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
         break;
       case "recheck":
         inbox();
+        clarifications();
         add("claims");
         add("atlas");
         add("library");
@@ -54,6 +56,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
       case "basis":
       case "claim":
         inbox();
+        clarifications();
         add("claims");
         add("atlas");
         add("graph", event.claimId);
@@ -121,9 +124,11 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
             graph();
             break;
           case "claim":
+            clarifications();
             claims();
             break;
           case "clarification":
+            clarifications();
             claims();
             break;
           case "intake":
@@ -133,6 +138,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
             claims();
             break;
           case "workspace":
+            clarifications();
             intake();
             runtime();
             add("library");

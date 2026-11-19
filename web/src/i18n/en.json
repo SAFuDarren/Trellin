@@ -183,6 +183,49 @@
     "status": "Status",
     "cliNote": "Items of this kind are handled from the command line for now:"
   },
+  "clarifications": {
+    "original": "Original statement",
+    "proposal": "Updated Lean statement",
+    "saveAnswers": "Save answers",
+    "prepare": "Prepare revised formalization",
+    "preparing": "Preparing formalization…",
+    "localPreparation": "The configured private local model will read the original statement and the saved answers.",
+    "publicPreparation": "Preparing the formalization sends the original public statement and saved answers to the configured model.",
+    "confirmPublic": "I confirm sending this public statement and answers to the configured model",
+    "next": "Open the next question",
+    "status": {
+      "waiting": "Waiting for answers",
+      "answered": "Answers saved",
+      "ready": "Formalization to confirm",
+      "continued": "Follow-up question recorded",
+      "confirmed": "Formalization confirmed",
+      "stale": "The research scope has changed",
+      "dismissed": "Question dismissed"
+    },
+    "explain": {
+      "target": "This confirms the exact target. Review and confirm its starting basis before proving it.",
+      "conjecture": "This selects the exact conjecture in the confirmed research frame."
+    },
+    "confirm": {
+      "target": "Confirm exact target",
+      "conjecture": "Confirm exact conjecture"
+    },
+    "confirmed": {
+      "target": "Target confirmed. Review its starting basis to continue.",
+      "conjecture": "Conjecture confirmed in its reviewed research frame."
+    },
+    "errors": {
+      "invalid": "Check the answers and reason, then try again.",
+      "not_found": "This question is unavailable in this workspace.",
+      "identity_required": "Reopen the bound workspace to identify the researcher.",
+      "unavailable": "Update the workspace database to answer clarifications here.",
+      "stale": "This question or proposal changed. Review the current state before continuing.",
+      "scope": "The confirmation does not match this research material’s privacy setting.",
+      "busy": "This clarification is already preparing a formalization.",
+      "prepare_failed": "The model could not prepare the formalization. Your answers are saved.",
+      "failed": "Could not complete this action. Check the current state and try again."
+    }
+  },
   "detail": {
     "formula": "Formula",
     "statement": "Statement",

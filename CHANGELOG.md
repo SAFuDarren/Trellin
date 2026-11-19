@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.18
+
+- Answer formalization questions in Trellin, prepare and inspect the exact
+  revised Lean statement, and confirm it before moving on. Saved answers
+  and proposals stay available after reopening the workspace.
+
 ## 1.0.17
 
 - Add a documented v1 claim-list endpoint and generated types while keeping

@@ -104,6 +104,8 @@ research-multiplier --workspace "PATH" workbench
 
 数据库升级到 `0076` 并使用 Research Multiplier `1.0.15` 或更新版本后，澄清、Agent 会话和其他工作区改动也会自动更新到对应视图。连接中断时会定期检查变化，重连后补读遗漏事件。
 
+使用数据库版本 `0077` 和 Research Multiplier `1.0.18` 或更新版本时，可在 Trellin 的「审阅」页保存澄清回答，再生成更新后的 Lean 陈述。核对原始措辞、陈述和共享参数后，确认该版本。私有资料只由配置好的私有本机模型处理，公开资料在发送前需要确认。保存回答后可以退出，下次打开从同一问题继续。[澄清流程](research-intake.md#answer-an-unresolved-interpretation)
+
 ## 选用模型
 
 显式请求可选的远程模型建议时，`run --model --base-url` 会将问题文件和检查结果发给所选端点。费用由所选端点决定。项目级授权和预算适用于绑定工作区中的模型入口。未发表研究使用已绑定工作区中明确授权的可信本地模型入口。[模型建议说明](quickstart.md#optional-model-suggestions) · [本地模型配置](model-adapters.md#work-with-restricted-research-in-the-terminal)
