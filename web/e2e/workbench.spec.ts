@@ -186,6 +186,9 @@ test("settings show the installed version and offer a manual stable release chec
   const errors = await open(page, "Settings");
   const settings = page.getByRole("region", { name: "Updates" });
   await expect(settings.getByText("Installed version 1.9.0")).toBeVisible();
+  const connections = page.getByRole("region", { name: "Model connections" });
+  await expect(connections.getByText("Add the models you want to use.")).toBeVisible();
+  await expect(connections.getByRole("button", { name: "Add connection" })).toBeEnabled();
   await expect(settings.getByRole("checkbox", { name: "Automatically check for updates" })).not.toBeChecked();
   await expect(settings.getByRole("status")).toHaveText("No update check has run yet.");
   await settings.getByRole("button", { name: "Check for updates" }).click();
