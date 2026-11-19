@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.11
+
+- Refresh open workbench views when evidence reviews are committed and replay
+  missed review events after a connection interruption.
+
 ## 1.0.10
 
 - Record new evidence reviews in the database transaction and expose a local

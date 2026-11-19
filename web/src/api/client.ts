@@ -42,12 +42,13 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(
+function request(
   session: string,
   path: string,
   init: { data?: unknown; signal?: AbortSignal; idempotencyKey?: string } = {},
-): Promise<T> {
-  const response = await fetch(path, {
+  extraHeaders: Record<string, string> = {},
+): Promise<Response> {
+  return fetch(path, {
     method: init.data === undefined ? "GET" : "POST",
     cache: "no-store",
     mode: "same-origin",
@@ -56,6 +57,7 @@ export async function api<T>(
     credentials: "omit",
     redirect: "error",
     headers: {
+      ...extraHeaders,
       "X-RM-Session": session,
       ...(init.data === undefined ? {} : { "Content-Type": "application/json" }),
       ...(init.data !== undefined && init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
@@ -63,6 +65,26 @@ export async function api<T>(
     body: init.data === undefined ? undefined : JSON.stringify(init.data),
     signal: init.signal,
   });
+}
+
+export function workspaceEventStream(session: string, workspace: string, cursor: string, signal: AbortSignal) {
+  return request(
+    session,
+    `/api/v1/workspaces/${encodeURIComponent(workspace)}/events`,
+    { signal },
+    {
+      Accept: "text/event-stream",
+      "Last-Event-ID": cursor,
+    },
+  );
+}
+
+export async function api<T>(
+  session: string,
+  path: string,
+  init: { data?: unknown; signal?: AbortSignal; idempotencyKey?: string } = {},
+): Promise<T> {
+  const response = await request(session, path, init);
   let payload: unknown;
   try {
     payload = await response.json();
