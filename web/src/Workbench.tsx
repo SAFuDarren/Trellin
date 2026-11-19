@@ -40,6 +40,8 @@ export function Workbench({
   const [initial] = useState(() => focus ?? desktopPosition());
   const [claimId, setClaimId] = useState<string | null>(initial?.claimId ?? null);
   const pendingNode = useRef(initial?.nodeId);
+  const [referencedClaim, setReferencedClaim] = useState<string | null>(null);
+  const [missingReferenceNode, setMissingReferenceNode] = useState(false);
   const [view, setView] = useState<View>("proof");
   const [selected, setSelected] = useState<string | null>(null);
   const [assumption, setAssumption] = useState<string | null>(null);
@@ -60,13 +62,15 @@ export function Workbench({
   useEffect(() => {
     const list = claims.data?.claims;
     if (!list) return;
-    if (claimId && list.some((claim) => claim.id === claimId)) return;
+    if (claimId && (claimId === referencedClaim || list.some((claim) => claim.id === claimId))) return;
     setClaimId(claims.data?.claim_id ?? list[0]?.id ?? null);
-  }, [claims.data, claimId]);
+  }, [claims.data, claimId, referencedClaim]);
 
   const snapshot = useQuery({
     queryKey: ["graph", claimId],
-    enabled: Boolean(claims.data?.claims.some((claim) => claim.id === claimId)),
+    enabled: Boolean(
+      claimId && (claimId === referencedClaim || claims.data?.claims.some((claim) => claim.id === claimId)),
+    ),
     queryFn: ({ signal }) =>
       api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId!), { signal }),
   });
@@ -78,6 +82,8 @@ export function Workbench({
     setClaimId(focus.claimId);
     setView("proof");
     pendingNode.current = focus.nodeId;
+    setReferencedClaim(null);
+    setMissingReferenceNode(false);
     onFocusHandled(null);
   }, [focus, onFocusHandled]);
 
@@ -86,6 +92,7 @@ export function Workbench({
     if (!graph || graph.claim.id !== claimId) return;
     const wanted = pendingNode.current;
     pendingNode.current = undefined;
+    if (wanted && claimId === referencedClaim) setMissingReferenceNode(!graph.nodes.has(wanted));
     setSelected((current) => {
       if (wanted && graph.nodes.has(wanted)) return wanted;
       if (current && graph.nodes.has(current)) return current;
@@ -95,7 +102,7 @@ export function Workbench({
     setAssumption((current) =>
       current && graph.hypotheses.some((node) => node.id === current) ? current : (graph.hypotheses[0]?.id ?? null),
     );
-  }, [graph, claimId]);
+  }, [graph, claimId, referencedClaim]);
 
   useEffect(() => {
     if (claimId && selected && graph?.claim.id === claimId && graph.nodes.has(selected)) {
@@ -136,12 +143,31 @@ export function Workbench({
     setSelected(null);
     setAssumption(null);
     setView("proof");
+    setReferencedClaim(null);
+    setMissingReferenceNode(false);
+    pendingNode.current = undefined;
   };
   const selectNode = (id: string) => {
     const node = graph?.nodes.get(id);
     if (!node) return;
     setSelected(id);
+    setMissingReferenceNode(false);
     if (node.kind === "hypothesis" && node.reference?.basis_version_id) setAssumption(id);
+  };
+  const openReference = (id: string, nodeId: string | null) => {
+    setView("proof");
+    if (graph?.claim.id === id && claimId === id) {
+      if (nodeId && graph.nodes.has(nodeId)) {
+        selectNode(nodeId);
+      } else {
+        setSelected(graph.order.find((id) => graph.nodes.get(id)?.kind === "goal") ?? null);
+        setMissingReferenceNode(Boolean(nodeId));
+      }
+    } else {
+      selectClaim(id);
+      setReferencedClaim(id);
+      pendingNode.current = nodeId ?? undefined;
+    }
   };
   const changeView = (next: View) => {
     if (next === "impact" && graph) {
@@ -168,7 +194,7 @@ export function Workbench({
       ? errorText(t, claims.error)
       : claims.isPending
         ? t("notice.loadingProject")
-        : claims.data.claims.length === 0
+        : claims.data.claims.length === 0 && !referencedClaim
           ? t("notice.noClaims")
           : snapshot.isError
             ? errorText(t, snapshot.error)
@@ -186,7 +212,9 @@ export function Workbench({
   const reviewCount = view === "impact" ? 0 : queueEntries(t, graph, view, assumption, impact.data).length;
   const claimTitle =
     graph?.claim.title || claims.data?.claims.find((claim) => claim.id === claimId)?.title || t("toolbar.defaultTitle");
-  const meta = graph ? [statusText(t, graph.claim.status), graph.claim.domain].filter(Boolean).join(" · ") : "";
+  const meta = graph
+    ? [graph.claim.code, statusText(t, graph.claim.status), graph.claim.domain].filter(Boolean).join(" · ")
+    : "";
   const showGraph = Boolean(graph && graph.order.length);
 
   const side = live.side ?? clamped.side;
@@ -238,7 +266,10 @@ export function Workbench({
             <ProjectActions
               session={session}
               claimId={graph?.claim.id === claimId ? claimId : null}
+              claimCode={graph?.claim.id === claimId ? graph.claim.code : null}
+              claimCodesAvailable={Boolean(claims.data?.claim_codes)}
               onRecorded={openRecorded}
+              onOpenReference={openReference}
             />
             {!layout.reviewOpen && graph && (
               <button
@@ -284,6 +315,11 @@ export function Workbench({
         {notice && (
           <p className="notice" role="status" data-error={String(noticeIsError)}>
             {notice}
+          </p>
+        )}
+        {missingReferenceNode && (
+          <p className="notice" role="status">
+            {t("claimCodes.nodeAbsent")}
           </p>
         )}
         {showGraph && graph && claimId && (

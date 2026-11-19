@@ -154,6 +154,23 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
     premise = next(node for node in graph["nodes"] if node["kind"] == "hypothesis")
     premise_id = premise["reference"]["basis_version_id"]
 
+    assert claims["claim_codes"] is True
+    initial_code = goal["code"]
+    assert _request(server, "GET", f"/api/claim-code?code={initial_code}") == {
+        "claim_id": claim_id, "node_id": goal["id"],
+    }
+    assert _request(server, "POST", "/api/claim-code", body={"claim_id": claim_id, "code": "REF35"}) == {
+        "code": "REF35",
+    }
+    renamed = _request(server, "GET", f"/api/graph?claim={claim_id}")
+    assert renamed["claim"]["code"] == "REF35"
+    rebuilt = {node["id"]: node["code"] for node in renamed["nodes"]}
+    assert rebuilt == {node["id"]: f"REF35-{node['code'].split('-')[1]}" for node in graph["nodes"]}
+    for lookup_code in (initial_code, rebuilt[goal["id"]]):
+        assert _request(server, "GET", f"/api/claim-code?code={lookup_code}") == {
+            "claim_id": claim_id, "node_id": goal["id"],
+        }
+
     impact = _request(server, "GET", f"/api/impact?claim={claim_id}&basis={premise_id}")
     assert impact["basis_version_id"] == premise_id and impact["includes_frozen_scope"]
     assert any(node["id"] == goal["id"] for node in impact["scope"])

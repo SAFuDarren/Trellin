@@ -324,7 +324,13 @@
     "proof_task.completed": "这条命题已有记录在案的结论。",
     "proof_task.busy": "此任务的证明工作正在运行。",
     "proof_task.unavailable": "证明任务暂不可用，请检查本机连接后重试。",
-    "proof_task.scope_mismatch": "收到的证明任务属于另一条命题。"
+    "proof_task.scope_mismatch": "收到的证明任务属于另一条命题。",
+    "claim_code.invalid": "请输入 2–12 个英文字母或数字，并以字母开头。",
+    "claim_code.exists": "该短码已属于此工作区的另一条命题。",
+    "claim_code.missing": "此工作区中没有对应短码的命题或节点。",
+    "claim_code.upgrade_required": "升级课题数据库后即可使用稳定的研究编号。",
+    "claim_code.save_failed": "无法保存短码，请检查本机连接后重试。",
+    "claim_code.conflict": "此目标已有其他短码，请从「研究引用」修改。"
   },
   "graph": {
     "label": "当前课题的依赖图",
@@ -635,6 +641,20 @@
       "budget_exhausted": "已用完获准的预算。",
       "awaiting_evidence_review": "证据正在等待审阅。"
     }
+  },
+  "claimCodes": {
+    "title": "研究引用",
+    "claim": "命题短码",
+    "optional": "命题短码（可选）",
+    "auto": "留空将自动分配短码。",
+    "format": "使用 2–12 个英文字母或数字，并以字母开头。",
+    "aliases": "修改短码后，原来的短码仍可定位该命题及其节点。",
+    "save": "保存短码",
+    "saved": "短码已保存。",
+    "reference": "命题或节点编号",
+    "lookupHint": "输入命题短码（例如 FLOW），或带数字的节点编号（例如 FLOW-09）。",
+    "open": "打开引用",
+    "nodeAbsent": "此编号对应当前命题，但它的节点已不在当前图谱中。"
   },
   "projectEntry": {
     "organize": "和 AI 梳理资料",

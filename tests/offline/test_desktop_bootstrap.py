@@ -153,7 +153,7 @@ def test_local_session_uses_selected_workspace_and_drains_on_parent_disconnect(m
             return None
         started.set()
         assert release.wait(5)
-        return []
+        return {"claims": []}
 
     monkeypatch.setattr(desktop.shutil, "which", lambda _: None)
     monkeypatch.setattr(desktop.WorkbenchServer, "read", read)

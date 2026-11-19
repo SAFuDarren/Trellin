@@ -4,7 +4,7 @@ import re
 from uuid import UUID
 
 from research_multiplier.protocol.serialization import fingerprint, json_text
-from research_multiplier.workflows import intake
+from research_multiplier.workflows import claim_references, intake
 
 
 class TheoremError(ValueError):
@@ -64,7 +64,7 @@ def recent(store):
          "wording": row["body"]["natural"], "lean": row["body"]["formal"]["lean"]["proposition"],
          "source": row["body"]["source"].get("reference", "")}
         for row in rows
-    ]}
+    ], **({"claim_codes": True} if claim_references.available(store) else {})}
 
 
 def _library(store, title, wording, formal, source):
@@ -81,7 +81,7 @@ def _library(store, title, wording, formal, source):
     return _receipt(recorded)
 
 
-def _goal(store, title, wording, formal, source, actor, reason):
+def _goal(store, title, wording, formal, source, actor, reason, *, code=None):
     target = {"title": title, "domain": "lean-core", "sensitivity": "restricted",
               "statement": wording, "formal": formal}
     raw = json_text(target).encode("utf-8")
@@ -92,6 +92,7 @@ def _goal(store, title, wording, formal, source, actor, reason):
     # The target digest fences duplicate submits from different workbench windows.
     store.query("human", "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", checksum)
     frozen = intake.freeze_target(store, raw, checksum, actor, reason)
+    result_code = {}
     if frozen["claim_id"] is None:
         # The form confirms a closed proposition. Any premises are part of the
         # submitted proposition itself. It does not select library items.
@@ -100,6 +101,15 @@ def _goal(store, title, wording, formal, source, actor, reason):
         draft = intake.draft(store, json_text(notes).encode("utf-8"), target_id=frozen["id"])
         intake.confirm(store, draft["id"], draft["intake_sha256"], {}, actor, reason)
         frozen = intake.target(store, frozen["id"])
+        if code is not None:
+            result_code = claim_references.set_code(store, frozen["claim_id"], code)
+    elif code is not None:
+        recorded = claim_references.snapshot(store, frozen["claim_id"])
+        if not recorded:
+            raise claim_references.ClaimCodeError("claim_code.upgrade_required")
+        if recorded["code"] != code:
+            raise claim_references.ClaimCodeError("claim_code.conflict")
+        result_code = {"code": code}
     return {
         "kind": "goal",
         "status": "open",
@@ -107,6 +117,7 @@ def _goal(store, title, wording, formal, source, actor, reason):
         "claim_id": str(frozen["claim_id"]),
         "packet_id": str(frozen["packet_id"]),
         "target_id": str(frozen["id"]),
+        **result_code,
     }
 
 
@@ -117,7 +128,7 @@ def add(store, document):
     kind = document.get("kind")
     fields = {"kind", "title", "wording", "lean", "domain", "source"}
     if kind == "goal":
-        fields |= {"confirmed", "actor", "reason"}
+        fields |= {"confirmed", "actor", "reason", "code"}
     if (kind not in ("library", "goal") or set(document) - fields
             or document.get("domain", "lean-core") != "lean-core"):
         raise TheoremError(_INVALID)
@@ -131,7 +142,8 @@ def add(store, document):
     if document.get("confirmed") is not True:
         raise TheoremError(_CONFIRMATION)
     actor, reason = _reviewer(document)
-    return _goal(store, title, wording, formal, source, actor, reason)
+    code = claim_references.normalize_code(document["code"]) if "code" in document else None
+    return _goal(store, title, wording, formal, source, actor, reason, code=code)
 
 
 def confirm(store, document):

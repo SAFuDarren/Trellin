@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.8
+
+- Save stable claim and proof-node references in PostgreSQL. Renamed prefixes
+  keep resolving to the original records, and activity displays recorded model
+  reasoning effort.
+
 ## 1.0.7
 
 - In Trellin, authorize proof work on a confirmed Lean scope, see its recorded

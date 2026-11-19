@@ -324,7 +324,13 @@
     "proof_task.completed": "This claim has reached a recorded conclusion.",
     "proof_task.busy": "Proof work is already running for this task.",
     "proof_task.unavailable": "The proof task is temporarily unavailable. Check the local connection and try again.",
-    "proof_task.scope_mismatch": "The returned proof task belongs to a different claim."
+    "proof_task.scope_mismatch": "The returned proof task belongs to a different claim.",
+    "claim_code.invalid": "Enter a short code of 2–12 letters or digits, starting with a letter.",
+    "claim_code.exists": "That code already belongs to another claim in this workspace.",
+    "claim_code.missing": "This workspace has no claim or node with that code.",
+    "claim_code.upgrade_required": "Upgrade the project database to use stable research codes.",
+    "claim_code.save_failed": "The code could not be saved. Check the local connection and try again.",
+    "claim_code.conflict": "This goal already has a different short code. Change it from Research references."
   },
   "graph": {
     "label": "Dependency graph of the current claim",
@@ -635,6 +641,20 @@
       "budget_exhausted": "The authorized budget is used up.",
       "awaiting_evidence_review": "The evidence is awaiting review."
     }
+  },
+  "claimCodes": {
+    "title": "Research references",
+    "claim": "Claim short code",
+    "optional": "Claim short code (optional)",
+    "auto": "Leave blank to assign a code automatically.",
+    "format": "Use 2–12 letters or digits, starting with a letter.",
+    "aliases": "After a change, previous codes still open this claim and its numbered nodes.",
+    "save": "Save short code",
+    "saved": "Short code saved.",
+    "reference": "Claim or node code",
+    "lookupHint": "Enter a claim code such as FLOW, or a numbered node code such as FLOW-09.",
+    "open": "Open reference",
+    "nodeAbsent": "This code still refers to the selected claim. Its node is no longer in the current graph."
   },
   "projectEntry": {
     "organize": "Organize with AI",

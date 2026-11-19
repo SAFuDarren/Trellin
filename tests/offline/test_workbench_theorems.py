@@ -32,6 +32,8 @@ class LibraryStore:
 
     def query(self, role, sql, *values):
         assert role == "human"
+        if "to_regprocedure" in sql:
+            return [{"installed": False}]
         if "propose_formal_item" in sql:
             self.proposals.append(values)
             if self.row is None:

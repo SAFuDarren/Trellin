@@ -16,7 +16,7 @@ from research_multiplier.cli._output import json_default
 from research_multiplier.proof.lean_watch import LakeWatch
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
-from research_multiplier.workflows import (doctor, proof_graph, research_progress, workbench_activity,
+from research_multiplier.workflows import (claim_references, doctor, proof_graph, research_progress, workbench_activity,
                                           workbench_guidance, workbench_intake, workbench_proof_tasks,
                                           workbench_sections, workbench_theorems)
 
@@ -72,6 +72,24 @@ def _uuid_parameters(query, *fields):
         return tuple(UUID(values[field][0]) for field in fields)
     except (ValueError, KeyError):
         raise _BadRequest("Supply one valid UUID for each requested reference.") from None
+
+
+def _reference_parameter(query):
+    try:
+        values = parse_qs(query, keep_blank_values=True, strict_parsing=True, max_num_fields=1)
+        if values.keys() != {"code"} or len(values["code"]) != 1:
+            raise ValueError
+        return values["code"][0]
+    except ValueError:
+        raise _BadRequest("claim_code.invalid") from None
+
+
+def _claim_code_error(error):
+    code = str(error)
+    return {
+        "claim_code.invalid": HTTPStatus.BAD_REQUEST,
+        "claim_code.missing": HTTPStatus.NOT_FOUND,
+    }.get(code, HTTPStatus.CONFLICT), code
 
 
 def _app_assets():
@@ -258,7 +276,7 @@ class _Handler(BaseHTTPRequestHandler):
         if route.path == "/api/claims":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
-            return {"claims": self.server.read(proof_graph.claims), "claim_id": self.server.claim_id}
+            return {**self.server.read(proof_graph.claim_index), "claim_id": self.server.claim_id}
         if route.path == "/api/atlas":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -279,6 +297,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self.server.read(_activity, *_uuid_parameters(route.query, "claim"))
         if route.path == "/api/proof-task":
             return self.server.proof_task(*_uuid_parameters(route.query, "claim"))
+        if route.path == "/api/claim-code":
+            return self.server.read(claim_references.resolve, _reference_parameter(route.query))
         return None
 
     def do_GET(self):
@@ -311,6 +331,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.BAD_REQUEST, str(error))
         except workbench_proof_tasks.ProofTaskError as error:
             self._error(HTTPStatus.NOT_FOUND, error.code)
+        except claim_references.ClaimCodeError as error:
+            self._error(*_claim_code_error(error))
         except DatabaseOperationError as error:
             if error.state in _SCHEMA_SQLSTATES:
                 self._error(HTTPStatus.CONFLICT, "This project database needs the workbench schema. See the workbench guide.")
@@ -373,6 +395,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.start_proof_task(self._body()))
             elif self.path == "/api/proof-task/stop":
                 self._json(HTTPStatus.OK, self.server.write(workbench_proof_tasks.stop, self._body()))
+            elif self.path == "/api/claim-code":
+                self._json(HTTPStatus.OK, self.server.write(claim_references.rename, self._body()))
             elif self.path in _PROJECT_WRITES:
                 document = self._body(_MAX_PROJECT_BYTES)
                 if not isinstance(document, dict):
@@ -387,12 +411,16 @@ class _Handler(BaseHTTPRequestHandler):
         except workbench_proof_tasks.ProofTaskError as error:
             status = HTTPStatus.BAD_REQUEST if error.code == "proof_task.invalid" else HTTPStatus.CONFLICT
             self._error(status, error.code)
+        except claim_references.ClaimCodeError as error:
+            self._error(*_claim_code_error(error))
         except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:
             self._error(HTTPStatus.CONFLICT, str(error))
         except DatabaseOperationError as error:
             if self.path in _PROOF_WRITES:
                 status = HTTPStatus.SERVICE_UNAVAILABLE if error.retryable else HTTPStatus.CONFLICT
                 self._error(status, "proof_task.unavailable" if error.retryable else "proof_task.stale")
+            elif self.path == "/api/claim-code":
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "claim_code.save_failed")
             elif self.path in _PROJECT_WRITES:
                 self._error(HTTPStatus.CONFLICT, "intake.save_failed")
             elif error.state == "23514" or (self.path == "/api/review" and not error.retryable):
@@ -405,6 +433,8 @@ class _Handler(BaseHTTPRequestHandler):
             _LOG.error("Workbench write failed (%s).", type(error).__name__)
             if self.path in _PROOF_WRITES:
                 message = "proof_task.unavailable"
+            elif self.path == "/api/claim-code":
+                message = "claim_code.save_failed"
             elif self.path in _PROJECT_WRITES:
                 message = "intake.save_failed"
             else:

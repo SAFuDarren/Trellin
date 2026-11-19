@@ -16,6 +16,7 @@ jobs AS (
            coalesce(a.model_provider, CASE WHEN j.payload ? 'workbench_guidance_model' THEN 'codex-cli' END)
                AS model_provider,
            coalesce(a.model_id, j.payload ->> 'workbench_guidance_model') AS model_id,
+           a.model_parameters ->> 'reasoning_effort' AS effort,
            coalesce(j.payload ->> 'lean_statement_id', j.payload ->> 'author_statement_id') AS statement_id,
            j.payload -> 'lean_search' = 'true'::jsonb AS model_job,
            j.payload -> 'lean_author' = 'true'::jsonb AS author_job,
@@ -153,7 +154,7 @@ def _job_event(job, goal):
                   node=_graph_node(job["workbench_node"], goal) or goal, goal=goal,
                   policy_id=_identifier(job["policy_id"]), job_id=job["id"],
                   statement_id=_identifier(job["statement_id"]), provider=job["model_provider"],
-                  model=_text(job["model_id"]) or None)
+                  model=_text(job["model_id"]) or None, effort=_text(job.get("effort")) or None)
 
 
 def _worker_event(policy, goal):

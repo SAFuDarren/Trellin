@@ -90,6 +90,8 @@ research-multiplier --workspace "PATH" workbench
 
 选中课题后打开「证明任务」，查看已确认的 Lean 命题、依据和待处理事项。范围就绪后，填写理由并授权启动。系统先做确定性检查和证明复用，默认允许零次模型调用。私有课题可以为已配置的本机 Lean 模型授权有限轮次。「停止」结束当前策略。重新打开工作区后可以查看原任务的进度和核验结果，工作中断时可以继续已授权的任务。证据的审阅和采纳仍由研究者决定。[证明任务说明](proof-workbench.md#start-a-proof-task)
 
+数据库升级到 `0072` 后，可在「研究引用」里更改课题短码，或输入笔记里的编号打开对应定理。节点的序号固定，改短码后旧短码和节点编号仍可查找。[研究引用说明](proof-workbench.md#work-with-the-models)
+
 ## 选用模型
 
 显式请求可选的远程模型建议时，`run --model --base-url` 会将问题文件和检查结果发给所选端点。费用由所选端点决定。项目级授权和预算适用于绑定工作区中的模型入口。未发表研究使用已绑定工作区中明确授权的可信本地模型入口。[模型建议说明](quickstart.md#optional-model-suggestions) · [本地模型配置](model-adapters.md#work-with-restricted-research-in-the-terminal)

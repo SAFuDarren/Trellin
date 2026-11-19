@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from research_multiplier import general_lean, lean_parameters
+from research_multiplier.workflows import claim_references
 
 
 _ANCHOR = """
@@ -354,12 +355,17 @@ def claims(store):
     """)
 
 
+def claim_index(store):
+    """List recent claims and tell clients whether saved references are available."""
+    return {"claims": claims(store), **({"claim_codes": True} if claim_references.available(store) else {})}
+
+
 def atlas(store, limit=40):
     """Summarize the recorded nodes and dependencies of recent claims for the workspace overview."""
     overview = []
     for claim in claims(store)[:limit]:
         try:
-            graph = snapshot(store, claim["id"])
+            graph = snapshot(store, claim["id"], references=False)
         except ValueError:
             continue
         nodes = graph["nodes"]
@@ -376,12 +382,21 @@ def atlas(store, limit=40):
     return {"claims": overview}
 
 
-def snapshot(store, claim_id):
+def snapshot(store, claim_id, *, references=True):
     """Project the selected frozen packet and its current Lean history in one snapshot."""
     rows = store.query("human", _GRAPH, claim_id)
     if not rows:
         raise ValueError("No frozen research claim matches this ID.")
-    return _snapshot(rows[0])
+    graph = _snapshot(rows[0])
+    codes = claim_references.snapshot(store, claim_id) if references else None
+    if codes:
+        prefix = codes["code"]
+        graph["claim"]["code"] = prefix
+        for node in graph["nodes"]:
+            number = codes["numbers"].get(node["id"])
+            if number is not None:
+                node["code"] = f"{prefix}-{number:02}"
+    return graph
 
 
 def impact(store, claim_id, basis_version_id):
