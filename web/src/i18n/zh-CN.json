@@ -183,6 +183,49 @@
     "status": "状态",
     "cliNote": "这类事项目前在命令行里处理："
   },
+  "clarifications": {
+    "original": "原始陈述",
+    "proposal": "更新后的 Lean 陈述",
+    "saveAnswers": "保存回答",
+    "prepare": "生成更新后的形式化",
+    "preparing": "正在生成形式化…",
+    "localPreparation": "配置的私有本机模型会读取原始陈述和已保存的回答。",
+    "publicPreparation": "生成形式化会将原始公开陈述和已保存的回答发送给配置的模型。",
+    "confirmPublic": "我确认将这条公开陈述和回答发送给配置的模型",
+    "next": "打开下一条问题",
+    "status": {
+      "waiting": "待回答",
+      "answered": "回答已保存",
+      "ready": "形式化待确认",
+      "continued": "已记录后续问题",
+      "confirmed": "形式化已确认",
+      "stale": "研究范围已变化",
+      "dismissed": "问题已关闭"
+    },
+    "explain": {
+      "target": "确认后将冻结这条原命题。开始证明前仍需核对并确认基本依据。",
+      "conjecture": "确认后将在已核对的研究范围内选定这条猜想。"
+    },
+    "confirm": {
+      "target": "确认这条原命题",
+      "conjecture": "确认这条猜想"
+    },
+    "confirmed": {
+      "target": "原命题已确认。核对基本依据后可继续。",
+      "conjecture": "猜想已在核对过的研究范围内确认。"
+    },
+    "errors": {
+      "invalid": "请核对回答和理由后重试。",
+      "not_found": "当前工作区中找不到这条问题。",
+      "identity_required": "请重新打开已绑定的工作区以确认研究者身份。",
+      "unavailable": "当前数据库版本需要升级后才能在这里回答澄清。",
+      "stale": "问题或候选陈述已变化，请核对当前状态后再继续。",
+      "scope": "确认的发送范围与该研究资料的隐私设置不匹配。",
+      "busy": "正在为这条澄清生成形式化。",
+      "prepare_failed": "模型未能生成形式化，已保存你的回答。",
+      "failed": "操作未完成，请检查当前状态后重试。"
+    }
+  },
   "detail": {
     "formula": "公式",
     "statement": "陈述",

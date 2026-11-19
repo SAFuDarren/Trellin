@@ -19,7 +19,7 @@ from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, research_progress, workbench_activity,
-                                          workbench_guidance, workbench_intake, workbench_proof_tasks,
+                                          workbench_clarification, workbench_guidance, workbench_intake, workbench_proof_tasks,
                                           workbench_review, workbench_sections, workbench_theorems, workspace_events)
 
 
@@ -34,6 +34,7 @@ _LOG = logging.getLogger(__name__)
 _CLAIMS_ROUTE = "/api/v1/workspaces/{workspace_id}/claims"
 _ACCESS_LOG_LOCK = threading.Lock()
 _MAX_GUIDANCE_BYTES = 16_384
+_MAX_CLARIFICATION_BYTES = 64_000
 _MAX_PROJECT_BYTES = 240_000
 _DOCTOR_SECONDS = 120
 _SCHEMA_SQLSTATES = {"42883", "42P01", "42703"}
@@ -54,6 +55,11 @@ _PROJECT_WRITES = {
     "/api/theorems/confirm": workbench_theorems.confirm,
 }
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
+_CLARIFICATION_WRITES = {
+    "answer": workbench_clarification.answer,
+    "prepare": workbench_clarification.prepare,
+    "confirm": workbench_clarification.confirm,
+}
 _V1_ERRORS = {
     "request.invalid": (HTTPStatus.BAD_REQUEST, "Supply a valid request and idempotency key."),
     "request.unauthenticated": (HTTPStatus.UNAUTHORIZED, "Open the workbench from its launcher."),
@@ -61,6 +67,14 @@ _V1_ERRORS = {
     "review.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to its database to resolve a local user."),
     "review.not_found": (HTTPStatus.NOT_FOUND, "The requested review record is unavailable in this workspace."),
     "review.not_pending": (HTTPStatus.CONFLICT, "The evidence is no longer eligible for this review."),
+    "clarification.invalid": (HTTPStatus.BAD_REQUEST, "Supply the requested answers, scope or review details."),
+    "clarification.not_found": (HTTPStatus.NOT_FOUND, "The clarification is unavailable in this workspace."),
+    "clarification.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local researcher."),
+    "clarification.unavailable": (HTTPStatus.CONFLICT, "The clarification needs an upgraded database and its archive."),
+    "clarification.stale": (HTTPStatus.CONFLICT, "The clarification changed. Reload it to review the current state."),
+    "clarification.scope": (HTTPStatus.FORBIDDEN, "Confirm the required scope for this model request."),
+    "clarification.busy": (HTTPStatus.CONFLICT, "A process is already preparing the clarification."),
+    "clarification.prepare_failed": (HTTPStatus.CONFLICT, "Preparation failed. The recorded answers are available to retry."),
     "idempotency.conflict": (HTTPStatus.CONFLICT, "This request key was already used for a different review."),
     "database.unavailable": (HTTPStatus.SERVICE_UNAVAILABLE, "The selected research database is unavailable."),
     "request.failed": (HTTPStatus.INTERNAL_SERVER_ERROR, "Could not complete the workbench request."),
@@ -171,6 +185,11 @@ class WorkbenchServer(ThreadingHTTPServer):
     def write(self, action, *values):
         with paths.use_workspace(self.workspace, strict=True), Store() as store:
             return store.transaction("human", lambda: action(store, *values))
+
+    def prepare_clarification(self, workspace_id, identifier, document):
+        # The existing workflow locks the request and commits only after the model returns.
+        with paths.use_workspace(self.workspace, strict=True), Store() as store:
+            return workbench_clarification.prepare(store, workspace_id, identifier, document)
 
     def write_project(self, action, document):
         if action is not workbench_intake.draft:
@@ -405,6 +424,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._v1_error("request.unauthenticated")
             return
         path = self.path.split("/")
+        if len(path) > 5 and path[3] == "workspaces" and path[5] == "clarifications":
+            self._v1_clarification(path)
+            return
         if len(path) != 6 or path[3] != "workspaces" or path[5] != "events":
             self._v1_error("events.not_found")
             return
@@ -537,6 +559,40 @@ class _Handler(BaseHTTPRequestHandler):
         status, message = _V1_ERRORS[code]
         self._json(status, {"error": {"code": code, "message": message, "request_id": self.request_id}})
 
+    def _v1_clarification(self, path):
+        try:
+            if len(path) != (7 if self.command == "GET" else 8):
+                raise workbench_clarification.ClarificationError("clarification.not_found")
+            try:
+                workspace_id, identifier = UUID(path[4]), UUID(path[6])
+            except ValueError:
+                raise workbench_clarification.ClarificationError("clarification.not_found") from None
+            if self.command == "GET":
+                result = self.server.read(workbench_clarification.detail, workspace_id, identifier)
+            else:
+                action = _CLARIFICATION_WRITES.get(path[7])
+                if action is None:
+                    raise workbench_clarification.ClarificationError("clarification.not_found")
+                document = self._body(_MAX_CLARIFICATION_BYTES)
+                if action is workbench_clarification.prepare:
+                    result = self.server.prepare_clarification(workspace_id, identifier, document)
+                else:
+                    result = self.server.write(action, workspace_id, identifier, document)
+            self._json(HTTPStatus.OK, result)
+        except _BadRequest:
+            self._v1_error("clarification.invalid")
+        except workbench_clarification.ClarificationError as error:
+            self._v1_error(str(error))
+        except DatabaseOperationError as error:
+            code = {"22023": "clarification.invalid", "23514": "clarification.stale",
+                    "P0002": "clarification.stale", "42501": "clarification.identity_required"}
+            self._v1_error(code.get(error.state, "database.unavailable"))
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            return
+        except Exception as error:
+            _LOG.error("Versioned workbench clarification failed (%s).", type(error).__name__)
+            self._v1_error("request.failed")
+
     def _post_v1(self):
         self.request_id = str(uuid4())
         try:
@@ -547,6 +603,9 @@ class _Handler(BaseHTTPRequestHandler):
                 self._v1_error("request.unauthenticated")
                 return
             path = self.path.split("/")
+            if len(path) > 5 and path[3] == "workspaces" and path[5] == "clarifications":
+                self._v1_clarification(path)
+                return
             if len(path) != 8 or path[3] != "workspaces" or path[5] != "evidence" or path[7] != "reviews":
                 self._v1_error("review.not_found")
                 return

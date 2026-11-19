@@ -10,6 +10,10 @@ from ..storage.artifacts import Artifacts
 from research_multiplier.protocol.serialization import fingerprint
 
 
+class ClarificationBusy(ValueError):
+    """Another process is already preparing this clarification."""
+
+
 def _objects():
     return Artifacts(paths.object_store(), workspace=False)
 
@@ -31,17 +35,27 @@ def _row(store, identifier):
     return rows[0]
 
 
-def show(store, identifier):
+def review_record(store, identifier):
+    """Read the durable request and its original statement for a review surface."""
     row = _row(store, identifier)
+    return row, _read(row["subject_sha256"])["data"]["statement"]
+
+
+def proposal_record(row):
+    return _read(row["result_sha256"])
+
+
+def show(store, identifier):
+    row, statement = review_record(store, identifier)
     fields = ("id", "title", "goal_id", "status", "questions", "answers", "actor_ref", "reason", "requested_at",
               "decided_at", "proposal_sha256", "result_sha256", "next_clarification_id")
     result = {key: row[key] for key in fields}
-    result["statement"] = _read(row["subject_sha256"])["data"]["statement"]
+    result["statement"] = statement
     if row["status"] == "answered":
         flag = "--confirm-local" if row["sensitivity"] == "restricted" else "--confirm-public"
         result["continue_command"] = f"research-multiplier research clarify {identifier} --continue {flag}"
     if row["result_sha256"]:
-        result["result"] = _read(row["result_sha256"])
+        result["result"] = proposal_record(row)
     return result
 
 
@@ -113,7 +127,7 @@ def prepare(store, source, draft, finish, *, continued=None):
 def _dispatch_lock(store, identifier):
     sql = "SELECT pg_try_advisory_lock(hashtextextended(%s, 4871)) AS acquired"
     if not store.query("human", sql, str(identifier))[0]["acquired"]:
-        raise ValueError("This formalization is already continuing in another process.")
+        raise ClarificationBusy("This formalization is already continuing in another process.")
     try:
         yield
     finally:
@@ -127,7 +141,7 @@ def continue_formalization(store, identifier, *, confirm_local):
     with _dispatch_lock(store, identifier):
         row = _row(store, identifier)
         if row["result_sha256"]:
-            return _read(row["result_sha256"])
+            return proposal_record(row)
         if row["next_clarification_id"]:
             return {"clarification": show(store, row["next_clarification_id"])}
         if row["status"] != "answered":

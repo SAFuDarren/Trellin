@@ -139,6 +139,10 @@ export function useInbox(session: string, streamHealthy = false) {
       api<{
         items: InboxItem[];
         review_identity?: { workspace_id: string };
+        clarification_review?: {
+          workspace_id: string;
+          followups: { id: string; title: string; status: "answered" | "ready"; waiting_since: string }[];
+        };
         workspace_events?: { workspace_id: string; cursor: string; coverage?: string };
       }>(session, "/api/inbox", { signal }),
   });

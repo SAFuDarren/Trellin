@@ -209,6 +209,94 @@ describe("App", () => {
     expect(keys[2]).not.toBe(keys[0]);
   });
 
+  it("saves answers, resumes the archived proposal after reopening, and separately confirms its exact token", async () => {
+    window.history.replaceState(null, "", "#review");
+    const id = "55555555-5555-4555-8555-555555555555";
+    const route = `/api/v1/workspaces/${WORKSPACE}/clarifications/${id}`;
+    const question = "Which carrier is intended?";
+    const original = "Every element equals itself.";
+    const proposal = {
+      token: "archived-result",
+      proposition: "∀ x : T, x = x",
+      parameters: [{ name: "T", type: "Type" }],
+    };
+    let status = "waiting";
+    const actions: [string, unknown][] = [];
+    const details = () => ({
+      id,
+      title: "Public clarification",
+      statement: original,
+      questions: [question],
+      answers: status === "waiting" ? null : ["An arbitrary type."],
+      reason: status === "waiting" ? null : "This is the original scope.",
+      kind: "target",
+      sensitivity: "public",
+      status,
+      next_id: null,
+      proposal: status === "ready" || status === "confirmed" ? proposal : null,
+      accepted: null,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string, init?: RequestInit) => {
+        if (input === "/api/inbox") {
+          return Response.json({
+            items:
+              status === "waiting"
+                ? [
+                    {
+                      kind: "clarify_formalization",
+                      item_id: id,
+                      waiting_since: REVIEW_ITEM.waiting_since,
+                      detail: { title: "Public clarification" },
+                    },
+                  ]
+                : [],
+            clarification_review: {
+              workspace_id: WORKSPACE,
+              followups:
+                status === "answered" || status === "ready"
+                  ? [{ id, title: "Public clarification", status, waiting_since: REVIEW_ITEM.waiting_since }]
+                  : [],
+            },
+          });
+        }
+        if (input.startsWith(route)) {
+          if (input === route) return Response.json(details());
+          const path = input.slice(route.length + 1);
+          actions.push([path, JSON.parse(String(init?.body))]);
+          status = { answer: "answered", prepare: "ready", confirm: "confirmed" }[path]!;
+          return Response.json(details());
+        }
+        return Response.json(responses[input] ?? {});
+      }),
+    );
+    const page = renderApp("token");
+    expect(await screen.findByText(original)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(question), { target: { value: "  An arbitrary type.  " } });
+    fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "This is the original scope." } });
+    fireEvent.click(screen.getByRole("button", { name: en.clarifications.saveAnswers }));
+    const prepare = await screen.findByRole("button", { name: en.clarifications.prepare });
+    expect(actions).toEqual([["answer", { answers: ["An arbitrary type."], reason: "This is the original scope." }]]);
+    expect(screen.queryByText(proposal.proposition)).toBeNull();
+
+    fireEvent.click(screen.getByLabelText(en.clarifications.confirmPublic));
+    fireEvent.click(prepare);
+    expect(await screen.findByText(proposal.proposition)).toBeTruthy();
+    expect(screen.getByText("T : Type")).toBeTruthy();
+    expect(actions[1]).toEqual(["prepare", { scope: "public" }]);
+    page.unmount();
+
+    renderApp("token");
+    expect(await screen.findByText(proposal.proposition)).toBeTruthy();
+    const confirm = screen.getByRole("button", { name: en.clarifications.confirm.target });
+    fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "The updated statement matches." } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(actions).toHaveLength(3));
+    expect(actions[2]).toEqual(["confirm", { token: proposal.token, reason: "The updated statement matches." }]);
+    expect(await screen.findByText(en.clarifications.confirmed.target)).toBeTruthy();
+  });
+
   it("retains the display name and original request on a legacy review inbox", async () => {
     window.history.replaceState(null, "", "#review");
     const fetch = vi.fn(async (input: string, init?: RequestInit) => {

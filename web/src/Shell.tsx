@@ -59,7 +59,7 @@ export function Shell({ session }: { session: string }) {
   };
   const running = team.data?.jobs?.filter((job) => job.state === "running").length ?? 0;
   const badges = {
-    review: { count: inbox.data?.items?.length ?? 0 },
+    review: { count: (inbox.data?.items?.length ?? 0) + (inbox.data?.clarification_review?.followups.length ?? 0) },
     team: { count: running, live: true },
   };
   const { section, sub } = route;
