@@ -15,6 +15,14 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 **Organize with AI** and **Add theorem** are available before the first claim. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
 
+## Start a proof task
+
+Select a claim and open **Proof task**. The panel shows the confirmed Lean proposition, its basis, and any decision that blocks work. If the Lean statement still needs preparation or review, follow [the Lean scope review](lean-core.md) before starting.
+
+When the scope is ready, confirm it in the panel and record your reason to start. The worker runs deterministic checks and proof reuse first. The default allows zero model rounds. For restricted research, the panel can authorize a bounded number of rounds with the exact configured private Lean model once that route is available. Public remote model work continues through the separate [explicit release procedure](#send-a-public-note-to-codex).
+
+The panel shows the proof task state, open obligations when the worker reports them, and the verified receipt when one is issued. Review and adoption remain researcher decisions. **Stop** ends the selected policy and prevents new work on it. Reopen the same workspace and proof task to see the recorded checkpoint. If an authorized pass was interrupted, use **Continue** to return to the same policy.
+
 ## Read a graph
 
 - **Proof** shows the frozen goal, checked steps, reductions and open obligations. Choose a node to see the stored statement and its current status. Long Lean statements start folded. The fold opens the exact stored text, including any binders already in the record.

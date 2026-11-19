@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.7
+
+- In Trellin, authorize proof work on a confirmed Lean scope, see its recorded
+  progress and verification result, and stop the selected task.
+
 ## 1.0.6
 
 - CI checks for new reverse imports between entry points and shared workflows.

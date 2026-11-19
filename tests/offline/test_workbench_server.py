@@ -1,5 +1,6 @@
 """Workbench request checks that run before any database access (docs/interfaces.md section 4)."""
 
+from contextlib import nullcontext
 import http.client
 import json
 import threading
@@ -73,6 +74,7 @@ def test_foreign_host_and_origin_are_refused(server):
     "/api/inbox?limit=5",
     "/api/team?x=1",
     "/api/doctor?fresh=yes",
+    "/api/proof-task?claim=not-a-uuid",
 ])
 def test_invalid_queries_are_rejected_before_reading(server, path):
     response, content = request(server, "GET", path)
@@ -107,6 +109,48 @@ def test_writes_need_json_a_session_and_the_local_origin(server):
     assert response.status == 403
     response, _ = request(server, "POST", "/api/review", body=b"{}", headers={"Content-Type": "text/plain"})
     assert response.status == 400
+
+
+@pytest.mark.parametrize("action", ["start", "stop"])
+def test_proof_task_writes_require_a_local_session(server, action):
+    path = f"/api/proof-task/{action}"
+    response, _ = request(server, "POST", path, body={}, session=False)
+    assert response.status == 403
+    response, _ = request(server, "POST", path, body={}, origin=False)
+    assert response.status == 403
+
+
+def test_proof_task_starts_only_the_committed_policy(server, monkeypatch):
+    claim = "0b6b2f6e-8d1a-4c2b-9f57-3a1c2d4e5f60"
+    policy = "b34a1bdf-8c98-497b-b33f-2be548ca9b7f"
+    started, reached_policy, release = [], threading.Event(), threading.Event()
+    document = {"claim_id": claim, "token": "a" * 64, "model_rounds": 0, "reason": "Reviewed"}
+
+    def write(action, supplied):
+        assert action.__name__ == "start" and supplied == document
+        started.append("committed")
+        return {"policy_id": policy}
+
+    def advance(stage, limit, identifiers, parallel, *, lake_watch):
+        started.append((stage, limit, identifiers, parallel))
+        reached_policy.set()
+        release.wait(5)
+        return {"errors": [], "lean_runs": []}
+
+    monkeypatch.setattr(server, "write", write)
+    monkeypatch.setattr("research_multiplier.workbench.server.paths.use_workspace", lambda *_, **__: nullcontext())
+    monkeypatch.setattr("research_multiplier.workbench.server.research_progress.advance_cycle", advance)
+    try:
+        response, content = request(server, "POST", "/api/proof-task/start", body=document)
+        assert response.status == 200
+        assert json.loads(content) == {"policy_id": policy}
+        assert reached_policy.wait(5)
+        assert started == ["committed", ("combined", 1, [policy], 1)]
+        response, content = request(server, "POST", "/api/proof-task/start", body=document)
+        assert response.status == 409
+        assert json.loads(content) == {"error": "proof_task.busy"}
+    finally:
+        release.set()
 
 
 def test_malformed_guidance_is_rejected(server):

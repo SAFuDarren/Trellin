@@ -13,10 +13,12 @@ from uuid import UUID
 import webbrowser
 
 from research_multiplier.cli._output import json_default
+from research_multiplier.proof.lean_watch import LakeWatch
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
-from research_multiplier.workflows import (doctor, proof_graph, workbench_activity, workbench_guidance,
-                                          workbench_intake, workbench_sections, workbench_theorems)
+from research_multiplier.workflows import (doctor, proof_graph, research_progress, workbench_activity,
+                                          workbench_guidance, workbench_intake, workbench_proof_tasks,
+                                          workbench_sections, workbench_theorems)
 
 
 # The interface is built from web/ into the package (docs/engineering.md); only its exact files are served.
@@ -47,6 +49,7 @@ _PROJECT_WRITES = {
     "/api/theorems": workbench_theorems.add,
     "/api/theorems/confirm": workbench_theorems.confirm,
 }
+_PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
 
 
 class _BadRequest(ValueError):
@@ -100,6 +103,10 @@ class WorkbenchServer(ThreadingHTTPServer):
         self._doctor = (0.0, None)
         self._doctor_lock = threading.Lock()
         self._intake_lock = threading.Lock()
+        self._proof_task_lock = threading.Lock()
+        self._proof_task_closing = threading.Event()
+        self._running_policy = None
+        self._failed_policy = None
         super().__init__(("127.0.0.1", port), _Handler)
         self.host = f"127.0.0.1:{self.server_port}"
         self.origin = f"http://{self.host}"
@@ -107,6 +114,10 @@ class WorkbenchServer(ThreadingHTTPServer):
     @property
     def launch_url(self):
         return f"{self.origin}/#session={self.session}"
+
+    def server_close(self):
+        self._proof_task_closing.set()
+        super().server_close()
 
     def read(self, action, *values):
         # Request threads do not inherit the CLI's workspace ContextVar.
@@ -145,6 +156,53 @@ class WorkbenchServer(ThreadingHTTPServer):
             return store.transaction("human", lambda: workbench_guidance.add(
                 store, claim_id, statement_id, request_id, node_id, text, audience=audience, confirm_release=confirmed,
             ))
+
+    def proof_task(self, claim_id):
+        task = self.read(workbench_proof_tasks.snapshot, claim_id)
+        policy = task["policy"]
+        if policy and task["state"] in {"authorized", "waiting"}:
+            with self._proof_task_lock:
+                if str(policy["id"]) == self._running_policy:
+                    return {**task, "state": "running", "can_start": False}
+                if str(policy["id"]) == self._failed_policy:
+                    return {**task, "state": "failed", "blocker": "proof_task.worker_failed"}
+        return task
+
+    def start_proof_task(self, document):
+        with self._proof_task_lock:
+            if self._running_policy is not None:
+                raise workbench_proof_tasks.ProofTaskError("proof_task.busy")
+            result = self.write(workbench_proof_tasks.start, document)
+            identifier = str(result["policy_id"])
+            self._running_policy = identifier
+            self._failed_policy = None
+            try:
+                threading.Thread(target=self._work_on_proof, args=(identifier,), daemon=True).start()
+            except RuntimeError:
+                self._running_policy = None
+                self._failed_policy = identifier
+                raise workbench_proof_tasks.ProofTaskError("proof_task.worker_failed") from None
+            return result
+
+    def _work_on_proof(self, identifier):
+        failed = True
+        try:
+            with paths.use_workspace(self.workspace, strict=True):
+                lake_watch = LakeWatch()
+                failed = False
+                while not self._proof_task_closing.is_set():
+                    cycle = research_progress.advance_cycle("combined", 1, [identifier], 1, lake_watch=lake_watch)
+                    failed = bool(cycle["errors"])
+                    if failed or not cycle["lean_runs"] or cycle["lean_runs"][0]["status"] != "search_continues":
+                        break
+        except Exception as error:
+            failed = True
+            _LOG.error("Workbench proof worker stopped (%s).", type(error).__name__)
+        finally:
+            with self._proof_task_lock:
+                self._running_policy = None
+                if failed:
+                    self._failed_policy = identifier
 
 
 def _activity(store, claim_id):
@@ -219,6 +277,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self.server.read(proof_graph.impact, *_uuid_parameters(route.query, "claim", "basis"))
         if route.path == "/api/activity":
             return self.server.read(_activity, *_uuid_parameters(route.query, "claim"))
+        if route.path == "/api/proof-task":
+            return self.server.proof_task(*_uuid_parameters(route.query, "claim"))
         return None
 
     def do_GET(self):
@@ -249,6 +309,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, result)
         except _BadRequest as error:
             self._error(HTTPStatus.BAD_REQUEST, str(error))
+        except workbench_proof_tasks.ProofTaskError as error:
+            self._error(HTTPStatus.NOT_FOUND, error.code)
         except DatabaseOperationError as error:
             if error.state in _SCHEMA_SQLSTATES:
                 self._error(HTTPStatus.CONFLICT, "This project database needs the workbench schema. See the workbench guide.")
@@ -307,6 +369,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.add_guidance(*self._guidance_body()))
             elif self.path == "/api/review":
                 self._json(HTTPStatus.OK, self.server.write(workbench_sections.review, *self._review_body()))
+            elif self.path == "/api/proof-task/start":
+                self._json(HTTPStatus.OK, self.server.start_proof_task(self._body()))
+            elif self.path == "/api/proof-task/stop":
+                self._json(HTTPStatus.OK, self.server.write(workbench_proof_tasks.stop, self._body()))
             elif self.path in _PROJECT_WRITES:
                 document = self._body(_MAX_PROJECT_BYTES)
                 if not isinstance(document, dict):
@@ -318,10 +384,16 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.BAD_REQUEST, str(error))
         except workbench_guidance.GuidanceError as error:
             self._error(HTTPStatus.CONFLICT, str(error))
+        except workbench_proof_tasks.ProofTaskError as error:
+            status = HTTPStatus.BAD_REQUEST if error.code == "proof_task.invalid" else HTTPStatus.CONFLICT
+            self._error(status, error.code)
         except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:
             self._error(HTTPStatus.CONFLICT, str(error))
         except DatabaseOperationError as error:
-            if self.path in _PROJECT_WRITES:
+            if self.path in _PROOF_WRITES:
+                status = HTTPStatus.SERVICE_UNAVAILABLE if error.retryable else HTTPStatus.CONFLICT
+                self._error(status, "proof_task.unavailable" if error.retryable else "proof_task.stale")
+            elif self.path in _PROJECT_WRITES:
                 self._error(HTTPStatus.CONFLICT, "intake.save_failed")
             elif error.state == "23514" or (self.path == "/api/review" and not error.retryable):
                 self._error(HTTPStatus.CONFLICT, "The record has changed; refresh and try again.")
@@ -331,7 +403,12 @@ class _Handler(BaseHTTPRequestHandler):
             return
         except Exception as error:
             _LOG.error("Workbench write failed (%s).", type(error).__name__)
-            message = "intake.save_failed" if self.path in _PROJECT_WRITES else "Could not send guidance to this project."
+            if self.path in _PROOF_WRITES:
+                message = "proof_task.unavailable"
+            elif self.path in _PROJECT_WRITES:
+                message = "intake.save_failed"
+            else:
+                message = "Could not send guidance to this project."
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, message)
 
 
