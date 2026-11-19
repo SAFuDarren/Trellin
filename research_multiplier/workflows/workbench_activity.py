@@ -2,9 +2,11 @@
 
 from uuid import UUID
 
+from research_multiplier.storage.lean_progress import ACTIVE_LEAN_POLICY_SQL
+
 _MAX_ACTIVITY = 60
 
-_SNAPSHOT = """
+_SNAPSHOT = f"""
 WITH selected AS MATERIALIZED (
     SELECT id, contract_sha256 FROM rm.claims
     WHERE id = %s::uuid AND contract_sha256 IS NOT NULL
@@ -32,14 +34,8 @@ jobs AS (
     LIMIT 36
 ),
 policies AS MATERIALIZED (
-    SELECT p.id, p.policy #>> '{lean,statement_id}' AS statement_id,
-           EXISTS (
-               SELECT FROM pg_locks active_lock, hashtextextended(p.id::text, 4801) AS key(value)
-               WHERE active_lock.locktype = 'advisory' AND active_lock.granted AND active_lock.objsubid = 1
-                 AND active_lock.database = (SELECT oid FROM pg_database WHERE datname = current_database())
-                 AND active_lock.classid::bigint = (key.value >> 32 & 4294967295::bigint)
-                 AND active_lock.objid::bigint = (key.value & 4294967295::bigint)
-           ) AS running
+    SELECT p.id, p.policy #>> '{{lean,statement_id}}' AS statement_id,
+           {ACTIVE_LEAN_POLICY_SQL} AS running
     FROM selected JOIN rm.research_progress_status p
       ON (p.claim_id,p.contract_sha256) = (selected.id,selected.contract_sha256)
     WHERE p.policy ? 'lean' AND p.approved_at IS NOT NULL

@@ -90,6 +90,7 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 - Use [Research references](proof-workbench.md#work-with-the-models) to rename a claim's short code and reopen a saved proof node by its permanent number.
 - On database revision `0073` or later, [review evidence](proof-workbench.md#read-a-graph) under the local researcher identity from the bound workspace.
 - On database revision `0074`, new evidence approvals and returns appear automatically in an open workbench, including decisions made in the terminal.
+- Database revision `0075` also records scope confirmations, withdrawals, and proof task changes in the same workspace event stream.
 - [Search Formalpedia offline](literature-search.md#search-formalpedia-locally) without creating a research database. To replay a selected result within a confirmed Lean scope, follow the same guide after enabling its database feature.
 - Run `research-multiplier research resume --format text` to inspect progress and decisions in a configured project. [Resume and advancement](research-progress.md)
 

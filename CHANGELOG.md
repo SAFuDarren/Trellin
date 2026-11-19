@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.12
+
+- Stream committed confirmations, withdrawals, proof task state and checked
+  evidence from the workspace database, including work started from the CLI.
+
 ## 1.0.11
 
 - Refresh open workbench views when evidence reviews are committed and replay

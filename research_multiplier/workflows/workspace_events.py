@@ -66,13 +66,14 @@ def _parse_cursor(after):
 
 
 def _envelope(row):
+    user = row["user_id"]
     return {
         "id": str(row["id"]),
         "type": row["type"],
         "schema_version": row["schema_version"],
         "workspace_id": str(row["workspace_id"]),
         "occurred_at": row["occurred_at"].astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "actor": {"kind": "user", "id": str(row["user_id"])},
+        "actor": {"kind": "user", "id": str(user)} if user is not None else {"kind": "system", "id": None},
         "subject": {"kind": row["subject_kind"], "id": str(row["subject_id"])},
         "data": row["data"],
     }
