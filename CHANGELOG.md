@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.13
+
+- Refresh open research views for confirmed scopes, withdrawals and proof task
+  changes, and replay the same updates after reconnecting.
+
 ## 1.0.12
 
 - Stream committed confirmations, withdrawals, proof task state and checked

@@ -100,6 +100,8 @@ research-multiplier --workspace "PATH" workbench
 
 数据库版本 `0075` 把命题和依据确认、核验输入撤回、证明任务状态和采纳结论记到同一事件流里。撤回后需要重验哪些证明，仍由现有依赖规则决定。
 
+使用新版工作台时，这些变化会自动更新对应的图谱、审阅列表和证明任务。即使你从命令行确认范围、撤回依据或运行证明任务，打开着的窗口也能看到结果。断线重连后会补读遗漏的事件。
+
 ## 选用模型
 
 显式请求可选的远程模型建议时，`run --model --base-url` 会将问题文件和检查结果发给所选端点。费用由所选端点决定。项目级授权和预算适用于绑定工作区中的模型入口。未发表研究使用已绑定工作区中明确授权的可信本地模型入口。[模型建议说明](quickstart.md#optional-model-suggestions) · [本地模型配置](model-adapters.md#work-with-restricted-research-in-the-terminal)
