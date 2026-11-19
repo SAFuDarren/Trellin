@@ -41,6 +41,15 @@ def _workspace_path(root, row):
     return Path(row["path"]) if "path" in row else root / "Workspaces" / row["slot"]
 
 
+def _external_path(value):
+    if not isinstance(value, str) or "\x00" in value:
+        raise LibraryError("storage-invalid")
+    path = Path(value)
+    if not path.is_absolute() or ".." in path.parts or str(path) != value:
+        raise LibraryError("storage-invalid")
+    return path
+
+
 def _project_markers(workspace):
     try:
         paths.workspace_details(workspace)
@@ -169,7 +178,13 @@ class Library:
             projects.mkdir(mode=0o700, exist_ok=True)
             _directory(projects)
             if not (root / _REGISTRY).exists():
-                if any(projects.iterdir()) or {entry.name for entry in root.iterdir()} != {"Workspaces"}:
+                # An interrupted atomic initial write can leave its temporary
+                # file. Leave it intact while rebuilding the empty registry.
+                if any(projects.iterdir()) or any(
+                    entry != projects and (not entry.name.startswith(".trellin-")
+                                           or not stat.S_ISREG(entry.lstat().st_mode))
+                    for entry in root.iterdir()
+                ):
                     raise LibraryError("storage-invalid")
                 publish_metadata(root / _REGISTRY, {"default_id": None, "default_slot": str(uuid4()), "projects": []})
             registry = self._read(root)
@@ -207,8 +222,8 @@ class Library:
                     raise LibraryError("storage-invalid")
                 slots.add(slot)
             else:
-                path = canonical_path(row["path"])
-                if str(path) != row["path"] or path.is_relative_to(root) or path in external:
+                path = _external_path(row["path"])
+                if path.is_relative_to(root) or path in external:
                     raise LibraryError("storage-invalid")
                 external.add(path)
         if data["default_id"] is not None:
@@ -255,7 +270,31 @@ class Library:
             root, data = self._state(initialize=True)
             if data["default_id"] is not None:
                 return self._registered_path(root, self._project_row(data, data["default_id"]))
+            self._recover_pending_default(root, data)
             return self._create(root, data, "Library", data["default_slot"], default=True)
+
+    def _recover_pending_default(self, root, data):
+        workspace = root / "Workspaces" / data["default_slot"]
+        if not workspace.exists() and not workspace.is_symlink():
+            return
+        _directory(workspace)
+        if workspace_registration(workspace) is not None:
+            # Publication of this marker follows successful provisioning.
+            return
+        identifier = paths.workspace_id(workspace)
+        if identifier is not None and paths.database_id(workspace) is not None:
+            try:
+                credentials.location(identifier).lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                # The complete candidate must retain its slot if PostgreSQL
+                # validation fails transiently on this launch.
+                return
+        # An interrupted or failed provisioning left an incomplete folder.
+        # Preserve its contents and reserve an unused slot for the new attempt.
+        data["default_slot"] = str(uuid4())
+        publish_metadata(root / _REGISTRY, data)
 
     def create(self, name):
         name = _name(name)
@@ -274,7 +313,8 @@ class Library:
                 raise LibraryError("storage-project")
             known = next((row for row in data["projects"] if row["id"] == identifier), None)
             if known is not None:
-                if _workspace_path(root, known) != workspace or known["database"] != database:
+                if (canonical_path(_workspace_path(root, known)) != workspace
+                        or known["database"] != database):
                     raise LibraryError("storage-project")
                 return self._project(root, known)
             name = workspace.parent.name if workspace.name == "Trellin" else workspace.name
@@ -292,6 +332,10 @@ class Library:
 
     def _registered_path(self, root, row):
         workspace = _workspace_path(root, row)
+        if "path" in row:
+            workspace = canonical_path(workspace)
+            if workspace.is_relative_to(root):
+                raise LibraryError("storage-verification")
         if _project_markers(workspace) != (row["id"], row["database"]):
             raise LibraryError("storage-verification")
         if "slot" in row and workspace_registration(workspace) != (self.anchor, row["slot"]):

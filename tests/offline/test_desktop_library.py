@@ -91,6 +91,79 @@ def test_default_retries_the_same_provision_after_postgres_is_available(monkeypa
     assert slots[0] == library.open_default() == slots[1]
 
 
+def test_default_retries_after_incomplete_provision_without_touching_its_files(monkeypatch, library):
+    create = desktop_library.create_workspace
+    interrupted = []
+
+    def launch(workspace, *, minimal=False):
+        if not interrupted:
+            interrupted.append(workspace)
+            workspace.mkdir()
+            (workspace / "unfinished").write_text("Retain for recovery")
+            raise WorkspaceCreationError("create-failed")
+        return create(workspace, minimal=minimal)
+
+    monkeypatch.setattr(desktop_library, "create_workspace", launch)
+    with pytest.raises(LibraryError, match="create-failed"):
+        library.open_default()
+    recovered = library.open_default()
+    assert recovered != interrupted[0]
+    assert library.open_default() == recovered
+    assert (interrupted[0] / "unfinished").read_text() == "Retain for recovery"
+    assert [item["path"] for item in library.status()["projects"]] == [str(recovered)]
+
+
+def test_complete_unpublished_default_is_reused_after_transient_database_failure(monkeypatch, library, tmp_path):
+    create = desktop_library.create_workspace
+    check = desktop_library._check_binding
+    pending = []
+    saved_login = tmp_path / "existing-login"
+    monkeypatch.setattr(desktop_library.credentials, "location", lambda _: saved_login)
+
+    def launch(workspace, *, minimal=False):
+        pending.append(workspace)
+        create(workspace, minimal=minimal)
+        saved_login.touch()
+        raise WorkspaceCreationError("create-failed")
+
+    def unavailable(*_):
+        raise LibraryError("storage-database")
+
+    monkeypatch.setattr(desktop_library, "create_workspace", launch)
+    with pytest.raises(LibraryError, match="create-failed"):
+        library.open_default()
+    monkeypatch.setattr(desktop_library, "_check_binding", unavailable)
+    with pytest.raises(LibraryError, match="storage-database"):
+        library.open_default()
+    monkeypatch.setattr(desktop_library, "_check_binding", check)
+    assert library.open_default() == pending[0]
+    assert len(pending) == 1
+
+
+def test_incidental_external_alias_does_not_block_managed_library(library, tmp_path):
+    default = library.open_default()
+    legacy = paths.initialize_workspace(tmp_path / "old" / "Trellin")
+    paths.bind_database(legacy, uuid4())
+    saved = library.register_external(legacy)
+    relocated_parent = legacy.parent.rename(tmp_path / "relocated")
+    legacy.parent.symlink_to(relocated_parent, target_is_directory=True)
+
+    assert library.open_default() == default
+    assert library.resolve_project(saved["id"]) == relocated_parent / legacy.name
+    assert library.register_external(relocated_parent / legacy.name) == saved
+    move = library.preview(tmp_path / "new library")
+    assert move["project_count"] == 1
+
+
+def test_default_recovers_after_registry_publication_interruption(library):
+    root = library.anchor / "Library"
+    (root / "Workspaces").mkdir(parents=True)
+    interrupted = root / ".trellin-failed"
+    interrupted.write_bytes(b'{"incomplete')
+    assert library.open_default().parent == root / "Workspaces"
+    assert interrupted.read_bytes() == b'{"incomplete'
+
+
 def test_move_preserves_workspace_ids_bytes_and_external_registration(library, tmp_path):
     default = library.open_default()
     secondary = library.create("Second theorem")
