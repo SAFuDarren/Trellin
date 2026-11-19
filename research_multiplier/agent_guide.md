@@ -57,6 +57,8 @@ These commands only read. Run them freely.
 | --- | --- |
 | Is the setup complete? | `research-multiplier doctor` (add `--json` to parse it) |
 | Where do files go? | `research-multiplier research paths` |
+| Find the latest verified project archive | `research-multiplier research latest-backup` |
+| Preview a portable research handoff | `research-multiplier research handoff --claim CLAIM_UUID` or `--project`. Export with the confirmed snapshot SHA-256 after the researcher approves its contents and destination. |
 | What is going on in this project? | `research-multiplier research resume --format text` |
 | What waits for the researcher? | `research-multiplier review inbox` |
 | Evidence for one claim | `research-multiplier research evidence CLAIM_ID` |

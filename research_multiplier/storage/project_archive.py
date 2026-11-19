@@ -209,10 +209,55 @@ def _manifest(source):
     return archive, manifest
 
 
-def verify(source):
-    archive, manifest = _manifest(source)
+def _verification_summary(archive, manifest):
     return {"directory": str(archive), "database_id": manifest["database_id"],
             "schema_revision": manifest["schema_revision"], "files": len(manifest["files"])}
+
+
+def verify(source):
+    return _verification_summary(*_manifest(source))
+
+
+def latest(directory=None):
+    """Find the newest intact archive for the active project, without a database connection."""
+    root = paths.require_workspace()
+    database_id = paths.database_id(root)
+    workspace_id = paths.workspace_id(root)
+    if not database_id or not workspace_id:
+        raise ValueError("Bind the selected project before looking for its backups.")
+    parent = paths.external_destination(directory if directory is not None else root / "backups", "backups")
+    if not parent.exists():
+        return {"archive": None, "unusable_archives": 0}
+    if not parent.is_dir():
+        raise ValueError("Choose a directory containing project backups.")
+    candidates = []
+    unusable = 0
+    for child in parent.iterdir():
+        manifest_file = child / "manifest.json"
+        if child.is_symlink() or not child.is_dir() or manifest_file.is_symlink() or not manifest_file.is_file():
+            continue
+        try:
+            metadata = json.loads(manifest_file.read_bytes())
+            if not isinstance(metadata, dict) or metadata.get("database_id") != str(database_id):
+                continue
+            if metadata.get("workspace_id", str(workspace_id)) != str(workspace_id):
+                continue
+            candidates.append((manifest_file.stat().st_mtime_ns, child))
+        except (OSError, ValueError):
+            unusable += 1
+
+    for modified, child in sorted(candidates, reverse=True):
+        try:
+            archive, manifest = _manifest(child)
+            if manifest["database_id"] != str(database_id) or manifest.get("workspace_id", str(workspace_id)) != str(workspace_id):
+                continue
+            checked = _verification_summary(archive, manifest)
+        except (OSError, ValueError, KeyError):
+            unusable += 1
+            continue
+        return {"archive": {**checked, "manifest_modified_at": datetime.fromtimestamp(
+            modified / 1_000_000_000, timezone.utc).isoformat(timespec="seconds")}, "unusable_archives": unusable}
+    return {"archive": None, "unusable_archives": unusable}
 
 
 def restore(source, workspace, *, pg_bin=None):

@@ -50,6 +50,8 @@ def test_restore_rejects_keyword_dsn_before_import_and_retries_with_uri(tmp_path
         monkeypatch.setenv("RM_MIGRATION_DSN", source_dsn)
         assert main(["--workspace", str(source), "research", "backup-project", "--out", str(archive)]) == 0
         capsys.readouterr()
+        assert main(["--workspace", str(source), "research", "latest-backup", "--directory", str(tmp_path)]) == 0
+        assert f'"directory": "{archive}"' in capsys.readouterr().out
 
         with TemporaryDirectory(prefix="rmr-") as directory:
             uri = _restore_uri(target_dsn, Path(directory) / "with space")
