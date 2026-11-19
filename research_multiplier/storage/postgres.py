@@ -1,6 +1,6 @@
 """Role-scoped connections and transactions for the production workflow."""
 
-from contextlib import ExitStack
+from contextlib import ExitStack, closing, contextmanager, suppress
 import os
 
 from research_multiplier.storage import paths
@@ -128,6 +128,31 @@ class Store:
                 return action()
 
         return self._call(role, run)
+
+    @contextmanager
+    def listen_workspace_events(self):
+        """Listen outside any transaction on this Store's dedicated human connection."""
+        from psycopg.pq import TransactionStatus
+
+        def listen(connection):
+            if not connection.autocommit or connection.info.transaction_status != TransactionStatus.IDLE:
+                raise ValueError("Workspace events require an idle autocommit connection.")
+            connection.execute("LISTEN rm_workspace_events")
+
+        def wait(timeout):
+            def receive(connection):
+                with closing(connection.notifies(timeout=timeout, stop_after=1)) as notifications:
+                    next(notifications, None)
+
+            self._call("human", receive)
+
+        self._call("human", listen)
+        try:
+            yield wait
+        finally:
+            # The Store also closes the connection if it disconnected during the read.
+            with suppress(DatabaseOperationError):
+                self._call("human", lambda connection: connection.execute("UNLISTEN rm_workspace_events"))
 
     def _verify_role(self, role, connection):
         if role in self.verified_roles:

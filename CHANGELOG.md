@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.10
+
+- Record new evidence reviews in the database transaction and expose a local
+  event stream that resumes after the last received event.
+
 ## 1.0.9
 
 - Record a stable local researcher ID on new approval records. The versioned

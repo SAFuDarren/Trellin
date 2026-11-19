@@ -122,6 +122,15 @@ def test_versioned_review_requires_local_session_and_idempotency_key(server, mon
         assert error["request_id"] == response.getheader("X-Request-Id")
 
 
+def test_workspace_event_stream_requires_a_session_and_valid_cursor(server):
+    path = "/api/v1/workspaces/d42ca2f7-9288-47af-b7e5-1150e6df5304/events"
+    response, payload = request(server, "GET", path, session=False)
+    assert response.status == 401 and json.loads(payload)["error"]["code"] == "request.unauthenticated"
+    for cursor in ("-1", "1e3", "9223372036854775808"):
+        response, payload = request(server, "GET", path, headers={"Last-Event-ID": cursor})
+        assert response.status == 400 and json.loads(payload)["error"]["code"] == "events.invalid_cursor"
+
+
 def test_writes_need_json_a_session_and_the_local_origin(server):
     valid = {"evidence_id": "0b6b2f6e-8d1a-4c2b-9f57-3a1c2d4e5f60", "action": "approve", "actor": "A", "reason": "r"}
     response, _ = request(server, "POST", "/api/review", body=valid, origin=False)
