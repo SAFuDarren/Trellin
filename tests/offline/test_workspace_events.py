@@ -72,6 +72,12 @@ def test_capability_reports_the_current_cursor_only_for_an_eligible_workspace():
     assert events.capability(EventStore(user=None)) == {}
 
 
+def test_unattributed_worker_event_keeps_system_provenance():
+    row, = EventStore(1).query("human", "rm.read_workspace_events", WORKSPACE, 0, 10)
+    row.update(type="evidence.recorded", user_id=None)
+    assert events._envelope(row)["actor"] == {"kind": "system", "id": None}
+
+
 @pytest.mark.parametrize("cursor", ["", "-1", "+1", "1 ", "١", str(1 << 63), "4", True])
 def test_subscribe_rejects_invalid_cursor_before_exposing_an_iterator(cursor):
     with pytest.raises(events.WorkspaceEventError, match="^events.invalid_cursor$"):

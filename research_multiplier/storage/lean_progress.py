@@ -8,6 +8,19 @@ from research_multiplier.policy.contracts import ArtifactRef
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 
 
+# Match the policy advisory lock used by rm.lock_lean_progress.
+# Both read models alias the research progress policy as p.
+ACTIVE_LEAN_POLICY_SQL = """
+EXISTS (
+    SELECT FROM pg_locks active_lock, hashtextextended(p.id::text, 4801) AS key(value)
+    WHERE active_lock.locktype = 'advisory' AND active_lock.granted AND active_lock.objsubid = 1
+      AND active_lock.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+      AND active_lock.classid::bigint = (key.value >> 32 & 4294967295::bigint)
+      AND active_lock.objid::bigint = (key.value & 4294967295::bigint)
+)
+"""
+
+
 @dataclass(frozen=True)
 class PendingLeanPass:
     policy_id: UUID

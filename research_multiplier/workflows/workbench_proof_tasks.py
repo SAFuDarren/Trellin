@@ -5,6 +5,7 @@ from uuid import UUID
 
 from research_multiplier.models.model_errors import ModelFailure
 from research_multiplier.protocol.serialization import fingerprint
+from research_multiplier.storage.lean_progress import ACTIVE_LEAN_POLICY_SQL
 from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workflows import research_progress, research_resume
 
@@ -15,16 +16,17 @@ class ProofTaskError(ValueError):
         super().__init__(self.code)
 
 
-_POLICY = """
+_POLICY = f"""
 SELECT p.id, p.policy_sha256, p.state, p.stopped_at,
-       (p.policy #>> '{lean,model_rounds}')::integer AS model_rounds,
-       p.policy #> '{lean,private_model}' AS private_model,
-       run.result ->> 'status' AS phase
+       (p.policy #>> '{{lean,model_rounds}}')::integer AS model_rounds,
+       p.policy #> '{{lean,private_model}}' AS private_model,
+       run.result ->> 'status' AS phase,
+       {ACTIVE_LEAN_POLICY_SQL} AS running
 FROM rm.research_progress_status p
 LEFT JOIN rm.lean_progress_last_run run ON run.policy_id = p.id
 WHERE p.claim_id = %s AND p.packet_id = %s AND p.approved_at IS NOT NULL
-  AND p.policy #>> '{lean,statement_id}' = %s::text
-  AND p.policy #>> '{lean,statement_sha256}' = %s
+  AND p.policy #>> '{{lean,statement_id}}' = %s::text
+  AND p.policy #>> '{{lean,statement_sha256}}' = %s
 ORDER BY (p.stopped_at IS NULL) DESC, p.approved_at DESC, p.id DESC LIMIT 1
 """
 
@@ -79,6 +81,8 @@ def _state(record, lean, policy, receipt, local_model):
         return "stopped", "proof_task.stopped"
     if policy["state"] != "awaiting_evidence":
         return "waiting", "proof_task.policy_conflict"
+    if policy.get("running"):
+        return "running", None
     if policy["model_rounds"] and policy["private_model"] is None:
         return "waiting", "proof_task.policy_conflict"
     if policy["model_rounds"] and policy["private_model"] != local_model:

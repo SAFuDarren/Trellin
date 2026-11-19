@@ -60,6 +60,15 @@ def _policy(rounds=0):
             "stopped_at": None, "model_rounds": rounds, "private_model": None, "phase": None}
 
 
+def test_proof_task_displays_the_durable_worker_lease(proof_context):
+    store, _, _ = proof_context
+    store.policy = {**_policy(), "running": True}
+    task = tasks.snapshot(store, CLAIM)
+    assert task["state"] == "running" and task["can_stop"] and not task["can_start"]
+    store.policy["running"] = False
+    assert tasks.snapshot(store, CLAIM)["state"] == "authorized"
+
+
 def test_start_signs_only_the_shown_scope_and_reuses_the_recorded_approval(monkeypatch, proof_context):
     store, _, document = proof_context
     changes = []

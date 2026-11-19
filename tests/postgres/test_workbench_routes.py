@@ -227,6 +227,7 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
     assert local_user is not None
     inbox = _request(server, "GET", "/api/inbox")
     reviewed_claim = next(item["claim_id"] for item in inbox["items"] if item["item_id"] == evidence_id)
+    starting_cursor = inbox["workspace_events"]["cursor"]
     assert inbox["review_identity"] == {"workspace_id": str(workspace_id)}
     endpoint = f"/api/v1/workspaces/{workspace_id}/evidence/{evidence_id}/reviews"
     headers = {"Idempotency-Key": str(uuid4())}
@@ -242,25 +243,29 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
         rows = store.query("human", """
             SELECT id::text, action, user_id, actor_ref FROM rm.decisions WHERE evidence_id = %s
         """, evidence_id)
+        starting_events = store.query("human", "SELECT * FROM rm.read_workspace_events(%s,0,100)", workspace_id)
     assert rows == [{"id": created["id"], "action": "approve", "user_id": local_user,
                      "actor_ref": "Local researcher"}]
 
-    assert inbox["workspace_events"] == {"workspace_id": str(workspace_id), "cursor": "0"}
+    setup_types = {row["type"] for row in starting_events if row["id"] <= int(starting_cursor)}
+    assert {"claim.frozen", "basis.confirmed", "lean_statement.confirmed", "job.status_changed",
+            "evidence.recorded"} <= setup_types
+    event_id = str(int(starting_cursor) + 1)
     after_review = _request(server, "GET", "/api/inbox")
-    assert after_review["workspace_events"] == {"workspace_id": str(workspace_id), "cursor": "1"}
+    assert after_review["workspace_events"] == {"workspace_id": str(workspace_id), "cursor": event_id}
     reader = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
     try:
         reader.request("GET", f"/api/v1/workspaces/{workspace_id}/events",
-                       headers={"X-RM-Session": server.session, "Last-Event-ID": "0"})
+                       headers={"X-RM-Session": server.session, "Last-Event-ID": starting_cursor})
         response = reader.getresponse()
         assert response.status == 200 and response.getheader("Content-Type").startswith("text/event-stream")
         assert response.readline() == b": connected\n"
         assert response.readline() == b"\n"
-        assert response.readline() == b"id: 1\n"
+        assert response.readline() == f"id: {event_id}\n".encode("ascii")
         assert response.readline() == b"event: evidence.reviewed\n"
         record = json.loads(response.readline().removeprefix(b"data: "))
         assert record == {
-            "id": "1", "type": "evidence.reviewed", "schema_version": 1, "workspace_id": str(workspace_id),
+            "id": event_id, "type": "evidence.reviewed", "schema_version": 1, "workspace_id": str(workspace_id),
             "occurred_at": record["occurred_at"], "actor": {"kind": "user", "id": str(local_user)},
             "subject": {"kind": "evidence", "id": evidence_id},
             "data": {"decision_id": created["id"], "claim_id": reviewed_claim, "action": "approve"},
