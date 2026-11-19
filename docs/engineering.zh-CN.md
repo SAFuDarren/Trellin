@@ -97,7 +97,7 @@
    - 类型有：`feat`、`fix`、`docs`、`refactor`、`test`、`build`、`ci`、`chore`。
    - 范围填所属的层或模块，例如 `kernel`、`lean`、`web`、`migrations`。
    - 每次提交只做一件事。
-4. **提 PR。** 按模板填写，包括下面的提交前检查清单。CI 必须通过，并且至少要有一位该模块的代码负责人批准，才能合并。
+4. **提 PR。** 按模板填写，包括下面的提交前检查清单。等必需的 CI 检查通过。只有一位维护者时，由维护者检查差异后手动合并。有第二位可信维护者能担任代码负责人后，要求一位独立代码负责人批准。见 [#7](https://github.com/SAFuDarren/Trellin/issues/7)。
 5. **合并。** 用 squash 合并，保留 Conventional Commits 格式的标题；更新日志根据这些标题起草。
 6. **涉及架构决定。** 如果改动需要新增一条架构决定，或者修改已定的决定，就在同一个 PR 里同时更新 `architecture.md` 和 `architecture.zh-CN.md`：
    - 新决定按所在章节顺延编号。

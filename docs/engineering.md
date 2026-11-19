@@ -94,7 +94,7 @@ Rules by language:
    - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`.
    - The scope is a layer or area, for example `kernel`, `lean`, `web` or `migrations`.
    - Keep each commit to one purpose.
-4. **Pull request.** Fill in the template, including the change checklist below. CI must pass. Merge only after at least one approving review from a code owner of the touched area.
+4. **Pull request.** Fill in the template, including the change checklist below. Wait for the required CI checks. A sole maintainer reviews the diff and merges manually. When a second trusted maintainer can review as a code owner, require an independent Code Owner approval. See [#7](https://github.com/SAFuDarren/Trellin/issues/7).
 5. **Merge.** Squash-merge and keep the Conventional Commit title; the changelog is drafted from these titles.
 6. **Decisions.** If a change needs a new architectural decision, or a change to a settled one, update `architecture.md` and `architecture.zh-CN.md` in the same pull request.
    - Give the decision the next number in its section.

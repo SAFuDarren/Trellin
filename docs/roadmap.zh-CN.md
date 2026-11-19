@@ -77,7 +77,7 @@
 - 仓库里要有：`CODE_OF_CONDUCT.md`；`SECURITY.md`（写明私下报告漏洞的渠道）；issue 和 PR 模板；`CODEOWNERS`。
 - `CONTRIBUTING.md` 写明提交前检查清单，并指向架构决定。
 - 在 GitHub Projects 建好看板和 P0–P6 里程碑，标签按[工程文档](engineering.zh-CN.md#issue-与计划)的定义设置。
-- `main` 开启分支保护：Checks、Tests、DCO 都通过，并经代码负责人批准，才能合并。这需要仓库公开，时间按公开条件来定（审计发现 A-202611-01）。
+- `main` 的改动都通过 PR。Checks、Tests、DCO 和 Task link 检查必须通过，禁止强推和删除。只有一位维护者时，必需批准人数为 0，代码负责人审批可选。加入有写权限及相应 `CODEOWNERS` 范围的可信维护者后，再启用一位独立代码负责人的审批要求。见 [#7](https://github.com/SAFuDarren/Trellin/issues/7) 和审计发现 A-202611-01。
 
 ### P0.5 依赖与漏洞扫描（后端）
 

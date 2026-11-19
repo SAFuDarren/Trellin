@@ -77,7 +77,7 @@ Acceptance criteria:
 - Present in the repository: `CODE_OF_CONDUCT.md`, `SECURITY.md` (private reporting channel), issue and pull request templates, and `CODEOWNERS`.
 - `CONTRIBUTING.md` explains the change checklist and points to the architecture decisions.
 - The GitHub Project board and milestones P0–P6 exist, with labels as defined in [engineering](engineering.md#issues-and-planning).
-- `main` is protected: Checks, Tests and DCO must pass and a code owner must approve before merging. This needs the repository to be public, which follows the publication gate (audit finding A-202611-01).
+- Protect `main` by requiring pull requests and passing Checks, Tests, DCO and Task link checks. Block force pushes and deletion. While there is one maintainer, require zero approvals and keep Code Owner review optional. After a second trusted maintainer with write access and matching `CODEOWNERS` coverage is available, require one independent Code Owner approval. See [#7](https://github.com/SAFuDarren/Trellin/issues/7) and audit finding A-202611-01.
 
 ### P0.5 Dependency and vulnerability scanning (Backend)
 
