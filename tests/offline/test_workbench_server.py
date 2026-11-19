@@ -121,6 +121,51 @@ def test_model_connections_are_session_bound_and_do_not_read_the_project(server,
     assert json.loads(request(server, "GET", path)[1]) == {"connections": []}
 
 
+def test_native_connections_are_discovered_and_selected_only_in_the_bound_session(server, tmp_path, monkeypatch):
+    from research_multiplier.models import cli_executor, connections
+
+    executable = tmp_path / "claude"
+    executable.write_text("fixture")
+    login = []
+
+    def find_binary(provider, selected):
+        if provider == "claude-code" and selected in {None, str(executable)}:
+            return str(executable)
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("An unauthorized or native connection request must not read a project or invoke inference.")
+
+    monkeypatch.setattr(server, "connections", connections.Registry(tmp_path / "connections.sqlite3"))
+    monkeypatch.setattr(server, "read", unexpected)
+    monkeypatch.setattr(server, "write", unexpected)
+    monkeypatch.setattr(connections, "_adapter", unexpected)
+    monkeypatch.setattr(connections, "_binary", find_binary)
+    monkeypatch.setattr(cli_executor, "require_native_login", lambda *args: login.append(args))
+
+    discovery = "/api/model-connections/native"
+    connect = "/api/model-connections/add-native"
+    body = {"provider": "claude-code"}
+    assert request(server, "GET", discovery, session=False)[0].status == 403
+    assert request(server, "GET", discovery, headers={"Origin": "https://foreign.test"})[0].status == 403
+    assert request(server, "GET", discovery + "?provider=claude-code")[0].status == 400
+    assert request(server, "POST", connect, body=body, session=False)[0].status == 403
+    assert request(server, "POST", connect, body=body, origin=False)[0].status == 403
+    assert request(server, "POST", connect, body={**body, "binary": str(executable)})[0].status == 409
+    assert not login
+
+    response, content = request(server, "GET", discovery)
+    assert response.status == 200
+    assert json.loads(content) == {"providers": [{"provider": "claude-code", "status": "signed_in"}]}
+    assert server.connections.list() == []
+
+    response, content = request(server, "POST", connect, body=body)
+    assert response.status == 200
+    saved = json.loads(content)
+    assert saved["provider"] == "claude-code" and saved["model"] == "native-default"
+    assert server.connections.list() == [saved]
+    assert login == [("claude-code", str(executable))] * 2
+
+
 def test_versioned_claims_rejects_unauthorized_and_invalid_requests(server, monkeypatch, capsys):
     workspace_id = "d42ca2f7-9288-47af-b7e5-1150e6df5304"
     path = f"/api/v1/workspaces/{workspace_id}/claims"

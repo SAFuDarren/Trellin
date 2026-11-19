@@ -5,6 +5,7 @@ import { api } from "../../api/client";
 import { useFallbackInterval } from "../../api/liveUpdates";
 import {
   connectionLabel,
+  connectionModelLabel,
   dispatchableConnection,
   useModelConnections,
   type ModelConnection,
@@ -96,7 +97,7 @@ function StartTaskForm({
   const [approved, setApproved] = useState(false);
   const [connectionId, setConnectionId] = useState("");
   const selected = policy?.public_model ?? connections.find(({ id }) => id === connectionId);
-  const model = selected && `${t(`team.providers.${selected.provider}`)} · ${selected.model}`;
+  const model = selected && `${t(`team.providers.${selected.provider}`)} · ${connectionModelLabel(t, selected)}`;
   const blockedSelection = Boolean((requiresExternal || connectionId) && !selected);
 
   function start(event: FormEvent<HTMLFormElement>) {
@@ -134,7 +135,7 @@ function StartTaskForm({
               </option>
             ))}
           </select>
-          {!connections.length && <a href={href("settings")}>{t("proofTask.connectModel")}</a>}
+          {!connections.length && <a href={href("team", "runtimes")}>{t("proofTask.connectModel")}</a>}
         </label>
       )}
       {(localModelAllowed || selected) && !policy && (
@@ -253,7 +254,9 @@ export function ProofTaskPane({ session, claimId }: { session: string; claimId: 
       {phaseText && <p className="project-entry-note">{phaseText}</p>}
       {model && (
         <p className="project-entry-note">
-          {t("proofTask.selectedModel", { model: `${t(`team.providers.${model.provider}`)} · ${model.model}` })}
+          {t("proofTask.selectedModel", {
+            model: `${t(`team.providers.${model.provider}`)} · ${connectionModelLabel(t, model)}`,
+          })}
         </p>
       )}
       {model && Boolean(usage?.length) && (

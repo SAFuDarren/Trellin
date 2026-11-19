@@ -92,6 +92,58 @@ def test_native_binary_is_part_of_the_authorized_identity(provider, command, tmp
     assert registry.identity(row["id"])["fingerprint"] != before["fingerprint"]
 
 
+def test_native_discovery_checks_sign_in_and_registers_only_the_selected_tool(tmp_path, monkeypatch):
+    location = tmp_path / "connections.sqlite3"
+    codex = tmp_path / "codex"
+    codex.write_text("fixture")
+    registry = connections.Registry(location, secrets=Secrets())
+
+    def find_binary(provider, selected):
+        if provider == "codex-cli" and selected in {None, str(codex)}:
+            return str(codex)
+
+    login = []
+    sign_in_allowed = True
+
+    def check_login(provider, binary):
+        login.append((provider, binary))
+        if not sign_in_allowed:
+            raise ModelFailure("authentication", "private native output")
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Discovery and registration must not run inference.")
+
+    monkeypatch.setattr(connections, "_binary", find_binary)
+    monkeypatch.setattr(cli_executor, "require_native_login", check_login)
+    monkeypatch.setattr(connections, "_adapter", unexpected)
+    assert registry.native() == [{"provider": "codex-cli", "status": "signed_in"}]
+    assert registry.list() == [] and not location.exists()
+    assert login == [("codex-cli", str(codex))]
+
+    for invalid in ({"provider": "openai"}, {"provider": "codex-cli", "binary": "/user/path"},
+                    {"provider": "codex-cli", "model": "user-supplied"}, {"provider": "codex-cli", "api_key": "secret"}):
+        with pytest.raises(connections.ConnectionError, match=r"^connection\.invalid$"):
+            registry.add_native(invalid)
+    with pytest.raises(connections.ConnectionError, match=r"^connection\.missing_cli$"):
+        registry.add_native({"provider": "claude-code"})
+    assert len(login) == 1 and not location.exists()
+
+    sign_in_allowed = False
+    assert registry.native() == [{"provider": "codex-cli", "status": "connection.authentication"}]
+    with pytest.raises(connections.ConnectionError, match=r"^connection\.authentication$"):
+        registry.add_native({"provider": "codex-cli"})
+    assert not location.exists()
+
+    sign_in_allowed = True
+    selected = registry.add_native({"provider": "codex-cli"})
+    assert selected["provider"] == "codex-cli" and selected["model"] == "native-default"
+    assert selected["status"] == "untested" and selected["label"] == "Codex"
+    assert set(selected) == {"id", "provider", "model", "status", "label", "fingerprint"}
+    assert registry.add_native({"provider": "codex-cli"}) == selected
+    assert registry.list() == [selected]
+    assert not registry._secrets.values
+
+
 @pytest.mark.parametrize("provider", ["openai", "anthropic"])
 def test_connection_test_is_synthetic_and_sanitizes_failure(provider, tmp_path, monkeypatch):
     probe_calls = []
@@ -133,11 +185,11 @@ def test_native_login_check_never_receives_project_credentials(provider, command
     monkeypatch.setenv("OPENAI_API_KEY", "TEST")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "TEST")
 
-    def run(arguments, *, cwd, env, timeout, stdout, stderr, check):
+    def run(arguments, *, cwd, env, timeout, stdin, stdout, stderr, check):
         assert arguments == ["/path/to/command", *command]
         assert Path(cwd).name.startswith("rm-proof-worker-")
         assert not any(key in env for key in ["RM_HUMAN_DSN", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"])
-        assert timeout == 5 and stdout == stderr == DEVNULL and not check
+        assert timeout == 5 and stdin == stdout == stderr == DEVNULL and not check
         return CompletedProcess(arguments, 1)
 
     monkeypatch.setattr(cli_executor.subprocess, "run", run)
@@ -159,6 +211,43 @@ def test_native_failures_show_actionable_codes_without_process_output(provider, 
         cli_executor.complete(provider, "/path/to/cli", "test-model", [], 10)
     assert failure.value.code == code
     assert "DO NOT SHOW THIS" not in str(failure.value)
+
+
+@pytest.mark.parametrize("provider", ["codex-cli", "claude-code"])
+def test_native_default_leaves_model_selection_to_the_registered_cli(provider, monkeypatch):
+    commands = []
+    guard_calls = []
+
+    def isolate(command, environment):
+        guard_calls.append(command)
+        return command
+
+    def run(command, **options):
+        if command[-1] == "--version":
+            return CompletedProcess(command, 0, "fixture version", "")
+        commands.append(command)
+        if provider == "codex-cli":
+            response = "\n".join(map(json.dumps, [
+                {"type": "item.completed", "item": {"type": "agent_message", "text": "fixture"}},
+                {"type": "turn.completed", "model": "actual-model", "usage": {}},
+            ]))
+        else:
+            response = json.dumps({"subtype": "success", "result": "fixture", "modelUsage": {"actual-model": {}}})
+        return CompletedProcess(command, 0, response, "")
+
+    monkeypatch.setattr(cli_executor, "_isolated_codex_command", isolate)
+    monkeypatch.setattr(cli_executor.subprocess, "run", run)
+    with cli_executor.workbench_connection(provider):
+        reply = cli_executor.complete(provider, "/fixture/native", cli_executor.NATIVE_DEFAULT_MODEL, [], 10)
+        cli_executor.complete(provider, "/fixture/native", "selected-model", [], 10)
+    cli_executor.complete(provider, "/fixture/native", cli_executor.NATIVE_DEFAULT_MODEL, [], 10)
+
+    native, explicitly_selected, legacy = commands
+    assert "--model" not in native
+    assert explicitly_selected[explicitly_selected.index("--model") + 1] == "selected-model"
+    assert legacy[legacy.index("--model") + 1] == cli_executor.NATIVE_DEFAULT_MODEL
+    assert reply["model"] == "actual-model" and reply["model_id_reported"]
+    assert guard_calls == ([native, explicitly_selected] if provider == "codex-cli" else [])
 
 
 @pytest.mark.parametrize("platform", ["darwin", "linux"])

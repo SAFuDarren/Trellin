@@ -2,7 +2,12 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
-import { connectionLabel, dispatchableConnection, useModelConnections } from "../../api/modelConnections";
+import {
+  connectionLabel,
+  connectionModelLabel,
+  dispatchableConnection,
+  useModelConnections,
+} from "../../api/modelConnections";
 import { href } from "../../shell/route";
 import { ReviewFields } from "./ReviewFields";
 import { reviewIdentity } from "./review";
@@ -270,8 +275,8 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
           </div>
           {!models.isPending && !connections.isPending && !canChoose && (
             <div className="project-entry-buttons">
-              <a className="button" href={href("settings")}>
-                {t("modelConnections.openSettings")}
+              <a className="button" href={href("team", "runtimes")}>
+                {t("modelConnections.openTeam")}
               </a>
               <button
                 className="button"
@@ -325,7 +330,7 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
               <p>
                 {t(`team.providers.${release.preview.provider}`, { defaultValue: release.preview.provider })}
                 {" · "}
-                {release.preview.model}
+                {connectionModelLabel(t, release.preview)}
               </p>
               <p>{t("modelConnections.previewLimits", { seconds: release.preview.limits.timeout_seconds })}</p>
               <pre className="code-block">{JSON.stringify(release.preview.outgoing, null, 2)}</pre>

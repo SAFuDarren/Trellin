@@ -1,8 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
 import { api } from "./client";
 
-export const MODEL_PROVIDERS = ["codex-cli", "claude-code", "openai", "anthropic"] as const;
-export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
+export const API_MODEL_PROVIDERS = ["openai", "anthropic"] as const;
+export type NativeModelProvider = "codex-cli" | "claude-code";
+export type ModelProvider = NativeModelProvider | (typeof API_MODEL_PROVIDERS)[number];
+export const NATIVE_DEFAULT_MODEL = "native-default";
 
 export type ModelConnection = {
   id: string;
@@ -26,6 +29,12 @@ export function useModelConnections(session: string, enabled = true) {
 
 export function connectionLabel(connection: ModelConnection) {
   return connection.label || connection.model;
+}
+
+export function connectionModelLabel(t: TFunction, { provider, model }: { provider: string; model: string }) {
+  return (provider === "codex-cli" || provider === "claude-code") && model === NATIVE_DEFAULT_MODEL
+    ? t("modelConnections.defaultModel")
+    : model;
 }
 
 export function dispatchableConnection(

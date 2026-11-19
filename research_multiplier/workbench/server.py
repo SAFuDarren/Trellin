@@ -58,6 +58,7 @@ _PROJECT_WRITES = {
 }
 _CONNECTION_WRITES = {
     "/api/model-connections/add": "add",
+    "/api/model-connections/add-native": "add_native",
     "/api/model-connections/remove": "remove",
     "/api/model-connections/test": "test",
 }
@@ -350,6 +351,10 @@ class _Handler(BaseHTTPRequestHandler):
             if route.query:
                 raise _BadRequest("connection.invalid")
             return {"connections": self.server.connections.list()}
+        if route.path == "/api/model-connections/native":
+            if route.query:
+                raise _BadRequest("connection.invalid")
+            return {"providers": self.server.connections.native()}
         if route.path == "/api/project-intake/models":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -676,6 +681,8 @@ class _Handler(BaseHTTPRequestHandler):
         registry = self.server.connections
         if method == "add":
             return registry.add(document)
+        if method == "add_native":
+            return registry.add_native(document)
         if not isinstance(document, dict) or document.keys() != {"id"}:
             raise _BadRequest("connection.invalid")
         if method == "test":

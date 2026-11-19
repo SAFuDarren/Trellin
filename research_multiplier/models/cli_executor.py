@@ -17,7 +17,8 @@ from .model_errors import ModelFailure
 # API keys, or project paths to either a login check or an inference command.
 _NATIVE_ENV = {"HOME", "PATH", "USER", "LOGNAME", "TMPDIR", "SYSTEMROOT", "APPDATA", "LOCALAPPDATA",
                "USERPROFILE", "LANG", "LC_ALL", "CODEX_HOME", "CLAUDE_CONFIG_DIR"}
-_ISOLATE_CODEX = ContextVar("isolate_workbench_codex", default=False)
+NATIVE_DEFAULT_MODEL = "native-default"
+_WORKBENCH_PROVIDER = ContextVar("workbench_cli_provider", default=None)
 _MAC_SANDBOX = "/usr/bin/sandbox-exec"
 _CODEX_INSTRUCTIONS = ("AGENTS.md", "AGENTS.override.md")
 
@@ -29,11 +30,11 @@ def _environment():
 @contextmanager
 def workbench_connection(provider):
     """Keep stricter native limits scoped to user-added workbench connections."""
-    token = _ISOLATE_CODEX.set(provider == "codex-cli")
+    token = _WORKBENCH_PROVIDER.set(provider)
     try:
         yield
     finally:
-        _ISOLATE_CODEX.reset(token)
+        _WORKBENCH_PROVIDER.reset(token)
 
 
 def _isolated_codex_command(command, environment):
@@ -76,7 +77,8 @@ def require_native_login(provider, binary):
     try:
         with TemporaryDirectory(prefix="rm-proof-worker-") as directory:
             result = subprocess.run([binary, *status], cwd=directory, env=_environment(), timeout=5,
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, check=False)
     except subprocess.TimeoutExpired:
         raise ModelFailure("timeout", "Native CLI login check timed out.") from None
     except OSError:
@@ -104,7 +106,7 @@ def _failed_completion(provider, signal):
 
 
 def _blocked_global_instruction_notice(item):
-    if not _ISOLATE_CODEX.get() or item["type"] != "error":
+    if _WORKBENCH_PROVIDER.get() != "codex-cli" or item["type"] != "error":
         return False
     message = item.get("message")
     return isinstance(message, str) and message.startswith("Failed to read global AGENTS.md instructions from `") and any(
@@ -117,13 +119,15 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
         raise ModelFailure("configuration", f"The {provider} adapter does not implement reasoning effort.")
     deadline = monotonic() + timeout
     prompt = "\n\n".join(f"{entry['role'].upper()}\n{entry['content']}" for entry in messages)
+    workbench = _WORKBENCH_PROVIDER.get() == provider
+    model_option = [] if workbench and model == NATIVE_DEFAULT_MODEL else ["--model", model]
     if provider == "codex-cli":
         command = [
             binary, "-a", "never", "exec", "--ephemeral", "--ignore-user-config", "--ignore-rules",
             "--skip-git-repo-check", "--sandbox", "read-only", "--disable", "shell_tool",
             "--disable", "memories", "--disable", "apps", "--disable", "multi_agent", "--disable", "hooks",
             "-c", 'mcp_servers.notion={url="http://127.0.0.1:9",enabled=false}',
-            "-c", 'web_search="disabled"', "--model", model, "--color", "never", "--json", "-",
+            "-c", 'web_search="disabled"', *model_option, "--color", "never", "--json", "-",
         ]
         if reasoning_effort is not None:
             command[4:4] = ["-c", f"model_reasoning_effort={json.dumps(reasoning_effort)}"]
@@ -131,13 +135,13 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
         command = [
             binary, "-p", "--safe-mode", "--restricted", "--tools", "", "--strict-mcp-config",
             "--mcp-config", '{"mcpServers":{}}', "--disallowedTools", "mcp__*",
-            "--no-session-persistence", "--max-turns", "1", "--output-format", "json", "--model", model,
+            "--no-session-persistence", "--max-turns", "1", "--output-format", "json", *model_option,
         ]
     else:
         raise ModelFailure("configuration", "Unknown native CLI model provider.")
 
     environment = _environment()
-    if provider == "codex-cli" and _ISOLATE_CODEX.get():
+    if provider == "codex-cli" and workbench:
         command = _isolated_codex_command(command, environment)
     try:
         with TemporaryDirectory(prefix="rm-proof-worker-") as directory:

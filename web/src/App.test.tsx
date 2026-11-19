@@ -1010,25 +1010,37 @@ describe("App", () => {
     });
   });
 
-  it("adds and removes only the model connections the user chooses", async () => {
-    window.history.replaceState(null, "", "#settings");
+  it("discovers installed tools in Team and connects only the selected signed-in tool", async () => {
+    window.history.replaceState(null, "", "#team/runtimes");
     let existing = false;
+    let scans = 0;
     const connection = {
       id: "codex",
       provider: "codex-cli",
-      model: "example-model",
-      label: "My Codex",
+      model: "native-default",
+      label: "Codex",
       status: "untested",
       fingerprint: "fingerprint",
     };
     const fetch = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === "/api/model-connections") return Response.json({ connections: existing ? [connection] : [] });
-      if (input === "/api/model-connections/add") {
-        expect(JSON.parse(String(init?.body))).toEqual({
-          provider: "codex-cli",
-          model: "example-model",
-          label: "My Codex",
+      if (input === "/api/team") {
+        return Response.json({
+          ...(responses[input] as object),
+          services: [{ provider: "openai", ready: false, transport: "https", via: "env", detail: "OPENAI_API_KEY" }],
         });
+      }
+      if (input === "/api/model-connections") return Response.json({ connections: existing ? [connection] : [] });
+      if (input === "/api/model-connections/native") {
+        scans++;
+        return Response.json({
+          providers: [
+            { provider: "codex-cli", status: "signed_in" },
+            { provider: "claude-code", status: scans === 1 ? "connection.authentication" : "signed_in" },
+          ],
+        });
+      }
+      if (input === "/api/model-connections/add-native") {
+        expect(JSON.parse(String(init?.body))).toEqual({ provider: "codex-cli" });
         existing = true;
         return Response.json(connection);
       }
@@ -1043,17 +1055,59 @@ describe("App", () => {
     renderApp("token");
     const connections = within(await screen.findByRole("region", { name: en.modelConnections.title }));
     expect(await connections.findByText(en.modelConnections.empty)).toBeTruthy();
-    expect(connections.queryByText(en.team.providers["codex-cli"])).toBeNull();
+    expect(screen.queryByText(en.team.providers.openai)).toBeNull();
+    expect(scans).toBe(0);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.add }));
-    fireEvent.change(connections.getByLabelText(en.modelConnections.provider), { target: { value: "codex-cli" } });
-    fireEvent.change(connections.getByLabelText(en.modelConnections.model), { target: { value: connection.model } });
-    fireEvent.change(connections.getByLabelText(en.modelConnections.label), { target: { value: connection.label } });
-    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.save }));
-    expect(await connections.findByText(connection.label)).toBeTruthy();
+    const codex = await connections.findByRole("button", { name: "Connect Codex" });
+    expect(connections.getByRole("button", { name: "Connect Claude Code" }).hasAttribute("disabled")).toBe(true);
+    expect(connections.getByText(/claude auth login/)).toBeTruthy();
+    expect(connections.queryByLabelText(en.modelConnections.provider)).toBeNull();
+    expect(connections.queryByLabelText(en.modelConnections.model)).toBeNull();
+    expect(connections.queryByLabelText(en.modelConnections.apiKey)).toBeNull();
+    expect(fetch.mock.calls.some(([path]) => path.endsWith("/add-native"))).toBe(false);
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.refreshNative }));
+    await waitFor(() =>
+      expect(connections.getByRole("button", { name: "Connect Claude Code" }).hasAttribute("disabled")).toBe(false),
+    );
+    fireEvent.click(codex);
+    expect(await connections.findByText(/Default model/)).toBeTruthy();
+    expect(connections.queryByText(en.team.providers["claude-code"])).toBeNull();
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.remove }));
     expect(fetch.mock.calls.filter(([path]) => path.endsWith("/remove"))).toHaveLength(0);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.removeConfirm }));
     expect(await connections.findByText(en.modelConnections.empty)).toBeTruthy();
+  });
+
+  it("opens a separate password-masked form for API connections", async () => {
+    window.history.replaceState(null, "", "#team/runtimes");
+    const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path === "/api/model-connections") return Response.json({ connections: [] });
+      if (path === "/api/model-connections/native") return Response.json({ providers: [] });
+      if (path === "/api/model-connections/add") {
+        expect(JSON.parse(String(init?.body))).toEqual({
+          provider: "anthropic",
+          model: "claude-model",
+          api_key: "test-key",
+        });
+        return Response.json({ id: "api" });
+      }
+      return Response.json(responses[path.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    const connections = within(await screen.findByRole("region", { name: en.modelConnections.title }));
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.add }));
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.addApi }));
+    const provider = connections.getByLabelText(en.modelConnections.provider);
+    expect(within(provider).queryByRole("option", { name: "Codex" })).toBeNull();
+    fireEvent.change(provider, { target: { value: "anthropic" } });
+    fireEvent.change(connections.getByLabelText(en.modelConnections.model), { target: { value: "claude-model" } });
+    const key = connections.getByLabelText(en.modelConnections.apiKey);
+    expect(key.getAttribute("type")).toBe("password");
+    fireEvent.change(key, { target: { value: "test-key" } });
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.save }));
+    await waitFor(() => expect(fetch.mock.calls.some(([path]) => path === "/api/model-connections/add")).toBe(true));
+    expect(fetch.mock.calls.some(([path]) => path === "/api/model-connections/add-native")).toBe(false);
   });
 
   it("previews the exact public excerpt and recipient before calling a provider", async () => {

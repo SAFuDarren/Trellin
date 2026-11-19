@@ -93,7 +93,7 @@ export function Shell({ session }: { session: string }) {
         ) : section === "progress" ? (
           <ProgressPage session={session} sub={sub} onOpen={open} />
         ) : section === "settings" ? (
-          <SettingsPage session={session} onResetLayout={resetLayout} updates={releaseUpdates} />
+          <SettingsPage onResetLayout={resetLayout} updates={releaseUpdates} />
         ) : section === "help" ? (
           <HelpPage />
         ) : (

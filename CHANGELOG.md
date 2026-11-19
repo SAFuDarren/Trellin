@@ -3,7 +3,8 @@
 ## 1.0.23
 
 - Add, test and remove user-selected Codex, Claude Code, OpenAI and Anthropic
-  connections under Settings. Store API keys in the local macOS Keychain.
+  connections under Team → Runtimes. Detect installed Codex and Claude Code commands
+  and reuse their existing logins. Store direct API keys in the macOS Keychain.
 - Use a connected model to organize an explicitly reviewed public excerpt
   and save the result for the existing intake review.
 

@@ -18,7 +18,8 @@ from research_multiplier.protocol.serialization import fingerprint
 from research_multiplier.storage import credentials
 
 
-SUPPORTED_PROVIDERS = frozenset({"codex-cli", "claude-code", "openai", "anthropic"})
+_NATIVE_PROVIDERS = {"codex-cli": "Codex", "claude-code": "Claude Code"}
+SUPPORTED_PROVIDERS = frozenset({*_NATIVE_PROVIDERS, "openai", "anthropic"})
 _MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/-]{0,254}")
 _SCHEMA = """
     CREATE TABLE IF NOT EXISTS model_connections (
@@ -79,7 +80,7 @@ def _input(document):
     transport, command, _, _ = PROVIDERS[provider]
     binary, key = document.get("binary"), document.get("api_key")
     if transport == "cli":
-        if key is not None:
+        if key is not None or model == cli_executor.NATIVE_DEFAULT_MODEL:
             raise ConnectionError("invalid")
         if binary is not None:
             binary = _text(binary, 4096)
@@ -212,12 +213,55 @@ class Registry:
     def list(self):
         return [_public(row) for row in self._rows()]
 
+    def native(self):
+        """Discover installed CLI tools and read their sign-in status."""
+        providers = []
+        for provider in _NATIVE_PROVIDERS:
+            binary = _binary(provider, None)
+            if not binary:
+                continue
+            try:
+                cli_executor.require_native_login(provider, binary)
+            except ModelFailure as error:
+                status = provider_error_code(error, fallback="connection.unavailable")
+            else:
+                status = "signed_in"
+            providers.append({"provider": provider, "status": status})
+        return providers
+
+    def add_native(self, document):
+        """Select one discovered tool using its existing native sign-in."""
+        if not isinstance(document, dict) or document.keys() != {"provider"}:
+            raise ConnectionError("invalid")
+        provider = _text(document["provider"], 40)
+        if provider not in _NATIVE_PROVIDERS:
+            raise ConnectionError("invalid")
+        binary = _binary(provider, None)
+        if not binary:
+            raise ConnectionError("missing_cli")
+        try:
+            cli_executor.require_native_login(provider, binary)
+        except ModelFailure as error:
+            status = provider_error_code(error, fallback="connection.unavailable")
+            raise ConnectionError(status.removeprefix("connection.")) from None
+        return self._add(provider, cli_executor.NATIVE_DEFAULT_MODEL, _NATIVE_PROVIDERS[provider], binary, None,
+                         deduplicate=True)
+
     def add(self, document):
-        provider, model, label, binary, key = _input(document)
+        return self._add(*_input(document))
+
+    def _add(self, provider, model, label, binary, key, *, deduplicate=False):
         identifier = str(uuid4())
         saved = False
         try:
             with self._write() as database:
+                if deduplicate:
+                    existing = database.execute(
+                        "SELECT * FROM model_connections WHERE provider = ? AND model = ? AND binary = ? LIMIT 1",
+                        (provider, model, binary),
+                    ).fetchone()
+                    if existing is not None:
+                        return _public(existing)
                 database.execute(
                     "INSERT INTO model_connections (id, provider, model, label, binary) VALUES (?, ?, ?, ?, ?)",
                     (identifier, provider, model, label, binary),

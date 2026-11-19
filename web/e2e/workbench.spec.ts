@@ -172,6 +172,15 @@ test("a result can be opened from review in the workbench", async ({ page }) => 
   await expect(page.locator(".node-detail h2")).toHaveText("reverseZeroAdd");
 });
 
+test("Team shows model management at the local runtime", async ({ page }) => {
+  const errors = await open(page, "Team");
+  const connections = page.getByRole("region", { name: "Model connections" });
+  await expect(connections.getByText("Add the models you want to use.")).toBeVisible();
+  await expect(connections.getByRole("button", { name: "Add connection" })).toBeEnabled();
+  await expect(page.getByText("Model services", { exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test("the language is chosen in settings and remembered", async ({ page }) => {
   await open(page, "Settings");
   await page.getByRole("button", { name: "简体中文" }).click();
@@ -186,9 +195,6 @@ test("settings show the installed version and offer a manual stable release chec
   const errors = await open(page, "Settings");
   const settings = page.getByRole("region", { name: "Updates" });
   await expect(settings.getByText("Installed version 1.9.0")).toBeVisible();
-  const connections = page.getByRole("region", { name: "Model connections" });
-  await expect(connections.getByText("Add the models you want to use.")).toBeVisible();
-  await expect(connections.getByRole("button", { name: "Add connection" })).toBeEnabled();
   await expect(settings.getByRole("checkbox", { name: "Automatically check for updates" })).not.toBeChecked();
   await expect(settings.getByRole("status")).toHaveText("No update check has run yet.");
   await settings.getByRole("button", { name: "Check for updates" }).click();

@@ -5,6 +5,7 @@ import type { TFunction } from "i18next";
 import { api } from "../api/client";
 import { useTeam, type Doctor, type Job, type Team } from "../api/sections";
 import { Clock, Mark, Spin } from "../components/Icons";
+import { ModelConnections } from "../components/ModelConnections";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
 import { harnessName, modelName, timeText } from "../workbench/text";
@@ -98,7 +99,6 @@ function Runtimes({ session, data, running }: { session: string; data: Team; run
     enabled: fresh > 0,
     queryFn: ({ signal }) => api<Doctor>(session, fresh > 1 ? "/api/doctor?fresh=1" : "/api/doctor", { signal }),
   });
-  const ready = data.services.filter((service) => service.ready);
   const failing = doctor.data?.checks.filter((check) => check.status === "fail" || check.status === "warn") ?? [];
   return (
     <div className="page-body">
@@ -127,12 +127,7 @@ function Runtimes({ session, data, running }: { session: string; data: Team; run
                 <b>{data.machine.name || t("team.unnamedMachine")}</b>{" "}
                 <span className="muted">{t("team.thisMachine")}</span>
               </td>
-              <td className="mono">
-                {[
-                  ...ready.filter((service) => service.transport === "cli").map((service) => service.provider),
-                  "Lean",
-                ].join(" · ")}
-              </td>
+              <td className="mono">{t("activityKind.lean")}</td>
               <td className="num">
                 {data.agents.reduce((sum, agent) => sum + Number(agent.runs), 0) + data.verifier.runs}
               </td>
@@ -149,38 +144,10 @@ function Runtimes({ session, data, running }: { session: string; data: Team; run
                 {t("team.remoteSoon")}
               </td>
             </tr>
-            <tr className="group-row">
-              <td colSpan={5}>
-                {t("team.services")}
-                <span>{data.services.length}</span>
-              </td>
-            </tr>
-            {data.services.map((service) => (
-              <tr key={service.provider}>
-                <td>
-                  <b>{t(`team.providers.${service.provider}`, { defaultValue: service.provider })}</b>
-                </td>
-                <td className="mono">{t(`team.via.${service.via}`, { name: service.detail })}</td>
-                <td className="num">{service.runs}</td>
-                <td className="muted">{service.transport}</td>
-                <td>
-                  <span className="pill" data-tone={service.ready === false ? "warn" : undefined}>
-                    <span
-                      className="status-dot"
-                      data-tone={service.ready ? "ok" : service.ready === false ? "warn" : "none"}
-                    />
-                    {service.ready
-                      ? t("team.ready")
-                      : service.ready === false
-                        ? t("team.notConfigured")
-                        : t("team.unchecked")}
-                  </span>
-                </td>
-              </tr>
-            ))}
           </tbody>
         </table>
       </div>
+      <ModelConnections session={session} />
       <div className="callout">
         <div className="body">
           <strong>{t("team.check.title")}</strong>
