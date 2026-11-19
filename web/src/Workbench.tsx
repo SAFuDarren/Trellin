@@ -235,7 +235,11 @@ export function Workbench({
             {meta && <span className="claim-meta">{meta}</span>}
           </div>
           <div className="project-toolbar-actions">
-            <ProjectActions session={session} onRecorded={openRecorded} />
+            <ProjectActions
+              session={session}
+              claimId={graph?.claim.id === claimId ? claimId : null}
+              onRecorded={openRecorded}
+            />
             {!layout.reviewOpen && graph && (
               <button
                 type="button"

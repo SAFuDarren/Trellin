@@ -8,6 +8,25 @@ import zhCN from "./i18n/zh-CN.json";
 
 const CLAIM = "11111111-1111-4111-8111-111111111111";
 const LEMMA = "lean:22222222-2222-4222-8222-222222222222";
+const PROOF_TASK = {
+  claim_id: CLAIM,
+  title: "Left zero",
+  state: "ready",
+  blocker: null,
+  can_start: true,
+  can_stop: false,
+  scope: {
+    token: "scope-1",
+    proposition: "∀ n : Nat, 0 + n = n",
+    basis: [{ label: "H", statement: "n is a natural number.", formal: { lean: { proposition: "n : Nat" } } }],
+    omitted_basis: 0,
+  },
+  decisions: [],
+  policy: null,
+  receipt: null,
+  local_model_allowed: false,
+  adopted: false,
+};
 const responses: Record<string, unknown> = {
   "/api/claims": { claim_id: CLAIM, claims: [{ id: CLAIM, title: "Left zero", status: "open", domain: "lean-core" }] },
   "/api/atlas": { claims: [] },
@@ -117,6 +136,120 @@ describe("App", () => {
     expect(lemma.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: /Original claim/ }));
     await waitFor(() => expect(postMessage).toHaveBeenLastCalledWith({ claimId: CLAIM, nodeId: `goal:${CLAIM}` }));
+  });
+
+  it("shows the exact blocker and offers no authorization for an unconfirmed proof scope", async () => {
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (init?.method === "POST") return Response.json({}, { status: 405 });
+      if (input === "/api/proof-task?claim=" + CLAIM) {
+        return Response.json({
+          ...PROOF_TASK,
+          state: "blocked",
+          can_start: false,
+          blocker: "proof_task.scope_unconfirmed",
+          scope: { token: null, proposition: null, basis: [], omitted_basis: 0 },
+          decisions: [{ kind: "review_formalization", question: "Does the premise describe all natural numbers?" }],
+        });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.proofTask.title }));
+    const modal = within(await screen.findByRole("dialog", { name: en.proofTask.title }));
+    expect(await modal.findByText(en.errors["proof_task.scope_unconfirmed"])).toBeTruthy();
+    expect(modal.getByText("Does the premise describe all natural numbers?")).toBeTruthy();
+    expect(modal.queryByRole("button", { name: en.proofTask.start })).toBeNull();
+    expect(fetch.mock.calls.every(([, options]) => options?.method !== "POST")).toBe(true);
+  });
+
+  it("authorizes exactly the visible Lean scope with zero model calls by default", async () => {
+    let started = false;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/proof-task/start" && init?.method === "POST") {
+        started = true;
+        return Response.json({ policy_id: "policy-1" });
+      }
+      if (input === "/api/proof-task?claim=" + CLAIM) {
+        return Response.json({
+          ...PROOF_TASK,
+          ...(started && {
+            state: "verified",
+            can_start: false,
+            receipt: { id: "receipt-1", kind: "lean", review_status: "pending" },
+          }),
+        });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.proofTask.title }));
+    const modal = within(await screen.findByRole("dialog", { name: en.proofTask.title }));
+    expect(await modal.findByText(PROOF_TASK.scope.proposition)).toBeTruthy();
+    fireEvent.click(modal.getByText(en.proofTask.basis));
+    expect(modal.getByText(PROOF_TASK.scope.basis[0]!.formal.lean.proposition)).toBeTruthy();
+    const start = modal.getByRole<HTMLButtonElement>("button", { name: en.proofTask.start });
+    expect(start.disabled).toBe(true);
+    fireEvent.change(modal.getByLabelText(en.review.reason), { target: { value: "Exact scope reviewed" } });
+    fireEvent.click(modal.getByLabelText(en.proofTask.authorize));
+    fireEvent.click(start);
+    expect(await modal.findByText(en.proofTask.states.verified)).toBeTruthy();
+    expect(modal.queryByText(en.proofTask.adopted)).toBeNull();
+    const post = fetch.mock.calls.find(
+      ([path, options]) => path === "/api/proof-task/start" && options?.method === "POST",
+    );
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({
+      claim_id: CLAIM,
+      token: PROOF_TASK.scope.token,
+      model_rounds: 0,
+      reason: "Exact scope reviewed",
+    });
+  });
+
+  it("reads the current proof state when reopened and stops the exact authorized policy", async () => {
+    let stopped = false;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/proof-task/stop" && init?.method === "POST") {
+        stopped = true;
+        return Response.json({ policy_id: "policy-1" });
+      }
+      if (input === "/api/proof-task?claim=" + CLAIM) {
+        return Response.json({
+          ...PROOF_TASK,
+          state: stopped ? "stopped" : "running",
+          can_start: false,
+          can_stop: !stopped,
+          policy: { id: "policy-1", fingerprint: "fingerprint", model_rounds: 0 },
+          obligations: [{ proposition: "n + 0 = n", verified: false }],
+        });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    const app = renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.proofTask.title }));
+    const modal = within(await screen.findByRole("dialog", { name: en.proofTask.title }));
+    expect(await modal.findByText(en.proofTask.states.running)).toBeTruthy();
+    expect(modal.getByText("n + 0 = n")).toBeTruthy();
+    fireEvent.change(modal.getByLabelText(en.proofTask.stopReason), {
+      target: { value: "Pause this line of inquiry" },
+    });
+    fireEvent.click(modal.getByRole("button", { name: en.proofTask.stop }));
+    expect(await modal.findByText(en.proofTask.states.stopped)).toBeTruthy();
+    const post = fetch.mock.calls.find(
+      ([path, options]) => path === "/api/proof-task/stop" && options?.method === "POST",
+    );
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({
+      claim_id: CLAIM,
+      policy_id: "policy-1",
+      reason: "Pause this line of inquiry",
+    });
+    app.unmount();
+    renderApp("new-session");
+    fireEvent.click(await screen.findByRole("button", { name: en.proofTask.title }));
+    expect(await screen.findByText(en.proofTask.states.stopped)).toBeTruthy();
+    expect(fetch.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(1);
   });
 
   it("organizes and reviews research notes before any claim exists", async () => {

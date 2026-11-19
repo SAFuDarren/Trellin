@@ -1,13 +1,28 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IntakePane } from "./IntakePane";
+import { ProofTaskPane } from "./ProofTaskPane";
 import { TheoremPane } from "./TheoremPane";
 import "../../styles/project-entry.css";
 
-type Mode = "intake" | "theorem";
+const captions = {
+  intake: "projectEntry.organize",
+  theorem: "projectEntry.addTheorem",
+  proof: "proofTask.title",
+} as const;
 
-/** Project-level entry, independent of the selected proof node. */
-export function ProjectActions({ session, onRecorded }: { session: string; onRecorded: (claimId?: string) => void }) {
+type Mode = keyof typeof captions;
+
+/** Project actions and proof work scoped to the selected claim. */
+export function ProjectActions({
+  session,
+  claimId,
+  onRecorded,
+}: {
+  session: string;
+  claimId: string | null;
+  onRecorded: (claimId?: string) => void;
+}) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -25,19 +40,23 @@ export function ProjectActions({ session, onRecorded }: { session: string; onRec
       <button className="button" type="button" onClick={() => setMode("theorem")}>
         {t("projectEntry.addTheorem")}
       </button>
+      {claimId && (
+        <button className="button" type="button" onClick={() => setMode("proof")}>
+          {t("proofTask.title")}
+        </button>
+      )}
       <dialog ref={dialog} className="project-entry" aria-labelledby={title} onClose={() => setMode(null)}>
         {mode && (
           <>
             <header className="project-entry-head">
-              <h2 id={title}>{t(mode === "intake" ? "projectEntry.organize" : "projectEntry.addTheorem")}</h2>
+              <h2 id={title}>{t(captions[mode])}</h2>
               <button className="button" type="button" onClick={() => dialog.current?.close()}>
                 {t("projectEntry.close")}
               </button>
             </header>
             <div className="project-entry-body">
-              {mode === "intake" ? (
-                <IntakePane session={session} onRecorded={onRecorded} />
-              ) : (
+              {mode === "intake" && <IntakePane session={session} onRecorded={onRecorded} />}
+              {mode === "theorem" && (
                 <TheoremPane
                   session={session}
                   onRecorded={(claimId) => {
@@ -46,6 +65,7 @@ export function ProjectActions({ session, onRecorded }: { session: string; onRec
                   }}
                 />
               )}
+              {mode === "proof" && claimId && <ProofTaskPane key={claimId} session={session} claimId={claimId} />}
             </div>
           </>
         )}
