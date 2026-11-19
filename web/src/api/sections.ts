@@ -132,10 +132,14 @@ export function useAtlas(session: string) {
 }
 export function useInbox(session: string) {
   return useQuery({
-    queryKey: ["inbox"],
+    queryKey: ["inbox", session],
     refetchInterval: LIVE_MS,
     queryFn: ({ signal }) =>
-      api<{ items: InboxItem[]; review_identity?: { workspace_id: string } }>(session, "/api/inbox", { signal }),
+      api<{
+        items: InboxItem[];
+        review_identity?: { workspace_id: string };
+        workspace_events?: { workspace_id: string; cursor: string };
+      }>(session, "/api/inbox", { signal }),
   });
 }
 export function useLibrary(session: string) {

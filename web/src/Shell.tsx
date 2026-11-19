@@ -10,6 +10,7 @@ import { ReviewPage } from "./pages/ReviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TeamPage } from "./pages/TeamPage";
 import { useRoute } from "./shell/route";
+import { WorkspaceEventFeed } from "./shell/WorkspaceEventFeed";
 import { Workbench, type Focus } from "./Workbench";
 import { resetLayout } from "./workbench/useLayout";
 
@@ -24,6 +25,7 @@ export function Shell({ session }: { session: string }) {
     go("workbench");
   };
   const running = team.data?.jobs?.filter((job) => job.state === "running").length ?? 0;
+  const eventFeed = inbox.data?.workspace_events;
   const badges = {
     review: { count: inbox.data?.items?.length ?? 0 },
     team: { count: running, live: true },
@@ -31,6 +33,14 @@ export function Shell({ session }: { session: string }) {
   const { section, sub } = route;
   return (
     <div className="shell">
+      {eventFeed && (
+        <WorkspaceEventFeed
+          key={`${session}:${eventFeed.workspace_id}`}
+          session={session}
+          workspace={eventFeed.workspace_id}
+          bootstrapCursor={eventFeed.cursor}
+        />
+      )}
       <Rail current={section} badges={badges} />
       {section === "review" ? (
         <ReviewPage session={session} sub={sub} onOpen={open} />

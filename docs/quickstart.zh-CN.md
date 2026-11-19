@@ -96,6 +96,8 @@ research-multiplier --workspace "PATH" workbench
 
 升级到 `0074` 后，从命令行或工作台批准、退回证据时，数据库会随审批写入一条可续读事件。事件里记录编号和动作，审阅理由保存在原审批记录中。
 
+打开的工作台会自动更新审阅列表、相应课题图谱和总览。连接中断后，会从上次处理的事件继续读取。断连期间和尚未接入事件的操作仍可通过定期刷新查看状态。
+
 ## 选用模型
 
 显式请求可选的远程模型建议时，`run --model --base-url` 会将问题文件和检查结果发给所选端点。费用由所选端点决定。项目级授权和预算适用于绑定工作区中的模型入口。未发表研究使用已绑定工作区中明确授权的可信本地模型入口。[模型建议说明](quickstart.md#optional-model-suggestions) · [本地模型配置](model-adapters.md#work-with-restricted-research-in-the-terminal)

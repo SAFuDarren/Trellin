@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./i18n";
@@ -11,6 +11,7 @@ const LEMMA = "lean:22222222-2222-4222-8222-222222222222";
 const WORKSPACE = "33333333-3333-4333-8333-333333333333";
 const EVIDENCE = "44444444-4444-4444-8444-444444444444";
 const REVIEW_PATH = `/api/v1/workspaces/${WORKSPACE}/evidence/${EVIDENCE}/reviews`;
+const EVENT_PATH = `/api/v1/workspaces/${WORKSPACE}/events`;
 const REVIEW_ITEM = {
   kind: "review_evidence",
   item_id: EVIDENCE,
@@ -67,8 +68,10 @@ const responses: Record<string, unknown> = {
   },
 };
 
-function renderApp(session: string | null) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderApp(
+  session: string | null,
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return render(
     <QueryClientProvider client={client}>
       <App session={session} />
@@ -230,6 +233,104 @@ describe("App", () => {
       reason: "Reviewed exact scope.",
     });
     expect(new Headers(request?.headers).has("Idempotency-Key")).toBe(false);
+    expect(fetch.mock.calls.some(([path]) => path.endsWith("/events"))).toBe(false);
+  });
+
+  it("refreshes a review once for the owned event and resumes from that event instead of a later inbox cursor", async () => {
+    window.history.replaceState(null, "", "#review");
+    let pending = true;
+    let head = "9007199254740992";
+    const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/inbox") {
+        return Response.json({
+          items: pending ? [REVIEW_ITEM] : [],
+          workspace_events: { workspace_id: WORKSPACE, cursor: head },
+        });
+      }
+      if (input === EVENT_PATH && init?.method === "GET") {
+        return new Response(new ReadableStream<Uint8Array>({ start: (stream) => streams.push(stream) }), {
+          headers: { "Content-Type": "text/event-stream; charset=utf-8" },
+        });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const app = renderApp("active", client);
+    expect(await screen.findByRole("button", { name: en.review.approve })).toBeTruthy();
+    await waitFor(() => expect(streams).toHaveLength(1));
+    const opened = fetch.mock.calls.find(([path]) => path === EVENT_PATH)?.[1];
+    expect(new Headers(opened?.headers).get("Last-Event-ID")).toBe(head);
+    expect(new Headers(opened?.headers).get("X-RM-Session")).toBe("active");
+    expect(opened).toMatchObject({ credentials: "omit", mode: "same-origin", redirect: "error" });
+    const id = "9007199254740993";
+    const body = {
+      id,
+      type: "evidence.reviewed",
+      workspace_id: WORKSPACE,
+      schema_version: 1,
+      occurred_at: "2026-11-19T00:00:00Z",
+      actor: { kind: "user", id: CLAIM },
+      subject: { kind: "evidence", id: EVIDENCE },
+      data: { claim_id: CLAIM, decision_id: EVIDENCE, action: "approve" },
+    };
+    const frame = (event: typeof body) =>
+      `id: ${event.id}\nevent: evidence.reviewed\ndata: ${JSON.stringify(event)}\n\n`;
+    head = "9007199254740995";
+    pending = false;
+    streams[0]!.enqueue(
+      new TextEncoder().encode(frame(body) + frame(body) + frame({ ...body, id: head, workspace_id: CLAIM })),
+    );
+    expect(await screen.findByText(en.review.allDone)).toBeTruthy();
+    expect(invalidate.mock.calls.map(([filter]) => filter?.queryKey)).toEqual([
+      ["inbox", "active"],
+      ["atlas"],
+      ["graph", CLAIM],
+    ]);
+    streams[0]!.close();
+    await waitFor(() => expect(streams).toHaveLength(2), { timeout: 2500 });
+    const resumed = fetch.mock.calls.filter(([path]) => path === EVENT_PATH)[1]?.[1];
+    expect(new Headers(resumed?.headers).get("Last-Event-ID")).toBe(id);
+    app.unmount();
+    expect(resumed?.signal?.aborted).toBe(true);
+  });
+
+  it("does not start a new session's feed from a previous session's cached inbox", async () => {
+    const otherPath = `/api/v1/workspaces/${CLAIM}/events`;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      const session = new Headers(init?.headers).get("X-RM-Session");
+      if (input === "/api/inbox") {
+        return Response.json({
+          items: [],
+          workspace_events:
+            session === "first" ? { workspace_id: WORKSPACE, cursor: "6" } : { workspace_id: CLAIM, cursor: "2" },
+        });
+      }
+      if (input.endsWith("/events")) {
+        return new Response(new ReadableStream<Uint8Array>(), { headers: { "Content-Type": "text/event-stream" } });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const app = renderApp("first", client);
+    await waitFor(() => expect(fetch.mock.calls.some(([path]) => path === EVENT_PATH)).toBe(true));
+    await act(async () => {
+      app.rerender(
+        <QueryClientProvider client={client}>
+          <App session="second" />
+        </QueryClientProvider>,
+      );
+    });
+    await waitFor(() => expect(fetch.mock.calls.some(([path]) => path === otherPath)).toBe(true));
+    const feeds = fetch.mock.calls.filter(([path]) => path.endsWith("/events"));
+    expect(feeds.map(([url, init]) => [url, new Headers(init?.headers).get("Last-Event-ID")])).toEqual([
+      [EVENT_PATH, "6"],
+      [otherPath, "2"],
+    ]);
+    expect(feeds[0]?.[1]?.signal?.aborted).toBe(true);
   });
 
   it("restores the desktop node and reports subsequent workbench selections", async () => {
