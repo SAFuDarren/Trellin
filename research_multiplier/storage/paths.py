@@ -8,6 +8,8 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from uuid import UUID, uuid4
 
+from .managed_workspaces import workspace_lease
+
 
 WORKSPACE_FILE = ".research-multiplier.json"
 WORKSPACE_ID_FILE = ".research-multiplier-workspace-id"
@@ -64,22 +66,24 @@ def workspace_details(location):
     return root
 
 
-def initialize_workspace(location):
+def initialize_workspace(location, *, minimal=False):
     root = _resolve(location)
     _reject_program_path(root)
     if _workspace_above(root.parent) is not None:
         raise ValueError("Choose a workspace outside existing research workspaces.")
-    _check_layout(root)
-    marker = root / WORKSPACE_FILE
-    if marker.exists() or marker.is_symlink():
-        workspace_details(root)
-    workspace_id(root)
-    database_id(root)
-    root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    for name in _MANAGED_DIRECTORIES:
-        (root / name).mkdir(mode=0o700, exist_ok=True)
-    _publish_marker(root, WORKSPACE_FILE, b'{"format_version": 1}\n')
-    ensure_workspace_id(root)
+    with workspace_lease(root):
+        _check_layout(root)
+        marker = root / WORKSPACE_FILE
+        if marker.exists() or marker.is_symlink():
+            workspace_details(root)
+        workspace_id(root)
+        database_id(root)
+        root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if not minimal:
+            for name in _MANAGED_DIRECTORIES:
+                (root / name).mkdir(mode=0o700, exist_ok=True)
+        _publish_marker(root, WORKSPACE_FILE, b'{"format_version": 1}\n')
+        ensure_workspace_id(root)
     return root
 
 
@@ -197,7 +201,8 @@ def use_workspace(location, *, strict=False):
             override = os.environ.get("RM_ARTIFACT_ROOT")
             if override and _resolve(override) != root / "objects":
                 raise ValueError("Use the selected workspace's objects/ directory. Clear the RM_ARTIFACT_ROOT override.")
-        yield
+        with workspace_lease(active_workspace()):
+            yield
     finally:
         if mode is not None:
             _STRICT_WORKSPACE.reset(mode)

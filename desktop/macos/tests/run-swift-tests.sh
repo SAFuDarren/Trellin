@@ -4,7 +4,7 @@ desktop="$(cd -P "$(dirname "$0")/.." && pwd)"
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/trellin-tests.XXXXXXXX")"
 trap 'rm -rf "$scratch"' EXIT
 xcrun swiftc -module-cache-path "$scratch/modules" -parse-as-library \
-    "$desktop/Sources/WorkbenchProcess.swift" "$desktop/Sources/ReleaseNotesLink.swift" \
+    "$desktop/Sources/WorkbenchProcess.swift" "$desktop/Sources/ReleaseNotesLink.swift" "$desktop/Sources/StorageProcess.swift" \
     "$desktop/tests/WorkbenchProcessTests.swift" \
     -o "$scratch/trellin-tests"
 "$scratch/trellin-tests"

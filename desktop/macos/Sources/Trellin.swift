@@ -2,7 +2,7 @@ import AppKit
 import UniformTypeIdentifiers
 import WebKit
 
-private func localized(_ key: String) -> String {
+func localized(_ key: String) -> String {
     Bundle.main.localizedString(forKey: key, value: nil, table: nil)
 }
 
@@ -12,7 +12,7 @@ private struct LastWorkspace: Codable {
 }
 
 @main
-final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, NSWindowDelegate {
     private let defaults = UserDefaults.standard
     private let lastKey = "lastWorkspaceV1"
     private let bridge = "trellinPosition"
@@ -21,11 +21,25 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
                                   backing: .buffered, defer: false)
     private var last: LastWorkspace?
     private var requested: URL?
-    private var requestedLaunch: WorkbenchLaunch = .restore
+    private var requestedLaunch: WorkbenchLaunch = .library
     private var child: WorkbenchProcess?
     private var webView: WKWebView?
     private var serverURL: URL?
     private var starting = false
+    private var movingStorage = false
+    private lazy var storageSettings = StorageSettings(window: window) { [weak self] plan in
+        self?.moveStorage(plan)
+    }
+
+    private var canPresent: Bool {
+        !starting && !movingStorage && !storageSettings.busy && window.attachedSheet == nil
+    }
+
+    private var runtime: URL? {
+        guard let runtime = Bundle.main.resourceURL?.appendingPathComponent("python/bin/python3"),
+              FileManager.default.isExecutableFile(atPath: runtime.path) else { return nil }
+        return runtime
+    }
 
     static func main() {
         let app = NSApplication.shared
@@ -41,16 +55,23 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         window.minSize = NSSize(width: 640, height: 460)
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
+        window.delegate = self
         window.center()
         window.setFrameAutosaveName("TrellinWorkbench")
         if let data = defaults.data(forKey: lastKey) {
             last = try? JSONDecoder().decode(LastWorkspace.self, from: data)
         }
-        if let last { open(URL(fileURLWithPath: last.path, isDirectory: true)) }
-        else { showStatus("welcome", retry: false) }
+        if let saved = localDirectoryURL(last?.path) { open(.restore(saved)) }
+        else { open(.library) }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        movingStorage ? .terminateCancel : .terminateNow
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool { !movingStorage }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
@@ -60,12 +81,19 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         let menu = NSMenu()
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
+        let settings = appMenu.addItem(withTitle: localized("settings"), action: #selector(showStorage), keyEquivalent: ",")
+        settings.target = self
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: localized("quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         menu.addItem(appItem)
 
         let fileItem = NSMenuItem()
         let fileMenu = NSMenu(title: localized("file"))
+        let create = fileMenu.addItem(withTitle: localized("projects.new"), action: #selector(newProject), keyEquivalent: "n")
+        create.target = self
+        let project = fileMenu.addItem(withTitle: localized("projects.open"), action: #selector(chooseProject), keyEquivalent: "")
+        project.target = self
         let choose = fileMenu.addItem(withTitle: localized("choose"), action: #selector(chooseWorkspace), keyEquivalent: "o")
         choose.target = self
         fileMenu.addItem(withTitle: localized("close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
@@ -74,8 +102,38 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         NSApp.mainMenu = menu
     }
 
+    @objc private func showStorage() {
+        guard canPresent, let runtime else { return }
+        storageSettings.show(runtime: runtime)
+    }
+
+    @objc private func newProject() {
+        guard canPresent else { return }
+        let sheet = NSAlert()
+        sheet.messageText = localized("projects.new.title")
+        let name = NSTextField(frame: NSRect(x: 0, y: 0, width: 310, height: 28))
+        name.placeholderString = localized("projects.name")
+        name.setAccessibilityLabel(localized("projects.name"))
+        sheet.accessoryView = name
+        sheet.window.initialFirstResponder = name
+        sheet.addButton(withTitle: localized("projects.create"))
+        sheet.addButton(withTitle: localized("cancel"))
+        sheet.beginSheetModal(for: window) { [weak self] response in
+            let title = name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard response == .alertFirstButtonReturn, !title.isEmpty else { return }
+            self?.open(.newManaged(title))
+        }
+    }
+
+    @objc private func chooseProject() {
+        guard canPresent, let runtime else { return }
+        storageSettings.chooseProject(runtime: runtime) { [weak self] workspace in
+            self?.open(.restore(workspace))
+        }
+    }
+
     @objc private func chooseWorkspace() {
-        guard !starting, window.attachedSheet == nil else { return }
+        guard canPresent else { return }
         let picker = NSOpenPanel()
         picker.title = localized("choose")
         picker.prompt = localized("open")
@@ -86,12 +144,33 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         picker.allowsMultipleSelection = false
         picker.directoryURL = requested?.deletingLastPathComponent() ?? FileManager.default.homeDirectoryForCurrentUser
         picker.beginSheetModal(for: window) { [weak self] result in
-            if result == .OK, let url = picker.url { self?.open(url, launch: .select) }
+            if result == .OK, let url = picker.url { self?.open(.select(url)) }
         }
     }
 
     @objc private func retryWorkspace() {
-        if !starting, let requested { open(requested, launch: requestedLaunch) }
+        if canPresent { open(requestedLaunch) }
+    }
+
+    private func moveStorage(_ plan: StoragePlan) {
+        guard !starting, !movingStorage, let runtime else { return }
+        movingStorage = true
+        let resume = requestedLaunch
+        let worker = child
+        stop()
+        showStatus("storage.moving", retry: false)
+
+        let perform = { [weak self] in
+            StorageProcess.run(.move(plan), runtime: runtime) { [weak self] reply in
+                guard let self else { return }
+                self.movingStorage = false
+                self.open(resume)
+                self.storageSettings.showMoveResult(reply, plan: plan)
+            }
+        }
+        // Closing the lifetime pipe drains in-flight project writes before the copy.
+        if let worker { worker.waitForExit(perform) }
+        else { perform() }
     }
 
     private func showStatus(_ key: String, retry: Bool) {
@@ -107,8 +186,8 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         group.orientation = .vertical
         group.alignment = .centerX
         group.spacing = 18
-        // On entry (the welcome and loading screens), show the Trellin logo: the app icon itself.
-        if key == "welcome" || key == "loading", let icon = NSApp.applicationIconImage {
+        // Show the application icon while the workbench opens.
+        if key == "loading", let icon = NSApp.applicationIconImage {
             let logo = NSImageView(image: icon)
             logo.imageScaling = .scaleProportionallyUpOrDown
             logo.setAccessibilityLabel("Trellin")
@@ -131,7 +210,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         let choices = NSStackView()
         choices.orientation = .horizontal
         choices.spacing = 12
-        if key != "loading" {
+        if key != "loading" && !movingStorage {
             let choose = NSButton(title: localized("choose"), target: self, action: #selector(chooseWorkspace))
             choose.keyEquivalent = "\r"
             choose.bezelStyle = .rounded
@@ -152,13 +231,11 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         window.contentView = view
     }
 
-    private func open(_ folder: URL, launch: WorkbenchLaunch = .restore) {
+    private func open(_ launch: WorkbenchLaunch) {
         stop()
-        let workspace = folder.standardizedFileURL.resolvingSymlinksInPath()
-        requested = workspace
+        requested = launch.location
         requestedLaunch = launch
-        guard let runtime = Bundle.main.resourceURL?.appendingPathComponent("python/bin/python3"),
-              FileManager.default.isExecutableFile(atPath: runtime.path) else {
+        guard let runtime else {
             showStatus("install", retry: false)
             return
         }
@@ -167,14 +244,18 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         child = process
         starting = true
         do {
-            try process.start(workspace: workspace, runtime: runtime, launch: launch, onReady: { [weak self, weak process] result in
+            try process.start(runtime: runtime, launch: launch, onReady: { [weak self, weak process] result in
                 guard let self, let process, self.child === process else { return }
                 self.starting = false
-                let opened = launch == .select ? result?.workspaceURL : workspace
-                if let result, let url = result.sessionURL, let opened {
+                if let result, let url = result.sessionURL, let opened = result.workspaceURL {
+                    if launch.isRestore, let priorPath = launch.location?.path, self.last?.path == priorPath,
+                       priorPath != opened.path {
+                        self.last = LastWorkspace(path: opened.path, position: self.last?.position)
+                    }
                     self.requested = opened
-                    self.requestedLaunch = .restore
-                    self.showWorkbench(url: url, workspace: opened, leanMissing: result.warnings?.contains("lean") == true)
+                    self.requestedLaunch = .restore(opened)
+                    self.showWorkbench(url: url, workspace: opened, name: result.name,
+                                       leanMissing: result.warnings?.contains("lean") == true)
                 } else {
                     self.stop()
                     let failure = result?.failure ?? .startup
@@ -190,7 +271,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
             showStatus("install", retry: false)
             return
         }
-        guard launch == .restore else { return }
+        guard launch.isRestore else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 25) { [weak self, weak process] in
             guard let self, let process, self.child === process, self.starting else { return }
             self.stop()
@@ -198,7 +279,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         }
     }
 
-    private func showWorkbench(url: URL, workspace: URL, leanMissing: Bool) {
+    private func showWorkbench(url: URL, workspace: URL, name: String?, leanMissing: Bool) {
         if last?.path != workspace.path { last = LastWorkspace(path: workspace.path, position: nil) }
         saveLast()
         serverURL = url
@@ -216,7 +297,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         webView = web
         let folderName = workspace.lastPathComponent == "Trellin"
             ? workspace.deletingLastPathComponent().lastPathComponent : workspace.lastPathComponent
-        window.subtitle = leanMissing ? localized("lean") : folderName
+        window.subtitle = leanMissing ? localized("lean") : (name ?? folderName)
         window.contentView = web
         web.load(URLRequest(url: url))
     }
@@ -227,7 +308,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     private func stop() {
-        if starting && requestedLaunch == .restore { child?.cancelStartup() }
+        if starting && requestedLaunch.isRestore { child?.cancelStartup() }
         else { child?.stop() }
         child = nil
         starting = false
