@@ -72,7 +72,8 @@ final class StorageSettings {
     }
 
     func showMoveResult(_ reply: StorageReply?, plan: StoragePlan) {
-        guard reply?.rootURL?.path == plan.destination.path, let backup = reply?.backupURL else {
+        guard let root = reply?.rootURL, sameStorageDestination(root, plan.destination),
+              let backup = reply?.backupURL else {
             showProblem("storage.moveError", reply: reply)
             return
         }
@@ -103,7 +104,7 @@ final class StorageSettings {
     private func preview(_ destination: URL, runtime: URL) {
         request(.preview(destination), runtime: runtime) { [weak self] reply in
             guard let self else { return }
-            guard let plan = reply?.plan, plan.destination.path == destination.path else {
+            guard let plan = reply?.plan, sameStorageDestination(plan.destination, destination) else {
                 self.showProblem("storage.previewError", reply: reply)
                 return
             }

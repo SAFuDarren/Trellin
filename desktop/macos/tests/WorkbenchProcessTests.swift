@@ -8,11 +8,12 @@ struct WorkbenchProcessTests {
         try startFailures()
         try launchDestination()
         try storageProtocol()
+        try storageDestinationAliases()
         try storageReplyBounds()
         try position()
         environment()
         releaseNotesLinks()
-        print("9 Trellin native boundary checks passed.")
+        print("10 Trellin native boundary checks passed.")
     }
 
     private static func startFailures() throws {
@@ -77,6 +78,23 @@ struct WorkbenchProcessTests {
             let invalid = try reply(values)
             precondition(invalid.plan == nil)
         }
+    }
+
+    private static func storageDestinationAliases() throws {
+        let name = "trellin-native-storage-\(UUID())"
+        let parent = URL(fileURLWithPath: "/private/tmp/\(name)", isDirectory: true)
+        let alias = URL(fileURLWithPath: "/tmp/\(name)", isDirectory: true)
+        let files = FileManager.default
+        try files.createDirectory(at: parent, withIntermediateDirectories: false)
+        defer { try? files.removeItem(at: parent) }
+        let selected = alias.appendingPathComponent("Trellin Library", isDirectory: true)
+        let reported = parent.appendingPathComponent("Trellin Library", isDirectory: true)
+        let other = parent.appendingPathComponent("Different Library", isDirectory: true)
+        precondition(!files.fileExists(atPath: reported.path))
+        precondition(sameStorageDestination(selected, reported))
+        precondition(!sameStorageDestination(selected, other))
+        try files.createDirectory(at: reported, withIntermediateDirectories: false)
+        precondition(sameStorageDestination(selected, reported))
     }
 
     private static func storageReplyBounds() throws {

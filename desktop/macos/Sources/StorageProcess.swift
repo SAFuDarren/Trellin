@@ -1,5 +1,19 @@
 import Foundation
 
+func sameStorageDestination(_ first: URL, _ second: URL) -> Bool {
+    func normalizedPath(_ url: URL) -> String? {
+        let leaf = url.lastPathComponent
+        guard url.isFileURL, !leaf.isEmpty, leaf != ".", leaf != "..", !leaf.contains("/"),
+              let parent = realpath(url.deletingLastPathComponent().path, nil) else { return nil }
+        defer { free(parent) }
+        // Resolve the existing parent so aliases compare even before the move creates the leaf.
+        return URL(fileURLWithPath: String(cString: parent), isDirectory: true)
+            .appendingPathComponent(leaf, isDirectory: true).path
+    }
+    guard let path = normalizedPath(first) else { return false }
+    return path == normalizedPath(second)
+}
+
 enum StorageCommand {
     case information
     case preview(URL)
