@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 import pytest
 
 from research_multiplier import general_lean, production
+from research_multiplier.cli import main
 from research_multiplier.storage import paths
 from research_multiplier.storage.artifacts import Artifacts
 from research_multiplier.storage.postgres import Store, bind_workspace
@@ -138,6 +139,32 @@ def _request(server, method, path, *, body=None, status=200, headers=None, respo
         return payload
     finally:
         connection.close()
+
+
+def test_handoff_previews_selected_scope_and_rejects_changed_notes(workbench, capsys, tmp_path):
+    server, claim, statement, _ = workbench
+    command = ["--workspace", str(server.workspace), "research", "handoff", "--claim", claim]
+    assert main(command) == 0
+    preview = json.loads(capsys.readouterr().out)
+    [selected] = preview["snapshot"]["claims"]
+    assert selected["graph"]["claim"]["id"] == claim
+    assert "The fixture assumes True." in json.dumps(selected["scope"]["hypotheses"])
+    assert "postgresql://" not in json.dumps(preview)
+
+    server.add_guidance(UUID(claim), UUID(statement), uuid4(), "goal:" + claim, "Check this next.", "local", False)
+    output = tmp_path / "handoff"
+    assert main([*command, "--out", str(output), "--confirm", preview["snapshot_sha256"]]) == 2
+    assert not output.exists()
+    capsys.readouterr()
+
+    assert main(command) == 0
+    revised = json.loads(capsys.readouterr().out)
+    assert revised["snapshot_sha256"] != preview["snapshot_sha256"]
+    assert main([*command, "--out", str(output), "--confirm", revised["snapshot_sha256"]]) == 0
+    for name in ("handoff.html", "handoff.md"):
+        report = (output / name).read_text()
+        assert "Check this next." in report
+        assert "Synthetic two-colourable graph" not in report
 
 
 def test_versioned_claims_matches_the_contract_and_legacy_snapshot(workbench, monkeypatch, capsys):

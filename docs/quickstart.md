@@ -65,6 +65,8 @@ research-multiplier run inputs/question.json
 
 An open question returns `needs_review`. The command prints the paths to `report.md` and `run.json` under `runs/offline/`. Read the report, or pass the printed `run.json` path to `research-multiplier replay` to reproduce the saved check. To try an exact check, see the [graph coloring and linear-program input formats](problem-formats.md#built-in-checks).
 
+In a project bound to PostgreSQL, use `research latest-backup` to find a verified project archive. To print or continue your research outside Trellin, [preview and export a handoff](research-foundation.md#take-a-research-handoff-with-you) for the whole project or selected claims.
+
 For a known path, use `research-multiplier research init-workspace "PATH"` to select it explicitly. From another directory, pass `--workspace "PATH"` before the subcommand and use absolute paths for project files. [Workspace layout](research-foundation.md#workspace-paths)
 
 ## Verify and reuse a first Lean proof

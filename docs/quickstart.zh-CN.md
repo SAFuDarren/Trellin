@@ -69,6 +69,8 @@ research-multiplier doctor
 
 使用 PostgreSQL URL 和新建的空库[恢复项目存档](research-foundation.md#recover-and-monitor)。若数据库导入后还有步骤失败，保留已导入的库和原存档，另选空库及尚未使用的目录重试。
 
+在所选项目运行 `research-multiplier research latest-backup`，可找到最近通过完整性校验的机器备份。默认查看 `backups/`，也可用 `--directory` 指定外部备份目录。按清单文件的修改时间排序。有恢复需求时，另用空库验证存档能正常还原。
+
 用 [`lean reuse-theorem`](lean-core.md#replay-a-native-lean-theorem) 在同一工作区的另一课题中重放已采纳的 `.lean` 或 Lake 定理。程序以目标课题已确认的依据证明原定理所需的前提，并列出仍缺的依据。
 
 [直接核验自己的 `.lean` 证明或本机 Lake 项目中已编译的定理](lean-core.md#check-a-lean-source-file-or-compiled-declaration)。核验使用已经确认的命题和依据，全程无需调用模型。
@@ -78,6 +80,20 @@ research-multiplier doctor
 可以离线检索 Formalpedia 的公开快照。对选定结果，可用冻结命题和已确认依据重放，并在 Lean 通过后自动入库工作引理。[Formalpedia 检索和重放](literature-search.md#search-formalpedia-locally)
 
 回到一个已有 PostgreSQL 工作区时，可以运行 `research-multiplier research resume` 查看已确认的范围、当前结论、进展和待决定事项。用 [Lean 证明路线](lean-core.md#check-sufficient-conditions-for-the-frozen-goal)登记待证的中间命题。公共模型搜索的[调用额度和历史](lean-search-budget.md)随冻结目标保存。
+
+## 导出可打印的科研交接
+
+先用命题 UUID 预览精确范围。多条命题可重复 `--claim`，也可用 `--project` 预览当前课题中的命题和待判断事项。
+
+```sh
+research-multiplier research handoff --claim CLAIM_UUID --language zh-CN
+research-multiplier research handoff --claim CLAIM_UUID --language zh-CN \
+  --out exports/first-handoff --confirm SNAPSHOT_SHA256
+```
+
+把 `SNAPSHOT_SHA256` 换成预览返回的摘要。选中内容变化时需要重新预览。目标为 `exports/` 下或外部已有上级目录中的新文件夹。
+
+可以离线打开并打印 `handoff.html`，也可以直接编辑 `handoff.md`。两份文件使用相同快照，列出命题、已冻结的假设、实际和计划依赖、核验与审批状态、来源、笔记与下一步。应用凭据和模型对话记录不在导出中。恢复完整项目仍用机器备份。 [英文操作说明](research-foundation.md#take-a-research-handoff-with-you)
 
 ## 打开本机证明工作台
 

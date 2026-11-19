@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.21
+
+- Preview a project or selected claims and export a printable HTML and
+  editable Markdown handoff from the same confirmed snapshot.
+- Find the latest checksum-verified project backup through the existing
+  backup and restore flow.
+
 ## 1.0.20
 
 - Show the installed version in Trellin and offer a manual stable-release
