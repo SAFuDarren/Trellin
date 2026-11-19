@@ -214,18 +214,21 @@ def public_intake(monkeypatch, tmp_path):
 def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(monkeypatch, tmp_path, public_intake):
     service, _, store = public_intake
     calls = []
-    candidate = {"kind": "theorem", "natural": _NOTES.strip(), "formal": None}
+    proposition = "  ∀ n : Nat, n + 0 = n\n"
+    candidate = {"kind": "theorem", "natural": _NOTES.strip(), "formal": {"lean": proposition}}
+    normalized = {**candidate, "formal": {"lean": {"proposition": proposition}}}
     artifacts = workbench_intake.Artifacts(tmp_path, workspace=False)
     store.json = lambda value: value
 
     def draft_query(role, query, body):
         assert role == "human" and "rm.draft_research_intake" in query
-        assert list(body["items"]) == [{**candidate, "id": "i1", "origin": "model"}]
+        assert list(body["items"]) == [{**normalized, "id": "i1", "origin": "model"}]
         assert body["sensitivity"] == "public"
         assert json.loads(artifacts.read(body["notes"]))["notes"] == _NOTES
         ref = body["model"]["call"]["parameters"]["workbench_public_intake"]
         assert artifacts.read_json(ref)["researcher_id"] == _GOAL_ID
         assert artifacts.read_json(ref)["token"] == preview["token"]
+        assert artifacts.read_json(body["model"]["transcript"]) == {"items": [candidate]}
         return [{**_saved_draft(), "body": body}]
 
     def complete(config, role, system, outgoing, output_limit, deadline):
@@ -236,7 +239,8 @@ def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(mo
         assert config.timeout_seconds == 60 and output_limit == intake.MODEL_OUTPUT_TOKENS
         audit_file, = tmp_path.iterdir()
         assert json.loads(audit_file.read_text())["visibility"] == "public"
-        return SimpleNamespace(output={"items": [candidate]}, metadata={"parameters": {}}, transcript={"provider": config.provider})
+        result = {"items": [candidate]}
+        return SimpleNamespace(output=result, metadata={"parameters": {}}, transcript=result)
 
     store.query = draft_query
     monkeypatch.setattr(intake, "complete_structured", complete)
@@ -250,9 +254,19 @@ def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(mo
     authorized = {**_PUBLIC_DRAFT, "token": preview["token"]}
     saved = service.draft(store, authorized)
     assert saved["id"] == _ID and saved["items"][0]["status"] == "confirm_scope"
+    assert saved["items"][0]["formal"] == normalized["formal"]
     with pytest.raises(workbench_intake.IntakeError, match="intake.release_stale"):
         service.draft(store, authorized)
     assert calls == [preview["outgoing"]]
+
+
+def test_legacy_lean_extraction_keeps_model_form_until_explicit_review(monkeypatch):
+    candidate = {"kind": "theorem", "natural": _NOTES.strip(), "formal": {"lean": "True"}}
+    reply = SimpleNamespace(output={"items": [candidate]})
+    monkeypatch.setattr(intake.ModelConfig, "from_env", lambda *args, **kwargs: object())
+    monkeypatch.setattr(intake, "complete_structured", lambda *args: reply)
+    _, items = intake._extract({**_DRAFT, "sensitivity": "public"})
+    assert items == [{**candidate, "origin": "model"}]
 
 
 @pytest.mark.parametrize("change", ["notes", "objective", "title", "workspace", "researcher", "model"])

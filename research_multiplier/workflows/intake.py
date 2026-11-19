@@ -102,7 +102,7 @@ def model_context(data):
     return {"domain": data["domain"], "objective": data["objective"], "notes": data.get("notes", "")}
 
 
-def _extract(data, target=None, *, explicit=(), confirm_local=False, model_config=None):
+def _extract(data, target=None, *, explicit=(), confirm_local=False, model_config=None, normalize_lean=False):
     require_model_scope(data["sensitivity"], confirm_local)
     notes = data.get("notes", "")
     if (target is None and not notes.strip()) or len(notes.encode("utf-8")) > MAX_MODEL_NOTES_BYTES:
@@ -132,6 +132,11 @@ def _extract(data, target=None, *, explicit=(), confirm_local=False, model_confi
                 # A local model may express an absent optional question as null.
                 # Retain the exact original reply in the model transcript.
                 output = {key: value for key, value in output.items() if key != "question"}
+            if normalize_lean and isinstance(output, dict):
+                formal = output.get("formal")
+                if (isinstance(formal, dict) and formal.keys() == {"lean"}
+                        and isinstance(proposition := formal["lean"], str) and proposition.strip()):
+                    output = {**output, "formal": {"lean": {"proposition": proposition}}}
             items.append(_item(output, "model"))
         if any(item["natural"] not in notes for item in items):
             raise ValueError("A stated candidate's wording must be present verbatim in the supplied notes.")
@@ -206,7 +211,8 @@ def draft(store, raw, *, model=False, target_id=None, confirm_local=False, model
     provenance = {}
     if model or confirm_local:
         reply, proposed = _extract(notes, target_body, explicit=items, confirm_local=confirm_local,
-                                   model_config=model_config)
+                                   model_config=model_config,
+                                   normalize_lean=public_authorization is not None and notes["domain"] == "lean-core")
         items.extend(proposed)
         call = reply.metadata
         if public_authorization is not None:
