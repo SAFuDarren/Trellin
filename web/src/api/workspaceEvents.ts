@@ -12,7 +12,28 @@ export function workspaceId(value: unknown): value is string {
 }
 
 type Frame = { id: string; type: string; data: string };
-type WorkspaceEvent = { id: string; reviewedClaim?: string };
+export type WorkspaceRefresh =
+  | { kind: "claim" | "basis" | "proof" | "proof-result" | "job" | "evidence"; claimId: string }
+  | { kind: "library" | "basis-item" | "recheck" };
+type WorkspaceEvent = { id: string; refresh?: WorkspaceRefresh };
+
+const SUBJECT: Readonly<Record<string, string | undefined>> = {
+  "claim.frozen": "claim",
+  "claim.concluded": "claim",
+  "basis.confirmed": "formalization",
+  "basis_item.confirmed": "basis_item",
+  "basis_item.retired": "basis_item",
+  "lean_statement.confirmed": "lean_statement",
+  "condition.decided": "condition",
+  "verification_input.retired": "workspace",
+  "proof_task.authorized": "proof_task",
+  "proof_task.stopped": "proof_task",
+  "proof_task.started": "proof_task",
+  "proof_task.updated": "proof_task",
+  "job.status_changed": "job",
+  "evidence.recorded": "evidence",
+  "evidence.reviewed": "evidence",
+};
 
 /** Parse a flow of text chunks, including the CRLF split across two chunks. */
 function assembleFrames() {
@@ -61,6 +82,67 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+function refreshHint(
+  type: string,
+  workspace: string,
+  actor: Record<string, unknown>,
+  subject: Record<string, unknown>,
+  data: Record<string, unknown>,
+): WorkspaceRefresh | null | undefined {
+  const subjectKind = SUBJECT[type];
+  if (!subjectKind) return undefined;
+  if (
+    subject.kind !== subjectKind ||
+    !workspaceId(subject.id) ||
+    (actor.kind === "user" && !workspaceId(actor.id)) ||
+    (actor.kind === "system" && actor.id !== null)
+  ) {
+    return null;
+  }
+  if (type === "basis_item.confirmed") return { kind: "basis-item" };
+  if (type === "basis_item.retired") return { kind: "recheck" };
+  if (type === "verification_input.retired") {
+    return subject.id === workspace && ["verifier", "environment", "source"].some((kind) => kind === data.input_kind)
+      ? { kind: "recheck" }
+      : null;
+  }
+  if (type === "condition.decided") {
+    if (!["reaffirm", "reject", "revise", "derived"].some((action) => action === data.action)) return null;
+    if (data.claim_id === null) return { kind: "library" };
+  }
+  const claimId = data.claim_id;
+  if (!workspaceId(claimId)) return null;
+  switch (type) {
+    case "claim.frozen":
+    case "claim.concluded":
+      return subject.id === claimId ? { kind: "claim", claimId } : null;
+    case "lean_statement.confirmed":
+      return { kind: "claim", claimId };
+    case "basis.confirmed":
+    case "condition.decided":
+      return { kind: "basis", claimId };
+    case "proof_task.authorized":
+    case "proof_task.stopped":
+    case "proof_task.started":
+      return { kind: "proof", claimId };
+    case "proof_task.updated":
+      return { kind: "proof-result", claimId };
+    case "job.status_changed":
+      return ["queued", "running", "succeeded", "failed", "cancelled"].some((state) => state === data.status)
+        ? { kind: "job", claimId }
+        : null;
+    case "evidence.recorded":
+      return { kind: "evidence", claimId };
+    case "evidence.reviewed":
+      if (actor.kind !== "user" || !workspaceId(data.decision_id)) return null;
+      if (data.action === "return") return { kind: "recheck" };
+      if (data.action === "approve") return { kind: "evidence", claimId };
+      return null;
+    default:
+      return undefined;
+  }
+}
+
 function ownedEvent(frame: Frame, workspace: string): WorkspaceEvent | null {
   if (!workspaceEventCursor(frame.id) || frame.id === "0" || !EVENT_TYPE.test(frame.type)) return null;
   let event: Record<string, unknown> | null;
@@ -90,19 +172,10 @@ function ownedEvent(frame: Frame, workspace: string): WorkspaceEvent | null {
   ) {
     return null;
   }
-  if (schema_version !== 1 || event.type !== "evidence.reviewed") return { id: frame.id };
-  if (
-    actor.kind !== "user" ||
-    !workspaceId(actor.id) ||
-    subject.kind !== "evidence" ||
-    !workspaceId(subject.id) ||
-    !workspaceId(data.claim_id) ||
-    !workspaceId(data.decision_id) ||
-    (data.action !== "approve" && data.action !== "return")
-  ) {
-    return null;
-  }
-  return { id: frame.id, reviewedClaim: data.claim_id };
+  if (schema_version !== 1) return { id: frame.id };
+  const refresh = refreshHint(frame.type, workspace, actor, subject, data);
+  if (refresh === null) return null;
+  return refresh ? { id: frame.id, refresh } : { id: frame.id };
 }
 
 /** Deliver only complete, owned events. Each read gives the subscriber one refresh batch. */

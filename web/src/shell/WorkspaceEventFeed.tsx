@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { workspaceEventStream } from "../api/client";
-import { readWorkspaceEvents, workspaceEventCursor, workspaceId } from "../api/workspaceEvents";
+import { readWorkspaceEvents, workspaceEventCursor, workspaceId, type WorkspaceRefresh } from "../api/workspaceEvents";
+import { workspaceEventQueries } from "./workspaceEventQueries";
 
 const RETRY_MS = 1000;
 const RETRY_LIMIT_MS = 8000;
+const REFRESH_MS = 25;
 
 /** Keeps one authenticated subscription for the mounted session and workspace. */
 export function WorkspaceEventFeed({
@@ -23,8 +25,19 @@ export function WorkspaceEventFeed({
     if (!workspaceId(workspace) || !workspaceEventCursor(firstCursor)) return;
     const abort = new AbortController();
     let cursor = firstCursor;
+    let received = firstCursor;
+    let refreshes: WorkspaceRefresh[] = [];
+    let refresh: ReturnType<typeof setTimeout> | undefined;
     let retryMs = RETRY_MS;
     let retry: ReturnType<typeof setTimeout> | undefined;
+
+    function apply() {
+      clearTimeout(refresh);
+      refresh = undefined;
+      for (const queryKey of workspaceEventQueries(refreshes, session)) void queries.invalidateQueries({ queryKey });
+      refreshes = [];
+      cursor = received;
+    }
 
     async function connect() {
       try {
@@ -36,18 +49,14 @@ export function WorkspaceEventFeed({
           response.body
         ) {
           await readWorkspaceEvents(response.body, workspace, abort.signal, (events) => {
-            const reviewed = new Set<string>();
             for (const event of events) {
-              if (BigInt(event.id) <= BigInt(cursor)) continue;
-              cursor = event.id;
-              if (event.reviewedClaim) reviewed.add(event.reviewedClaim);
+              if (BigInt(event.id) <= BigInt(received)) continue;
+              received = event.id;
+              if (event.refresh) refreshes.push(event.refresh);
             }
             retryMs = RETRY_MS;
-            if (reviewed.size) {
-              void queries.invalidateQueries({ queryKey: ["inbox", session] });
-              void queries.invalidateQueries({ queryKey: ["atlas"] });
-              for (const claimId of reviewed) void queries.invalidateQueries({ queryKey: ["graph", claimId] });
-            }
+            if (refreshes.length) refresh ??= setTimeout(apply, REFRESH_MS);
+            else cursor = received;
           });
         } else {
           await response.body?.cancel();
@@ -57,6 +66,7 @@ export function WorkspaceEventFeed({
         // Existing workbench polling continues while the stream reconnects.
       }
       if (!abort.signal.aborted) {
+        apply();
         retry = setTimeout(() => void connect(), retryMs);
         retryMs = Math.min(retryMs * 2, RETRY_LIMIT_MS);
       }
@@ -65,6 +75,7 @@ export function WorkspaceEventFeed({
     void connect();
     return () => {
       abort.abort();
+      clearTimeout(refresh);
       clearTimeout(retry);
     };
   }, [session, workspace, firstCursor, queries]);

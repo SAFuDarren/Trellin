@@ -288,6 +288,9 @@ describe("App", () => {
       ["inbox", "active"],
       ["atlas"],
       ["graph", CLAIM],
+      ["progress"],
+      ["proof-task", "active", CLAIM],
+      ["activity", CLAIM],
     ]);
     streams[0]!.close();
     await waitFor(() => expect(streams).toHaveLength(2), { timeout: 2500 });
@@ -295,6 +298,80 @@ describe("App", () => {
     expect(new Headers(resumed?.headers).get("Last-Event-ID")).toBe(id);
     app.unmount();
     expect(resumed?.signal?.aborted).toBe(true);
+  });
+
+  it("re-reads proof state and the graph once after overlapping events and resumes from the applied batch", async () => {
+    const graphPath = "/api/graph?claim=" + CLAIM;
+    const proofPath = "/api/proof-task?claim=" + CLAIM;
+    const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
+    let withdrawn = false;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/inbox") {
+        return Response.json({
+          items: [],
+          workspace_events: { workspace_id: WORKSPACE, cursor: withdrawn ? "9" : "1" },
+        });
+      }
+      if (input === graphPath) {
+        const status = withdrawn ? "needs_recheck" : "proved";
+        return Response.json({
+          claim: { id: CLAIM, title: "Left zero", status, domain: "lean-core" },
+          nodes: [{ id: `goal:${CLAIM}`, kind: "goal", title: "Original claim", status }],
+          edges: [],
+        });
+      }
+      if (input === proofPath) {
+        return Response.json({
+          ...PROOF_TASK,
+          state: withdrawn ? "blocked" : "authorized",
+          blocker: withdrawn ? "proof_task.decision_needed" : null,
+          can_start: !withdrawn,
+        });
+      }
+      if (input === EVENT_PATH && init?.method === "GET") {
+        return new Response(new ReadableStream<Uint8Array>({ start: (stream) => streams.push(stream) }), {
+          headers: { "Content-Type": "text/event-stream; charset=utf-8" },
+        });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    const app = renderApp("active");
+    fireEvent.click(await screen.findByRole("button", { name: en.proofTask.title }));
+    const pane = within(await screen.findByRole("dialog", { name: en.proofTask.title }));
+    expect(await pane.findByText(en.proofTask.states.authorized)).toBeTruthy();
+    await waitFor(() => expect(streams).toHaveLength(1));
+    const count = (path: string) => fetch.mock.calls.filter(([url]) => url === path).length;
+    const originalGraphReads = count(graphPath);
+    const originalProofReads = count(proofPath);
+    const emit = (id: string, type: string, kind: string, subjectId: string, data: object) => {
+      const body = {
+        id,
+        type,
+        workspace_id: WORKSPACE,
+        schema_version: 1,
+        occurred_at: "2026-11-19T00:00:00Z",
+        actor: { kind: "system", id: null },
+        subject: { kind, id: subjectId },
+        data,
+      };
+      streams[0]!.enqueue(new TextEncoder().encode(`id: ${id}\nevent: ${type}\ndata: ${JSON.stringify(body)}\n\n`));
+    };
+    withdrawn = true;
+    emit("2", "basis.confirmed", "formalization", EVIDENCE, { claim_id: CLAIM });
+    emit("3", "basis_item.retired", "basis_item", EVIDENCE, {});
+    emit("4", "proof_task.updated", "proof_task", EVIDENCE, { claim_id: CLAIM });
+    expect(await pane.findByText(en.proofTask.states.blocked)).toBeTruthy();
+    expect(await pane.findByText(en.errors["proof_task.decision_needed"])).toBeTruthy();
+    expect((await screen.findAllByText(en.status.needs_recheck)).length).toBeGreaterThan(0);
+    expect(count(graphPath) - originalGraphReads).toBe(1);
+    expect(count(proofPath) - originalProofReads).toBe(1);
+    expect(pane.queryByRole("button", { name: en.proofTask.start })).toBeNull();
+    streams[0]!.close();
+    await waitFor(() => expect(streams).toHaveLength(2), { timeout: 2500 });
+    const resumed = fetch.mock.calls.filter(([path]) => path === EVENT_PATH)[1]?.[1];
+    expect(new Headers(resumed?.headers).get("Last-Event-ID")).toBe("4");
+    app.unmount();
   });
 
   it("does not start a new session's feed from a previous session's cached inbox", async () => {
