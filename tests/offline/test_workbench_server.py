@@ -99,6 +99,28 @@ def test_release_updates_are_local_and_separate_from_research(server, tmp_path, 
     assert settings.is_file()
 
 
+def test_model_connections_are_session_bound_and_do_not_read_the_project(server, tmp_path, monkeypatch):
+    from research_multiplier.models.connections import Registry
+
+    registry = Registry(tmp_path / "connections.sqlite3")
+    monkeypatch.setattr(server, "connections", registry)
+    monkeypatch.setattr(server, "read", lambda *args: pytest.fail("Unexpected project access"))
+    path = "/api/model-connections"
+    body = {"model": "example-model", "provider": "codex-cli"}
+    assert request(server, "GET", path, session=False)[0].status == 403
+    assert request(server, "POST", path + "/add", body=body, session=False)[0].status == 403
+    assert request(server, "POST", path + "/add", body=body, origin=False)[0].status == 403
+    assert request(server, "POST", path + "/add", body=body, headers={"Origin": "https://foreign.test"})[0].status == 403
+    assert json.loads(request(server, "GET", path)[1]) == {"connections": []}
+    response, content = request(server, "POST", path + "/add", body=body)
+    assert response.status == 200
+    connection = json.loads(content)
+    assert set(connection) == {"id", "provider", "model", "label", "status", "fingerprint"}
+    assert json.loads(request(server, "GET", path)[1]) == {"connections": [connection]}
+    assert request(server, "POST", path + "/remove", body={"id": connection["id"]})[0].status == 200
+    assert json.loads(request(server, "GET", path)[1]) == {"connections": []}
+
+
 def test_versioned_claims_rejects_unauthorized_and_invalid_requests(server, monkeypatch, capsys):
     workspace_id = "d42ca2f7-9288-47af-b7e5-1150e6df5304"
     path = f"/api/v1/workspaces/{workspace_id}/claims"

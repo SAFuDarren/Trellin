@@ -1,12 +1,115 @@
 """Stateless CLI workers for public proof and audit packets."""
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 import json
 import os
+from pathlib import Path
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 from time import monotonic
 
 from .model_errors import ModelFailure
+
+
+# Native credentials stay owned by the installed CLI. Never pass project DSNs,
+# API keys, or project paths to either a login check or an inference command.
+_NATIVE_ENV = {"HOME", "PATH", "USER", "LOGNAME", "TMPDIR", "SYSTEMROOT", "APPDATA", "LOCALAPPDATA",
+               "USERPROFILE", "LANG", "LC_ALL", "CODEX_HOME", "CLAUDE_CONFIG_DIR"}
+_ISOLATE_CODEX = ContextVar("isolate_workbench_codex", default=False)
+_MAC_SANDBOX = "/usr/bin/sandbox-exec"
+_CODEX_INSTRUCTIONS = ("AGENTS.md", "AGENTS.override.md")
+
+
+def _environment():
+    return {key: value for key, value in os.environ.items() if key in _NATIVE_ENV}
+
+
+@contextmanager
+def workbench_connection(provider):
+    """Keep stricter native limits scoped to user-added workbench connections."""
+    token = _ISOLATE_CODEX.set(provider == "codex-cli")
+    try:
+        yield
+    finally:
+        _ISOLATE_CODEX.reset(token)
+
+
+def _isolated_codex_command(command, environment):
+    if sys.platform != "darwin" or not os.access(_MAC_SANDBOX, os.X_OK):
+        raise ModelFailure("configuration", "A registered Codex connection needs the macOS sandbox.")
+    try:
+        home = Path.home()
+        configured = environment.get("CODEX_HOME")
+        codex = Path(configured) if configured else home / ".codex"
+        if not codex.is_absolute():
+            raise ValueError
+        instructions = [codex / name for name in _CODEX_INSTRUCTIONS]
+        skills = [home / ".agents" / "skills", codex / "skills", codex / "plugins"]
+        rules = []
+        for matcher, locations in (("literal", instructions), ("subpath", skills)):
+            for location in locations:
+                for path in sorted({str(location.absolute()), str(location.resolve())}):
+                    if not path.isprintable():
+                        raise ValueError
+                    rules.append(f"({matcher} {json.dumps(path, ensure_ascii=False)})")
+    except (OSError, RuntimeError, ValueError):
+        raise ModelFailure("configuration", "Could not isolate the registered Codex connection.") from None
+    profile = "(version 1)(allow default)(deny file-read* " + " ".join(rules) + ")"
+    return [
+        _MAC_SANDBOX, "-p", profile, *command[:-1],
+        "-c", "project_doc_max_bytes=0", "--disable", "plugins", "--disable", "browser_use",
+        "--disable", "computer_use", "--disable", "tool_suggest", "--disable", "skill_search",
+        "--disable", "view_image", "--disable", "image_generation", command[-1],
+    ]
+
+
+def require_native_login(provider, binary):
+    """Check the official CLI's own login without sending a prompt."""
+    if provider == "codex-cli":
+        status = ["login", "status"]
+    elif provider == "claude-code":
+        status = ["auth", "status"]
+    else:
+        raise ModelFailure("configuration", "Unknown native CLI model provider.")
+    try:
+        with TemporaryDirectory(prefix="rm-proof-worker-") as directory:
+            result = subprocess.run([binary, *status], cwd=directory, env=_environment(), timeout=5,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    except subprocess.TimeoutExpired:
+        raise ModelFailure("timeout", "Native CLI login check timed out.") from None
+    except OSError:
+        raise ModelFailure("adapter", "Native CLI login check could not start.") from None
+    if result.returncode == 1:
+        raise ModelFailure("authentication", "Complete sign-in with the native CLI.")
+    if result.returncode != 0:
+        raise ModelFailure("adapter", "Native CLI could not check its authentication status.")
+
+
+def _failed_completion(provider, signal):
+    """Map known transport failures without retaining native process output."""
+    signal = signal.casefold()
+    if any(word in signal for word in ("not logged in", "please run /login", "authenticate", "unauthorized")):
+        return ModelFailure("authentication", f"{provider} is not signed in. Complete login using the native CLI.")
+    if any(word in signal for word in ("rate limit", "too many requests", "usage limit", "quota", "out of credits")):
+        return ModelFailure("rate_limit", f"{provider} reached a rate or usage limit.", retryable=True)
+    if any(word in signal for word in ("model_not_found", "model not found", "model is not available",
+                                      "model is not supported", "unsupported model", "no access to model")):
+        return ModelFailure("model_unavailable", f"The selected model is unavailable from {provider}.")
+    if any(word in signal for word in ("failed to connect", "connection refused", "network error",
+                                      "network unreachable", "stream disconnected", "service unavailable")):
+        return ModelFailure("transport", f"{provider} could not reach the model service.", retryable=True)
+    return None
+
+
+def _blocked_global_instruction_notice(item):
+    if not _ISOLATE_CODEX.get() or item["type"] != "error":
+        return False
+    message = item.get("message")
+    return isinstance(message, str) and message.startswith("Failed to read global AGENTS.md instructions from `") and any(
+        message.endswith(f"/{name}`: Operation not permitted (os error 1)") for name in _CODEX_INSTRUCTIONS
+    )
 
 
 def complete(provider, binary, model, messages, timeout, *, reasoning_effort=None):
@@ -18,7 +121,8 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
         command = [
             binary, "-a", "never", "exec", "--ephemeral", "--ignore-user-config", "--ignore-rules",
             "--skip-git-repo-check", "--sandbox", "read-only", "--disable", "shell_tool",
-            "--disable", "memories", "-c", 'mcp_servers.notion={url="http://127.0.0.1:9",enabled=false}',
+            "--disable", "memories", "--disable", "apps", "--disable", "multi_agent", "--disable", "hooks",
+            "-c", 'mcp_servers.notion={url="http://127.0.0.1:9",enabled=false}',
             "-c", 'web_search="disabled"', "--model", model, "--color", "never", "--json", "-",
         ]
         if reasoning_effort is not None:
@@ -32,10 +136,9 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
     else:
         raise ModelFailure("configuration", "Unknown native CLI model provider.")
 
-    # The worker receives only native login context and OS paths, no database DSNs or API keys.
-    inherited = {"HOME", "PATH", "USER", "LOGNAME", "TMPDIR", "SYSTEMROOT", "APPDATA", "LOCALAPPDATA",
-                 "USERPROFILE", "LANG", "LC_ALL", "CODEX_HOME", "CLAUDE_CONFIG_DIR"}
-    environment = {key: value for key, value in os.environ.items() if key in inherited}
+    environment = _environment()
+    if provider == "codex-cli" and _ISOLATE_CODEX.get():
+        command = _isolated_codex_command(command, environment)
     try:
         with TemporaryDirectory(prefix="rm-proof-worker-") as directory:
             remaining = deadline - monotonic()
@@ -59,18 +162,17 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
     if len(child.stdout.encode("utf-8")) > 1_048_576:
         raise ModelFailure("budget_exceeded", f"{provider} response exceeded 1 MiB.")
     if child.returncode != 0:
-        signal = (child.stdout + child.stderr).casefold()
-        if any(word in signal for word in ("not logged in", "please run /login", "authenticate", "unauthorized")):
-            raise ModelFailure("authentication", f"{provider} is not signed in. Complete login using the native CLI.")
-        if any(phrase in signal for phrase in ("rate limit", "too many requests")):
-            raise ModelFailure("rate_limit", f"{provider} reached a rate limit.", retryable=True)
+        failure = _failed_completion(provider, child.stdout + child.stderr)
+        if failure is not None:
+            raise failure
         raise ModelFailure("adapter", f"{provider} exited with status {child.returncode}.")
     try:
         reported_model = None
         if provider == "codex-cli":
             events = [json.loads(line) for line in child.stdout.splitlines() if line.strip()]
             items = [event["item"] for event in events if event["type"] == "item.completed"]
-            if any(item["type"] not in {"agent_message", "reasoning"} for item in items):
+            if any(item["type"] not in {"agent_message", "reasoning"} and not _blocked_global_instruction_notice(item)
+                   for item in items):
                 raise ModelFailure("invalid_output", "Codex attempted an external action.")
             content = [item["text"] for item in items if item["type"] == "agent_message"][-1]
             turn = next(event for event in reversed(events) if event["type"] == "turn.completed")
@@ -81,6 +183,9 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
         else:
             response = json.loads(child.stdout)
             if response.get("is_error") or response.get("subtype") != "success":
+                failure = _failed_completion(provider, child.stdout + child.stderr)
+                if failure is not None:
+                    raise failure
                 raise ModelFailure("invalid_output", "Claude Code did not complete its response.")
             content = response["result"]
             usage = response.get("usage", {})

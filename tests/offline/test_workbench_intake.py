@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 import json
 from types import SimpleNamespace
 from uuid import UUID
@@ -182,3 +183,161 @@ def test_expected_database_rejection_is_fixed(monkeypatch):
     with pytest.raises(workbench_intake.IntakeError) as rejection:
         workbench_intake.confirm(object(), _REVIEW)
     assert str(rejection.value) == "intake.review_conflict"
+
+
+_CONNECTION_ID = "e17ae088-acb0-42aa-aa9f-3282b91cc58f"
+_PUBLIC_DRAFT = {key: value for key, value in _DRAFT.items() if key != "model"} | {"connection_id": _CONNECTION_ID}
+
+
+@pytest.fixture
+def public_intake(monkeypatch, tmp_path):
+    families = {"codex-cli": "openai", "claude-code": "claude"}
+    settings = {"provider": "codex-cli", "model": "test-model", "fingerprint": "route revision one"}
+
+    class Registry:
+        def resolve(self, identifier):
+            if identifier != _CONNECTION_ID:
+                raise workbench_intake.ConnectionError("missing")
+            provider, model = settings["provider"], settings["model"]
+            config = ModelConfig(provider, model, families[provider], "", binary="echo", timeout_seconds=60)
+            return config, {"id": identifier, **settings}
+
+        def use(self, identifier):
+            return nullcontext(self.resolve(identifier))
+
+    researcher = UUID(_GOAL_ID)
+    store = SimpleNamespace(workspace_id=UUID(_ID), local_user=lambda: {"id": researcher})
+    monkeypatch.setattr(workbench_intake.paths, "object_store", lambda: tmp_path)
+    return workbench_intake.PublicIntake(Registry()), settings, store
+
+
+def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(monkeypatch, tmp_path, public_intake):
+    service, _, store = public_intake
+    calls = []
+    candidate = {"kind": "theorem", "natural": _NOTES.strip(), "formal": None}
+    artifacts = workbench_intake.Artifacts(tmp_path, workspace=False)
+    store.json = lambda value: value
+
+    def draft_query(role, query, body):
+        assert role == "human" and "rm.draft_research_intake" in query
+        assert list(body["items"]) == [{**candidate, "id": "i1", "origin": "model"}]
+        assert body["sensitivity"] == "public"
+        assert json.loads(artifacts.read(body["notes"]))["notes"] == _NOTES
+        ref = body["model"]["call"]["parameters"]["workbench_public_intake"]
+        assert artifacts.read_json(ref)["researcher_id"] == _GOAL_ID
+        assert artifacts.read_json(ref)["token"] == preview["token"]
+        return [{**_saved_draft(), "body": body}]
+
+    def complete(config, role, system, outgoing, output_limit, deadline):
+        calls.append(outgoing)
+        assert role == "intake-notes" and config.provider == "codex-cli"
+        assert system == intake.EXTRACT_PROMPT
+        assert outgoing == preview["outgoing"]
+        assert config.timeout_seconds == 60 and output_limit == intake.MODEL_OUTPUT_TOKENS
+        audit_file, = tmp_path.iterdir()
+        assert json.loads(audit_file.read_text())["visibility"] == "public"
+        return SimpleNamespace(output={"items": [candidate]}, metadata={"parameters": {}}, transcript={"provider": config.provider})
+
+    store.query = draft_query
+    monkeypatch.setattr(intake, "complete_structured", complete)
+    preview = service.preview(store, _PUBLIC_DRAFT)
+    assert preview["provider"] == "codex-cli" and preview["model"] == "test-model"
+    assert preview["outgoing"] == {"domain": _DRAFT["domain"], "objective": _DRAFT["objective"], "notes": _NOTES}
+    assert preview["limits"]["timeout_seconds"] == 60
+    assert preview["limits"]["output_token_limit_enforced"] is False
+    assert not calls and not list(tmp_path.iterdir())
+
+    authorized = {**_PUBLIC_DRAFT, "token": preview["token"]}
+    saved = service.draft(store, authorized)
+    assert saved["id"] == _ID and saved["items"][0]["status"] == "confirm_scope"
+    with pytest.raises(workbench_intake.IntakeError, match="intake.release_stale"):
+        service.draft(store, authorized)
+    assert calls == [preview["outgoing"]]
+
+
+@pytest.mark.parametrize("change", ["notes", "objective", "title", "workspace", "researcher", "model"])
+def test_changed_public_intake_requires_a_new_preview(monkeypatch, tmp_path, public_intake, change):
+    service, settings, store = public_intake
+    preview = service.preview(store, _PUBLIC_DRAFT)
+    request = {**_PUBLIC_DRAFT, "token": preview["token"]}
+    if change == "workspace":
+        store.workspace_id = UUID(_GOAL_ID)
+    elif change == "researcher":
+        store.local_user = lambda: {"id": UUID(_ID)}
+    elif change == "model":
+        settings.update(provider="claude-code", fingerprint="route revision two")
+    else:
+        request[change] += " changed"
+    monkeypatch.setattr(intake, "draft", lambda *args, **kwargs: pytest.fail("unexpected public call"))
+    with pytest.raises(workbench_intake.IntakeError, match="intake.release_stale"):
+        service.draft(store, request)
+    assert not list(tmp_path.iterdir())
+
+
+def test_public_intake_rejects_restricted_input_or_unbound_identity(monkeypatch, public_intake):
+    service, _, store = public_intake
+    monkeypatch.setattr(intake, "draft", lambda *args, **kwargs: pytest.fail("unexpected public call"))
+    with pytest.raises(workbench_intake.IntakeError, match="intake.invalid_input"):
+        service.preview(store, {**_PUBLIC_DRAFT, "sensitivity": "restricted"})
+    store.local_user = lambda: None
+    with pytest.raises(workbench_intake.IntakeError, match="intake.identity_required"):
+        service.preview(store, _PUBLIC_DRAFT)
+
+
+def test_public_intake_reports_a_removed_connection_without_calling_the_model(monkeypatch, public_intake):
+    service, _, store = public_intake
+    monkeypatch.setattr(intake, "draft", lambda *args, **kwargs: pytest.fail("unexpected public call"))
+    with pytest.raises(workbench_intake.IntakeError, match="connection.missing"):
+        service.preview(store, {**_PUBLIC_DRAFT, "connection_id": _GOAL_ID})
+
+
+def test_public_intake_fails_without_retrying_or_releasing_the_same_preview(monkeypatch, tmp_path, public_intake):
+    service, _, store = public_intake
+    preview = service.preview(store, _PUBLIC_DRAFT)
+    attempts = []
+
+    def timeout(*args, **kwargs):
+        attempts.append(1)
+        raise ModelFailure("timeout", "Detailed error stays out of the workbench")
+
+    monkeypatch.setattr(intake, "draft", timeout)
+    authorized = {**_PUBLIC_DRAFT, "token": preview["token"]}
+    with pytest.raises(workbench_intake.IntakeError, match="connection.timeout"):
+        service.draft(store, authorized)
+    with pytest.raises(workbench_intake.IntakeError, match="intake.release_stale"):
+        service.draft(store, authorized)
+    audit_file, = tmp_path.iterdir()
+    assert json.loads(audit_file.read_text())["token"] == preview["token"]
+    assert attempts == [1]
+
+
+@pytest.mark.parametrize(("code", "expected"), [
+    ("model_unavailable", "connection.model_unavailable"),
+    ("project_budget_exhausted", "intake.project_budget_exhausted"),
+    ("adapter", "intake.public_failed"),
+])
+def test_public_intake_sanitizes_provider_failure(monkeypatch, public_intake, code, expected):
+    service, _, store = public_intake
+    preview = service.preview(store, _PUBLIC_DRAFT)
+
+    def reject(*args, **kwargs):
+        raise ModelFailure(code, "Detailed response stays out of the workbench")
+
+    monkeypatch.setattr(intake, "draft", reject)
+    with pytest.raises(workbench_intake.IntakeError) as failure:
+        service.draft(store, {**_PUBLIC_DRAFT, "token": preview["token"]})
+    assert str(failure.value) == expected
+
+
+def test_public_draft_review_requires_the_saved_authorization(monkeypatch, tmp_path):
+    saved = _saved_draft(sensitivity="public")
+    workspace_objects = workbench_intake.Artifacts(tmp_path, workspace=False)
+    ref = workspace_objects.put({"kind": "workbench_public_intake"})
+    saved["body"]["model"]["call"]["parameters"] = {"workbench_public_intake": ref}
+    monkeypatch.setattr(workbench_intake.paths, "object_store", lambda: tmp_path)
+    monkeypatch.setattr(intake, "show", lambda *_: saved)
+    monkeypatch.setattr(intake, "confirm", lambda *_: {"id": UUID(_GOAL_ID)})
+    assert workbench_intake.confirm(object(), _REVIEW)["confirmed"]
+    (tmp_path / ref["sha256"]).unlink()
+    with pytest.raises(workbench_intake.IntakeError, match="intake.review_conflict"):
+        workbench_intake.confirm(object(), _REVIEW)

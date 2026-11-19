@@ -1,11 +1,20 @@
 import { useTranslation } from "react-i18next";
 import type { ReleaseUpdates } from "../api/releaseUpdates";
 import { LANGUAGES, setLanguage, type Language } from "../i18n";
+import { ModelConnections } from "../components/ModelConnections";
 import { ReleaseNotesLink } from "../components/ReleaseUpdateNotice";
 import { PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
 
-export function SettingsPage({ onResetLayout, updates }: { onResetLayout: () => void; updates: ReleaseUpdates }) {
+export function SettingsPage({
+  session,
+  onResetLayout,
+  updates,
+}: {
+  session: string;
+  onResetLayout: () => void;
+  updates: ReleaseUpdates;
+}) {
   const { t, i18n } = useTranslation();
   return (
     <SectionLayout
@@ -15,6 +24,7 @@ export function SettingsPage({ onResetLayout, updates }: { onResetLayout: () => 
       <PageHead title={t("settings.general")} />
       <div className="page-body settings">
         <UpdateSettings updates={updates} />
+        <ModelConnections session={session} />
         <section aria-labelledby="settings-language">
           <h3 id="settings-language">{t("settings.language")}</h3>
           <p>{t("settings.languageNote")}</p>

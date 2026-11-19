@@ -76,6 +76,21 @@ class _RequestDeadline:
                     pass
 
 
+def _model_unavailable(error):
+    """Read only a bounded provider error to classify an unavailable model."""
+    if error.code not in {400, 404}:
+        return False
+    try:
+        document = json.loads(error.read(8192))
+    except (OSError, HTTPException, ValueError, RecursionError):
+        return False
+    details = document.get("error") if isinstance(document, dict) else None
+    return isinstance(details, dict) and (
+        details.get("code") == "model_not_found"
+        or (error.code == 404 and details.get("type") == "not_found_error")
+    )
+
+
 def _read_response(request, deadline, use_proxy):
     # urllib retains system proxy and TLS configuration. Track the socket so
     # a peer sending headers or body fragments cannot extend the wall budget.
@@ -140,6 +155,8 @@ def _read_response(request, deadline, use_proxy):
                 raise ModelFailure("rate_limit", message, retryable=True, retry_after_seconds=wait) from None
             if status in {408, 425, 500, 502, 503, 504}:
                 raise ModelFailure("transport", message, retryable=True) from None
+            if _model_unavailable(error):
+                raise ModelFailure("model_unavailable", "The selected model is unavailable from the endpoint.") from None
             raise ModelFailure("request_rejected", message) from None
     except URLError as error:
         if isinstance(error.reason, TimeoutError):

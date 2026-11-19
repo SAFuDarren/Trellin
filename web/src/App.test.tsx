@@ -1010,6 +1010,102 @@ describe("App", () => {
     });
   });
 
+  it("adds and removes only the model connections the user chooses", async () => {
+    window.history.replaceState(null, "", "#settings");
+    let existing = false;
+    const connection = {
+      id: "codex",
+      provider: "codex-cli",
+      model: "example-model",
+      label: "My Codex",
+      status: "untested",
+      fingerprint: "fingerprint",
+    };
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/model-connections") return Response.json({ connections: existing ? [connection] : [] });
+      if (input === "/api/model-connections/add") {
+        expect(JSON.parse(String(init?.body))).toEqual({
+          provider: "codex-cli",
+          model: "example-model",
+          label: "My Codex",
+        });
+        existing = true;
+        return Response.json(connection);
+      }
+      if (input === "/api/model-connections/remove") {
+        expect(JSON.parse(String(init?.body))).toEqual({ id: connection.id });
+        existing = false;
+        return Response.json({ removed: true });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    const connections = within(await screen.findByRole("region", { name: en.modelConnections.title }));
+    expect(await connections.findByText(en.modelConnections.empty)).toBeTruthy();
+    expect(connections.queryByText(en.team.providers["codex-cli"])).toBeNull();
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.add }));
+    fireEvent.change(connections.getByLabelText(en.modelConnections.provider), { target: { value: "codex-cli" } });
+    fireEvent.change(connections.getByLabelText(en.modelConnections.model), { target: { value: connection.model } });
+    fireEvent.change(connections.getByLabelText(en.modelConnections.label), { target: { value: connection.label } });
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.save }));
+    expect(await connections.findByText(connection.label)).toBeTruthy();
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.remove }));
+    expect(fetch.mock.calls.filter(([path]) => path.endsWith("/remove"))).toHaveLength(0);
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.removeConfirm }));
+    expect(await connections.findByText(en.modelConnections.empty)).toBeTruthy();
+  });
+
+  it("previews the exact public excerpt and recipient before calling a provider", async () => {
+    const content = "Addition of natural numbers is commutative.";
+    const connection = {
+      id: "claude",
+      provider: "claude-code",
+      label: "My Claude",
+      model: "sonnet",
+      status: "connected",
+      fingerprint: "fingerprint",
+    };
+    let proposed: Record<string, unknown> | undefined;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/claims") return Response.json({ claim_id: null, claims: [] });
+      if (input === "/api/model-connections") return Response.json({ connections: [connection] });
+      if (input === "/api/project-intake/models") return Response.json({ models: [] });
+      if (input.endsWith("/public-preview")) {
+        proposed = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        const { domain, objective, notes } = proposed;
+        return Response.json({
+          token: "reviewed",
+          provider: connection.provider,
+          model: connection.model,
+          outgoing: { domain, objective, notes },
+          limits: { timeout_seconds: 45, max_calls: 1 },
+        });
+      }
+      if (input.endsWith("/public-draft")) {
+        expect(JSON.parse(String(init?.body))).toEqual({ ...proposed, token: "reviewed" });
+        return Response.json({ id: "review", title: "Reviewed public notes", items: [], confirmed: false });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.projectEntry.organize }));
+    const dialog = within(await screen.findByRole("dialog"));
+    await dialog.findByRole("option", { name: /My Claude/ });
+    fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.model), {
+      target: { value: "connection:claude" },
+    });
+    fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: content } });
+    fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.analyze }));
+    const preview = within(await dialog.findByRole("region", { name: en.modelConnections.publicPreview }));
+    expect(preview.getByText(new RegExp(content))).toBeTruthy();
+    expect(preview.getByText(/Claude Code · sonnet/)).toBeTruthy();
+    expect(fetch.mock.calls.some(([path]) => path.endsWith("/public-draft"))).toBe(false);
+    fireEvent.click(preview.getByRole("button", { name: en.modelConnections.sendPublic }));
+    expect(await dialog.findByText("Reviewed public notes")).toBeTruthy();
+  });
+
   it("saves and confirms a manual library theorem without a model", async () => {
     let submission: unknown;
     let confirmation: unknown;

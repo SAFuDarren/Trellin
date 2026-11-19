@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 import webbrowser
 
 from research_multiplier.cli._output import json_default
+from research_multiplier.models import connections
 from research_multiplier.proof.lean_watch import LakeWatch
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
@@ -55,6 +56,12 @@ _PROJECT_WRITES = {
     "/api/theorems": workbench_theorems.add,
     "/api/theorems/confirm": workbench_theorems.confirm,
 }
+_CONNECTION_WRITES = {
+    "/api/model-connections/add": "add",
+    "/api/model-connections/remove": "remove",
+    "/api/model-connections/test": "test",
+}
+_INTAKE_PUBLIC = ("/api/project-intake/public-preview", "/api/project-intake/public-draft")
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
 _CLARIFICATION_WRITES = {
     "answer": workbench_clarification.answer,
@@ -161,6 +168,8 @@ class WorkbenchServer(ThreadingHTTPServer):
         self._doctor = (0.0, None)
         self._doctor_lock = threading.Lock()
         self._intake_lock = threading.Lock()
+        self.connections = connections.Registry()
+        self.public_intake = workbench_intake.PublicIntake(self.connections)
         self._proof_task_lock = threading.Lock()
         self.closing = threading.Event()
         self._running_policy = None
@@ -194,7 +203,7 @@ class WorkbenchServer(ThreadingHTTPServer):
             return workbench_clarification.prepare(store, workspace_id, identifier, document)
 
     def write_project(self, action, document):
-        if action is not workbench_intake.draft:
+        if action not in (workbench_intake.draft, self.public_intake.draft):
             return self.write(action, document)
         if not self._intake_lock.acquire(blocking=False):
             raise workbench_intake.IntakeError("intake.busy")
@@ -337,6 +346,10 @@ class _Handler(BaseHTTPRequestHandler):
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
             return self.server.release_updates.snapshot()
+        if route.path == "/api/model-connections":
+            if route.query:
+                raise _BadRequest("connection.invalid")
+            return {"connections": self.server.connections.list()}
         if route.path == "/api/project-intake/models":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -402,6 +415,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.BAD_REQUEST, str(error))
         except workbench_proof_tasks.ProofTaskError as error:
             self._error(HTTPStatus.NOT_FOUND, error.code)
+        except connections.ConnectionError as error:
+            self._error(HTTPStatus.SERVICE_UNAVAILABLE, error.code)
         except claim_references.ClaimCodeError as error:
             self._error(*_claim_code_error(error))
         except DatabaseOperationError as error:
@@ -656,6 +671,18 @@ class _Handler(BaseHTTPRequestHandler):
         except (ValueError, AttributeError, TypeError, RecursionError):
             raise _BadRequest("Supply one valid guidance message with a claim, a node and a request ID.") from None
 
+    def _change_connection(self, method):
+        document = self._body()
+        registry = self.server.connections
+        if method == "add":
+            return registry.add(document)
+        if not isinstance(document, dict) or document.keys() != {"id"}:
+            raise _BadRequest("connection.invalid")
+        if method == "test":
+            return registry.test(document["id"])
+        registry.remove(document["id"])
+        return {"removed": True}
+
     def do_POST(self):
         if self.path.startswith("/api/v1/"):
             self._post_v1()
@@ -684,6 +711,13 @@ class _Handler(BaseHTTPRequestHandler):
                 except ValueError as error:
                     raise _BadRequest(str(error)) from None
                 self._json(HTTPStatus.OK, result)
+            elif self.path in _CONNECTION_WRITES:
+                self._json(HTTPStatus.OK, self._change_connection(_CONNECTION_WRITES[self.path]))
+            elif self.path == "/api/project-intake/public-preview":
+                self._json(HTTPStatus.OK, self.server.read(self.server.public_intake.preview, self._body(_MAX_PROJECT_BYTES)))
+            elif self.path == "/api/project-intake/public-draft":
+                self._json(HTTPStatus.OK, self.server.write_project(self.server.public_intake.draft,
+                                                                   self._body(_MAX_PROJECT_BYTES)))
             elif self.path in _PROJECT_WRITES:
                 document = self._body(_MAX_PROJECT_BYTES)
                 if not isinstance(document, dict):
@@ -705,6 +739,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(status, error.code)
         except claim_references.ClaimCodeError as error:
             self._error(*_claim_code_error(error))
+        except connections.ConnectionError as error:
+            self._error(HTTPStatus.CONFLICT, error.code)
         except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:
             self._error(HTTPStatus.CONFLICT, str(error))
         except DatabaseOperationError as error:
@@ -713,7 +749,7 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(status, "proof_task.unavailable" if error.retryable else "proof_task.stale")
             elif self.path == "/api/claim-code":
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "claim_code.save_failed")
-            elif self.path in _PROJECT_WRITES:
+            elif self.path in _PROJECT_WRITES or self.path in _INTAKE_PUBLIC:
                 self._error(HTTPStatus.CONFLICT, "intake.save_failed")
             elif error.state == "23514" or (self.path == "/api/review" and not error.retryable):
                 self._error(HTTPStatus.CONFLICT, "The record has changed; refresh and try again.")
@@ -727,7 +763,7 @@ class _Handler(BaseHTTPRequestHandler):
                 message = "proof_task.unavailable"
             elif self.path == "/api/claim-code":
                 message = "claim_code.save_failed"
-            elif self.path in _PROJECT_WRITES:
+            elif self.path in _PROJECT_WRITES or self.path in _INTAKE_PUBLIC:
                 message = "intake.save_failed"
             else:
                 message = "Could not send guidance to this project."

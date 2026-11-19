@@ -29,8 +29,9 @@ class PendingLeanPass:
     inputs_sha256: str
 
 
-def pending_lean_passes(store: Store, limit: int, policy_ids) -> list[PendingLeanPass]:
-    rows = store.query("scheduler", "SELECT * FROM rm.lean_progress_queue(%s,%s::uuid[])", limit, policy_ids)
+def pending_lean_passes(store: Store, limit: int, policy_ids, *, public_model_policies=False) -> list[PendingLeanPass]:
+    queue = "rm.lean_progress_public_model_queue" if public_model_policies else "rm.lean_progress_queue"
+    rows = store.query("scheduler", f"SELECT * FROM {queue}(%s,%s::uuid[])", limit, policy_ids)
     return [PendingLeanPass(row["id"], row["statement_id"], row["model_rounds"], row["inputs_sha256"]) for row in rows]
 
 
@@ -39,6 +40,7 @@ class LeanPassSettings:
     private_model: dict | None
     route_parallelism: int
     route_stall_limit: int
+    public_model: dict | None = None
 
 
 class ClaimedLeanPass:
@@ -51,11 +53,13 @@ class ClaimedLeanPass:
     def settings(self) -> LeanPassSettings:
         row, = self._store.query("scheduler", """
             SELECT policy #> '{lean,private_model}' AS private_model,
+                   policy #> '{lean,public_model}' AS public_model,
                    coalesce((policy #>> '{lean,route_parallelism}')::integer, 1) AS route_parallelism,
                    coalesce((policy #>> '{lean,route_stall_limit}')::integer, 3) AS route_stall_limit
             FROM rm.research_progress_status WHERE id = %s
         """, self._pending.policy_id)
-        return LeanPassSettings(row["private_model"], row["route_parallelism"], row["route_stall_limit"])
+        return LeanPassSettings(row["private_model"], row["route_parallelism"], row["route_stall_limit"],
+                                row.get("public_model"))
 
     def is_active(self) -> bool:
         return bool(self._store.query("scheduler", """

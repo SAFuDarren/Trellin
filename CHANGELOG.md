@@ -2,7 +2,10 @@
 
 ## 1.0.23
 
-- Document repository layout, task branch retirement, and issue pickup by urgency.
+- Add, test and remove user-selected Codex, Claude Code, OpenAI and Anthropic
+  connections under Settings. Store API keys in the local macOS Keychain.
+- Use a connected model to organize an explicitly reviewed public excerpt
+  and save the result for the existing intake review.
 
 ## 1.0.22
 
