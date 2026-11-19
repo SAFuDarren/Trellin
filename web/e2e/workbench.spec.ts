@@ -182,6 +182,25 @@ test("the language is chosen in settings and remembered", async ({ page }) => {
   await expect(page.getByRole("button", { name: "证明进展" })).toBeVisible();
 });
 
+test("settings show the installed version and offer a manual stable release check", async ({ page }) => {
+  const errors = await open(page, "Settings");
+  const settings = page.getByRole("region", { name: "Updates" });
+  await expect(settings.getByText("Installed version 1.9.0")).toBeVisible();
+  await expect(settings.getByRole("checkbox", { name: "Automatically check for updates" })).not.toBeChecked();
+  await expect(settings.getByRole("status")).toHaveText("No update check has run yet.");
+  await settings.getByRole("button", { name: "Check for updates" }).click();
+  const notice = page.getByRole("complementary", { name: "Updates" });
+  await expect(notice.getByRole("status")).toHaveText("Version 1.10.0 is available.");
+  await expect(notice.getByRole("link", { name: "Release notes" })).toHaveAttribute(
+    "href",
+    "https://github.com/SAFuDarren/Trellin/releases/tag/v1.10.0",
+  );
+  await notice.getByRole("button", { name: "Dismiss" }).click();
+  await expect(notice).toHaveCount(0);
+  await expect(settings.getByRole("link", { name: "Release notes" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("the browser tab icons load", async ({ page, request }) => {
   await open(page);
   const icons = await page
