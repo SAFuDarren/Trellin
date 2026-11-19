@@ -1,0 +1,114 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Research Multiplier workbench API",
+    "version": "1",
+    "description": "Local workbench contract pilot covering the recent claims list."
+  },
+  "paths": {
+    "/api/v1/workspaces/{workspace_id}/claims": {
+      "get": {
+        "operationId": "listRecentClaims",
+        "summary": "List the selected workspace's recent frozen claims",
+        "description": "Returns up to the 100 most recent visible frozen researcher claims, sorted by creation time (newest first) and then by ID. Archived and superseded claims are excluded. This pilot is a snapshot with no query parameters or pagination. The legacy /api/claims endpoint remains available with its existing response.",
+        "security": [{ "LocalSession": [] }],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The selected workspace's claim snapshot.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ClaimsList" } } }
+          },
+          "400": { "$ref": "#/components/responses/InvalidQuery" },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/Failed" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "LocalSession": { "type": "apiKey", "in": "header", "name": "X-RM-Session" }
+    },
+    "headers": {
+      "RequestId": {
+        "description": "Server-generated correlation ID. Also included in each error body.",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+    "responses": {
+      "InvalidQuery": {
+        "description": "The recent claims pilot does not accept query parameters (claims.invalid_query).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "Unauthenticated": {
+        "description": "Local session missing or invalid (request.unauthenticated).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "Forbidden": {
+        "description": "Request Host or Origin does not match the launcher (request.forbidden).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "NotFound": {
+        "description": "Malformed or inaccessible workspace reference (claims.not_found).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "Failed": {
+        "description": "Unexpected server error (request.failed).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "Unavailable": {
+        "description": "The selected database is unavailable (database.unavailable).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      }
+    },
+    "schemas": {
+      "Claim": {
+        "type": "object",
+        "required": ["id", "title", "status", "domain"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": ["string", "null"] },
+          "status": { "type": "string" },
+          "domain": { "type": ["string", "null"] }
+        }
+      },
+      "ClaimsList": {
+        "type": "object",
+        "required": ["items", "next_cursor", "claim_id"],
+        "additionalProperties": false,
+        "properties": {
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/Claim" } },
+          "next_cursor": { "type": "null", "description": "Always null during the recent snapshot pilot." },
+          "claim_id": {
+            "type": ["string", "null"],
+            "format": "uuid",
+            "description": "The claim selected by the launcher, when supplied."
+          },
+          "claim_codes": {
+            "type": "boolean",
+            "description": "Present when the workspace supports persistent claim references."
+          }
+        }
+      }
+    }
+  }
+}

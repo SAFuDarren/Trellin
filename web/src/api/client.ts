@@ -1,5 +1,7 @@
 // Session handling and requests to the local workbench server (docs/interfaces.md, section 4).
 
+import type { ClaimsList } from "./claims.generated";
+
 const SESSION_KEY = "research-multiplier-session";
 
 /** Read the launch token from the URL hash once, keep it for this tab, and remove it from the address bar. */
@@ -108,5 +110,5 @@ export async function api<T>(
   return payload as T;
 }
 
-export type Claim = { id: string; title: string | null; status: string; domain: string | null };
-export type ClaimsResponse = { claims: Claim[]; claim_id: string | null; claim_codes?: boolean };
+export type { Claim } from "./claims.generated";
+export type ClaimsResponse = Pick<ClaimsList, "claim_id" | "claim_codes"> & { claims: ClaimsList["items"] };

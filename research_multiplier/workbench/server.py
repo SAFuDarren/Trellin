@@ -6,6 +6,7 @@ from importlib.resources import files
 import json
 import logging
 import secrets
+import sys
 import threading
 import time
 from urllib.parse import parse_qs, urlsplit
@@ -30,6 +31,8 @@ _APP_TYPES = {
 _POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
            "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 _LOG = logging.getLogger(__name__)
+_CLAIMS_ROUTE = "/api/v1/workspaces/{workspace_id}/claims"
+_ACCESS_LOG_LOCK = threading.Lock()
 _MAX_GUIDANCE_BYTES = 16_384
 _MAX_PROJECT_BYTES = 240_000
 _DOCTOR_SECONDS = 120
@@ -65,6 +68,8 @@ _V1_ERRORS = {
     "events.invalid_cursor": (HTTPStatus.BAD_REQUEST, "The event cursor is invalid for this workspace."),
     "events.unavailable": (HTTPStatus.CONFLICT, "Upgrade the project database to use workspace events."),
     "events.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local user."),
+    "claims.invalid_query": (HTTPStatus.BAD_REQUEST, "The recent claims list does not take parameters."),
+    "claims.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace claims are unavailable."),
 }
 
 
@@ -77,6 +82,10 @@ class _MissingAssets(ValueError):
 
 
 class _MissingSchema(ValueError):
+    pass
+
+
+class _MissingClaimsWorkspace(ValueError):
     pass
 
 
@@ -248,6 +257,12 @@ def _activity(store, claim_id):
     return {**workbench_activity.snapshot(store, claim_id), **workbench_guidance.activity(store, claim_id)}
 
 
+def _workspace_claims(store, workspace_id):
+    if store.workspace_id != workspace_id:
+        raise _MissingClaimsWorkspace
+    return proof_graph.claim_index(store)
+
+
 class _Handler(BaseHTTPRequestHandler):
     server_version = "ResearchMultiplier/1.0"
     request_id = None
@@ -379,6 +394,10 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _get_v1(self):
         self.request_id = str(uuid4())
+        claims_path = self.path.split("?", 1)[0].split("#", 1)[0].split("/")
+        if len(claims_path) == 6 and claims_path[3] == "workspaces" and claims_path[5] == "claims":
+            self._get_claims_v1(claims_path[4], "?" in self.path or "#" in self.path)
+            return
         if not self._trusted():
             self._v1_error("request.forbidden")
             return
@@ -442,6 +461,49 @@ class _Handler(BaseHTTPRequestHandler):
             _LOG.error("Workbench event stream failed (%s).", type(error).__name__)
             if not streaming:
                 self._v1_error("request.failed")
+
+    def _claims_v1_reply(self, workspace, has_arguments):
+        if not self._trusted():
+            return "request.forbidden", None
+        if not self._authorized():
+            return "request.unauthenticated", None
+        try:
+            workspace_id = UUID(workspace)
+            if str(workspace_id) != workspace.lower():
+                raise ValueError
+        except ValueError:
+            return "claims.not_found", None
+        if has_arguments:
+            return "claims.invalid_query", None
+        try:
+            index = self.server.read(_workspace_claims, workspace_id)
+        except _MissingClaimsWorkspace:
+            return "claims.not_found", None
+        except ValueError:
+            # Store configuration and driver errors can contain sensitive connection details.
+            return "database.unavailable", None
+        except Exception:
+            return "request.failed", None
+        payload = {"items": index["claims"], "next_cursor": None, "claim_id": self.server.claim_id}
+        if "claim_codes" in index:
+            payload["claim_codes"] = index["claim_codes"]
+        return None, payload
+
+    def _get_claims_v1(self, workspace, has_arguments):
+        start = time.monotonic()
+        code, payload = self._claims_v1_reply(workspace, has_arguments)
+        status = _V1_ERRORS[code][0] if code else HTTPStatus.OK
+        entry = {"route": _CLAIMS_ROUTE, "status": status, "request_id": self.request_id,
+                 "duration_ms": round((time.monotonic() - start) * 1000, 3)}
+        with _ACCESS_LOG_LOCK:
+            print(json.dumps(entry, separators=(",", ":")), file=sys.stderr)
+        try:
+            if code:
+                self._v1_error(code)
+            else:
+                self._json(status, payload)
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            pass
 
     def _body(self, limit=_MAX_GUIDANCE_BYTES):
         if (self.headers.get_content_type() != "application/json" or self.headers.get_all("Transfer-Encoding")
