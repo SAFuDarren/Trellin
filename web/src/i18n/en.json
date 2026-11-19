@@ -178,6 +178,7 @@
     "approved": "Approved and recorded.",
     "returned": "Returned with your note.",
     "needNameAndReason": "Add your name and a reason first.",
+    "needReason": "Add a reason first.",
     "context": "Context",
     "status": "Status",
     "cliNote": "Items of this kind are handled from the command line for now:"
@@ -294,6 +295,14 @@
     "fallback": "Model"
   },
   "errors": {
+    "request.invalid": "Check the review decision and reason.",
+    "request.unauthenticated": "Reopen the workbench from your local project to restore its session.",
+    "request.forbidden": "This session cannot record the review.",
+    "review.identity_required": "Bind this project to its local database, then reopen the workbench to record reviews.",
+    "review.not_found": "This evidence is unavailable in the selected workspace.",
+    "review.not_pending": "This evidence is no longer waiting for review.",
+    "idempotency.conflict": "This request key belongs to another decision. Reopen the review and check its current state.",
+    "database.unavailable": "The project database is unavailable. Check the connection and retry the review.",
     "unreadable_response": "The local service returned a response that could not be read.",
     "request_failed": "The local service could not read the project.",
     "project.theorem.invalid": "Review the theorem fields and their lengths.",

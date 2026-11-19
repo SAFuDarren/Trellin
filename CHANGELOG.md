@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.9
+
+- Record a stable local researcher ID on new approval records. The versioned
+  workbench review endpoint resolves identity from the selected workspace and
+  returns the original decision on a repeated request.
+
 ## 1.0.8
 
 - Save stable claim and proof-node references in PostgreSQL. Renamed prefixes

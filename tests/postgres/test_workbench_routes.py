@@ -121,8 +121,8 @@ def workbench(tmp_path, monkeypatch):
                 thread.join()
 
 
-def _request(server, method, path, *, body=None, status=200):
-    headers = {"X-RM-Session": server.session}
+def _request(server, method, path, *, body=None, status=200, headers=None):
+    headers = {"X-RM-Session": server.session, **(headers or {})}
     if method == "POST":
         headers.update({"Origin": server.origin, "Content-Type": "application/json"})
     connection = HTTPConnection("127.0.0.1", server.server_port, timeout=20)
@@ -218,3 +218,28 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
         persisted = store.query("human", "SELECT review_status FROM rm.evidence_foundation_status WHERE id = %s",
                                 evidence_id)
     assert persisted == [{"review_status": "approved"}]
+
+
+def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workbench):
+    server, _, _, evidence_id = workbench
+    workspace_id = paths.workspace_id(server.workspace)
+    local_user = paths.local_user_id(server.workspace)
+    assert local_user is not None
+    inbox = _request(server, "GET", "/api/inbox")
+    assert inbox["review_identity"] == {"workspace_id": str(workspace_id)}
+    endpoint = f"/api/v1/workspaces/{workspace_id}/evidence/{evidence_id}/reviews"
+    headers = {"Idempotency-Key": str(uuid4())}
+    review = {"decision": "approve", "reason": REASON}
+    bad = _request(server, "POST", endpoint, headers=headers, body={**review, "actor": "Not the user"}, status=400)
+    assert bad["error"]["code"] == "request.invalid"
+    created = _request(server, "POST", endpoint, headers=headers, body=review, status=201)
+    assert created["user_id"] == str(local_user)
+    assert _request(server, "POST", endpoint, headers=headers, body=review, status=201) == created
+    different = _request(server, "POST", endpoint, headers=headers, body={**review, "decision": "return"}, status=409)
+    assert different["error"]["code"] == "idempotency.conflict"
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        rows = store.query("human", """
+            SELECT id::text, action, user_id, actor_ref FROM rm.decisions WHERE evidence_id = %s
+        """, evidence_id)
+    assert rows == [{"id": created["id"], "action": "approve", "user_id": local_user,
+                     "actor_ref": "Local researcher"}]

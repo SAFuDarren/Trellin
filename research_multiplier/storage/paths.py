@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 WORKSPACE_FILE = ".research-multiplier.json"
 WORKSPACE_ID_FILE = ".research-multiplier-workspace-id"
 DATABASE_FILE = ".research-multiplier-database"
+LOCAL_USER_FILE = ".research-multiplier-local-user-id"
 _ACTIVE_WORKSPACE = ContextVar("research_multiplier_workspace", default=None)
 _STRICT_WORKSPACE = ContextVar("research_multiplier_strict_workspace", default=False)
 _PACKAGE_PARENT = Path(__file__).resolve().parents[2]
@@ -139,6 +140,10 @@ def workspace_id(workspace):
     return _read_uuid_marker(workspace, WORKSPACE_ID_FILE, "workspace identity")
 
 
+def local_user_id(workspace):
+    return _read_uuid_marker(workspace, LOCAL_USER_FILE, "local user identity")
+
+
 def _publish_marker(workspace, name, data):
     temporary = None
     try:
@@ -170,6 +175,13 @@ def bind_database(workspace, identifier):
     _publish_marker(root, DATABASE_FILE, f"{identifier}\n".encode("ascii"))
     if database_id(root) != identifier:
         raise ValueError("This research project is already bound to a different database.")
+
+
+def bind_local_user(workspace, identifier):
+    root = workspace_details(workspace)
+    _publish_marker(root, LOCAL_USER_FILE, f"{identifier}\n".encode("ascii"))
+    if local_user_id(root) != identifier:
+        raise ValueError("This research project is already bound to a different local user.")
 
 
 @contextmanager

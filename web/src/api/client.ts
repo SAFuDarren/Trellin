@@ -36,6 +36,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -44,7 +45,7 @@ export class ApiError extends Error {
 export async function api<T>(
   session: string,
   path: string,
-  init: { data?: unknown; signal?: AbortSignal } = {},
+  init: { data?: unknown; signal?: AbortSignal; idempotencyKey?: string } = {},
 ): Promise<T> {
   const response = await fetch(path, {
     method: init.data === undefined ? "GET" : "POST",
@@ -57,6 +58,7 @@ export async function api<T>(
     headers: {
       "X-RM-Session": session,
       ...(init.data === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(init.data !== undefined && init.idempotencyKey ? { "Idempotency-Key": init.idempotencyKey } : {}),
     },
     body: init.data === undefined ? undefined : JSON.stringify(init.data),
     signal: init.signal,
@@ -68,14 +70,11 @@ export async function api<T>(
     throw new ApiError(response.status, "unreadable_response");
   }
   if (!response.ok) {
-    const error = (payload as { error?: unknown }).error;
+    const error = (payload as { error?: unknown } | null)?.error;
+    const details = typeof error === "object" && error ? (error as { message?: unknown; code?: unknown }) : null;
     const message =
-      typeof error === "string"
-        ? error
-        : typeof error === "object" && error
-          ? String((error as { message?: unknown }).message)
-          : "request_failed";
-    throw new ApiError(response.status, message);
+      typeof error === "string" ? error : typeof details?.message === "string" ? details.message : "request_failed";
+    throw new ApiError(response.status, message, typeof details?.code === "string" ? details.code : undefined);
   }
   return payload as T;
 }

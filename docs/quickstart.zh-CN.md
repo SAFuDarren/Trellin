@@ -92,6 +92,8 @@ research-multiplier --workspace "PATH" workbench
 
 数据库升级到 `0072` 后，可在「研究引用」里更改课题短码，或输入笔记里的编号打开对应定理。节点的序号固定，改短码后旧短码和节点编号仍可查找。[研究引用说明](proof-workbench.md#work-with-the-models)
 
+升级到 `0073` 后，在「审阅」里批准或退回证据时只需填写理由，系统会记录绑定工作区的本机用户。历史审批保留原先记录的署名。[工作台说明](proof-workbench.md#read-a-graph)
+
 ## 选用模型
 
 显式请求可选的远程模型建议时，`run --model --base-url` 会将问题文件和检查结果发给所选端点。费用由所选端点决定。项目级授权和预算适用于绑定工作区中的模型入口。未发表研究使用已绑定工作区中明确授权的可信本地模型入口。[模型建议说明](quickstart.md#optional-model-suggestions) · [本地模型配置](model-adapters.md#work-with-restricted-research-in-the-terminal)

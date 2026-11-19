@@ -102,6 +102,26 @@ def test_review_decisions_are_validated(server, body):
     assert response.status == 400
 
 
+def test_versioned_review_requires_local_session_and_idempotency_key(server, monkeypatch):
+    path = "/api/v1/workspaces/d42ca2f7-9288-47af-b7e5-1150e6df5304/evidence/0b6b2f6e-8d1a-4c2b-9f57-3a1c2d4e5f60/reviews"
+    review = {"decision": "approve", "reason": "Review complete."}
+
+    def unexpected_write(*args):
+        pytest.fail("A malformed or unauthorized request must not write.")
+
+    monkeypatch.setattr(server, "write", unexpected_write)
+    for status, code, options in (
+        (401, "request.unauthenticated", {"session": False}),
+        (403, "request.forbidden", {"origin": False}),
+        (400, "request.invalid", {}),
+    ):
+        response, content = request(server, "POST", path, body=review, **options)
+        assert response.status == status
+        error = json.loads(content)["error"]
+        assert error["code"] == code
+        assert error["request_id"] == response.getheader("X-Request-Id")
+
+
 def test_writes_need_json_a_session_and_the_local_origin(server):
     valid = {"evidence_id": "0b6b2f6e-8d1a-4c2b-9f57-3a1c2d4e5f60", "action": "approve", "actor": "A", "reason": "r"}
     response, _ = request(server, "POST", "/api/review", body=valid, origin=False)

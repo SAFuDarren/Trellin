@@ -9,7 +9,7 @@ import secrets
 import threading
 import time
 from urllib.parse import parse_qs, urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 import webbrowser
 
 from research_multiplier.cli._output import json_default
@@ -18,7 +18,7 @@ from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, research_progress, workbench_activity,
                                           workbench_guidance, workbench_intake, workbench_proof_tasks,
-                                          workbench_sections, workbench_theorems)
+                                          workbench_review, workbench_sections, workbench_theorems)
 
 
 # The interface is built from web/ into the package (docs/engineering.md); only its exact files are served.
@@ -50,6 +50,17 @@ _PROJECT_WRITES = {
     "/api/theorems/confirm": workbench_theorems.confirm,
 }
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
+_V1_ERRORS = {
+    "request.invalid": (HTTPStatus.BAD_REQUEST, "Supply a valid request and idempotency key."),
+    "request.unauthenticated": (HTTPStatus.UNAUTHORIZED, "Open the workbench from its launcher."),
+    "request.forbidden": (HTTPStatus.FORBIDDEN, "Submit this request from the local workbench."),
+    "review.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to its database to resolve a local user."),
+    "review.not_found": (HTTPStatus.NOT_FOUND, "The requested review record is unavailable in this workspace."),
+    "review.not_pending": (HTTPStatus.CONFLICT, "The evidence is no longer eligible for this review."),
+    "idempotency.conflict": (HTTPStatus.CONFLICT, "This request key was already used for a different review."),
+    "database.unavailable": (HTTPStatus.SERVICE_UNAVAILABLE, "The selected research database is unavailable."),
+    "request.failed": (HTTPStatus.INTERNAL_SERVER_ERROR, "Could not complete the workbench request."),
+}
 
 
 class _BadRequest(ValueError):
@@ -229,6 +240,7 @@ def _activity(store, claim_id):
 
 class _Handler(BaseHTTPRequestHandler):
     server_version = "ResearchMultiplier/1.0"
+    request_id = None
 
     def setup(self):
         self.request.settimeout(10)
@@ -247,6 +259,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Content-Security-Policy", _POLICY)
+        if self.request_id is not None:
+            self.send_header("X-Request-Id", self.request_id)
         self.end_headers()
         self.wfile.write(body)
 
@@ -371,6 +385,53 @@ class _Handler(BaseHTTPRequestHandler):
         except (ValueError, AttributeError, TypeError):
             raise _BadRequest("Supply the evidence, approve or return, your name and a reason.") from None
 
+    def _v1_error(self, code):
+        status, message = _V1_ERRORS[code]
+        self._json(status, {"error": {"code": code, "message": message, "request_id": self.request_id}})
+
+    def _post_v1(self):
+        self.request_id = str(uuid4())
+        try:
+            if not self._trusted() or self.headers.get_all("Origin") != [self.server.origin]:
+                self._v1_error("request.forbidden")
+                return
+            if not self._authorized():
+                self._v1_error("request.unauthenticated")
+                return
+            path = self.path.split("/")
+            if len(path) != 8 or path[3] != "workspaces" or path[5] != "evidence" or path[7] != "reviews":
+                self._v1_error("review.not_found")
+                return
+            try:
+                workspace_id, evidence_id = UUID(path[4]), UUID(path[6])
+            except ValueError:
+                self._v1_error("review.not_found")
+                return
+            keys = self.headers.get_all("Idempotency-Key", ())
+            try:
+                if len(keys) != 1:
+                    raise ValueError
+                idempotency_key = UUID(keys[0])
+                if str(idempotency_key) != keys[0].lower():
+                    raise ValueError
+            except ValueError:
+                self._v1_error("request.invalid")
+                return
+            result = self.server.write(workbench_review.authenticated, workspace_id, evidence_id,
+                                       self._body(), idempotency_key)
+            self._json(HTTPStatus.CREATED, result)
+        except _BadRequest:
+            self._v1_error("request.invalid")
+        except workbench_review.ReviewError as error:
+            self._v1_error(str(error))
+        except DatabaseOperationError:
+            self._v1_error("database.unavailable")
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            return
+        except Exception as error:
+            _LOG.error("Versioned workbench review failed (%s).", type(error).__name__)
+            self._v1_error("request.failed")
+
     def _guidance_body(self):
         body = self._body()
         try:
@@ -383,6 +444,9 @@ class _Handler(BaseHTTPRequestHandler):
             raise _BadRequest("Supply one valid guidance message with a claim, a node and a request ID.") from None
 
     def do_POST(self):
+        if self.path.startswith("/api/v1/"):
+            self._post_v1()
+            return
         try:
             if (not self._trusted() or self.headers.get_all("Origin") != [self.server.origin]
                     or not self._authorized()):
