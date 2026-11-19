@@ -1,19 +1,20 @@
-# Research Multiplier 快速入门
+# Trellin 快速入门
 
 [English](quickstart.md) · [完整文档](README.md)
 
 ## 安装
 
-需要 Python 3.10 或更新版。先在软件源码目录之外创建虚拟环境。macOS 和 Linux 可以这样做。
+桌面版见 [Trellin for macOS](desktop.zh-CN.md)。命令行从源码安装需要 Git 和 Python 3.10 或更新版。在 macOS 或 Linux 上，可在软件目录外创建虚拟环境并安装。
 
 ```sh
 RM_ENV="$HOME/.venvs/research-multiplier"
 python3 -m venv "$RM_ENV"
 . "$RM_ENV/bin/activate"
-python -m pip install "/path/to/research_multiplier-<version>-py3-none-any.whl"
+python -m pip install "git+https://github.com/SAFuDarren/Trellin.git"
+research-multiplier --help
 ```
 
-安装包在仓库的 Releases 页面，命令中的路径用自己下载的文件替换。从 Git 源码安装可按[源码快照安装方法](quickstart.md#install)操作，构建文件会留在临时目录。Windows 离线试用可按同一页的 PowerShell 安装步骤操作，并以 `& $RmPython -m research_multiplier` 代替以下命令里的 `research-multiplier`。
+已有对应版本的 wheel 时，可以直接把它的本地路径传给 `python -m pip install`。Windows 离线试用可按[英文版的 PowerShell 步骤](quickstart.md#install)安装，并用 `& $RmPython -m research_multiplier` 代替下文的 `research-multiplier`。
 
 ## 用自己的问题开始
 
@@ -40,9 +41,9 @@ research-multiplier run inputs/question.json
 
 ## 首次核验和复用一个 Lean 证明
 
-在同一发行版本的 Releases 资产中下载 `research_multiplier-<version>-first-proof.tar.gz` 和 `SHA256SUMS`，校验 SHA-256 后解压到软件目录之外，打开 `first-proof/README.md`。教程从安装开始，走过确认命题和前提、核验实际依赖、跨题复用和撤回，全程零模型调用。
+先用 [Lean 指南](lean-core.md)的小例子确认和核验一个命题，全程无需模型。该指南也说明如何复用结果和撤回依据。已有匹配发行包时，用 `SHA256SUMS` 核对其中的 `first-proof` 压缩包，在软件目录外解压后查看完整教程 `first-proof/README.md`。
 
-在 macOS 或 glibc Linux 上准备本机 Lean 4.19.0 和带 pgvector 的 PostgreSQL 18，选一个空项目目录及空数据库。教程会带你安装 PostgreSQL 支持并绑定工作区。[数据库和项目设置](research-foundation.md#set-up-the-workspace)
+在 macOS 或 glibc Linux 上准备本机 Lean 4.19.0 和带 pgvector 的 PostgreSQL 18，选一个空项目目录及空数据库。按下面的设置指南安装 PostgreSQL 支持并绑定工作区。[数据库和项目设置](research-foundation.md#set-up-the-workspace)
 
 想一步准备好持久研究和 Lean，对项目目录运行 `setup`。它使用你本机已有的、带 pgvector 的 PostgreSQL 18 服务器；缺少的软件和大文件下载，都会先问你同意才安装。[setup 做了什么](research-foundation.md#set-up-in-one-command)
 

@@ -1,8 +1,10 @@
-# Get started with Research Multiplier
+# Get started with Trellin
 
 [简体中文](quickstart.zh-CN.md) · [Documentation](README.md)
 
 ## Install
+
+For the macOS app, see [Trellin for macOS](desktop.md). For the Research Multiplier CLI, install from source with Git and Python.
 
 Use Python 3.10 or later. Create your Python environment outside the software checkout. On macOS or Linux:
 
@@ -12,11 +14,14 @@ python3 -m venv "$RM_ENV"
 . "$RM_ENV/bin/activate"
 ```
 
-Install the matching wheel from the repository's Releases page. Replace the path with the file you downloaded.
+Install the CLI from the repository.
 
 ```sh
-python -m pip install "/path/to/research_multiplier-<version>-py3-none-any.whl"
+python -m pip install "git+https://github.com/SAFuDarren/Trellin.git"
+research-multiplier --help
 ```
+
+If you already have a wheel for the version you want, pass its local path to `python -m pip install`.
 
 If you are working from a Git checkout, build from a committed source snapshot so build files stay outside the checkout. Run this from the checkout with the environment above active.
 
@@ -33,7 +38,8 @@ On Windows, the offline workflow can use PowerShell. Invoke the environment's Py
 $RmEnv = Join-Path $HOME ".venvs\research-multiplier"
 py -3 -m venv $RmEnv
 $RmPython = Join-Path $RmEnv "Scripts\python.exe"
-& $RmPython -m pip install "C:\path\to\research_multiplier-<version>-py3-none-any.whl"
+& $RmPython -m pip install "git+https://github.com/SAFuDarren/Trellin.git"
+& $RmPython -m research_multiplier --help
 ```
 
 ## Start with your own question
@@ -63,9 +69,9 @@ For a known path, use `research-multiplier research init-workspace "PATH"` to se
 
 ## Verify and reuse a first Lean proof
 
-From the same release as your installation, download `research_multiplier-<version>-first-proof.tar.gz` and `SHA256SUMS`. Check its SHA-256, unpack it outside the checkout, and open `first-proof/README.md`. It guides you from installation to review, verification, replay, and withdrawal with zero model calls.
+Start with the small proof in the [Lean guide](lean-core.md). It shows how to confirm a statement and check it with zero model calls. The same guide covers replay and withdrawal. If you have a matching release bundle, check its `first-proof` archive against `SHA256SUMS`, unpack it outside the checkout, and follow `first-proof/README.md` for the complete walkthrough.
 
-For this walkthrough, use native Lean 4.19.0 and PostgreSQL 18 with pgvector on macOS or glibc Linux. In a fresh project folder and empty database, follow the walkthrough's instructions to install the PostgreSQL extra and bind the workspace. [Database setup](research-foundation.md#set-up-the-workspace) · [Native Lean setup](lean-core.md)
+For this walkthrough, use native Lean 4.19.0 and PostgreSQL 18 with pgvector on macOS or glibc Linux. Use a fresh project folder and an empty database for the example. Follow the setup guides to install PostgreSQL support and bind the workspace. [Database setup](research-foundation.md#set-up-the-workspace) · [Native Lean setup](lean-core.md)
 
 To prepare a project folder for persistent research and Lean in one step, run `setup` with the folder. It uses your existing PostgreSQL 18 server with pgvector, and installs or downloads anything missing only after you confirm. [What setup does](research-foundation.md#set-up-in-one-command)
 

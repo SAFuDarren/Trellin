@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.19
+
+- Introduce the Trellin workbench with English and Chinese getting-started
+  pages, annotated proof-graph screenshots, and source installation links.
+
 ## 1.0.18
 
 - Answer formalization questions in Trellin, prepare and inspect the exact

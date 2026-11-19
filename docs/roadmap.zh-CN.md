@@ -340,7 +340,7 @@ P3 出口标准：一个组的三个人共用一台服务器，各自登录；�
 验收标准：
 
 - 桌面应用自带 Python 运行环境和构建好的界面，安装后把本机登记为一个运行环境。
-  [Trellin macOS 日用版](desktop.zh-CN.md)的 Launchpad 启动、选择课题和图谱恢复由 [#44](https://github.com/SAFuDarren/research-multiplier/issues/44) 跟踪。
+  [Trellin macOS 日用版](desktop.zh-CN.md)的 Launchpad 启动、选择课题和图谱恢复由 [#44](https://github.com/SAFuDarren/Trellin/issues/44) 跟踪。
 - 托管服务准备就绪：收费扩展（如果有）已与 Apache-2.0 核心分开（E9）；计量和多组织的配额限制可用；安全评审完成。
 - 文档网站上线，提供中英文两个版本。
 - 发布流程自动化：安装包带签名，并公布 SHA-256 校验值。
