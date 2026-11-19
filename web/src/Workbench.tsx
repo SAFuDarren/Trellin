@@ -3,11 +3,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { api, type ClaimsResponse } from "./api/client";
+import { useFallbackInterval } from "./api/liveUpdates";
 import { ChatPanel } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
+import { ProjectActions } from "./components/project/ProjectActions";
 import { queueEntries, ReviewPanel } from "./components/ReviewPanel";
 import { Sidebar } from "./components/Sidebar";
 import { Splitter } from "./components/Splitter";
+import { desktopPosition, saveDesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type View } from "./workbench/graph";
 import { nodeTitle, statusText } from "./workbench/text";
 import type { ActivitySnapshot, Atlas, GraphSnapshot, ImpactPreview } from "./workbench/types";
@@ -22,13 +25,24 @@ function errorText(t: TFunction, error: unknown): string {
 
 export type Focus = { claimId: string; nodeId?: string; nonce: number };
 
-export function Workbench({ session, focus }: { session: string; focus?: Focus | null }) {
+export function Workbench({
+  session,
+  focus,
+  onFocusHandled,
+}: {
+  session: string;
+  focus?: Focus | null;
+  onFocusHandled: (focus: null) => void;
+}) {
   const { t } = useTranslation();
   const queries = useQueryClient();
   const layout = useLayout();
   const { sizes, clamped } = layout;
-  const [claimId, setClaimId] = useState<string | null>(focus?.claimId ?? null);
-  const pendingNode = useRef<string | undefined>(focus?.nodeId);
+  const [initial] = useState(() => focus ?? desktopPosition());
+  const [claimId, setClaimId] = useState<string | null>(initial?.claimId ?? null);
+  const pendingNode = useRef(initial?.nodeId);
+  const [referencedClaim, setReferencedClaim] = useState<string | null>(null);
+  const [missingReferenceNode, setMissingReferenceNode] = useState(false);
   const [view, setView] = useState<View>("proof");
   const [selected, setSelected] = useState<string | null>(null);
   const [assumption, setAssumption] = useState<string | null>(null);
@@ -49,13 +63,15 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
   useEffect(() => {
     const list = claims.data?.claims;
     if (!list) return;
-    if (claimId && list.some((claim) => claim.id === claimId)) return;
+    if (claimId && (claimId === referencedClaim || list.some((claim) => claim.id === claimId))) return;
     setClaimId(claims.data?.claim_id ?? list[0]?.id ?? null);
-  }, [claims.data, claimId]);
+  }, [claims.data, claimId, referencedClaim]);
 
   const snapshot = useQuery({
     queryKey: ["graph", claimId],
-    enabled: Boolean(claimId),
+    enabled: Boolean(
+      claimId && (claimId === referencedClaim || claims.data?.claims.some((claim) => claim.id === claimId)),
+    ),
     queryFn: ({ signal }) =>
       api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId!), { signal }),
   });
@@ -67,20 +83,19 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
     setClaimId(focus.claimId);
     setView("proof");
     pendingNode.current = focus.nodeId;
-  }, [focus]);
+    setReferencedClaim(null);
+    setMissingReferenceNode(false);
+    onFocusHandled(null);
+  }, [focus, onFocusHandled]);
 
   // A newly loaded claim starts at its focus (or goal) and its first assumption; a reload keeps the selection.
   useEffect(() => {
-    if (!graph) return;
+    if (!graph || graph.claim.id !== claimId) return;
     const wanted = pendingNode.current;
-    if (wanted && graph.claim.id === claimId) {
-      pendingNode.current = undefined;
-      if (graph.nodes.has(wanted)) {
-        setSelected(wanted);
-        return;
-      }
-    }
+    pendingNode.current = undefined;
+    if (wanted && claimId === referencedClaim) setMissingReferenceNode(!graph.nodes.has(wanted));
     setSelected((current) => {
+      if (wanted && graph.nodes.has(wanted)) return wanted;
       if (current && graph.nodes.has(current)) return current;
       const focus = graph.focusId && graph.nodes.has(graph.focusId) ? graph.focusId : null;
       return focus ?? [...graph.nodes.values()].find((node) => node.kind === "goal")?.id ?? graph.order[0] ?? null;
@@ -88,7 +103,13 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
     setAssumption((current) =>
       current && graph.hypotheses.some((node) => node.id === current) ? current : (graph.hypotheses[0]?.id ?? null),
     );
-  }, [graph, claimId]);
+  }, [graph, claimId, referencedClaim]);
+
+  useEffect(() => {
+    if (claimId && selected && graph?.claim.id === claimId && graph.nodes.has(selected)) {
+      saveDesktopPosition({ claimId, nodeId: selected });
+    }
+  }, [claimId, graph, selected]);
 
   const basis = assumption ? graph?.nodes.get(assumption)?.reference?.basis_version_id : undefined;
   const impact = useQuery({
@@ -103,7 +124,7 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
   const activity = useQuery({
     queryKey: ["activity", claimId],
     enabled: Boolean(graph),
-    refetchInterval: ACTIVITY_MS,
+    refetchInterval: useFallbackInterval(ACTIVITY_MS),
     queryFn: async ({ signal }) => {
       const reply = await api<ActivitySnapshot>(session, "/api/activity?claim=" + encodeURIComponent(claimId!), {
         signal,
@@ -123,12 +144,31 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
     setSelected(null);
     setAssumption(null);
     setView("proof");
+    setReferencedClaim(null);
+    setMissingReferenceNode(false);
+    pendingNode.current = undefined;
   };
   const selectNode = (id: string) => {
     const node = graph?.nodes.get(id);
     if (!node) return;
     setSelected(id);
+    setMissingReferenceNode(false);
     if (node.kind === "hypothesis" && node.reference?.basis_version_id) setAssumption(id);
+  };
+  const openReference = (id: string, nodeId: string | null) => {
+    setView("proof");
+    if (graph?.claim.id === id && claimId === id) {
+      if (nodeId && graph.nodes.has(nodeId)) {
+        selectNode(nodeId);
+      } else {
+        setSelected(graph.order.find((id) => graph.nodes.get(id)?.kind === "goal") ?? null);
+        setMissingReferenceNode(Boolean(nodeId));
+      }
+    } else {
+      selectClaim(id);
+      setReferencedClaim(id);
+      pendingNode.current = nodeId ?? undefined;
+    }
   };
   const changeView = (next: View) => {
     if (next === "impact" && graph) {
@@ -144,6 +184,10 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
   const refresh = () => {
     void queries.invalidateQueries();
   };
+  const openRecorded = async (claimId?: string) => {
+    await queries.invalidateQueries();
+    if (claimId) selectClaim(claimId);
+  };
 
   const notice = !session
     ? t("session.missing")
@@ -151,7 +195,7 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
       ? errorText(t, claims.error)
       : claims.isPending
         ? t("notice.loadingProject")
-        : claims.data.claims.length === 0
+        : claims.data.claims.length === 0 && !referencedClaim
           ? t("notice.noClaims")
           : snapshot.isError
             ? errorText(t, snapshot.error)
@@ -169,7 +213,9 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
   const reviewCount = view === "impact" ? 0 : queueEntries(t, graph, view, assumption, impact.data).length;
   const claimTitle =
     graph?.claim.title || claims.data?.claims.find((claim) => claim.id === claimId)?.title || t("toolbar.defaultTitle");
-  const meta = graph ? [statusText(t, graph.claim.status), graph.claim.domain].filter(Boolean).join(" · ") : "";
+  const meta = graph
+    ? [graph.claim.code, statusText(t, graph.claim.status), graph.claim.domain].filter(Boolean).join(" · ")
+    : "";
   const showGraph = Boolean(graph && graph.order.length);
 
   const side = live.side ?? clamped.side;
@@ -217,16 +263,26 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
             <h1>{claimTitle}</h1>
             {meta && <span className="claim-meta">{meta}</span>}
           </div>
-          {!layout.reviewOpen && graph && (
-            <button
-              type="button"
-              className="chip"
-              aria-controls="review"
-              onClick={() => layout.update({ reviewOpen: true })}
-            >
-              {reviewCount ? t("toolbar.openReviewCount", { count: reviewCount }) : t("toolbar.openReview")}
-            </button>
-          )}
+          <div className="project-toolbar-actions">
+            <ProjectActions
+              session={session}
+              claimId={graph?.claim.id === claimId ? claimId : null}
+              claimCode={graph?.claim.id === claimId ? graph.claim.code : null}
+              claimCodesAvailable={Boolean(claims.data?.claim_codes)}
+              onRecorded={openRecorded}
+              onOpenReference={openReference}
+            />
+            {!layout.reviewOpen && graph && (
+              <button
+                type="button"
+                className="chip"
+                aria-controls="review"
+                onClick={() => layout.update({ reviewOpen: true })}
+              >
+                {reviewCount ? t("toolbar.openReviewCount", { count: reviewCount }) : t("toolbar.openReview")}
+              </button>
+            )}
+          </div>
         </header>
         {view === "impact" && graph && (
           <div className="impact-bar">
@@ -260,6 +316,11 @@ export function Workbench({ session, focus }: { session: string; focus?: Focus |
         {notice && (
           <p className="notice" role="status" data-error={String(noticeIsError)}>
             {notice}
+          </p>
+        )}
+        {missingReferenceNode && (
+          <p className="notice" role="status">
+            {t("claimCodes.nodeAbsent")}
           </p>
         )}
         {showGraph && graph && claimId && (

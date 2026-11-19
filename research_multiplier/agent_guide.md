@@ -138,6 +138,11 @@ budgeted advancement (`advance ...`, `plan ...`) and incident handling (`trust .
 Every `--actor` command in them is a researcher decision. Every
 `--confirm-public`, `--confirm-local` or `--model` flag needs consent.
 
+Trellin's **Proof task** panel shows the confirmed Lean proposition, basis and
+pending decisions. The researcher can authorize and stop the selected task
+there. Its default is a program-only pass. A restricted scope can use an exact
+configured on-machine model only within the allowance the researcher approves.
+
 ## Offline questions
 
 Without a database, `init inputs/question.json` writes a template.

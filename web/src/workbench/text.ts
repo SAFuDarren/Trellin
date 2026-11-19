@@ -135,6 +135,11 @@ export function claimCode(claim: { id: string; title?: string | null; code?: str
   return initials.length >= 2 ? initials : "C" + claim.id.replace(/-/g, "").slice(0, 3).toUpperCase();
 }
 
+/** Canonicalize ASCII letters without turning an unsupported Unicode character into a valid code. */
+export function normalizeReferenceCode(value: string): string {
+  return value.trim().replace(/[a-z]/g, (letter) => letter.toUpperCase());
+}
+
 export function isCodex(record: { provider?: string; model_provider?: string }): boolean {
   return ["codex-cli", "codex"].includes(record.provider ?? record.model_provider ?? "");
 }

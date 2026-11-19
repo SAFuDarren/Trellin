@@ -1,6 +1,7 @@
 """Advance signed research policies using stored plans and verifier observations."""
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from contextvars import copy_context
 from time import monotonic_ns
 from uuid import UUID
@@ -99,9 +100,9 @@ def specification(document):
     return defaults
 
 
-def propose(document):
+def propose(document, *, store=None):
     policy = specification(document)
-    with Store() as store:
+    with (Store() if store is None else nullcontext(store)) as store:
         if policy["actions"] == ["lean"]:
             bound = store.query("human", "SELECT packet_id FROM rm.lean_statement_status WHERE id = %s",
                                 policy["lean_statement_id"])
@@ -126,14 +127,14 @@ def propose(document):
                            store.json(policy))[0]
 
 
-def approve(policy_id, fingerprint, actor, reason):
-    with Store() as store:
+def approve(policy_id, fingerprint, actor, reason, *, store=None):
+    with (Store() if store is None else nullcontext(store)) as store:
         return store.query("human", "SELECT rm.approve_research_progress(%s,%s,%s,%s) AS id",
                            policy_id, fingerprint, actor, reason)[0]
 
 
-def stop(policy_id, reason):
-    with Store() as store:
+def stop(policy_id, reason, *, store=None):
+    with (Store() if store is None else nullcontext(store)) as store:
         return store.query("human", "SELECT rm.stop_research_progress(%s,%s) AS id", policy_id, reason)[0]
 
 

@@ -28,7 +28,7 @@ export type Graph = {
   hypotheses: GraphNode[];
   evidenceAliases: Map<string, string>;
   statementId: string | null;
-  /** Display codes such as FLT-03, numbered in reading order from the claim down. */
+  /** Durable codes from the server, or temporary labels on an older database. */
   codes: Map<string, string>;
   focusId: string | null;
 };
@@ -128,8 +128,14 @@ export function buildGraph(t: TFunction, snapshot: GraphSnapshot): Graph {
 }
 
 function nodeCodes(claim: GraphSnapshot["claim"], levels: string[][], nodes: Map<string, GraphNode>) {
-  const prefix = claimCode(claim);
   const codes = new Map<string, string>();
+  if (claim.code) {
+    for (const node of nodes.values()) {
+      if (node.code) codes.set(node.id, node.code);
+    }
+    return codes;
+  }
+  const prefix = claimCode(claim);
   [...levels]
     .reverse()
     .flat()

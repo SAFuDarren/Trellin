@@ -1,8 +1,10 @@
-# Get started with Research Multiplier
+# Get started with Trellin
 
 [简体中文](quickstart.zh-CN.md) · [Documentation](README.md)
 
 ## Install
+
+For the macOS app, see [Trellin for macOS](desktop.md). For the Research Multiplier CLI, install from source with Git and Python.
 
 Use Python 3.10 or later. Create your Python environment outside the software checkout. On macOS or Linux:
 
@@ -12,11 +14,14 @@ python3 -m venv "$RM_ENV"
 . "$RM_ENV/bin/activate"
 ```
 
-Install the matching wheel from the repository's Releases page. Replace the path with the file you downloaded.
+Install the CLI from the repository.
 
 ```sh
-python -m pip install "/path/to/research_multiplier-<version>-py3-none-any.whl"
+python -m pip install "git+https://github.com/SAFuDarren/Trellin.git"
+research-multiplier --help
 ```
+
+If you already have a wheel for the version you want, pass its local path to `python -m pip install`.
 
 If you are working from a Git checkout, build from a committed source snapshot so build files stay outside the checkout. Run this from the checkout with the environment above active.
 
@@ -33,10 +38,13 @@ On Windows, the offline workflow can use PowerShell. Invoke the environment's Py
 $RmEnv = Join-Path $HOME ".venvs\research-multiplier"
 py -3 -m venv $RmEnv
 $RmPython = Join-Path $RmEnv "Scripts\python.exe"
-& $RmPython -m pip install "C:\path\to\research_multiplier-<version>-py3-none-any.whl"
+& $RmPython -m pip install "git+https://github.com/SAFuDarren/Trellin.git"
+& $RmPython -m research_multiplier --help
 ```
 
 ## Start with your own question
+
+In the local proof workbench, use **Organize with AI** to review selected notes before creating a claim, or **Add theorem** to enter a theorem yourself. See [Project intake](project-intake.md).
 
 Choose the project folder when prompted. The first command prints its actual path. In the remaining commands, replace `PATH` with that folder and run from there.
 
@@ -61,9 +69,9 @@ For a known path, use `research-multiplier research init-workspace "PATH"` to se
 
 ## Verify and reuse a first Lean proof
 
-From the same release as your installation, download `research_multiplier-<version>-first-proof.tar.gz` and `SHA256SUMS`. Check its SHA-256, unpack it outside the checkout, and open `first-proof/README.md`. It guides you from installation to review, verification, replay, and withdrawal with zero model calls.
+Start with the small proof in the [Lean guide](lean-core.md). It shows how to confirm a statement and check it with zero model calls. The same guide covers replay and withdrawal. If you have a matching release bundle, check its `first-proof` archive against `SHA256SUMS`, unpack it outside the checkout, and follow `first-proof/README.md` for the complete walkthrough.
 
-For this walkthrough, use native Lean 4.19.0 and PostgreSQL 18 with pgvector on macOS or glibc Linux. In a fresh project folder and empty database, follow the walkthrough's instructions to install the PostgreSQL extra and bind the workspace. [Database setup](research-foundation.md#set-up-the-workspace) · [Native Lean setup](lean-core.md)
+For this walkthrough, use native Lean 4.19.0 and PostgreSQL 18 with pgvector on macOS or glibc Linux. Use a fresh project folder and an empty database for the example. Follow the setup guides to install PostgreSQL support and bind the workspace. [Database setup](research-foundation.md#set-up-the-workspace) · [Native Lean setup](lean-core.md)
 
 To prepare a project folder for persistent research and Lean in one step, run `setup` with the folder. It uses your existing PostgreSQL 18 server with pgvector, and installs or downloads anything missing only after you confirm. [What setup does](research-foundation.md#set-up-in-one-command)
 
@@ -82,7 +90,15 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 ## Choose your next workflow
 
 - [Set up an existing or new research database](research-foundation.md#set-up-the-workspace) for persistent research scope, evidence and model budgeting.
+- [Recover a project archive](research-foundation.md#recover-and-monitor) using a PostgreSQL URL and a fresh target database. If a later step fails after import, keep the imported database and the archive, then retry with a fresh database and an unused directory.
 - [Verify a Lean proof in your own project](lean-core.md#check-a-lean-source-file-or-compiled-declaration) and see the confirmed assumptions and facts actually used.
+- Open [Proof task in Trellin](proof-workbench.md#start-a-proof-task) to check whether the confirmed Lean scope is ready, authorize local proof work, and monitor its result.
+- Use [Research references](proof-workbench.md#work-with-the-models) to rename a claim's short code and reopen a saved proof node by its permanent number.
+- On database revision `0073` or later, [review evidence](proof-workbench.md#read-a-graph) under the local researcher identity from the bound workspace.
+- On database revision `0074`, new evidence approvals and returns appear automatically in an open workbench, including decisions made in the terminal.
+- On database revision `0075`, the open workbench also updates after scope confirmation, withdrawal and proof task changes, including a CLI worker's progress.
+- On revision `0076` with Research Multiplier `1.0.15` or later, clarifications, agent conversations and other workspace updates appear in the open workbench. Periodic refresh is used during disconnection and missed events are replayed after reconnecting.
+- On revision `0077` with Research Multiplier `1.0.18` or later, Trellin's **Review** page also lets you save clarification answers, prepare the updated Lean statement, and explicitly confirm it. [Answer an interpretation](research-intake.md#answer-an-unresolved-interpretation)
 - [Search Formalpedia offline](literature-search.md#search-formalpedia-locally) without creating a research database. To replay a selected result within a confirmed Lean scope, follow the same guide after enabling its database feature.
 - Run `research-multiplier research resume --format text` to inspect progress and decisions in a configured project. [Resume and advancement](research-progress.md)
 

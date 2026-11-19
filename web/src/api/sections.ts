@@ -1,6 +1,7 @@
 // Workspace-wide read models behind the section pages (research_multiplier/workflows/workbench_sections.py).
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./client";
+import { useFallbackInterval } from "./liveUpdates";
 import type { ActivityRecord, Atlas, GraphNode } from "../workbench/types";
 import type { ClaimsResponse } from "./client";
 
@@ -130,11 +131,20 @@ export function useAtlas(session: string) {
     retry: false,
   });
 }
-export function useInbox(session: string) {
+export function useInbox(session: string, streamHealthy = false) {
   return useQuery({
-    queryKey: ["inbox"],
-    refetchInterval: LIVE_MS,
-    queryFn: ({ signal }) => api<{ items: InboxItem[] }>(session, "/api/inbox", { signal }),
+    queryKey: ["inbox", session],
+    refetchInterval: useFallbackInterval(LIVE_MS, streamHealthy),
+    queryFn: ({ signal }) =>
+      api<{
+        items: InboxItem[];
+        review_identity?: { workspace_id: string };
+        clarification_review?: {
+          workspace_id: string;
+          followups: { id: string; title: string; status: "answered" | "ready"; waiting_since: string }[];
+        };
+        workspace_events?: { workspace_id: string; cursor: string; coverage?: string };
+      }>(session, "/api/inbox", { signal }),
   });
 }
 export function useLibrary(session: string) {
@@ -143,10 +153,10 @@ export function useLibrary(session: string) {
     queryFn: ({ signal }) => api<{ items: LibraryItem[] }>(session, "/api/library", { signal }),
   });
 }
-export function useTeam(session: string) {
+export function useTeam(session: string, streamHealthy = false) {
   return useQuery({
     queryKey: ["team"],
-    refetchInterval: LIVE_MS,
+    refetchInterval: useFallbackInterval(LIVE_MS, streamHealthy),
     queryFn: ({ signal }) => api<Team>(session, "/api/team", { signal }),
   });
 }
@@ -159,7 +169,7 @@ export function useProgress(session: string) {
 export function useThreads(session: string) {
   return useQuery({
     queryKey: ["threads"],
-    refetchInterval: LIVE_MS,
+    refetchInterval: useFallbackInterval(LIVE_MS),
     queryFn: ({ signal }) => api<{ threads: Thread[] }>(session, "/api/threads", { signal }),
   });
 }

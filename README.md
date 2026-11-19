@@ -1,59 +1,48 @@
-# Research Multiplier
+# Trellin
 
-**A research workspace where people and AI models prove theorems together, and every step is checked by Lean.**
+**A local workbench for theoretical research.**
 
-English · [简体中文](README.zh-CN.md)
+Turn a research question into a precise statement, follow the proof as it develops, and reuse what you have already checked. Trellin keeps the assumptions, proof dependencies, and open decisions in view so you can spend more time on the mathematics.
+
+[Build for macOS](docs/desktop.md#build-for-local-review) · [Browser and CLI](docs/quickstart.md#install) · [Documentation](docs/README.md) · [简体中文](README.zh-CN.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/workbench-dark.png">
-  <img alt="The Research Multiplier workbench on a sample Fermat's Last Theorem project: a proof graph where the reduction to odd prime exponents and the cases n = 3 and n = 4 are verified, the case p ≥ 5 is open, and two model runs work on the Frey curve step" src="docs/images/workbench-light.png">
+  <img alt="Trellin shows a Fermat’s Last Theorem proof graph with verified cases, open steps, and the selected theorem’s details" src="docs/images/workbench-light.png">
 </picture>
 
-<sub>A sample project on Fermat's Last Theorem. The reduction to odd prime exponents and the cases n = 3 and n = 4 are theorems in Mathlib. The general case is open here: its route through the Frey curve rests on the modularity theorem and Ribet's theorem, recorded as an assumption because they are not in Mathlib yet. Sample data; run it yourself with <code>python tests/fixtures/workbench_demo_fermat.py</code>.</sub>
+*Illustrative Fermat’s Last Theorem workspace. The reduction to odd prime exponents and the cases for exponents 3 and 4 correspond to theorems in the pinned Mathlib. The case for primes at least 5 is open in this example. The proof progress and agent activity shown are sample data.*
 
-## What it does
+## Start here
 
-You decide what to prove and approve exactly what it means. Research Multiplier keeps the proof honest from there.
+- **macOS.** Build the [desktop app](docs/desktop.md#build-for-local-review) on an Apple Silicon Mac running macOS 15 or later. After preparing local PostgreSQL with pgvector and Lean, open Trellin and choose a research folder. Trellin creates a workspace inside it and restores your last workspace and selected node when you reopen the app.
+- **Browser or terminal.** Install the [Research Multiplier CLI from source](docs/quickstart.md#install). Save a research brief or run a supported offline check with Python alone, or [open the local proof workbench](docs/proof-workbench.md) for a project backed by PostgreSQL.
+- **Try a Lean proof.** The [Lean guide](docs/lean-core.md) includes a small example that proves `True → True ∧ True` without a model. It also shows how to [check a `.lean` file or a Lake declaration](docs/lean-core.md#check-a-lean-source-file-or-compiled-declaration) and [replay a verified theorem in another claim](docs/lean-core.md#reuse-a-checked-theorem-in-another-claim).
 
-- **Freeze the exact claim.** Each claim is fixed as a Lean statement together with the assumptions and library theorems you allow. Nothing counts as proved against a statement you did not approve.
-- **See the whole proof as a graph.** Goals, reductions, open obligations, assumptions and library theorems, with what is verified, planned, blocked or waiting for your review.
-- **Let models do the legwork.** Models propose proofs for open steps in parallel, within a budget you set. You can watch their reasoning and leave notes on any node. Lean checks every result; nothing is accepted on a model's word.
-- **Know what depends on what.** Withdraw an assumption and the workbench shows every result that would need to be checked again, before anything changes.
-- **Reuse what is already proved.** Verified lemmas and library theorems are recorded with their exact versions and replayed in later claims.
+The macOS app is currently built from source. The Python package and terminal command are both named `research-multiplier`.
+
+## From a question to a reusable result
+
+1. **Confirm the intended statement.** Enter a theorem yourself or use a local model to organize selected notes. Review the exact Lean statement and approve the assumptions and existing results the proof may use. If the meaning changes, review the revised wording and formalization before work continues. [Project intake](docs/project-intake.md)
+2. **See where the proof stands.** Open the graph to distinguish verified steps, planned dependencies, and open obligations. Select a node to read its stored Lean statement and see the dependencies recorded by verification. Send a note on that node and follow the task and recorded replies when a model is enabled. [Proof workbench](docs/proof-workbench.md)
+3. **Reuse checked results and see the impact of changes.** Within a workspace, Trellin can replay eligible Lean results against the destination’s confirmed basis. Preview which results and obligations would be affected by withdrawing an assumption. If you withdraw a dependency, affected evidence is marked for recheck. [Lean verification and reuse](docs/lean-core.md)
+
+<details>
+<summary>See the assumption withdrawal preview</summary>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/withdrawal-dark.png">
-  <img alt="The If withdrawn view: withdrawing the modularity and level-lowering assumption marks the Frey curve route, the p ≥ 5 case and the reduction for recheck" src="docs/images/withdrawal-light.png">
+  <img alt="Trellin highlights proof steps affected by withdrawing the selected assumption" src="docs/images/withdrawal-light.png">
 </picture>
 
-<sub>"If withdrawn" previews the consequences: here, without modularity and level lowering, the Frey curve route, the case p ≥ 5 and the reduction would all need to be checked again. Nothing is changed until you decide.</sub>
+*In the example, withdrawing the modularity and level-lowering assumption affects the Frey curve route and its downstream steps. The preview leaves the workspace unchanged.*
 
-## Get started
+</details>
 
-| If you want to… | Start with… |
-| --- | --- |
-| Try it with your own question | [Offline quickstart](docs/quickstart.md#start-with-your-own-question). Python 3.10 or later is enough to save a research brief and replay supported checks. |
-| Verify your first Lean proof | [First-proof walkthrough](docs/quickstart.md#verify-and-reuse-a-first-lean-proof): confirm a theorem and its assumptions, verify it, reuse it for a second claim, and withdraw it. Uses Lean 4.19.0 and PostgreSQL with pgvector on macOS or glibc Linux. |
-| Bring an existing proof | [Check a `.lean` file or Lake declaration](docs/lean-core.md#check-a-lean-source-file-or-compiled-declaration) and see the assumptions and theorems it actually uses. |
-| Open the workbench | [Local proof workbench](docs/proof-workbench.md) for a project with a PostgreSQL database: `research-multiplier --workspace PATH workbench`. |
+## Keep research on your computer
 
-[Full documentation](docs/README.md) · [中文快速入门](docs/quickstart.zh-CN.md)
+You choose the project folder. The persistent workflow stores the proof records in that workspace’s PostgreSQL database. Lean verification and supported proof replay run with zero model calls. On-device model suggestions are optional. The workbench’s external Codex workflow requires an explicitly authorized public scope. [Workspace layout](docs/research-foundation.md#workspace-paths) · [Model configuration](docs/model-adapters.md)
 
-## How it works
+[Version history](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Repository layout](docs/engineering.md#repository-layout)
 
-- **Local first.** Each research project lives in its own folder with its own PostgreSQL database. Your inputs, proofs and results stay there; nothing leaves the workspace unless you authorize it. [Workspace layout and backup](docs/research-foundation.md#workspace-paths)
-- **Checked, not trusted.** Lean 4 with a pinned Mathlib verifies proofs; deterministic checkers cover selected other domains. Core verification and replay run with zero model calls.
-- **Models are optional.** Connect local models, the Codex CLI or API providers, under a monthly project budget you approve. [Model adapters](docs/model-adapters.md)
-- **Built to be extended.** Lean is the first plugin; the core is domain-independent, and plugins run as separate processes in any language. [Architecture](docs/architecture.md)
-
-## Project status
-
-Research Multiplier is in active development toward its first public release. The [roadmap](docs/roadmap.md) lists the tasks and their acceptance criteria, and the [changelog](CHANGELOG.md) records what each version adds.
-
-## Contributing
-
-Contributions are welcome. Read the [contributor guide](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md); commits are signed off under the Developer Certificate of Origin.
-
-## License
-
-The program and documentation are licensed under the [Apache License 2.0](LICENSE); see [NOTICE](NOTICE). Your research data, proofs and results are yours and are not covered by this license. The project name and logo follow the [name and logo policy](TRADEMARKS.md).
+The program and documentation use the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) and the [name and logo policy](TRADEMARKS.md).

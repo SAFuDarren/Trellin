@@ -5,7 +5,8 @@ import platform
 import shutil
 
 from research_multiplier.policy import project_budget
-from research_multiplier.workflows import proof_graph, research_review, workbench_activity, workbench_guidance
+from research_multiplier.workflows import (proof_graph, research_review, workbench_activity, workbench_clarification,
+                                          workbench_guidance, workbench_review, workspace_events)
 
 _MAX_THREAD_CLAIMS = 30
 _MAX_THREAD_EVENTS = 40
@@ -19,7 +20,8 @@ def inbox(store):
     for item in items:
         claim = str(item["claim_id"]) if item["claim_id"] else None
         item["claim_title"] = titles.get(claim)
-    return {"items": items}
+    return {"items": items, **workbench_review.capability(store), **workspace_events.capability(store),
+            **workbench_clarification.capability(store)}
 
 
 _LIBRARY = """
@@ -199,4 +201,4 @@ def threads(store):
 
 def review(store, evidence_id, action, actor, reason):
     """Record the researcher's decision on one verified result from the review page."""
-    return {"id": store.review(evidence_id, action, actor, reason)}
+    return workbench_review.legacy(store, evidence_id, action, actor, reason)

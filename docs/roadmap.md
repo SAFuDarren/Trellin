@@ -91,7 +91,7 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- Stress test 4 from the [engineering audit](audits/README.md): each injected fault in the audit skill's list makes an offline test fail. Any fault that slips through gets a new test.
+- Stress test 4 from the [engineering audit](audits/README.md): each injected fault in the maintainer's audit plan makes an offline test fail. Any fault that slips through gets a new test.
 - Stress test 6: a fresh agent with only the repository completes an ordinary task, following `AGENTS.md` without extra explanation. Every rule it missed is fixed in `AGENTS.md` or enforced in CI.
 - Both results are recorded in the next audit (audit finding A-202611-13).
 
@@ -340,6 +340,7 @@ Goal: release readiness beyond self-hosting.
 Acceptance criteria:
 
 - A desktop app bundles the Python runtime and the built interface, and registers the local machine as a runtime.
+  The [Trellin macOS daily-use build](desktop.md) tracks local Launchpad, workspace selection and graph resume in [#44](https://github.com/SAFuDarren/Trellin/issues/44).
 - Readiness for a hosted service: any paid extensions are separated from the Apache-2.0 core (E9); metering and multi-organization limits work; the security review is completed.
 - A documentation site is published in English and Chinese.
 - Releases are automated, with signed artifacts and published SHA-256 sums.

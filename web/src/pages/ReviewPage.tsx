@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { api } from "../api/client";
+import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
+import { ClarificationReview } from "../components/ClarificationReview";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
 import { nodeFormula, nodeTitle, statusText, timeText } from "../workbench/text";
@@ -36,7 +37,20 @@ export function ReviewPage({
 }) {
   const { t, i18n } = useTranslation();
   const inbox = useInbox(session);
-  const items = inbox.data?.items ?? [];
+  const clarification = inbox.data?.clarification_review;
+  const items: InboxItem[] = [
+    ...(inbox.data?.items ?? []),
+    ...(clarification?.followups ?? []).map((followup) => ({
+      item_id: followup.id,
+      kind: "clarify_formalization",
+      claim_id: null,
+      claim_title: followup.title,
+      waiting_since: followup.waiting_since,
+      question: "",
+      detail: { clarification_status: followup.status },
+      priority: 1,
+    })),
+  ];
   const selected = items.find((item) => item.item_id === sub) ?? items[0];
   // A decided item leaves the inbox, so its confirmation is kept here rather than on the item.
   const [notice, setNotice] = useState("");
@@ -50,8 +64,16 @@ export function ReviewPage({
           empty: inbox.isPending ? t("common.loading") : t("review.none"),
           entries: items.map((item) => ({
             key: item.item_id,
-            label: item.claim_title || t("sidebar.untitled"),
-            sub: `${kindLabel(t, item)} · ${timeText(i18n.language, item.waiting_since, true)}`,
+            label:
+              item.claim_title ||
+              (item.kind === "clarify_formalization" && typeof item.detail?.title === "string"
+                ? item.detail.title
+                : t("sidebar.untitled")),
+            sub: `${
+              typeof item.detail?.clarification_status === "string"
+                ? t(`clarifications.status.${item.detail.clarification_status}`)
+                : kindLabel(t, item)
+            } · ${timeText(i18n.language, item.waiting_since, true)}`,
             href: href("review", item.item_id),
             current: item === selected,
             dot: item.priority <= 1 ? "bad" : "warn",
@@ -71,11 +93,20 @@ export function ReviewPage({
           <PageHead title={t("rail.review")} />
           <Empty>{inbox.isPending ? t("common.loading") : t("review.allDone")}</Empty>
         </>
+      ) : selected.kind === "clarify_formalization" && clarification ? (
+        <ClarificationReview
+          key={selected.item_id}
+          session={session}
+          workspace={clarification.workspace_id}
+          id={selected.item_id}
+          onConfirmed={(kind) => setNotice(t(`clarifications.confirmed.${kind}`))}
+        />
       ) : selected.kind === "review_evidence" && selected.claim_id ? (
         <EvidenceReview
           key={selected.item_id}
           session={session}
           item={selected}
+          reviewWorkspace={inbox.data?.review_identity?.workspace_id}
           onOpen={onOpen}
           onDecided={setNotice}
         />
@@ -89,11 +120,13 @@ export function ReviewPage({
 function EvidenceReview({
   session,
   item,
+  reviewWorkspace,
   onOpen,
   onDecided,
 }: {
   session: string;
   item: InboxItem;
+  reviewWorkspace?: string;
   onOpen: (claimId: string, nodeId?: string) => void;
   onDecided: (message: string) => void;
 }) {
@@ -115,24 +148,39 @@ function EvidenceReview({
         .data!.edges.filter((edge) => edge.source === node.id)
         .map((edge) => graph.data!.nodes.find((entry) => entry.id === edge.target))
     : [];
-  const [reviewer, setReviewer] = useState(readReviewer);
+  const [reviewer, setReviewer] = useState(() => (reviewWorkspace ? "" : readReviewer()));
   const [reason, setReason] = useState("");
   const [state, setState] = useState<{ sending?: boolean; message?: string; error?: boolean }>({});
+  const requestKeys = useRef(new Map<string, string>());
   const decide = async (action: "approve" | "return") => {
-    if (!reviewer.trim() || !reason.trim()) {
-      setState({ message: t("review.needNameAndReason"), error: true });
+    if (state.sending) return;
+    const actor = reviewer.trim();
+    const rationale = reason.trim();
+    if (!rationale || (!reviewWorkspace && !actor)) {
+      setState({ message: t(reviewWorkspace ? "review.needReason" : "review.needNameAndReason"), error: true });
       return;
-    }
-    try {
-      window.localStorage.setItem(REVIEWER_KEY, reviewer.trim());
-    } catch {
-      // The name still applies to this decision.
     }
     setState({ sending: true });
     try {
-      await api(session, "/api/review", {
-        data: { evidence_id: item.item_id, action, actor: reviewer.trim(), reason: reason.trim() },
-      });
+      if (reviewWorkspace) {
+        const draft = JSON.stringify([reviewWorkspace, action, rationale]);
+        const key = requestKeys.current.get(draft) ?? crypto.randomUUID();
+        requestKeys.current.set(draft, key);
+        const route = `/api/v1/workspaces/${encodeURIComponent(reviewWorkspace)}/evidence/${encodeURIComponent(item.item_id)}/reviews`;
+        await api<{ id: string; user_id: string }>(session, route, {
+          data: { decision: action, reason: rationale },
+          idempotencyKey: key,
+        });
+      } else {
+        try {
+          window.localStorage.setItem(REVIEWER_KEY, actor);
+        } catch {
+          // The name still applies to this decision.
+        }
+        await api(session, "/api/review", {
+          data: { evidence_id: item.item_id, action, actor, reason: rationale },
+        });
+      }
       setState({});
       setReason("");
       onDecided(t(action === "approve" ? "review.approved" : "review.returned"));
@@ -140,7 +188,12 @@ function EvidenceReview({
       void queries.invalidateQueries({ queryKey: ["graph", item.claim_id] });
       void queries.invalidateQueries({ queryKey: ["atlas"] });
     } catch (error) {
-      setState({ message: error instanceof Error ? error.message : String(error), error: true });
+      const message = error instanceof Error ? error.message : String(error);
+      setState({
+        message:
+          error instanceof ApiError && error.code ? t(`errors.${error.code}`, { defaultValue: message }) : message,
+        error: true,
+      });
     }
   };
   const title = node ? nodeTitle(t, node) : t("review.kinds.review_evidence");
@@ -173,16 +226,20 @@ function EvidenceReview({
               void decide("approve");
             }}
           >
-            <label className="field-label" htmlFor="reviewer">
-              {t("review.reviewer")}
-            </label>
-            <input
-              id="reviewer"
-              className="reviewer"
-              value={reviewer}
-              maxLength={120}
-              onChange={(event) => setReviewer(event.target.value)}
-            />
+            {!reviewWorkspace && (
+              <>
+                <label className="field-label" htmlFor="reviewer">
+                  {t("review.reviewer")}
+                </label>
+                <input
+                  id="reviewer"
+                  className="reviewer"
+                  value={reviewer}
+                  maxLength={120}
+                  onChange={(event) => setReviewer(event.target.value)}
+                />
+              </>
+            )}
             <label className="field-label" htmlFor="review-reason">
               {t("review.reason")}
             </label>

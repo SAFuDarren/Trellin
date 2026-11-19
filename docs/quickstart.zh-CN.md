@@ -1,21 +1,24 @@
-# Research Multiplier 快速入门
+# Trellin 快速入门
 
 [English](quickstart.md) · [完整文档](README.md)
 
 ## 安装
 
-需要 Python 3.10 或更新版。先在软件源码目录之外创建虚拟环境。macOS 和 Linux 可以这样做。
+桌面版见 [Trellin for macOS](desktop.zh-CN.md)。命令行从源码安装需要 Git 和 Python 3.10 或更新版。在 macOS 或 Linux 上，可在软件目录外创建虚拟环境并安装。
 
 ```sh
 RM_ENV="$HOME/.venvs/research-multiplier"
 python3 -m venv "$RM_ENV"
 . "$RM_ENV/bin/activate"
-python -m pip install "/path/to/research_multiplier-<version>-py3-none-any.whl"
+python -m pip install "git+https://github.com/SAFuDarren/Trellin.git"
+research-multiplier --help
 ```
 
-安装包在仓库的 Releases 页面，命令中的路径用自己下载的文件替换。从 Git 源码安装可按[源码快照安装方法](quickstart.md#install)操作，构建文件会留在临时目录。Windows 离线试用可按同一页的 PowerShell 安装步骤操作，并以 `& $RmPython -m research_multiplier` 代替以下命令里的 `research-multiplier`。
+已有对应版本的 wheel 时，可以直接把它的本地路径传给 `python -m pip install`。Windows 离线试用可按[英文版的 PowerShell 步骤](quickstart.md#install)安装，并用 `& $RmPython -m research_multiplier` 代替下文的 `research-multiplier`。
 
 ## 用自己的问题开始
+
+在本地工作台里，可以先用「和 AI 梳理资料」整理选中的资料，也可以用「手动添加定理」自行录入。参见[课题开始与定理录入](project-intake.zh-CN.md)。
 
 先运行选址命令，输入你为这个课题选的目录。程序会打印实际地址。在下列命令中把 `PATH` 换成该地址后进入项目。PowerShell 用 `Set-Location "PATH"`。
 
@@ -38,9 +41,9 @@ research-multiplier run inputs/question.json
 
 ## 首次核验和复用一个 Lean 证明
 
-在同一发行版本的 Releases 资产中下载 `research_multiplier-<version>-first-proof.tar.gz` 和 `SHA256SUMS`，校验 SHA-256 后解压到软件目录之外，打开 `first-proof/README.md`。教程从安装开始，走过确认命题和前提、核验实际依赖、跨题复用和撤回，全程零模型调用。
+先用 [Lean 指南](lean-core.md)的小例子确认和核验一个命题，全程无需模型。该指南也说明如何复用结果和撤回依据。已有匹配发行包时，用 `SHA256SUMS` 核对其中的 `first-proof` 压缩包，在软件目录外解压后查看完整教程 `first-proof/README.md`。
 
-在 macOS 或 glibc Linux 上准备本机 Lean 4.19.0 和带 pgvector 的 PostgreSQL 18，选一个空项目目录及空数据库。教程会带你安装 PostgreSQL 支持并绑定工作区。[数据库和项目设置](research-foundation.md#set-up-the-workspace)
+在 macOS 或 glibc Linux 上准备本机 Lean 4.19.0 和带 pgvector 的 PostgreSQL 18，选一个空项目目录及空数据库。按下面的设置指南安装 PostgreSQL 支持并绑定工作区。[数据库和项目设置](research-foundation.md#set-up-the-workspace)
 
 想一步准备好持久研究和 Lean，对项目目录运行 `setup`。它使用你本机已有的、带 pgvector 的 PostgreSQL 18 服务器；缺少的软件和大文件下载，都会先问你同意才安装。[setup 做了什么](research-foundation.md#set-up-in-one-command)
 
@@ -64,6 +67,8 @@ research-multiplier doctor
 
 [用已有的本机 Lean 项目验证自己确认过的命题](lean-core.md#check-a-goal-with-your-native-lean-project)。
 
+使用 PostgreSQL URL 和新建的空库[恢复项目存档](research-foundation.md#recover-and-monitor)。若数据库导入后还有步骤失败，保留已导入的库和原存档，另选空库及尚未使用的目录重试。
+
 用 [`lean reuse-theorem`](lean-core.md#replay-a-native-lean-theorem) 在同一工作区的另一课题中重放已采纳的 `.lean` 或 Lake 定理。程序以目标课题已确认的依据证明原定理所需的前提，并列出仍缺的依据。
 
 [直接核验自己的 `.lean` 证明或本机 Lake 项目中已编译的定理](lean-core.md#check-a-lean-source-file-or-compiled-declaration)。核验使用已经确认的命题和依据，全程无需调用模型。
@@ -83,6 +88,24 @@ research-multiplier --workspace "PATH" workbench
 ```
 
 点定理或假设可查看已记录的 Lean 陈述、实际引用和证明卡点。长陈述可展开。「撤回影响」显示撤回已确认版本时哪些记录需要重验。图可以拖动和缩放，各区域之间的边界也可以拖动调整。选中节点后，下方的对话区显示这个节点上模型的进度和反馈。启用数据库版本 `0070` 后，已确认 Lean 陈述的私有课题还可以提交意见，由获授权的本机模型在下一次可用调用时读取。公开课题可选择启用 `0071`，在已批准的公开推进策略下逐条确认发送给 Codex。 [工作台说明](proof-workbench.md)
+
+选中课题后打开「证明任务」，查看已确认的 Lean 命题、依据和待处理事项。范围就绪后，填写理由并授权启动。系统先做确定性检查和证明复用，默认允许零次模型调用。私有课题可以为已配置的本机 Lean 模型授权有限轮次。「停止」结束当前策略。重新打开工作区后可以查看原任务的进度和核验结果，工作中断时可以继续已授权的任务。证据的审阅和采纳仍由研究者决定。[证明任务说明](proof-workbench.md#start-a-proof-task)
+
+数据库升级到 `0072` 后，可在「研究引用」里更改课题短码，或输入笔记里的编号打开对应定理。节点的序号固定，改短码后旧短码和节点编号仍可查找。[研究引用说明](proof-workbench.md#work-with-the-models)
+
+升级到 `0073` 后，在「审阅」里批准或退回证据时只需填写理由，系统会记录绑定工作区的本机用户。历史审批保留原先记录的署名。[工作台说明](proof-workbench.md#read-a-graph)
+
+升级到 `0074` 后，从命令行或工作台批准、退回证据时，数据库会随审批写入一条可续读事件。事件里记录编号和动作，审阅理由保存在原审批记录中。
+
+打开的工作台会自动更新审阅列表、相应课题图谱和总览。连接中断后，会从上次处理的事件继续读取。断连期间和尚未接入事件的操作仍可通过定期刷新查看状态。
+
+数据库版本 `0075` 把命题和依据确认、核验输入撤回、证明任务状态和采纳结论记到同一事件流里。撤回后需要重验哪些证明，仍由现有依赖规则决定。
+
+使用新版工作台时，这些变化会自动更新对应的图谱、审阅列表和证明任务。即使你从命令行确认范围、撤回依据或运行证明任务，打开着的窗口也能看到结果。断线重连后会补读遗漏的事件。
+
+数据库升级到 `0076` 并使用 Research Multiplier `1.0.15` 或更新版本后，澄清、Agent 会话和其他工作区改动也会自动更新到对应视图。连接中断时会定期检查变化，重连后补读遗漏事件。
+
+使用数据库版本 `0077` 和 Research Multiplier `1.0.18` 或更新版本时，可在 Trellin 的「审阅」页保存澄清回答，再生成更新后的 Lean 陈述。核对原始措辞、陈述和共享参数后，确认该版本。私有资料只由配置好的私有本机模型处理，公开资料在发送前需要确认。保存回答后可以退出，下次打开从同一问题继续。[澄清流程](research-intake.md#answer-an-unresolved-interpretation)
 
 ## 选用模型
 

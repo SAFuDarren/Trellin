@@ -181,3 +181,16 @@ test("the language is chosen in settings and remembered", async ({ page }) => {
   await railLink(page, "工作台").click();
   await expect(page.getByRole("button", { name: "证明进展" })).toBeVisible();
 });
+
+test("the browser tab icons load", async ({ page, request }) => {
+  await open(page);
+  const icons = await page
+    .locator('link[rel="icon"], link[rel="apple-touch-icon"]')
+    .evaluateAll((links) => links.map((link) => (link as HTMLLinkElement).href));
+  expect(icons.length).toBe(4);
+  for (const icon of icons) {
+    const response = await request.get(icon);
+    expect(response.status(), icon).toBe(200);
+    expect(response.headers()["content-type"]).toMatch(/^image\//);
+  }
+});

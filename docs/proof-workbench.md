@@ -11,6 +11,18 @@ Use `--no-browser` to open the printed session link yourself. Keep that link loc
 
 The graph and activity view require database revision `0069`. Local-model guidance requires revision `0070`. Public Codex guidance requires revision `0071`. For an existing project, [back up the workspace](research-foundation.md#recover-and-monitor) and run the normal [migration command](research-foundation.md#set-up-the-workspace) only when you choose to enable the graph. The launcher leaves the database schema as it finds it.
 
+## Start a research project
+
+**Organize with AI** and **Add theorem** are available before the first claim. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
+
+## Start a proof task
+
+Select a claim and open **Proof task**. The panel shows the confirmed Lean proposition, its basis, and any decision that blocks work. If the Lean statement still needs preparation or review, follow [the Lean scope review](lean-core.md) before starting.
+
+When the scope is ready, confirm it in the panel and record your reason to start. The worker runs deterministic checks and proof reuse first. The default allows zero model rounds. For restricted research, the panel can authorize a bounded number of rounds with the exact configured private Lean model once that route is available. Public remote model work continues through the separate [explicit release procedure](#send-a-public-note-to-codex).
+
+The panel shows the proof task state, open obligations when the worker reports them, and the verified receipt when one is issued. Review and adoption remain researcher decisions. **Stop** ends the selected policy and prevents new work on it. Reopen the same workspace and proof task to see the recorded checkpoint. If an authorized pass was interrupted, use **Continue** to return to the same policy.
+
 ## Read a graph
 
 - **Proof** shows the frozen goal, checked steps, reductions and open obligations. Choose a node to see the stored statement and its current status. Long Lean statements start folded. The fold opens the exact stored text, including any binders already in the record.
@@ -21,13 +33,36 @@ Some projects have no Lean statement for a record. The workbench shows its recor
 
 The narrow bar on the far left switches between sections: **Workbench**, **Review** (results and questions waiting for you, with approve and return), **Claims** (every claim by status), **Library** (theorems and hypotheses, and where each is used), **Chats** (model conversations across claims), **Team** (runtimes, model agents, usage and jobs), and **Automation** (advancement policies). Counts on the bar show items waiting for review and jobs running now. **Help** and **Settings** sit at the bottom of the bar.
 
+On database revision `0073` or later, **Review** records the local researcher's ID from the bound workspace for each new evidence decision. Enter the reason and choose **Approve** or **Return**. Workspaces with an older database still use the earlier review form. Previous decisions retain their recorded names.
+
+Database revision `0077` also records the bound researcher's ID on new clarification decisions, plan cancellations, literature confirmations, and other human-authored records. Entries made before the upgrade retain their existing attribution.
+
+Database revision `0074` adds a workspace event stream for evidence reviews. An approval or return from the workbench or CLI records an event with the committed decision. Clients can resume from a prior event ID. The event carries identifiers and the decision type. Review reasons stay in the research record.
+
+Database revision `0075` also records confirmed claims and premises, confirmed Lean statements, retirements of premises and verification inputs, proof task activity, new evidence, and adopted conclusions. Clients can use these events to refresh existing views. The dependency rules still determine which proofs need recheck, including claims that reused a retired result. Event frames carry IDs and operation types, without exposing proof text or review notes.
+
+With the live workbench, approving or returning evidence from the CLI updates the Review list, the selected claim's graph and the workspace overview in an open window. After a connection drops, the workbench resumes after the last event it applied. On revisions `0074` and `0075`, periodic refresh also covers operations outside those revisions' event coverage.
+
+With revision `0075` and the updated workbench, confirmed claims and premises, proof task changes, and withdrawals also refresh the affected views. A withdrawn dependency may affect multiple claims. The workbench re-reads their current assurance status, including proofs that must be checked again. The proof task dialog shows active CLI worker leases and the recorded verification result.
+
+With revision `0076` and Research Multiplier `1.0.15` or later, clarifications,
+agent guidance and replies, intake changes, library changes and other
+workspace writes update the relevant views. While the event stream is
+healthy, these views refresh on events. During an interruption they check
+for changes periodically, then replay missed events when the connection
+returns. Older databases keep the earlier refresh behavior. Agent text and
+clarification answers remain in the workspace and are fetched through the
+existing authorized views.
+
 The workbench has four areas. The left column lists the project's claims by domain, with a search field. The centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **If withdrawn**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser; **Settings** can reset them. The interface is in English by default; choose **简体中文** in **Settings** to switch to Chinese, and the choice is remembered too. The map can be dragged by its title and resized from its corner.
 
 Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. The small **Global position** map in the corner shows the recorded nodes of recent claims, with a dashed circle at the current claim.
 
 ## Work with the models
 
-Every node has a short code made of the claim's initials and a number, for example `FLT-09`, so you can refer to it in notes and discussions. A node whose recorded job is running shows the agent (model and reasoning effort) and the number of parallel jobs, for example `GPT-6.2 Sol xhigh ×2`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
+On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
+
+A node whose recorded job is running shows the agent and the number of parallel jobs. The workbench also displays reasoning effort when the model attempt records it, for example `GPT-6.2 Sol xhigh`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
 
 The conversation under the graph shows your notes, the models' recorded methods and reasons, and the Lean results for the selected node. Choose **All nodes** to see the whole claim, with a link from each entry back to its node.
 

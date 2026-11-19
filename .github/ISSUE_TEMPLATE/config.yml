@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Report a security problem privately
-    url: https://github.com/SAFuDarren/research-multiplier/security/advisories/new
+    url: https://github.com/SAFuDarren/Trellin/security/advisories/new
     about: Do not open public issues for vulnerabilities.
