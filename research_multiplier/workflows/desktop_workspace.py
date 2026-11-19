@@ -86,7 +86,7 @@ def _local_endpoint():
     return socket, int(port)
 
 
-def create_workspace(location):
+def create_workspace(location, *, minimal=False):
     """Provision and bind a new leaf directory, leaving an existing project untouched."""
     try:
         destination = _new_destination(location)
@@ -118,7 +118,7 @@ def create_workspace(location):
             raise WorkspaceCreationError("create-path") from None
 
         try:
-            paths.initialize_workspace(destination)
+            paths.initialize_workspace(destination, minimal=minimal)
             agent_guide.install(destination)
             workspace_id = paths.workspace_id(destination)
             login = credentials.location(workspace_id)

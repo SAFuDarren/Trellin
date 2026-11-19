@@ -192,6 +192,7 @@ def _simple(args):
         print(f"Human review pending: {directory}")
         return 0
     if args.command == "init":
+        (paths.require_workspace() / "inputs").mkdir(mode=0o700, exist_ok=True)
         with args.path.open("x", encoding="utf-8") as stream:
             stream.write(workflow.json_text(_problem_template(args.kind)) + "\n")
         print(f"Edit {args.path} and run it with the 'run' command.")

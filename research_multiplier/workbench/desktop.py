@@ -9,7 +9,12 @@ import sys
 from threading import Thread
 
 from research_multiplier.storage import credentials, paths
+from research_multiplier.storage.managed_workspaces import workspace_registration
 from research_multiplier.storage.postgres import DatabaseOperationError
+
+from research_multiplier.workflows import release_updates
+from research_multiplier.workflows.desktop_library import Library, LibraryError
+from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, select_workspace
 
 from .server import _SCHEMA_SQLSTATES, WorkbenchServer, _check_schema, _MissingAssets, _MissingSchema
 
@@ -81,21 +86,49 @@ def _stop_on_disconnect(server, lifetime):
         server.shutdown()
 
 
-def run(workspace_path, lifetime, output, *, select=False):
-    if select:
-        from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, select_workspace
-
-        try:
+def run(workspace_path, lifetime, output, *, select=False, library=None, new_name=None):
+    try:
+        if library is not None and new_name is not None:
+            workspace_path = library.create(new_name)
+        elif library is not None and workspace_path is None:
+            workspace_path = library.open_default()
+        elif select:
             workspace_path = select_workspace(workspace_path)
-        except WorkspaceCreationError as error:
-            _reply(output, "error", code=error.args[0])
-            return 2
-        except Exception:
-            _reply(output, "error", code="create-failed")
-            return 2
+            if library is not None:
+                workspace_path = library.resolve_existing(workspace_path)
+        elif library is not None:
+            workspace_path = library.resolve_existing(workspace_path)
+    except WorkspaceCreationError as error:
+        _reply(output, "error", code=error.args[0])
+        return 2
+    except LibraryError as error:
+        _reply(output, "error", code=error.code)
+        return 2
+    except Exception:
+        _reply(output, "error", code="create-failed" if select else "startup")
+        return 2
     with ExitStack() as resources:
         try:
-            server = _open(workspace_path, resources)
+            server = _open(str(workspace_path), resources)
+            selection = {"workspace": str(server.workspace)} if select or library is not None else {}
+            if library is not None:
+                if workspace_registration(server.workspace) is not None:
+                    project = library.describe(server.workspace)
+                else:
+                    try:
+                        project = library.register_external(server.workspace)
+                    except LibraryError as error:
+                        if error.code not in {"storage-busy", "storage-unavailable", "storage-invalid"}:
+                            raise
+                        # Older projects can still open if the app library is offline.
+                        project = None
+                if project is not None:
+                    selection["name"] = project["name"]
+                # Keep a recorded update preference from an earlier install.
+                # Fresh native profiles store this setting in the app home.
+                legacy = credentials.directory().parent / "release-updates.sqlite3"
+                if not legacy.exists():
+                    server.release_updates = release_updates.ReleaseUpdates(library.anchor / "Settings" / legacy.name)
             warnings = [] if shutil.which("lean") else ["lean"]
         except _StartError as error:
             _reply(output, "error", code=error.args[0])
@@ -103,31 +136,61 @@ def run(workspace_path, lifetime, output, *, select=False):
         except _MissingAssets:
             _reply(output, "error", code="install")
             return 2
+        except LibraryError as error:
+            _reply(output, "error", code=error.code)
+            return 2
         except Exception:
             # Driver paths, SQL responses and other diagnostics may contain
             # credentials or research data. Only send a fixed code.
             _reply(output, "error", code="startup")
             return 2
 
-        selection = {"workspace": str(server.workspace)} if select else {}
         _reply(output, "ready", url=server.launch_url, warnings=warnings, **selection)
         Thread(target=_stop_on_disconnect, args=(server, lifetime), daemon=True).start()
         server.serve_forever(poll_interval=0.2)
         return 0
 
 
+def _storage(library, args, output):
+    if args == ["--storage-info"]:
+        data = library.status()
+    elif len(args) == 2 and args[0] == "--storage-preview":
+        plan = library.preview(args[1])
+        data = {
+            "root": plan["source"], "destination": plan["destination"], "confirmation": plan["sha256"],
+            "project_count": plan["project_count"], "files": plan["files"], "bytes": plan["bytes"],
+        }
+    elif len(args) == 3 and args[0] == "--storage-move":
+        moved = library.move(args[1], args[2])
+        data = {"root": moved["destination"], "backup": moved["backup"]}
+    else:
+        _reply(output, "error", code="storage-destination")
+        return 2
+    _reply(output, "ready", **data)
+    return 0
+
+
 def main():
     args = sys.argv[1:]
-    select = bool(args and args[0] == "--select")
-    folders = args[1:] if select else args
-    if len(folders) != 1:
+    try:
+        if args and args[0].startswith("--storage-"):
+            return _storage(Library(), args, sys.stdout)
+        if args == ["--library"]:
+            return run(None, sys.stdin.buffer, sys.stdout, library=Library())
+        if len(args) == 2 and args[0] == "--new-managed":
+            return run(None, sys.stdin.buffer, sys.stdout, library=Library(), new_name=args[1])
+        if len(args) == 2 and args[0] == "--select":
+            return run(args[1], sys.stdin.buffer, sys.stdout, select=True, library=Library())
+        if len(args) == 1 and not args[0].startswith("--"):
+            return run(args[0], sys.stdin.buffer, sys.stdout, library=Library())
         _reply(sys.stdout, "error", code="workspace")
         return 2
-    try:
-        return run(folders[0], sys.stdin.buffer, sys.stdout, select=select)
+    except LibraryError as error:
+        _reply(sys.stdout, "error", code=error.code)
+        return 2
     except Exception:
-        # The launcher observes process termination after a successful
-        # handshake. Never emit a second reply or dump a traceback.
+        # Leave the currently registered path intact on a storage error. The
+        # launcher observes termination without exposing internal diagnostics.
         return 1
 
 

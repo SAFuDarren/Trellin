@@ -192,3 +192,64 @@ def test_local_session_uses_selected_workspace_and_drains_on_parent_disconnect(m
             release.set()
             parent.close()
             process.join(timeout=5)
+
+
+def test_run_resolves_a_moved_managed_project_before_starting_server(monkeypatch, tmp_path):
+    old, confirmed = tmp_path / "previous", tmp_path / "active"
+    calls = []
+
+    class Library:
+        anchor = tmp_path
+
+        def resolve_existing(self, path):
+            assert path == str(old)
+            return confirmed
+
+        def describe(self, path):
+            assert path == confirmed
+            calls.append(("describe", path))
+            return {"name": "Original project"}
+
+    class Server:
+        workspace = confirmed
+        launch_url = "test"
+
+        def serve_forever(self, *, poll_interval):
+            calls.append(("serve", self.workspace))
+
+        def shutdown(self):
+            pass
+
+    def open_project(path, _resources):
+        calls.append(("open", Path(path)))
+        return Server()
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "credentials"))
+    monkeypatch.setattr(desktop, "_open", open_project)
+    monkeypatch.setattr(desktop, "workspace_registration", lambda path: (tmp_path, "slot"))
+    monkeypatch.setattr(desktop.shutil, "which", lambda _: "/fixture/lean")
+    output = StringIO()
+    assert desktop.run(str(old), BytesIO(), output, library=Library()) == 0
+    assert calls == [("open", confirmed), ("describe", confirmed), ("serve", confirmed)]
+    assert json.loads(output.getvalue()) == {
+        "version": 1, "status": "ready", "workspace": str(confirmed), "name": "Original project",
+        "url": "test", "warnings": [],
+    }
+
+
+def test_storage_preview_translates_the_exact_confirmation_token(tmp_path):
+    target = str(tmp_path / "Trellin Library")
+    source = str(tmp_path / "Library")
+
+    class Library:
+        def preview(self, destination):
+            assert destination == target
+            return {"source": source, "destination": target, "sha256": "a" * 64,
+                    "files": 6, "bytes": 1024, "project_count": 1}
+
+    output = StringIO()
+    assert desktop._storage(Library(), ["--storage-preview", target], output) == 0
+    assert json.loads(output.getvalue()) == {
+        "version": 1, "status": "ready", "root": source, "destination": target, "confirmation": "a" * 64,
+        "files": 6, "bytes": 1024, "project_count": 1,
+    }

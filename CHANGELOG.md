@@ -1,5 +1,13 @@
 # Changes
 
+## 1.0.22
+
+- Open a default Trellin library on first launch and keep new managed projects
+  together under the user's application support directory.
+- Move the library from the Mac app's Storage settings after confirming the
+  destination and checking the copied files and database bindings. Keep the
+  original copy available for recovery and leave external projects in place.
+
 ## 1.0.21
 
 - Preview a project or selected claims and export a printable HTML and

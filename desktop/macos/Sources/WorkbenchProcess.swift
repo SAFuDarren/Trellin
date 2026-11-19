@@ -28,14 +28,16 @@ struct WorkbenchReadiness: Decodable {
     let warnings: [String]?
     let code: String?
     let workspace: String?
+    let name: String?
 
     var workspaceURL: URL? {
-        guard let workspace, workspace.hasPrefix("/") else { return nil }
-        return URL(fileURLWithPath: workspace, isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
+        localDirectoryURL(workspace)
     }
 
     var failure: WorkbenchStartFailure {
         guard version == 1, status == "error", let code else { return .startup }
+        if code == "storage-project" { return .project }
+        if code.hasPrefix("storage-") { return .library }
         return WorkbenchStartFailure(rawValue: code) ?? .startup
     }
 
@@ -58,16 +60,45 @@ enum WorkbenchStartFailure: String {
     case createPath = "create-path"
     case createPostgres = "create-postgres"
     case createFailed = "create-failed"
+    case library, project
 
-    var canRetry: Bool { self == .postgres || self == .createPostgres || self == .startup }
+    var canRetry: Bool { self == .postgres || self == .createPostgres || self == .startup || self == .library }
+}
+
+func localDirectoryURL(_ path: String?) -> URL? {
+    guard let path, path.hasPrefix("/"), !path.contains("\0") else { return nil }
+    return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
 }
 
 enum WorkbenchLaunch {
-    case restore, select
+    case restore(URL)
+    case select(URL)
+    case library
+    case newManaged(String)
 
-    func arguments(workspace: URL) -> [String] {
-        let base = ["-I", "-B", "-m", "research_multiplier.workbench.desktop"]
-        return base + (self == .select ? ["--select", workspace.path] : [workspace.path])
+    static let prefix = ["-I", "-B", "-m", "research_multiplier.workbench.desktop"]
+
+    var arguments: [String] {
+        switch self {
+        case let .restore(workspace): return Self.prefix + [workspace.path]
+        case let .select(folder): return Self.prefix + ["--select", folder.path]
+        case .library: return Self.prefix + ["--library"]
+        case let .newManaged(name): return Self.prefix + ["--new-managed", name]
+        }
+    }
+
+    var location: URL? {
+        switch self {
+        case let .restore(url), let .select(url):
+            return url.standardizedFileURL.resolvingSymlinksInPath()
+        case .library, .newManaged:
+            return nil
+        }
+    }
+
+    var isRestore: Bool {
+        if case .restore = self { return true }
+        return false
     }
 }
 
@@ -77,10 +108,10 @@ final class WorkbenchProcess {
     private let lifetime = Pipe()
     private let response = Pipe()
 
-    func start(workspace: URL, runtime: URL, launch: WorkbenchLaunch, onReady: @escaping (WorkbenchReadiness?) -> Void,
+    func start(runtime: URL, launch: WorkbenchLaunch, onReady: @escaping (WorkbenchReadiness?) -> Void,
                onExit: @escaping () -> Void) throws {
         process.executableURL = runtime
-        process.arguments = launch.arguments(workspace: workspace)
+        process.arguments = launch.arguments
         process.environment = Self.environment(ProcessInfo.processInfo.environment, home: NSHomeDirectory())
         process.standardInput = lifetime
         process.standardOutput = response
@@ -98,6 +129,13 @@ final class WorkbenchProcess {
     func stop() {
         // EOF stops accepting connections and lets the server drain current requests.
         try? lifetime.fileHandleForWriting.close()
+    }
+
+    func waitForExit(_ completion: @escaping () -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async { [process] in
+            process.waitUntilExit()
+            DispatchQueue.main.async(execute: completion)
+        }
     }
 
     func cancelStartup() {

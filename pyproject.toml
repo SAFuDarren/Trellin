@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "research-multiplier"
-version = "1.0.21"
+version = "1.0.22"
 description = "Turn a research question into a checkable next step."
 readme = "README.md"
 license = "Apache-2.0"
