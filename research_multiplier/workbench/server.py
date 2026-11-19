@@ -18,7 +18,7 @@ from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, research_progress, workbench_activity,
                                           workbench_guidance, workbench_intake, workbench_proof_tasks,
-                                          workbench_review, workbench_sections, workbench_theorems)
+                                          workbench_review, workbench_sections, workbench_theorems, workspace_events)
 
 
 # The interface is built from web/ into the package (docs/engineering.md); only its exact files are served.
@@ -60,6 +60,10 @@ _V1_ERRORS = {
     "idempotency.conflict": (HTTPStatus.CONFLICT, "This request key was already used for a different review."),
     "database.unavailable": (HTTPStatus.SERVICE_UNAVAILABLE, "The selected research database is unavailable."),
     "request.failed": (HTTPStatus.INTERNAL_SERVER_ERROR, "Could not complete the workbench request."),
+    "events.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace event stream is unavailable."),
+    "events.invalid_cursor": (HTTPStatus.BAD_REQUEST, "The event cursor is invalid for this workspace."),
+    "events.unavailable": (HTTPStatus.CONFLICT, "Upgrade the project database to use workspace events."),
+    "events.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local user."),
 }
 
 
@@ -133,7 +137,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self._doctor_lock = threading.Lock()
         self._intake_lock = threading.Lock()
         self._proof_task_lock = threading.Lock()
-        self._proof_task_closing = threading.Event()
+        self.closing = threading.Event()
         self._running_policy = None
         self._failed_policy = None
         super().__init__(("127.0.0.1", port), _Handler)
@@ -145,7 +149,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         return f"{self.origin}/#session={self.session}"
 
     def server_close(self):
-        self._proof_task_closing.set()
+        self.closing.set()
         super().server_close()
 
     def read(self, action, *values):
@@ -219,7 +223,7 @@ class WorkbenchServer(ThreadingHTTPServer):
             with paths.use_workspace(self.workspace, strict=True):
                 lake_watch = LakeWatch()
                 failed = False
-                while not self._proof_task_closing.is_set():
+                while not self.closing.is_set():
                     cycle = research_progress.advance_cycle("combined", 1, [identifier], 1, lake_watch=lake_watch)
                     failed = bool(cycle["errors"])
                     if failed or not cycle["lean_runs"] or cycle["lean_runs"][0]["status"] != "search_continues":
@@ -249,10 +253,11 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass  # Do not record project URLs, IDs or request headers.
 
-    def _send(self, status, content, body):
+    def _headers(self, status, content, length=None):
         self.send_response(status)
         self.send_header("Content-Type", content)
-        self.send_header("Content-Length", str(len(body)))
+        if length is not None:
+            self.send_header("Content-Length", str(length))
         self.send_header("Cache-Control", "no-store")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -262,6 +267,9 @@ class _Handler(BaseHTTPRequestHandler):
         if self.request_id is not None:
             self.send_header("X-Request-Id", self.request_id)
         self.end_headers()
+
+    def _send(self, status, content, body):
+        self._headers(status, content, len(body))
         self.wfile.write(body)
 
     def _json(self, status, payload):
@@ -316,6 +324,9 @@ class _Handler(BaseHTTPRequestHandler):
         return None
 
     def do_GET(self):
+        if self.path.startswith("/api/v1/"):
+            self._get_v1()
+            return
         try:
             if not self._trusted():
                 self._error(HTTPStatus.FORBIDDEN, "Open the workbench using its local launch address.")
@@ -359,6 +370,64 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception as error:
             _LOG.error("Workbench request failed (%s).", type(error).__name__)
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, "Could not load the workbench view.")
+
+    def _get_v1(self):
+        self.request_id = str(uuid4())
+        if not self._trusted():
+            self._v1_error("request.forbidden")
+            return
+        if not self._authorized():
+            self._v1_error("request.unauthenticated")
+            return
+        path = self.path.split("/")
+        if len(path) != 6 or path[3] != "workspaces" or path[5] != "events":
+            self._v1_error("events.not_found")
+            return
+        try:
+            workspace_id = UUID(path[4])
+        except ValueError:
+            self._v1_error("events.not_found")
+            return
+        cursors = self.headers.get_all("Last-Event-ID", ())
+        if len(cursors) > 1 or (cursors and not 1 <= len(cursors[0]) <= 19):
+            self._v1_error("events.invalid_cursor")
+            return
+        after = None
+        if cursors:
+            cursor = cursors[0]
+            if not cursor.isascii() or not cursor.isdecimal() or int(cursor) >= 2**63:
+                self._v1_error("events.invalid_cursor")
+                return
+            after = int(cursor)
+        streaming = False
+        try:
+            with paths.use_workspace(self.server.workspace, strict=True), Store() as store:
+                with workspace_events.subscribe(store, workspace_id, after, closing=self.server.closing) as events:
+                    self.close_connection = True
+                    streaming = True
+                    self._headers(HTTPStatus.OK, "text/event-stream; charset=utf-8")
+                    self.wfile.write(b": connected\n\n")
+                    self.wfile.flush()
+                    for event in events:
+                        if event is None:
+                            frame = b": heartbeat\n\n"
+                        else:
+                            data = json.dumps(event, default=json_default, ensure_ascii=False, separators=(",", ":"))
+                            frame = f"id: {event['id']}\nevent: {event['type']}\ndata: {data}\n\n".encode("utf-8")
+                        self.wfile.write(frame)
+                        self.wfile.flush()
+        except workspace_events.WorkspaceEventError as error:
+            if not streaming:
+                self._v1_error(str(error))
+        except DatabaseOperationError:
+            if not streaming:
+                self._v1_error("database.unavailable")
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            return
+        except Exception as error:
+            _LOG.error("Workbench event stream failed (%s).", type(error).__name__)
+            if not streaming:
+                self._v1_error("request.failed")
 
     def _body(self, limit=_MAX_GUIDANCE_BYTES):
         if (self.headers.get_content_type() != "application/json" or self.headers.get_all("Transfer-Encoding")

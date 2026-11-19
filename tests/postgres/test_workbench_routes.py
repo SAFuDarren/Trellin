@@ -226,6 +226,7 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
     local_user = paths.local_user_id(server.workspace)
     assert local_user is not None
     inbox = _request(server, "GET", "/api/inbox")
+    reviewed_claim = next(item["claim_id"] for item in inbox["items"] if item["item_id"] == evidence_id)
     assert inbox["review_identity"] == {"workspace_id": str(workspace_id)}
     endpoint = f"/api/v1/workspaces/{workspace_id}/evidence/{evidence_id}/reviews"
     headers = {"Idempotency-Key": str(uuid4())}
@@ -243,3 +244,27 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
         """, evidence_id)
     assert rows == [{"id": created["id"], "action": "approve", "user_id": local_user,
                      "actor_ref": "Local researcher"}]
+
+    assert inbox["workspace_events"] == {"workspace_id": str(workspace_id), "cursor": "0"}
+    after_review = _request(server, "GET", "/api/inbox")
+    assert after_review["workspace_events"] == {"workspace_id": str(workspace_id), "cursor": "1"}
+    reader = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+    try:
+        reader.request("GET", f"/api/v1/workspaces/{workspace_id}/events",
+                       headers={"X-RM-Session": server.session, "Last-Event-ID": "0"})
+        response = reader.getresponse()
+        assert response.status == 200 and response.getheader("Content-Type").startswith("text/event-stream")
+        assert response.readline() == b": connected\n"
+        assert response.readline() == b"\n"
+        assert response.readline() == b"id: 1\n"
+        assert response.readline() == b"event: evidence.reviewed\n"
+        record = json.loads(response.readline().removeprefix(b"data: "))
+        assert record == {
+            "id": "1", "type": "evidence.reviewed", "schema_version": 1, "workspace_id": str(workspace_id),
+            "occurred_at": record["occurred_at"], "actor": {"kind": "user", "id": str(local_user)},
+            "subject": {"kind": "evidence", "id": evidence_id},
+            "data": {"decision_id": created["id"], "claim_id": reviewed_claim, "action": "approve"},
+        }
+        assert record["occurred_at"].endswith("Z")
+    finally:
+        reader.close()
