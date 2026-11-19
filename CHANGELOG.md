@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.20
+
+- Show the installed version in Trellin and offer a manual stable-release
+  check. Optional daily checks share one setting across workspaces and
+  stay off until enabled. Read release notes from the update notice.
+
 ## 1.0.19
 
 - Introduce the Trellin workbench with English and Chinese getting-started

@@ -592,6 +592,26 @@
   },
   "settings": {
     "general": "General",
+    "updates": {
+      "title": "Updates",
+      "installed": "Installed version {{version}}",
+      "installedUnknown": "Installed version unavailable",
+      "automatic": "Automatically check for updates",
+      "automaticNote": "Trellin checks GitHub while the workbench is open, at most once a day.",
+      "check": "Check for updates",
+      "checking": "Checking for updates…",
+      "lastChecked": "Last checked {{time}}",
+      "notes": "Release notes",
+      "dismiss": "Dismiss",
+      "requestFailed": "Could not reach the local update settings. Try again.",
+      "status": {
+        "not_checked": "No update check has run yet.",
+        "current": "You’re using the latest stable version.",
+        "available": "Version {{version}} is available.",
+        "no_release": "There is no published stable release to check against.",
+        "unavailable": "Could not check for updates. Try again later."
+      }
+    },
     "language": "Language",
     "languageNote": "English is the default. Research content always stays as written.",
     "layout": "Workbench layout",

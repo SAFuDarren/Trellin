@@ -9,7 +9,8 @@ struct WorkbenchProcessTests {
         try launchDestination()
         try position()
         environment()
-        print("6 Trellin native boundary checks passed.")
+        releaseNotesLinks()
+        print("7 Trellin native boundary checks passed.")
     }
 
     private static func startFailures() throws {
@@ -84,6 +85,31 @@ struct WorkbenchProcessTests {
         precondition(selection.script.contains(nodeId))
         precondition(WorkbenchPosition(message: ["claimId": claimId, "nodeId": "other study"]) == nil)
         precondition(WorkbenchPosition(message: ["claimId": "bad", "nodeId": nodeId]) == nil)
+    }
+
+    private static func releaseNotesLinks() {
+        let path = "https://github.com/SAFuDarren/Trellin/releases/tag/"
+        let allowed = ["v1.2.3", "1.2.3", "v0.0.0", "v999999999.1.2"]
+        let rejectedTags = [
+            "", "v1.2", "v1.2.3.4", "V1.2.3", "v01.2.3", "1.02.3", "1.2.03", "1..3",
+            "v1000000000.1.2", "v1.2.3-rc.1", "v1.2.3+build", "１.2.3", "v%31.2.3",
+            "v1.2.3#fragment", "v1.2.3?", "v1.2.3?scope=public", "v1.2.3/", "../tag/v1.2.3",
+        ]
+        let rejectedAddresses = [
+            "http://github.com/SAFuDarren/Trellin/releases/tag/v1.2.3",
+            "https://github.com:443/SAFuDarren/Trellin/releases/tag/v1.2.3",
+            "https://example.test/SAFuDarren/Trellin/releases/tag/v1.2.3",
+            "https://github.com@example.test/SAFuDarren/Trellin/releases/tag/v1.2.3",
+            "https://github.com/SAFuDarren/another-project/releases/tag/v1.2.3",
+            "https://github.com/SAFuDarren/Trellin/releases/latest",
+            "https://github.com/SAFuDarren/Trellin/releases/download/v1.2.3/Trellin.zip",
+        ]
+        for tag in allowed {
+            precondition(ReleaseNotesLink.isOfficial(URL(string: path + tag)!))
+        }
+        for address in rejectedTags.map({ path + $0 }) + rejectedAddresses {
+            precondition(!ReleaseNotesLink.isOfficial(URL(string: address)!), "Accepted disallowed URL: " + address)
+        }
     }
 
     private static func environment() {

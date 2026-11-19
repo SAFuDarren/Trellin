@@ -14,6 +14,8 @@ First open uses the local Unix socket at `/tmp` on port `5432` by default, with 
 
 The app keeps the last successful folder and graph selection in macOS preferences. The workspace keeps its own research files and proof records. The loopback service starts on a free port with a fresh session for each workspace open. Project review and external model authorization use the same rules as the browser workbench. The app leaves schema migration and dependency installation to the normal tools.
 
+**Settings → Software updates** shows the installed version and a manual check for new stable releases. Automatic checks are off by default. If enabled, Trellin checks at most once every 24 hours while the workbench is open. The check requests public release metadata from GitHub without sending project data or credentials. You can open the release notes in your browser and choose when to install the update.
+
 ## Build for local review
 
 Use an Apple Silicon Mac with the Xcode Command Line Tools, Git and HTTPS access to the runtime and package archives. Build from a Git checkout with the compiled workbench committed. The build checks the runtime archive and wheel hashes. The output folder must already exist outside the checkout.

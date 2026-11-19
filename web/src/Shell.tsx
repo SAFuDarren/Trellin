@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { LiveWorkspaceUpdates, WORKSPACE_WRITES } from "./api/liveUpdates";
+import { useReleaseUpdates } from "./api/releaseUpdates";
 import { useInbox, useTeam } from "./api/sections";
 import { workspaceEventCursor, workspaceId } from "./api/workspaceEvents";
 import { Rail } from "./components/Rail";
+import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
 import { ClaimsPage } from "./pages/ClaimsPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
 import { HelpPage } from "./pages/HelpPage";
@@ -21,6 +23,7 @@ import { resetLayout } from "./workbench/useLayout";
 /** The function rail on the left and the page it selects. */
 export function Shell({ session }: { session: string }) {
   const [route, go] = useRoute();
+  const releaseUpdates = useReleaseUpdates(session);
   const queries = useQueryClient();
   const [connection, setConnection] = useState<WorkspaceConnection | null>(null);
   const sessionConnection = connection?.session === session ? connection : null;
@@ -90,12 +93,13 @@ export function Shell({ session }: { session: string }) {
         ) : section === "progress" ? (
           <ProgressPage session={session} sub={sub} onOpen={open} />
         ) : section === "settings" ? (
-          <SettingsPage onResetLayout={resetLayout} />
+          <SettingsPage onResetLayout={resetLayout} updates={releaseUpdates} />
         ) : section === "help" ? (
           <HelpPage />
         ) : (
           <Workbench session={session} focus={focus} onFocusHandled={setFocus} />
         )}
+        <ReleaseUpdateNotice updates={releaseUpdates} />
       </div>
     </LiveWorkspaceUpdates.Provider>
   );

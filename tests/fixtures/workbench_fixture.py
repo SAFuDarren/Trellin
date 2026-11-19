@@ -5,7 +5,7 @@ Usage: python tests/fixtures/workbench_fixture.py [--port 4174], then open /#ses
 
 The data is synthetic: five claims, one graph with running model work, a blocker, an assumption with an
 impact preview, conversation records and guidance channels for both local models and Codex. Guidance
-POSTs are kept in memory. No database, credentials or network access are involved.
+and synthetic update settings are kept in memory. No database, credentials or external network access are involved.
 """
 
 import argparse
@@ -181,6 +181,11 @@ THREADS = {"threads": [
 DOCTOR = {"capabilities": {"offline": {"title": "Offline briefs and replay", "ready": True}},
           "checks": [{"id": "python", "group": "Basics", "title": "Python", "status": "ok", "detail": "3.14.4", "fix": ""},
                      {"id": "lean-toolchain", "group": "Lean", "title": "Lean 4.19.0", "status": "ok", "detail": "found", "fix": ""}]}
+INITIAL_RELEASE_STATE = {"installed_version": "1.9.0", "automatic": False, "last_checked_at": None,
+                         "status": "not_checked", "available": None}
+RELEASE_STATE = INITIAL_RELEASE_STATE.copy()
+AVAILABLE_RELEASE = {"version": "1.10.0", "url": "https://github.com/SAFuDarren/Trellin/releases/tag/v1.10.0",
+                     "dismissed": False}
 REVIEWS = []
 INITIAL_INBOX = [dict(item) for item in INBOX["items"]]
 INITIAL_GUIDANCE = [dict(item) for item in ACTIVITY["guidance"]]
@@ -208,6 +213,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send(b'{"error": "missing"}', "application/json", 404)
             return
+        if route.path == "/api/release-updates":
+            self.release_updates(route)
+            return
         query = parse_qs(route.query)
         data = {"/api/claims": {"claims": CLAIMS, "claim_id": CLAIM}, "/api/graph": GRAPH, "/api/activity": ACTIVITY,
                 "/api/atlas": ATLAS, "/api/impact": IMPACT, "/api/inbox": INBOX, "/api/library": LIBRARY,
@@ -222,12 +230,17 @@ class Handler(BaseHTTPRequestHandler):
         self.send(json.dumps(data, ensure_ascii=False).encode(), "application/json; charset=utf-8")
 
     def do_POST(self):
+        route = urlsplit(self.path)
+        if route.path == "/api/release-updates":
+            self.release_updates(route)
+            return
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length))
         if self.path == "/__reset":  # test-only: restore the inbox between end-to-end tests
             INBOX["items"] = [dict(item) for item in INITIAL_INBOX]
             REVIEWS.clear()
             ACTIVITY["guidance"][:] = [dict(item) for item in INITIAL_GUIDANCE]
+            RELEASE_STATE.update(INITIAL_RELEASE_STATE)
             self.send(b'{"ok": true}', "application/json")
             return
         if self.path == "/api/review":
@@ -239,6 +252,32 @@ class Handler(BaseHTTPRequestHandler):
                                      "audience": body.get("audience", "local"), "node_id": body["node_id"],
                                      "created_at": datetime.now(timezone.utc).isoformat()})
         self.send(b'{"ok": true}', "application/json")
+
+    def release_updates(self, route):
+        host, port = self.server.server_address
+        local_host = f"{host}:{port}"
+        origin = [f"http://{local_host}"]
+        allowed_origins = (origin,) if self.command == "POST" else (None, origin)
+        if (self.headers.get_all("Host") != [local_host] or self.headers.get_all("Origin") not in allowed_origins
+                or self.headers.get_all("X-RM-Session") != ["fixture"]):
+            self.send(b'{"error": "Open the local fixture session."}', "application/json", 403)
+            return
+        if route.query:
+            self.send(b'{"error": "This endpoint does not take parameters."}', "application/json", 400)
+            return
+        if self.command == "POST":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length))
+            action = body.get("action")
+            if action == "check" or (action == "auto_check" and RELEASE_STATE["automatic"]
+                                     and RELEASE_STATE["last_checked_at"] is None):
+                release = RELEASE_STATE["available"] or AVAILABLE_RELEASE.copy()
+                RELEASE_STATE.update(last_checked_at=int(NOW.timestamp()), status="available", available=release)
+            elif action == "automatic":
+                RELEASE_STATE["automatic"] = body["enabled"]
+            elif action == "dismiss" and RELEASE_STATE["available"] and body["version"] == AVAILABLE_RELEASE["version"]:
+                RELEASE_STATE["available"]["dismissed"] = True
+        self.send(json.dumps(RELEASE_STATE).encode(), "application/json; charset=utf-8")
 
 
 if __name__ == "__main__":

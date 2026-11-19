@@ -18,9 +18,10 @@ from research_multiplier.proof.lean_watch import LakeWatch
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.runtime_updates import RuntimeUpdates
-from research_multiplier.workflows import (claim_references, doctor, proof_graph, research_progress, workbench_activity,
-                                          workbench_clarification, workbench_guidance, workbench_intake, workbench_proof_tasks,
-                                          workbench_review, workbench_sections, workbench_theorems, workspace_events)
+from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
+                                          workbench_activity, workbench_clarification, workbench_guidance,
+                                          workbench_intake, workbench_proof_tasks, workbench_review, workbench_sections,
+                                          workbench_theorems, workspace_events)
 
 
 # The interface is built from web/ into the package (docs/engineering.md); only its exact files are served.
@@ -165,6 +166,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self._running_policy = None
         self._failed_policy = None
         self.runtime_updates = RuntimeUpdates(self._local_proof_worker)
+        self.release_updates = release_updates.ReleaseUpdates()
         super().__init__(("127.0.0.1", port), _Handler)
         self.host = f"127.0.0.1:{self.server_port}"
         self.origin = f"http://{self.host}"
@@ -331,6 +333,10 @@ class _Handler(BaseHTTPRequestHandler):
                 and secrets.compare_digest(tokens[0], self.server.session))
 
     def _read_api(self, route):
+        if route.path == "/api/release-updates":
+            if route.query:
+                raise _BadRequest("This endpoint does not take parameters.")
+            return self.server.release_updates.snapshot()
         if route.path == "/api/project-intake/models":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -668,6 +674,16 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.write(workbench_proof_tasks.stop, self._body()))
             elif self.path == "/api/claim-code":
                 self._json(HTTPStatus.OK, self.server.write(claim_references.rename, self._body()))
+            elif self.path == "/api/release-updates":
+                document = self._body(512)
+                try:
+                    result = self.server.release_updates.apply(document)
+                except release_updates.SettingsUnavailable as error:
+                    self._error(HTTPStatus.SERVICE_UNAVAILABLE, str(error))
+                    return
+                except ValueError as error:
+                    raise _BadRequest(str(error)) from None
+                self._json(HTTPStatus.OK, result)
             elif self.path in _PROJECT_WRITES:
                 document = self._body(_MAX_PROJECT_BYTES)
                 if not isinstance(document, dict):

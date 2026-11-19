@@ -1,9 +1,11 @@
 import { useTranslation } from "react-i18next";
+import type { ReleaseUpdates } from "../api/releaseUpdates";
 import { LANGUAGES, setLanguage, type Language } from "../i18n";
+import { ReleaseNotesLink } from "../components/ReleaseUpdateNotice";
 import { PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
 
-export function SettingsPage({ onResetLayout }: { onResetLayout: () => void }) {
+export function SettingsPage({ onResetLayout, updates }: { onResetLayout: () => void; updates: ReleaseUpdates }) {
   const { t, i18n } = useTranslation();
   return (
     <SectionLayout
@@ -12,6 +14,7 @@ export function SettingsPage({ onResetLayout }: { onResetLayout: () => void }) {
     >
       <PageHead title={t("settings.general")} />
       <div className="page-body settings">
+        <UpdateSettings updates={updates} />
         <section aria-labelledby="settings-language">
           <h3 id="settings-language">{t("settings.language")}</h3>
           <p>{t("settings.languageNote")}</p>
@@ -50,5 +53,54 @@ export function SettingsPage({ onResetLayout }: { onResetLayout: () => void }) {
         </section>
       </div>
     </SectionLayout>
+  );
+}
+
+function UpdateSettings({ updates: { state, pending, error, submit } }: { updates: ReleaseUpdates }) {
+  const { t, i18n } = useTranslation();
+  if (!state) return null;
+  const release = state.available;
+  const checking = pending === "check" || pending === "auto_check";
+  const status = error ? "requestFailed" : checking ? "checking" : `status.${state.status}`;
+  return (
+    <section aria-labelledby="settings-updates">
+      <h3 id="settings-updates">{t("settings.updates.title")}</h3>
+      <p>
+        {state.installed_version
+          ? t("settings.updates.installed", { version: state.installed_version })
+          : t("settings.updates.installedUnknown")}
+      </p>
+      <div className="choices">
+        <button
+          type="button"
+          className="button"
+          disabled={Boolean(pending)}
+          onClick={() => submit({ action: "check" })}
+        >
+          {t("settings.updates.check")}
+        </button>
+        {release && <ReleaseNotesLink url={release.url} />}
+      </div>
+      <label className="update-preference">
+        <input
+          type="checkbox"
+          checked={state.automatic}
+          disabled={Boolean(pending)}
+          onChange={(event) => submit({ action: "automatic", enabled: event.currentTarget.checked })}
+        />
+        {t("settings.updates.automatic")}
+      </label>
+      <p>{t("settings.updates.automaticNote")}</p>
+      <p role="status">{t(`settings.updates.${status}`, { version: release?.version })}</p>
+      {state.last_checked_at !== null && (
+        <p>
+          {t("settings.updates.lastChecked", {
+            time: new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" }).format(
+              state.last_checked_at * 1000,
+            ),
+          })}
+        </p>
+      )}
+    </section>
   );
 }
