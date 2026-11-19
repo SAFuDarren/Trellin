@@ -3,11 +3,13 @@
 
 from hashlib import sha256
 from http.client import HTTPConnection
+from importlib.resources import files
 import json
 import os
 from threading import Thread
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+from jsonschema import Draft202012Validator, FormatChecker
 import pytest
 
 from research_multiplier import general_lean, production
@@ -121,7 +123,7 @@ def workbench(tmp_path, monkeypatch, request):
                 thread.join()
 
 
-def _request(server, method, path, *, body=None, status=200, headers=None):
+def _request(server, method, path, *, body=None, status=200, headers=None, response_headers=None):
     headers = {"X-RM-Session": server.session, **(headers or {})}
     if method == "POST":
         headers.update({"Origin": server.origin, "Content-Type": "application/json"})
@@ -131,9 +133,59 @@ def _request(server, method, path, *, body=None, status=200, headers=None):
         response = connection.getresponse()
         payload = json.loads(response.read())
         assert response.status == status, (method, path, response.status)
+        if response_headers is not None:
+            response_headers.update(response.getheaders())
         return payload
     finally:
         connection.close()
+
+
+def test_versioned_claims_matches_the_contract_and_legacy_snapshot(workbench, monkeypatch, capsys):
+    server, claim_id, *_ = workbench
+    workspace_id = paths.workspace_id(server.workspace)
+    path = f"/api/v1/workspaces/{workspace_id}/claims"
+    schemas = files("research_multiplier").joinpath("schemas")
+    openapi = json.loads(schemas.joinpath("workbench.openapi.json").read_text(encoding="utf-8"))
+    contract = openapi["paths"]["/api/v1/workspaces/{workspace_id}/claims"]["get"]
+    success_schema = contract["responses"]["200"]["content"]["application/json"]["schema"]
+    snapshot = Draft202012Validator({**success_schema, "components": openapi["components"]},
+                                    format_checker=FormatChecker())
+    error_contract = Draft202012Validator(json.loads(schemas.joinpath("error.schema.json").read_text(encoding="utf-8")))
+
+    legacy = _request(server, "GET", "/api/claims")
+    headers = {}
+    current = _request(server, "GET", path, response_headers=headers)
+    snapshot.validate(current)
+    assert current == {
+        "items": legacy["claims"], "next_cursor": None, "claim_id": legacy["claim_id"], "claim_codes": True,
+    }
+    assert legacy["claim_id"] == claim_id and legacy["claim_codes"] is True
+    assert any(item["id"] == claim_id and item["title"] == TITLE for item in current["items"])
+    assert UUID(headers["X-Request-Id"])
+    entry = json.loads(capsys.readouterr().err)
+    assert entry.pop("duration_ms") >= 0
+    assert entry == {"route": "/api/v1/workspaces/{workspace_id}/claims", "status": 200,
+                     "request_id": headers["X-Request-Id"]}
+
+    for target, status, code, request_headers in (
+        (path.replace(str(workspace_id), str(uuid4())), 404, "claims.not_found", {}),
+        (path, 401, "request.unauthenticated", {"X-RM-Session": "wrong"}),
+        (path, 403, "request.forbidden", {"Origin": "http://foreign.example"}),
+        (path + "?cursor=unexpected", 400, "claims.invalid_query", {}),
+    ):
+        response_headers = {}
+        failure = _request(server, "GET", target, status=status, headers=request_headers,
+                           response_headers=response_headers)
+        error_contract.validate(failure)
+        assert str(status) in contract["responses"]
+        assert failure["error"]["code"] == code
+        assert failure["error"]["request_id"] == response_headers["X-Request-Id"]
+        assert TITLE not in json.dumps(failure)
+
+    monkeypatch.setattr(server, "claim_id", None)
+    unselected = _request(server, "GET", path)
+    snapshot.validate(unselected)
+    assert unselected == {**current, "claim_id": None}
 
 
 def test_workbench_api_reads_and_persists_project_records(workbench):

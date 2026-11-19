@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.17
+
+- Add a documented v1 claim-list endpoint and generated types while keeping
+  the previous claim list available. Versioned claim reads include a request
+  ID and a log entry with route, status and duration.
+
 ## 1.0.16
 
 - Attribute remaining human research decisions and policy records to the

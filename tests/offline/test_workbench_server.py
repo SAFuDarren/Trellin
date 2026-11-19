@@ -4,9 +4,11 @@ from contextlib import nullcontext
 import http.client
 import json
 import threading
+from uuid import UUID
 
 import pytest
 
+from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workbench.server import WorkbenchServer
 
 pytestmark = pytest.mark.offline
@@ -65,6 +67,57 @@ def test_foreign_host_and_origin_are_refused(server):
     assert response.status == 403
     response, _ = request(server, "GET", "/api/claims", headers={"Origin": "http://evil.example"})
     assert response.status == 403
+
+
+def test_versioned_claims_rejects_unauthorized_and_invalid_requests(server, monkeypatch, capsys):
+    workspace_id = "d42ca2f7-9288-47af-b7e5-1150e6df5304"
+    path = f"/api/v1/workspaces/{workspace_id}/claims"
+
+    def unexpected_read(*args):
+        pytest.fail("A malformed or unauthorized request must not read the project's records.")
+
+    monkeypatch.setattr(server, "read", unexpected_read)
+    requests = (
+        (path, 401, "request.unauthenticated", {"session": False}),
+        (path, 401, "request.unauthenticated", {"headers": {"X-RM-Session": "wrong"}}),
+        (path, 403, "request.forbidden", {"headers": {"Host": "foreign.example"}}),
+        (path, 403, "request.forbidden", {"headers": {"Origin": "http://foreign.example"}}),
+        (path + "?limit=1", 400, "claims.invalid_query", {}),
+        (path + "?", 400, "claims.invalid_query", {}),
+        (path.replace(workspace_id, "bad-address"), 404, "claims.not_found", {}),
+    )
+    request_ids = set()
+    for target, status, code, options in requests:
+        response, content = request(server, "GET", target, **options)
+        identifier = response.getheader("X-Request-Id")
+        request_ids.add(UUID(identifier))
+        assert response.status == status
+        assert response.getheader("Cache-Control") == "no-store"
+        assert json.loads(content)["error"]["code"] == code
+        assert json.loads(content)["error"]["request_id"] == identifier
+        record = json.loads(capsys.readouterr().err)
+        assert record.pop("duration_ms") >= 0
+        assert record == {
+            "route": "/api/v1/workspaces/{workspace_id}/claims", "status": status, "request_id": identifier,
+        }
+    assert len(request_ids) == len(requests)
+
+
+@pytest.mark.parametrize(("error", "status", "code"), [
+    (DatabaseOperationError("human", "08001", "private DSN fixture"), 503, "database.unavailable"),
+    (ValueError("private DSN fixture"), 503, "database.unavailable"),
+    (RuntimeError("private DSN fixture"), 500, "request.failed"),
+])
+def test_versioned_claims_errors_redact_diagnostics(server, monkeypatch, capsys, error, status, code):
+    def unavailable(*args):
+        raise error
+
+    monkeypatch.setattr(server, "read", unavailable)
+    path = "/api/v1/workspaces/d42ca2f7-9288-47af-b7e5-1150e6df5304/claims"
+    response, content = request(server, "GET", path)
+    assert response.status == status and b"private DSN fixture" not in content
+    assert json.loads(content)["error"]["code"] == code
+    assert "private DSN fixture" not in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("path", [

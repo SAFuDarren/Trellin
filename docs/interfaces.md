@@ -152,6 +152,8 @@ The compatibility route `POST /api/review` accepts `evidence_id`, `action`, and 
 - Lists page by cursor: `?limit=` (default 50, maximum 200) and `?cursor=`.
 - Filters are query parameters named after fields. Sorting uses `?sort=field,-other` from a documented set per endpoint.
 
+`GET /api/v1/workspaces/{workspace_id}/claims` is the first pilot in the [workbench OpenAPI document](../research_multiplier/schemas/workbench.openapi.json). It exposes the same snapshot as `/api/claims`, up to the 100 most recent visible frozen claims. During the pilot it accepts no query parameters and returns `next_cursor: null`. The response includes the launcher's selected `claim_id` (or `null`) and, when available, `claim_codes: true`. Run `pnpm gen:api` from `web/` after editing the OpenAPI types. The web type check verifies that the generated types match the contract.
+
 ### Long-running operations
 
 Operations that take more than about a second return `202 Accepted` with a job resource: `{"job": {"id": "…", "state": "queued"}}`. Clients follow progress through events or `GET …/jobs/{id}`.
