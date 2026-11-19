@@ -11,6 +11,8 @@ _MAX_CURSOR = (1 << 63) - 1
 _PAGE_SIZE = 100
 _HEARTBEAT_SECONDS = 10
 _WAIT_SECONDS = 1
+FULL_COVERAGE = "workspace-writes-v1"
+RUNTIME_CHANGED = object()
 
 
 class WorkspaceEventError(ValueError):
@@ -20,6 +22,12 @@ class WorkspaceEventError(ValueError):
 def _installed(store):
     return store.query("human", """
         SELECT to_regprocedure('rm.workspace_event_cursor(uuid)') IS NOT NULL AS installed
+    """)[0]["installed"]
+
+
+def _complete(store):
+    return store.query("human", """
+        SELECT to_regprocedure('rm.capture_workspace_change_event()') IS NOT NULL AS installed
     """)[0]["installed"]
 
 
@@ -52,7 +60,10 @@ def capability(store):
         if error.state == "42501":
             return {}
         raise
-    return {"workspace_events": {"workspace_id": str(workspace_id), "cursor": str(cursor)}}
+    feature = {"workspace_id": str(workspace_id), "cursor": str(cursor)}
+    if _complete(store):
+        feature["coverage"] = FULL_COVERAGE
+    return {"workspace_events": feature}
 
 
 def _parse_cursor(after):
@@ -79,7 +90,8 @@ def _envelope(row):
     }
 
 
-def _events(store, workspace_id, cursor, wait, closing):
+def _events(store, workspace_id, cursor, wait, closing, runtime_version):
+    last_runtime = None
     next_heartbeat = monotonic() + _HEARTBEAT_SECONDS
     while not closing.is_set():
         rows = store.query("human", "SELECT * FROM rm.read_workspace_events(%s,%s,%s)",
@@ -92,6 +104,12 @@ def _events(store, workspace_id, cursor, wait, closing):
             next_heartbeat = monotonic() + _HEARTBEAT_SECONDS
         if len(rows) == _PAGE_SIZE:
             continue
+        if runtime_version is not None and not closing.is_set():
+            observed = runtime_version(store, cursor)
+            if observed != last_runtime:
+                last_runtime = observed
+                yield RUNTIME_CHANGED
+                next_heartbeat = monotonic() + _HEARTBEAT_SECONDS
         remaining = next_heartbeat - monotonic()
         if remaining <= 0 and not closing.is_set():
             yield None
@@ -103,7 +121,7 @@ def _events(store, workspace_id, cursor, wait, closing):
 
 
 @contextmanager
-def subscribe(store, workspace_id, after, *, closing):
+def subscribe(store, workspace_id, after, *, closing, runtime_version=None):
     """Validate the stream before headers, then replay in order and follow commits."""
     if store.workspace_id is None or workspace_id != store.workspace_id:
         raise WorkspaceEventError("events.not_found")
@@ -119,7 +137,9 @@ def subscribe(store, workspace_id, after, *, closing):
                 cursor = latest
             if cursor > latest:
                 raise WorkspaceEventError("events.invalid_cursor")
-            yield _events(store, workspace_id, cursor, wait, closing)
+            if runtime_version is not None and not _complete(store):
+                runtime_version = None
+            yield _events(store, workspace_id, cursor, wait, closing, runtime_version)
     except DatabaseOperationError as error:
         code = {"22023": "events.invalid_cursor", "42501": "events.identity_required"}.get(error.state)
         if code:

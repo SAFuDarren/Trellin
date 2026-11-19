@@ -220,6 +220,67 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
     assert persisted == [{"review_status": "approved"}]
 
 
+def test_guidance_and_clarification_emit_once_for_each_committed_change(workbench):
+    server, claim_id, statement_id, evidence_id = workbench
+    workspace_id = paths.workspace_id(server.workspace)
+    local_user = paths.local_user_id(server.workspace)
+    assert local_user is not None
+
+    class Aborted(Exception):
+        pass
+
+    with paths.use_workspace(server.workspace, strict=True), Store() as store, Store() as reader:
+        initial = reader.query("human", "SELECT rm.workspace_event_cursor(%s) AS head", workspace_id)[0]["head"]
+
+        def events_after(cursor):
+            return reader.query("human", "SELECT * FROM rm.read_workspace_events(%s,%s,100)", workspace_id, cursor)
+
+        def write_guidance(request_id):
+            return store.query("human", "SELECT rm.add_workbench_guidance(%s,%s,%s,%s,%s)", request_id,
+                               claim_id, statement_id, f"goal:{claim_id}", "Synthetic guidance text.")
+
+        def aborted_write():
+            write_guidance(uuid4())
+            assert not events_after(initial)
+            raise Aborted
+
+        with pytest.raises(Aborted):
+            store.transaction("human", aborted_write)
+        assert not events_after(initial)
+
+        first = uuid4()
+
+        def committed_writes():
+            write_guidance(first)
+            write_guidance(uuid4())
+            assert not events_after(initial)
+
+        store.transaction("human", committed_writes)
+        write_guidance(first)
+        guidance, = events_after(initial)
+        assert (guidance["id"], guidance["type"], guidance["user_id"]) == (
+            initial + 1, "workspace.changed", local_user,
+        )
+        assert (guidance["subject_kind"], guidance["subject_id"], guidance["data"]) == (
+            "workspace", workspace_id, {"area": "activity", "claim_id": claim_id},
+        )
+
+        # The target-first Lean claim is frozen against legacy clarifications.
+        # Use the other fixture claim that follows the original review workflow.
+        evidence, = store.query("human", "SELECT claim_id FROM rm.evidence_foundation_status WHERE id = %s", evidence_id)
+        packet = formalization.read(store, "claim_id", evidence["claim_id"])
+        item_id = packet["packet"]["items"][0]["id"]
+        request_id = formalization.request(store, packet["id"], item_id,
+                                          "Synthetic research question.", "Synthetic research impact.")
+        assert formalization.resolve(request_id, ACTOR, REASON) == request_id
+        requested, resolved = events_after(guidance["id"])
+        assert [row["id"] for row in (requested, resolved)] == [initial + 2, initial + 3]
+        assert [row["type"] for row in (requested, resolved)] == ["workspace.changed"] * 2
+        assert [row["user_id"] for row in (requested, resolved)] == [None, local_user]
+        expected_data = {"area": "clarification", "claim_id": str(evidence["claim_id"])}
+        assert [row["data"] for row in (requested, resolved)] == [expected_data, expected_data]
+
+
 def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workbench):
     server, _, _, evidence_id = workbench
     workspace_id = paths.workspace_id(server.workspace)
@@ -252,7 +313,9 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
             "evidence.recorded"} <= setup_types
     event_id = str(int(starting_cursor) + 1)
     after_review = _request(server, "GET", "/api/inbox")
-    assert after_review["workspace_events"] == {"workspace_id": str(workspace_id), "cursor": event_id}
+    assert after_review["workspace_events"] == {
+        "workspace_id": str(workspace_id), "cursor": event_id, "coverage": "workspace-writes-v1",
+    }
     reader = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
     try:
         reader.request("GET", f"/api/v1/workspaces/{workspace_id}/events",
@@ -273,3 +336,37 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
         assert record["occurred_at"].endswith("Z")
     finally:
         reader.close()
+
+
+def test_opted_in_stream_notifies_lease_expiry_without_advancing_the_cursor(workbench):
+    from research_multiplier.workflows import runtime, workspace_events
+
+    server, claim_id, _, _ = workbench
+    workspace_id = paths.workspace_id(server.workspace)
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        frozen = store.frozen(claim_id)
+        subject = {"claim_id": claim_id, "contract_sha256": frozen["contract_sha256"]}
+        job = runtime.schedule(store, subject, "small_case", {}, 20, "workbench-clock", model_calls=0)
+        leased, = store.claim_job("small_case", "clock-fixture", 2, job["id"])
+        assert leased["status"] == "running"
+        head = workspace_events.capability(store)["workspace_events"]["cursor"]
+    clock = HTTPConnection("127.0.0.1", server.server_port, timeout=6)
+    try:
+        clock.request("GET", f"/api/v1/workspaces/{workspace_id}/events", headers={
+            "X-RM-Session": server.session,
+            "Last-Event-ID": head,
+            "X-RM-Workbench-Updates": "workspace-writes-v1",
+        })
+        response = clock.getresponse()
+        assert response.status == 200
+        assert response.readline() == b": connected\n"
+        assert response.readline() == b"\n"
+        assert response.readline() == b": workbench-runtime-changed\n"
+        assert response.readline() == b"\n"
+        assert response.readline() == b": workbench-runtime-changed\n"
+        team = _request(server, "GET", "/api/team")
+        job_state = next(item["state"] for item in team["jobs"] if item["id"] == str(job["id"]))
+        assert job_state == "lease_expired"
+        assert _request(server, "GET", "/api/inbox")["workspace_events"]["cursor"] == head
+    finally:
+        clock.close()

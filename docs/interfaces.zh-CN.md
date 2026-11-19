@@ -12,7 +12,7 @@
 | [CLI 约定](#2-cli-约定) | **稳定** | 现在 |
 | [数据库边界](#3-数据库边界) | **稳定** | 现在 |
 | [HTTP API v1](#4-http-api-v1) | v1 草案 | 路线图 P1.2 完成时 |
-| [事件 v1](#5-事件-v1) | v1 草案 | P1.3 完成时 |
+| [事件 v1](#5-事件-v1) | **稳定** | P1.3 |
 | [插件协议 v1](#6-插件协议-v1) | v1 草案 | P2.3 完成时 |
 | [MCP 工具](#7-mcp-工具) | 草案 | P2.4 完成时 |
 | [Worker 协议 v1](#8-worker-协议-v1) | v1 草案 | P3.3 完成时 |
@@ -189,7 +189,7 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 
 ## 5. 事件 v1
 
-v1 草案，P1.3 完成时转为稳定。事件信封定义在 `event.schema.json`：
+事件信封定义在 `event.schema.json`。
 
 ```json
 {
@@ -211,6 +211,10 @@ v1 草案，P1.3 完成时转为稳定。事件信封定义在 `event.schema.jso
 - 投递语义是「至少一次」，使用方按 `id` 去重。只保证同一个工作区内的顺序。
 - 服务器推送事件：`GET /api/v1/workspaces/{id}/events`。每条消息的 `id:` 是事件 ID，`event:` 是事件类型，`data:` 是事件信封。断线后用 `Last-Event-ID` 续传。
 - `data` 只放 ID 和简短摘要，绝不放凭据。体积大或敏感的内容，由读者凭自己的权限通过 API 获取。
+
+数据库版本 `0076` 为工作区内已提交的写入增加 `workspace.changed`。事件对象是工作区，数据包含受影响的区域，以及可以确定时的命题 ID。同一事务内涉及相同区域和命题的写入可共用一条通知。客户端通过已有接口读取最新状态。原有事件类型和游标的含义继续有效。
+
+`GET /api/inbox` 通过 `workspace_events.coverage = "workspace-writes-v1"` 声明完整覆盖。工作台发送 `X-RM-Workbench-Updates: workspace-writes-v1` 后也可收到 SSE 注释 `: workbench-runtime-changed`，用于提示任务租约到期等运行状态变化。注释没有游标。
 
 ---
 
