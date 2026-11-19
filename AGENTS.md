@@ -56,7 +56,7 @@ Several agents and people may work on this repository at the same time. Follow t
 1. **Claim before you start, with the claim tool.** Every agent uses the same GitHub account, so pick a short name for this session (for example `claude-web` or `codex-backend-1`) and use it for every claim.
    - See who holds what: `python scripts/tasks.py board`.
    - Claim: `python scripts/tasks.py claim <issue> --agent <name> --branch <type>/<issue>-<topic> --scope <paths>`. The tool refuses issues that someone else holds or that need a decision. If two agents claim at the same moment, the later one withdraws automatically: start work only when the tool says `Claimed`.
-   - Release when you stop: `python scripts/tasks.py release <issue> --agent <name> --reason "..."`.
+   - Keep the claim while you own review follow-up. When you hand off or relinquish follow-up, record the branch and remaining work in the issue, then release with `python scripts/tasks.py release <issue> --agent <name> --reason "..."`.
    - Work only on an open issue. If no issue exists for what you were asked to do, ask the maintainer instead of starting.
    - Link the claimed issue in the PR with `Closes #N` when all criteria are met, or `Refs #N` for a partial change. CI checks the linked task and branch.
 2. **One task, one branch, one worktree:** `git worktree add ../rm-<issue>-<topic> -b <type>/<issue>-<topic> origin/main`. Use the exact branch name from your claim. Never edit another agent's worktree or branch.
@@ -78,19 +78,6 @@ Several agents and people may work on this repository at the same time. Follow t
 ## Layout
 
 Use the [repository layout and artifact rules](docs/engineering.md#repository-layout) when adding or moving files.
-
-| Path | Contents |
-| --- | --- |
-| `research_multiplier/cli/` | Argument parsing and output only |
-| `research_multiplier/workflows/` | Research logic shared by the CLI and the API |
-| `research_multiplier/storage/`, `research_multiplier/migrations/` | PostgreSQL access, Alembic revisions and their SQL |
-| `research_multiplier/workbench/` | Local workbench server and its generated `app/` |
-| `web/` | React source, build configuration and browser tests |
-| `tests/` | Python checks and small shared test fixtures |
-| `research_multiplier/schemas/` | JSON Schemas for records and interface contracts |
-| `research_multiplier/*/_pinned/`, `_compat/` | Fingerprinted verifier and adapter sources (do not edit) |
-| `lean/` | Pinned Lean and Mathlib setup |
-| `docs/` | User and design documentation |
 
 ## Commands
 
@@ -135,7 +122,7 @@ python -m venv "$scratch/venv"
 )
 ```
 
-See [tests/README.md](tests/README.md) and the [contributor guide](CONTRIBUTING.md#run-the-external-regression-suite) for the regression lanes. Follow the lane instructions for an installed wheel and a disposable workspace or database.
+See [tests/README.md](tests/README.md) and the [contributor guide](CONTRIBUTING.md#run-the-compatibility-regressions) for the regression lanes. Follow the lane instructions for an installed wheel and a disposable workspace or database.
 
 Open the workbench on a test project:
 

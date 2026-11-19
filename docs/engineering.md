@@ -28,13 +28,13 @@ Use the current layout below when placing new files. Keep the root for project-w
 | `research_multiplier/*/_pinned/`, `research_multiplier/_compat/` | Exact verifier and adapter sources behind recorded fingerprints (B7) | Python |
 | `lean/` | Generic Lean support and pinned Lean and Mathlib configuration | Lean |
 | `web/` | React source under `src/`, browser tests under `e2e/`, frontend configuration and lockfile | TypeScript |
-| `tests/` | Python test source and small synthetic fixtures shared by tests. P0.2 tracks the additional regression lanes | Python |
+| `desktop/macos/` | App sources and resources, build and packaging tools, and native tests | Swift, shell |
+| `brand/` | Product artwork and usage guidance | SVG, PNG, Markdown |
+| `tests/` | Offline, PostgreSQL and Lean tests, the versioned `compat_validation/` suite, and small synthetic fixtures | Python |
 | `scripts/`, `.github/` | Maintainer automation, CI workflows, and issue and PR templates | Python, YAML |
-| `docs/` | User and engineering documentation. Index guides through `docs/README.md` and keep dated audits in `docs/audits/` | Markdown |
+| `docs/` | User and engineering guides indexed in `docs/README.md`, reviewed images in `docs/images/`, and dated project audit summaries in `docs/audits/` | Markdown, images |
 
-Keep real research projects and public example projects in separate directories outside the software checkout. Keep test output, logs, screenshots produced by runs, database dumps, external validation bundles, and wheel or source distribution output outside it too. Use a disposable workspace and database for each test lane and a temporary output directory such as `RUNNER_TEMP` in CI. A local dependency environment or cache may stay in the worktree if Git ignores it. Review the paths in the PR diff before sending it.
-
-The roadmap describes future `plugins/` and `deploy/` directories. Work in the existing directories until the corresponding roadmap task introduces them.
+Keep real research projects, runnable public examples and documentation demos, personal skills, agent memory and raw audit materials in separate directories outside the software checkout. Keep test output, logs, screenshots produced by runs, database dumps, external validation bundles, and wheel or source distribution output outside it too. Use a disposable workspace and database for each test lane and a temporary output directory such as `RUNNER_TEMP` in CI. A local dependency environment or cache may stay in the worktree if Git ignores it. Review the paths in the PR diff before sending it.
 
 ---
 
@@ -215,18 +215,19 @@ Several people and coding agents may work on the repository at once. The rules b
 
 ### Retire a branch and worktree
 
-The owner handles cleanup of their branch and worktree, or arranges an explicit handoff in the issue. The maintainer decides whether to change GitHub settings such as automatic branch deletion. Follow this order when retiring a task branch.
+The owner handles local checkout cleanup or arranges an explicit handoff in the issue. Record the branch, reviewed commit and remaining work there. Keep the claim while you own review follow-up. Release it on handoff or when you relinquish follow-up. GitHub settings remain a maintainer decision.
 
-1. Run `gh pr view "$pr" --json state,headRefName,headRefOid` with the task PR number. Check for `MERGED` and record the reviewed head. Squash merging replaces commits, so `git branch --merged` alone cannot prove the PR was merged. If work is paused, abandoned or still waiting for review, record its branch and remaining work in the issue and release the claim when appropriate. Keep the branch until the work is merged or the maintainer approves retirement of an explicitly closed task.
-2. Check that the task claim is closed or released, then run `gh pr list --state open --head "$branch"` and `gh pr list --state open --base "$branch"`. An open PR still using that branch blocks cleanup. After a stacked PR's parent merges, have the dependent owners retarget their PRs to `main`, replay only their own commits on current `origin/main`, and verify the diffs and required checks. Keep the parent branch until its dependents are integrated or have passed those checks on the new base.
-3. Fetch `origin`. Use `git worktree list` to identify the correct checkout and `git -C "$worktree" status --short --untracked-files=all --ignored=matching` to inspect its files. Compare the local branch with the reviewed head using `git log --oneline "$reviewed_head..$branch"` and check the live remote head for updates. Preserve any commits that are absent from the reviewed change. Before proceeding, also preserve local edits, untracked files and ignored artifacts that you need, and record where they went.
-4. When the checks pass, use `git worktree remove "$worktree"` and `git branch -d "$branch"` from a different checkout. If a squash merge makes the local deletion refuse and the fetched remote tracking branch still points to the verified reviewed head, run `git branch --set-upstream-to="origin/$branch" "$branch"` and retry the guarded deletion. Otherwise leave the branch for the maintainer. The owner can remove the verified remote branch after the local cleanup and a final dependency check. Never force removal, delete another worker's branch or worktree, or use cleanup to clear an active claim.
+**Remove a local worktree.** Confirm which worktree and task it serves. Use `git -C "$worktree" status --short --untracked-files=all --ignored=matching` and check for pending Git operations and active users or processes. Preserve useful changes and artifacts at the recorded recovery location, then verify the commit or files can be recovered. A maintainer-authorized handoff can remove a clean, unused checkout of an open PR while the branch and claim stay in place. Run `git worktree remove "$worktree"` from another checkout.
+
+**Retire a branch.** Keep an open task branch. After integration, use `gh pr view "$pr" --json state,headRefOid,mergeCommit,baseRefName` to verify `MERGED` and record the final reviewed head. Fetch the target and verify that the reported merge commit is in its history. A squash merge does not preserve the original head in the target history. After explicit closure without merge, record the preserved work and get the maintainer's retirement decision.
+
+Check open PRs with `gh pr list --state open --head "$branch"` and `gh pr list --state open --base "$branch"`. With stacked changes, the dependent owner retargets to the integrated base, reapplies only that PR's commits and runs the required checks before the parent branch retires. Compare the local and live remote tips with the reviewed commit and preserve any extra work. Once the task is closed or released and the checks pass, try `git branch -d "$branch"`. Leave a refusal for the maintainer. The owner may remove a verified remote task branch after one last check for dependent PRs.
 
 ### Stress tests
 
-Stress tests 3 (parallel development) and 6 (handover) in the [engineering audit](audits/README.md) check that these rules work in practice. Run them before relying on several agents for a whole phase.
+Before relying on several agents for a phase, rehearse a same-issue claim race and the independent integration of two non-overlapping changes. Verify that one claimant wins, workers use separate worktrees and test resources, and both changes pass the required checks after integration. Record the result in the [engineering audit](audits/README.md).
 
-For the repository-only [handover exercise #9](https://github.com/SAFuDarren/research-multiplier/issues/9), ask the next agent to find the source, generated interface, test and output paths from `AGENTS.md`, then name what would block retirement of a task branch. Record the result in the issue.
+For the repository-only [handover exercise #9](https://github.com/SAFuDarren/Trellin/issues/9), ask the next agent to find the source, generated interface, test and output paths from `AGENTS.md`, then name what would block retirement of a task branch. Record the result in the issue.
 
 ## Keeping status and records current
 

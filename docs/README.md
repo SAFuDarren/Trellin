@@ -3,6 +3,7 @@
 ## First use
 
 - [Quickstart](quickstart.md) · [中文快速入门](quickstart.zh-CN.md)
+- [Workspace layout](research-foundation.md#workspace-paths)
 - [Workspace and PostgreSQL setup](research-foundation.md#set-up-the-workspace)
 - [Input templates and result meanings](problem-formats.md)
 
@@ -27,8 +28,8 @@
 - [Architecture direction and design decisions](architecture.md) · [中文](architecture.zh-CN.md)
 - [Interface contracts](interfaces.md) · [中文](interfaces.zh-CN.md)
 - [Roadmap and acceptance criteria](roadmap.md) · [中文](roadmap.zh-CN.md)
-- [Engineering and project management](engineering.md) · [中文](engineering.zh-CN.md)
+- [Engineering and project management](engineering.md) · [Repository layout](engineering.md#repository-layout) · [中文](engineering.zh-CN.md)
 - [Engineering audits](audits/README.md) · [中文](audits/README.zh-CN.md)
-- [Contributing and external regression suites](../CONTRIBUTING.md)
+- [Contributing and compatibility regressions](../CONTRIBUTING.md)
 - [Lean search trust boundaries](search-contracts.md)
 - [Release preparation](release.md) · [Version history](../CHANGELOG.md)
