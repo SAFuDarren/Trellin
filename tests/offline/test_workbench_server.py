@@ -75,6 +75,7 @@ def test_foreign_host_and_origin_are_refused(server):
     "/api/team?x=1",
     "/api/doctor?fresh=yes",
     "/api/proof-task?claim=not-a-uuid",
+    "/api/claim-code?code=FLOW&code=ABC",
 ])
 def test_invalid_queries_are_rejected_before_reading(server, path):
     response, content = request(server, "GET", path)
@@ -118,6 +119,20 @@ def test_proof_task_writes_require_a_local_session(server, action):
     assert response.status == 403
     response, _ = request(server, "POST", path, body={}, origin=False)
     assert response.status == 403
+
+
+def test_claim_code_routes_require_session_and_exact_payload(server, monkeypatch):
+    def refuse_bad_references(operation, document):
+        return operation(None, document)
+
+    monkeypatch.setattr(server, "write", refuse_bad_references)
+    response, _ = request(server, "GET", "/api/claim-code?code=FLOW-02", session=False)
+    assert response.status == 403
+    response, _ = request(server, "POST", "/api/claim-code", body={"code": "NOT-A-PREFIX"}, origin=False)
+    assert response.status == 403
+    response, content = request(server, "POST", "/api/claim-code", body={"code": "NOT-A-PREFIX"})
+    assert response.status == 400
+    assert json.loads(content) == {"error": "claim_code.invalid"}
 
 
 def test_proof_task_starts_only_the_committed_policy(server, monkeypatch):

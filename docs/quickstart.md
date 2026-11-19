@@ -87,6 +87,7 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 - [Recover a project archive](research-foundation.md#recover-and-monitor) using a PostgreSQL URL and a fresh target database. If a later step fails after import, keep the imported database and the archive, then retry with a fresh database and an unused directory.
 - [Verify a Lean proof in your own project](lean-core.md#check-a-lean-source-file-or-compiled-declaration) and see the confirmed assumptions and facts actually used.
 - Open [Proof task in Trellin](proof-workbench.md#start-a-proof-task) to check whether the confirmed Lean scope is ready, authorize local proof work, and monitor its result.
+- Use [Research references](proof-workbench.md#work-with-the-models) to rename a claim's short code and reopen a saved proof node by its permanent number.
 - [Search Formalpedia offline](literature-search.md#search-formalpedia-locally) without creating a research database. To replay a selected result within a confirmed Lean scope, follow the same guide after enabling its database feature.
 - Run `research-multiplier research resume --format text` to inspect progress and decisions in a configured project. [Resume and advancement](research-progress.md)
 

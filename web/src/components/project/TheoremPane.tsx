@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
+import { normalizeReferenceCode } from "../../workbench/text";
 import { ReviewFields } from "./ReviewFields";
 import { reviewIdentity } from "./review";
 
@@ -18,7 +19,8 @@ export function TheoremPane({ session, onRecorded }: { session: string; onRecord
   const [message, setMessage] = useState("");
   const pending = useQuery({
     queryKey: ["manual-theorems", session],
-    queryFn: ({ signal }) => api<{ drafts: DraftTheorem[] }>(session, "/api/theorems", { signal }),
+    queryFn: ({ signal }) =>
+      api<{ drafts: DraftTheorem[]; claim_codes?: boolean }>(session, "/api/theorems", { signal }),
     retry: false,
   });
   const sync = () => void queries.invalidateQueries({ queryKey: ["manual-theorems", session] });
@@ -30,10 +32,13 @@ export function TheoremPane({ session, onRecorded }: { session: string; onRecord
         lean: String(event.get("lean")).trim(),
         source: String(event.get("source") ?? "").trim(),
       };
+      const code = normalizeReferenceCode(String(event.get("code") ?? ""));
       const data = {
         ...fields,
         kind,
-        ...(kind === "goal" ? { confirmed: event.has("confirmed"), ...reviewIdentity(event) } : {}),
+        ...(kind === "goal"
+          ? { confirmed: event.has("confirmed"), ...reviewIdentity(event), ...(code ? { code } : {}) }
+          : {}),
       };
       const result = await api<AddedTheorem>(session, "/api/theorems", { data });
       return { result, fields };
@@ -113,6 +118,23 @@ export function TheoremPane({ session, onRecorded }: { session: string; onRecord
             {t("projectEntry.title")}
             <input name="title" maxLength={300} required />
           </label>
+          {kind === "goal" && pending.data?.claim_codes && (
+            <div>
+              <label>
+                {t("claimCodes.optional")}
+                <input
+                  name="code"
+                  maxLength={12}
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  aria-describedby="optional-claim-code"
+                />
+              </label>
+              <p id="optional-claim-code" className="project-entry-note">
+                {t("claimCodes.auto")}
+              </p>
+            </div>
+          )}
           <label>
             {t("projectEntry.theorem.wording")}
             <textarea name="wording" rows={2} maxLength={4000} required />

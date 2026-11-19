@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import i18n from "../i18n";
 import { buildGraph, CARD, highlights, impactItems, layoutGraph, liveWork } from "./graph";
 import { atlasShape } from "./atlas";
-import { claimCode, modelName, nodeTitle, nodeTone, prettyModel } from "./text";
+import { claimCode, modelName, nodeTitle, nodeTone, normalizeReferenceCode, prettyModel } from "./text";
 import type { GraphSnapshot } from "./types";
 
 const t = i18n.getFixedT("en");
@@ -140,20 +140,25 @@ describe("codes and agent names", () => {
     expect(new Set(graph.codes.values()).size).toBe(snapshot.nodes.length);
   });
 
-  it("prefers codes the server sends", () => {
+  it("uses only durable node codes when the claim has a server code", () => {
     const graph = buildGraph(t, {
       ...snapshot,
       claim: { ...snapshot.claim, code: "FLT" },
       nodes: snapshot.nodes.map((node) => (node.id === "goal:c" ? { ...node, code: "FLT-00" } : node)),
     });
     expect(graph.codes.get("goal:c")).toBe("FLT-00");
-    expect(graph.codes.get("local-lemma:r")).toMatch(/^FLT-\d\d$/);
+    expect(graph.codes.has("local-lemma:r")).toBe(false);
   });
 
   it("derives claim codes from titles, with a fallback for titles without Latin words", () => {
     expect(claimCode({ id: "x", title: "Fermat's Last Theorem" })).toBe("FLT");
     expect(claimCode({ id: "x", title: "Sums of two squares" })).toBe("STS");
     expect(claimCode({ id: "abcdef12-0000", title: "自然数加零的对称性" })).toBe("CABC");
+  });
+
+  it("does not expand a non-ASCII letter into a valid reference code", () => {
+    expect(normalizeReferenceCode(" flow-09 ")).toBe("FLOW-09");
+    expect(normalizeReferenceCode("ß-09")).toBe("ß-09");
   });
 
   it("names agents by model and effort", () => {

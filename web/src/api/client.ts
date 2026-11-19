@@ -81,4 +81,4 @@ export async function api<T>(
 }
 
 export type Claim = { id: string; title: string | null; status: string; domain: string | null };
-export type ClaimsResponse = { claims: Claim[]; claim_id: string | null };
+export type ClaimsResponse = { claims: Claim[]; claim_id: string | null; claim_codes?: boolean };

@@ -39,7 +39,9 @@ Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around
 
 ## Work with the models
 
-Every node has a short code made of the claim's initials and a number, for example `FLT-09`, so you can refer to it in notes and discussions. A node whose recorded job is running shows the agent (model and reasoning effort) and the number of parallel jobs, for example `GPT-6.2 Sol xhigh ×2`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
+On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
+
+A node whose recorded job is running shows the agent and the number of parallel jobs. The workbench also displays reasoning effort when the model attempt records it, for example `GPT-6.2 Sol xhigh`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
 
 The conversation under the graph shows your notes, the models' recorded methods and reasons, and the Lean results for the selected node. Choose **All nodes** to see the whole claim, with a link from each entry back to its node.
 

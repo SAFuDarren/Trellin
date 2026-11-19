@@ -138,6 +138,69 @@ describe("App", () => {
     await waitFor(() => expect(postMessage).toHaveBeenLastCalledWith({ claimId: CLAIM, nodeId: `goal:${CLAIM}` }));
   });
 
+  it("renames a numbered claim and opens the exact node from a previous code", async () => {
+    let code = "FLOW";
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/claim-code" && init?.method === "POST") {
+        code = JSON.parse(String(init.body)).code;
+        return Response.json({ code });
+      }
+      if (input === "/api/claim-code?code=FLOW-09") return Response.json({ claim_id: CLAIM, node_id: LEMMA });
+      if (input.startsWith("/api/graph?"))
+        return Response.json({
+          claim: { id: CLAIM, title: "Left zero", status: "open", domain: "lean-core", code },
+          nodes: [
+            { id: `goal:${CLAIM}`, title: "Original claim", kind: "goal", code: code + "-01" },
+            { id: LEMMA, title: "A helper lemma", kind: "lemma", code: code + "-09" },
+          ],
+          edges: [],
+        });
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.claimCodes.title }));
+    const modal = within(await screen.findByRole("dialog", { name: en.claimCodes.title }));
+    fireEvent.change(modal.getByLabelText(en.claimCodes.claim), { target: { value: "new" } });
+    fireEvent.click(modal.getByRole("button", { name: en.claimCodes.save }));
+    expect(await modal.findByText(en.claimCodes.saved)).toBeTruthy();
+    expect(await screen.findAllByText("NEW-09")).not.toHaveLength(0);
+    fireEvent.change(modal.getByLabelText(en.claimCodes.reference), { target: { value: "flow-09" } });
+    fireEvent.click(modal.getByRole("button", { name: en.claimCodes.open }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /A helper lemma/ }).getAttribute("aria-pressed")).toBe("true"),
+    );
+    const post = fetch.mock.calls.find(([path, init]) => path === "/api/claim-code" && init?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({ claim_id: CLAIM, code: "NEW" });
+    expect(fetch.mock.calls.filter(([path]) => path === "/api/claim-code?code=FLOW-09")).toHaveLength(1);
+  });
+
+  it("opens an archived claim from an empty recent list and reports an absent historical node", async () => {
+    const fetch = vi.fn(async (input: string) => {
+      if (input === "/api/claims") return Response.json({ claims: [], claim_id: null, claim_codes: true });
+      if (input === "/api/claim-code?code=OLD-19") {
+        return Response.json({ claim_id: CLAIM, node_id: "lean:historical-node" });
+      }
+      if (input === "/api/graph?claim=" + CLAIM)
+        return Response.json({
+          claim: { id: CLAIM, title: "Archived theorem", status: "archived", domain: "lean-core", code: "OLD" },
+          nodes: [{ id: `goal:${CLAIM}`, title: "Original claim", kind: "goal", code: "OLD-01" }],
+          edges: [],
+        });
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.claimCodes.title }));
+    const modal = within(await screen.findByRole("dialog", { name: en.claimCodes.title }));
+    expect(modal.queryByLabelText(en.claimCodes.claim)).toBeNull();
+    fireEvent.change(modal.getByLabelText(en.claimCodes.reference), { target: { value: "OLD-19" } });
+    fireEvent.click(modal.getByRole("button", { name: en.claimCodes.open }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Archived theorem" })).toBeTruthy();
+    expect(await screen.findByText(en.claimCodes.nodeAbsent)).toBeTruthy();
+    expect(screen.queryByText(en.notice.noClaims)).toBeNull();
+  });
+
   it("shows the exact blocker and offers no authorization for an unconfirmed proof scope", async () => {
     const fetch = vi.fn(async (input: string, init?: RequestInit) => {
       if (init?.method === "POST") return Response.json({}, { status: 405 });
@@ -349,6 +412,33 @@ describe("App", () => {
     expect(fetch.mock.calls.every(([path]) => !path.startsWith("/api/project-intake"))).toBe(true);
     const write = fetch.mock.calls.find(([path, init]) => path === "/api/theorems" && init?.method === "POST");
     expect(write?.[1]).toMatchObject({ mode: "same-origin", referrerPolicy: "origin", redirect: "error" });
+  });
+
+  it("passes an optional code at confirmed goal intake only when supported", async () => {
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/theorems") {
+        return Response.json(
+          init?.method === "POST" ? { kind: "goal", claim_id: CLAIM } : { drafts: [], claim_codes: true },
+        );
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.projectEntry.addTheorem }));
+    const modal = within(await screen.findByRole("dialog"));
+    fireEvent.change(await modal.findByLabelText(en.claimCodes.optional), { target: { value: "test1" } });
+    fireEvent.change(modal.getByLabelText(en.projectEntry.title), { target: { value: "Reflexivity" } });
+    fireEvent.change(modal.getByLabelText(en.projectEntry.theorem.wording), { target: { value: "Zero equals zero." } });
+    fireEvent.change(modal.getByLabelText(en.projectEntry.lean), { target: { value: "(0 : Nat) = 0" } });
+    fireEvent.change(modal.getByLabelText(en.review.reviewer), { target: { value: "Reviewer" } });
+    fireEvent.change(modal.getByLabelText(en.review.reason), { target: { value: "Exact statement checked" } });
+    fireEvent.click(modal.getByLabelText(en.projectEntry.theorem.goalReview));
+    fireEvent.click(modal.getByRole("button", { name: en.projectEntry.theorem.saveGoal }));
+    await waitFor(() => {
+      const post = fetch.mock.calls.find(([path, init]) => path === "/api/theorems" && init?.method === "POST");
+      expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ code: "TEST1", kind: "goal", confirmed: true });
+    });
   });
 });
 
