@@ -45,6 +45,7 @@ def test_restore_rejects_keyword_dsn_before_import_and_retries_with_uri(tmp_path
         with psycopg.connect(source_dsn, autocommit=True) as connection:
             database_id, = connection.execute("SELECT rm.current_database_id()").fetchone()
             connection.execute("SELECT rm.bind_research_workspace(%s, %s)", (paths.workspace_id(source), database_id))
+            original_user, = connection.execute("SELECT id FROM rm.current_local_user()").fetchone()
         paths.bind_database(source, database_id)
         monkeypatch.setenv("RM_MIGRATION_DSN", source_dsn)
         assert main(["--workspace", str(source), "research", "backup-project", "--out", str(archive)]) == 0
@@ -72,6 +73,7 @@ def test_restore_rejects_keyword_dsn_before_import_and_retries_with_uri(tmp_path
 
         assert (restored / "inputs" / note.name).read_bytes() == note.read_bytes()
         assert paths.workspace_id(restored) != paths.workspace_id(source)
+        assert paths.local_user_id(restored) == original_user
         with psycopg.connect(target_dsn) as connection:
             identity, workspace = connection.execute(
                 "SELECT database_id, workspace_id FROM rm.current_workspace_binding()"

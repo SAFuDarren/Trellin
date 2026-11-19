@@ -1,8 +1,8 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { api } from "../api/client";
+import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
@@ -76,6 +76,7 @@ export function ReviewPage({
           key={selected.item_id}
           session={session}
           item={selected}
+          reviewWorkspace={inbox.data?.review_identity?.workspace_id}
           onOpen={onOpen}
           onDecided={setNotice}
         />
@@ -89,11 +90,13 @@ export function ReviewPage({
 function EvidenceReview({
   session,
   item,
+  reviewWorkspace,
   onOpen,
   onDecided,
 }: {
   session: string;
   item: InboxItem;
+  reviewWorkspace?: string;
   onOpen: (claimId: string, nodeId?: string) => void;
   onDecided: (message: string) => void;
 }) {
@@ -115,24 +118,39 @@ function EvidenceReview({
         .data!.edges.filter((edge) => edge.source === node.id)
         .map((edge) => graph.data!.nodes.find((entry) => entry.id === edge.target))
     : [];
-  const [reviewer, setReviewer] = useState(readReviewer);
+  const [reviewer, setReviewer] = useState(() => (reviewWorkspace ? "" : readReviewer()));
   const [reason, setReason] = useState("");
   const [state, setState] = useState<{ sending?: boolean; message?: string; error?: boolean }>({});
+  const requestKeys = useRef(new Map<string, string>());
   const decide = async (action: "approve" | "return") => {
-    if (!reviewer.trim() || !reason.trim()) {
-      setState({ message: t("review.needNameAndReason"), error: true });
+    if (state.sending) return;
+    const actor = reviewer.trim();
+    const rationale = reason.trim();
+    if (!rationale || (!reviewWorkspace && !actor)) {
+      setState({ message: t(reviewWorkspace ? "review.needReason" : "review.needNameAndReason"), error: true });
       return;
-    }
-    try {
-      window.localStorage.setItem(REVIEWER_KEY, reviewer.trim());
-    } catch {
-      // The name still applies to this decision.
     }
     setState({ sending: true });
     try {
-      await api(session, "/api/review", {
-        data: { evidence_id: item.item_id, action, actor: reviewer.trim(), reason: reason.trim() },
-      });
+      if (reviewWorkspace) {
+        const draft = JSON.stringify([reviewWorkspace, action, rationale]);
+        const key = requestKeys.current.get(draft) ?? crypto.randomUUID();
+        requestKeys.current.set(draft, key);
+        const route = `/api/v1/workspaces/${encodeURIComponent(reviewWorkspace)}/evidence/${encodeURIComponent(item.item_id)}/reviews`;
+        await api<{ id: string; user_id: string }>(session, route, {
+          data: { decision: action, reason: rationale },
+          idempotencyKey: key,
+        });
+      } else {
+        try {
+          window.localStorage.setItem(REVIEWER_KEY, actor);
+        } catch {
+          // The name still applies to this decision.
+        }
+        await api(session, "/api/review", {
+          data: { evidence_id: item.item_id, action, actor, reason: rationale },
+        });
+      }
       setState({});
       setReason("");
       onDecided(t(action === "approve" ? "review.approved" : "review.returned"));
@@ -140,7 +158,12 @@ function EvidenceReview({
       void queries.invalidateQueries({ queryKey: ["graph", item.claim_id] });
       void queries.invalidateQueries({ queryKey: ["atlas"] });
     } catch (error) {
-      setState({ message: error instanceof Error ? error.message : String(error), error: true });
+      const message = error instanceof Error ? error.message : String(error);
+      setState({
+        message:
+          error instanceof ApiError && error.code ? t(`errors.${error.code}`, { defaultValue: message }) : message,
+        error: true,
+      });
     }
   };
   const title = node ? nodeTitle(t, node) : t("review.kinds.review_evidence");
@@ -173,16 +196,20 @@ function EvidenceReview({
               void decide("approve");
             }}
           >
-            <label className="field-label" htmlFor="reviewer">
-              {t("review.reviewer")}
-            </label>
-            <input
-              id="reviewer"
-              className="reviewer"
-              value={reviewer}
-              maxLength={120}
-              onChange={(event) => setReviewer(event.target.value)}
-            />
+            {!reviewWorkspace && (
+              <>
+                <label className="field-label" htmlFor="reviewer">
+                  {t("review.reviewer")}
+                </label>
+                <input
+                  id="reviewer"
+                  className="reviewer"
+                  value={reviewer}
+                  maxLength={120}
+                  onChange={(event) => setReviewer(event.target.value)}
+                />
+              </>
+            )}
             <label className="field-label" htmlFor="review-reason">
               {t("review.reason")}
             </label>

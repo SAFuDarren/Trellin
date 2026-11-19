@@ -241,7 +241,9 @@ def restore(source, workspace, *, pg_bin=None):
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with TemporaryDirectory(dir=target.parent, prefix=".rm-restore-") as directory:
         staging = paths.initialize_workspace(Path(directory) / "project")
-        markers = {f"project/{name}" for name in (paths.WORKSPACE_FILE, paths.WORKSPACE_ID_FILE, paths.DATABASE_FILE)}
+        markers = {f"project/{name}" for name in (
+            paths.WORKSPACE_FILE, paths.WORKSPACE_ID_FILE, paths.DATABASE_FILE, paths.LOCAL_USER_FILE,
+        )}
         files = {name: archive / name for name in manifest["files"] if name.startswith("project/") and name not in markers}
         copied = _copy(files, Path(directory))
         if any(record != manifest["files"][name] for name, record in copied.items()):
@@ -260,7 +262,10 @@ def restore(source, workspace, *, pg_bin=None):
         with _connect(dsn) as connection:
             identity, = connection.execute("SELECT rm.reidentify_restored_database(%s,%s)",
                                            (restored, paths.ensure_workspace_id(staging))).fetchone()
+            local_user = connection.execute("SELECT id FROM rm.current_local_user()").fetchone()
         paths.bind_database(staging, identity)
+        if local_user:
+            paths.bind_local_user(staging, local_user[0])
         if target.exists():
             raise FileExistsError(f"Restore destination already exists: {target}")
         staging.rename(target)

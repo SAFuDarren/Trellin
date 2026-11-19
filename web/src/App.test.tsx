@@ -8,6 +8,17 @@ import zhCN from "./i18n/zh-CN.json";
 
 const CLAIM = "11111111-1111-4111-8111-111111111111";
 const LEMMA = "lean:22222222-2222-4222-8222-222222222222";
+const WORKSPACE = "33333333-3333-4333-8333-333333333333";
+const EVIDENCE = "44444444-4444-4444-8444-444444444444";
+const REVIEW_PATH = `/api/v1/workspaces/${WORKSPACE}/evidence/${EVIDENCE}/reviews`;
+const REVIEW_ITEM = {
+  kind: "review_evidence",
+  item_id: EVIDENCE,
+  claim_id: CLAIM,
+  claim_title: "Left zero",
+  waiting_since: "2026-01-01T00:00:00Z",
+  priority: 2,
+};
 const PROOF_TASK = {
   claim_id: CLAIM,
   title: "Left zero",
@@ -72,6 +83,7 @@ function keys(value: object, prefix = ""): string[] {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "#workbench");
   // jsdom lacks ResizeObserver.
   vi.stubGlobal(
     "ResizeObserver",
@@ -121,6 +133,103 @@ describe("App", () => {
     );
     renderApp("token");
     expect((await screen.findByText("Forbidden.")).getAttribute("data-error")).toBe("true");
+  });
+
+  it("records an authenticated review with only the decision and reason", async () => {
+    window.history.replaceState(null, "", "#review");
+    let reviewed = false;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/inbox") {
+        return Response.json({
+          items: reviewed ? [] : [REVIEW_ITEM],
+          review_identity: { workspace_id: WORKSPACE },
+        });
+      }
+      if (input === REVIEW_PATH && init?.method === "POST") {
+        reviewed = true;
+        return Response.json({ id: "review", user_id: "local-reviewer" });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    const approve = await screen.findByRole("button", { name: en.review.approve });
+    expect(screen.queryByLabelText(en.review.reviewer)).toBeNull();
+    fireEvent.click(approve);
+    expect(await screen.findByText(en.review.needReason)).toBeTruthy();
+    expect(fetch.mock.calls.every(([, init]) => init?.method !== "POST")).toBe(true);
+    fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "  Exact scope verified.  " } });
+    fireEvent.click(approve);
+    expect(await screen.findByText(en.review.approved)).toBeTruthy();
+    expect(await screen.findByText(en.review.allDone)).toBeTruthy();
+    const writes = fetch.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(writes).toHaveLength(1);
+    const [path, request] = writes[0]!;
+    expect(path).toBe(REVIEW_PATH);
+    expect(JSON.parse(String(request?.body))).toEqual({ decision: "approve", reason: "Exact scope verified." });
+    const headers = new Headers(request?.headers);
+    expect(headers.get("X-RM-Session")).toBe("token");
+    expect(headers.get("Idempotency-Key")).toMatch(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+  });
+
+  it("retries the same authenticated review with its original key and preserves the chosen route", async () => {
+    window.history.replaceState(null, "", "#review");
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/inbox") {
+        return Response.json({ items: [REVIEW_ITEM], review_identity: { workspace_id: WORKSPACE } });
+      }
+      if (input === REVIEW_PATH && init?.method === "POST") {
+        return Response.json(
+          { error: { code: "review.identity_required", message: "Missing local identity." } },
+          { status: 403 },
+        );
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    const approve = await screen.findByRole("button", { name: en.review.approve });
+    const sendAndWait = async (button: HTMLElement) => {
+      fireEvent.click(button);
+      expect(await screen.findByText(en.errors["review.identity_required"])).toBeTruthy();
+    };
+    fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "Reviewed frozen scope." } });
+    await sendAndWait(approve);
+    await sendAndWait(approve);
+    const returnEvidence = screen.getByRole("button", { name: en.review.return });
+    await sendAndWait(returnEvidence);
+    const writes = fetch.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(writes.map(([path]) => path)).toEqual([REVIEW_PATH, REVIEW_PATH, REVIEW_PATH]);
+    const keys = writes.map(([, init]) => new Headers(init?.headers).get("Idempotency-Key"));
+    expect(keys[0]).toBeTruthy();
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).not.toBe(keys[0]);
+  });
+
+  it("retains the display name and original request on a legacy review inbox", async () => {
+    window.history.replaceState(null, "", "#review");
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/inbox") return Response.json({ items: [REVIEW_ITEM] });
+      if (input === "/api/review" && init?.method === "POST") return Response.json({ id: "legacy-review" });
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.change(await screen.findByLabelText(en.review.reviewer), { target: { value: "Reviewer" } });
+    fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "Reviewed exact scope." } });
+    fireEvent.click(screen.getByRole("button", { name: en.review.approve }));
+    expect(await screen.findByText(en.review.approved)).toBeTruthy();
+    const writes = fetch.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(writes).toHaveLength(1);
+    const [path, request] = writes[0]!;
+    expect(path).toBe("/api/review");
+    expect(JSON.parse(String(request?.body))).toEqual({
+      evidence_id: EVIDENCE,
+      action: "approve",
+      actor: "Reviewer",
+      reason: "Reviewed exact scope.",
+    });
+    expect(new Headers(request?.headers).has("Idempotency-Key")).toBe(false);
   });
 
   it("restores the desktop node and reports subsequent workbench selections", async () => {

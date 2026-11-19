@@ -40,7 +40,10 @@ def bind_workspace(workspace):
             paths.bind_database(workspace, identifier)
             return identifier
 
-        return store.transaction("human", bind)
+        identifier = store.transaction("human", bind)
+        if user := store.local_user():
+            paths.bind_local_user(workspace, user["id"])
+        return identifier
 
 
 class Store:
@@ -144,6 +147,22 @@ class Store:
     def verify_runtime_roles(self, *, roles=_ROLES):
         for role in roles:
             self._call(role, lambda conn: self._verify_role(role, conn))
+
+    def local_identity_installed(self):
+        return self.query("human", """
+            SELECT to_regprocedure('rm.current_local_user()') IS NOT NULL AS installed
+        """)[0]["installed"]
+
+    def local_user(self):
+        """Resolve identity from the bound database and verify any saved local marker."""
+        if not self.local_identity_installed():
+            return None
+        rows = self.query("human", "SELECT * FROM rm.current_local_user()")
+        user = rows[0] if rows else None
+        saved = paths.local_user_id(paths.active_workspace())
+        if saved is not None and (user is None or saved != user["id"]):
+            raise ValueError("The saved research user differs from the database identity.")
+        return user
 
     def freeze(self, claim, actor_ref):
         validate("claim", "ClaimContract", claim)

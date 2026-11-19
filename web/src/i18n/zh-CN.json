@@ -178,6 +178,7 @@
     "approved": "已批准并记录。",
     "returned": "已附上说明退回。",
     "needNameAndReason": "请先填写名字和理由。",
+    "needReason": "请先填写理由。",
     "context": "上下文",
     "status": "状态",
     "cliNote": "这类事项目前在命令行里处理："
@@ -294,6 +295,14 @@
     "fallback": "模型"
   },
   "errors": {
+    "request.invalid": "请核对审阅决定和理由。",
+    "request.unauthenticated": "请从本机课题重新打开工作台以恢复会话。",
+    "request.forbidden": "当前会话无法记录审阅决定。",
+    "review.identity_required": "请将此课题绑定到本机数据库，再重新打开工作台记录审阅决定。",
+    "review.not_found": "当前工作区中无法查看此证据。",
+    "review.not_pending": "此证据已不在待审阅列表中。",
+    "idempotency.conflict": "此请求编号已用于另一项决定。请重新打开审阅并核对当前状态。",
+    "database.unavailable": "课题数据库暂不可用，请检查连接后重试。",
     "unreadable_response": "本机服务返回了无法读取的响应。",
     "request_failed": "本机服务未能读取项目。",
     "project.theorem.invalid": "请检查定理各字段及其长度。",

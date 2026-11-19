@@ -134,7 +134,8 @@ export function useInbox(session: string) {
   return useQuery({
     queryKey: ["inbox"],
     refetchInterval: LIVE_MS,
-    queryFn: ({ signal }) => api<{ items: InboxItem[] }>(session, "/api/inbox", { signal }),
+    queryFn: ({ signal }) =>
+      api<{ items: InboxItem[]; review_identity?: { workspace_id: string } }>(session, "/api/inbox", { signal }),
   });
 }
 export function useLibrary(session: string) {
