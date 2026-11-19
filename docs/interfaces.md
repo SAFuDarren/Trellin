@@ -12,7 +12,7 @@ These are the contracts that contributors, plugins, agents and the interface bui
 | [CLI conventions](#2-cli-conventions) | **Stable** | Now |
 | [Database boundary](#3-database-boundary) | **Stable** | Now |
 | [HTTP API v1](#4-http-api-v1) | Draft v1 | Roadmap P1.2 lands |
-| [Events v1](#5-events-v1) | Draft v1 | P1.3 lands |
+| [Events v1](#5-events-v1) | **Stable** | P1.3 |
 | [Plugin protocol v1](#6-plugin-protocol-v1) | Draft v1 | P2.3 lands |
 | [MCP tools](#7-mcp-tools) | Draft | P2.4 lands |
 | [Worker protocol v1](#8-worker-protocol-v1) | Draft v1 | P3.3 lands |
@@ -189,7 +189,7 @@ The current policy remains part of the contract:
 
 ## 5. Events v1
 
-Draft v1. It becomes stable when P1.3 lands. The envelope is defined in `event.schema.json`:
+The envelope is defined in `event.schema.json`.
 
 ```json
 {
@@ -211,6 +211,18 @@ Draft v1. It becomes stable when P1.3 lands. The envelope is defined in `event.s
 - Delivery is at least once. Consumers deduplicate by `id`. Order is guaranteed only within one workspace.
 - Server-sent events: `GET /api/v1/workspaces/{id}/events`. Each message sets `id:` to the event id and `event:` to the type, and `data:` carries the envelope. Clients resume with `Last-Event-ID`.
 - `data` carries identifiers and short summaries, never credentials. Large or sensitive content is fetched through the API with the reader's permissions.
+
+Database revision `0076` adds `workspace.changed` for committed writes across
+the workspace. Its subject is the workspace and its data contains the affected
+area and, when available, a claim ID. Related changes to the same area and
+claim in one transaction can share a hint. The reader fetches current state
+from the existing API. Existing event types and cursors keep their meaning.
+
+`GET /api/inbox` advertises full coverage as
+`workspace_events.coverage = "workspace-writes-v1"`. A workbench that sends
+`X-RM-Workbench-Updates: workspace-writes-v1` may also receive the SSE comment
+`: workbench-runtime-changed`. It prompts a read of runtime status, including
+transitions such as an elapsed lease. Comments carry no cursor.
 
 ---
 

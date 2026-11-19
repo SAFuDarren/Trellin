@@ -16,6 +16,7 @@ from research_multiplier.cli._output import json_default
 from research_multiplier.proof.lean_watch import LakeWatch
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
+from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, research_progress, workbench_activity,
                                           workbench_guidance, workbench_intake, workbench_proof_tasks,
                                           workbench_review, workbench_sections, workbench_theorems, workspace_events)
@@ -140,6 +141,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self.closing = threading.Event()
         self._running_policy = None
         self._failed_policy = None
+        self.runtime_updates = RuntimeUpdates(self._local_proof_worker)
         super().__init__(("127.0.0.1", port), _Handler)
         self.host = f"127.0.0.1:{self.server_port}"
         self.origin = f"http://{self.host}"
@@ -189,6 +191,10 @@ class WorkbenchServer(ThreadingHTTPServer):
             return store.transaction("human", lambda: workbench_guidance.add(
                 store, claim_id, statement_id, request_id, node_id, text, audience=audience, confirm_release=confirmed,
             ))
+
+    def _local_proof_worker(self):
+        with self._proof_task_lock:
+            return self._running_policy, self._failed_policy
 
     def proof_task(self, claim_id):
         task = self.read(workbench_proof_tasks.snapshot, claim_id)
@@ -400,9 +406,15 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             after = int(cursor)
         streaming = False
+        runtime_version = (
+            self.server.runtime_updates.version
+            if self.headers.get("X-RM-Workbench-Updates") == workspace_events.FULL_COVERAGE else None
+        )
         try:
             with paths.use_workspace(self.server.workspace, strict=True), Store() as store:
-                with workspace_events.subscribe(store, workspace_id, after, closing=self.server.closing) as events:
+                with workspace_events.subscribe(
+                    store, workspace_id, after, closing=self.server.closing, runtime_version=runtime_version,
+                ) as events:
                     self.close_connection = True
                     streaming = True
                     self._headers(HTTPStatus.OK, "text/event-stream; charset=utf-8")
@@ -411,6 +423,8 @@ class _Handler(BaseHTTPRequestHandler):
                     for event in events:
                         if event is None:
                             frame = b": heartbeat\n\n"
+                        elif event is workspace_events.RUNTIME_CHANGED:
+                            frame = b": workbench-runtime-changed\n\n"
                         else:
                             data = json.dumps(event, default=json_default, ensure_ascii=False, separators=(",", ":"))
                             frame = f"id: {event['id']}\nevent: {event['type']}\ndata: {data}\n\n".encode("utf-8")

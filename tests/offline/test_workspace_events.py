@@ -22,9 +22,10 @@ EVIDENCE = UUID("33333333-3333-4333-8333-333333333333")
 class EventStore:
     workspace_id = WORKSPACE
 
-    def __init__(self, latest=0, *, installed=True, user=USER, wait=lambda _timeout: False):
+    def __init__(self, latest=0, *, installed=True, complete=False, user=USER, wait=lambda _timeout: False):
         self.latest = latest
         self.installed = installed
+        self.complete = complete
         self.user = user
         self.wait = wait
         self.calls = []
@@ -35,6 +36,8 @@ class EventStore:
 
     def query(self, role, statement, *args):
         assert role == "human"
+        if "rm.capture_workspace_change_event()" in statement:
+            return [{"installed": self.complete}]
         if "to_regprocedure" in statement:
             return [{"installed": self.installed}]
         assert args[0] == self.workspace_id
@@ -70,6 +73,10 @@ def test_capability_reports_the_current_cursor_only_for_an_eligible_workspace():
     }
     assert events.capability(EventStore(installed=False)) == {}
     assert events.capability(EventStore(user=None)) == {}
+
+    assert events.capability(EventStore(19, complete=True)) == {
+        "workspace_events": {"workspace_id": str(WORKSPACE), "cursor": "19", "coverage": "workspace-writes-v1"},
+    }
 
 
 def test_unattributed_worker_event_keeps_system_provenance():

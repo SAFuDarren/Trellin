@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.14
+
+- Record clarification, agent activity, intake, library and other committed
+  workspace changes in the existing resumable event stream.
+- Database revision `0076` follows `0075`. Existing records and event cursors
+  carry forward through the migration.
+
 ## 1.0.13
 
 - Refresh open research views for confirmed scopes, withdrawals and proof task
