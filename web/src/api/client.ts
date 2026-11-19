@@ -67,7 +67,13 @@ function request(
   });
 }
 
-export function workspaceEventStream(session: string, workspace: string, cursor: string, signal: AbortSignal) {
+export function workspaceEventStream(
+  session: string,
+  workspace: string,
+  cursor: string,
+  signal: AbortSignal,
+  coverage?: string,
+) {
   return request(
     session,
     `/api/v1/workspaces/${encodeURIComponent(workspace)}/events`,
@@ -75,6 +81,7 @@ export function workspaceEventStream(session: string, workspace: string, cursor:
     {
       Accept: "text/event-stream",
       "Last-Event-ID": cursor,
+      ...(coverage ? { "X-RM-Workbench-Updates": coverage } : {}),
     },
   );
 }

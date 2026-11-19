@@ -39,9 +39,18 @@ Database revision `0074` adds a workspace event stream for evidence reviews. An 
 
 Database revision `0075` also records confirmed claims and premises, confirmed Lean statements, retirements of premises and verification inputs, proof task activity, new evidence, and adopted conclusions. Clients can use these events to refresh existing views. The dependency rules still determine which proofs need recheck, including claims that reused a retired result. Event frames carry IDs and operation types, without exposing proof text or review notes.
 
-With the live workbench, approving or returning evidence from the CLI updates the Review list, the selected claim's graph and the workspace overview in an open window. After a connection drops, the workbench resumes after the last event it applied. The existing periodic refresh keeps working while disconnected and for changes that the event stream does not yet cover.
+With the live workbench, approving or returning evidence from the CLI updates the Review list, the selected claim's graph and the workspace overview in an open window. After a connection drops, the workbench resumes after the last event it applied. On revisions `0074` and `0075`, periodic refresh also covers operations outside those revisions' event coverage.
 
 With revision `0075` and the updated workbench, confirmed claims and premises, proof task changes, and withdrawals also refresh the affected views. A withdrawn dependency may affect multiple claims. The workbench re-reads their current assurance status, including proofs that must be checked again. The proof task dialog shows active CLI worker leases and the recorded verification result.
+
+With revision `0076` and Research Multiplier `1.0.15` or later, clarifications,
+agent guidance and replies, intake changes, library changes and other
+workspace writes update the relevant views. While the event stream is
+healthy, these views refresh on events. During an interruption they check
+for changes periodically, then replay missed events when the connection
+returns. Older databases keep the earlier refresh behavior. Agent text and
+clarification answers remain in the workspace and are fetched through the
+existing authorized views.
 
 The workbench has four areas. The left column lists the project's claims by domain, with a search field. The centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **If withdrawn**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser; **Settings** can reset them. The interface is in English by default; choose **简体中文** in **Settings** to switch to Chinese, and the choice is remembered too. The map can be dragged by its title and resized from its corner.
 

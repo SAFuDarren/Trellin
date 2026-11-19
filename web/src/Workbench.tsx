@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { api, type ClaimsResponse } from "./api/client";
+import { useFallbackInterval } from "./api/liveUpdates";
 import { ChatPanel } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
 import { ProjectActions } from "./components/project/ProjectActions";
@@ -123,7 +124,7 @@ export function Workbench({
   const activity = useQuery({
     queryKey: ["activity", claimId],
     enabled: Boolean(graph),
-    refetchInterval: ACTIVITY_MS,
+    refetchInterval: useFallbackInterval(ACTIVITY_MS),
     queryFn: async ({ signal }) => {
       const reply = await api<ActivitySnapshot>(session, "/api/activity?claim=" + encodeURIComponent(claimId!), {
         signal,

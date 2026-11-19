@@ -12,9 +12,22 @@ export function workspaceId(value: unknown): value is string {
 }
 
 type Frame = { id: string; type: string; data: string };
+const CHANGED_AREAS = [
+  "activity",
+  "clarification",
+  "intake",
+  "library",
+  "claim",
+  "proof",
+  "operations",
+  "workspace",
+] as const;
+type ChangedArea = (typeof CHANGED_AREAS)[number];
+export type WorkspaceStreamSignal = "connected" | "heartbeat" | "runtime-changed";
 export type WorkspaceRefresh =
   | { kind: "claim" | "basis" | "proof" | "proof-result" | "job" | "evidence"; claimId: string }
-  | { kind: "library" | "basis-item" | "recheck" };
+  | { kind: "library" | "basis-item" | "recheck" | "runtime" }
+  | { kind: "change"; area: ChangedArea; claimId?: string };
 type WorkspaceEvent = { id: string; refresh?: WorkspaceRefresh };
 
 const SUBJECT: Readonly<Record<string, string | undefined>> = {
@@ -33,10 +46,11 @@ const SUBJECT: Readonly<Record<string, string | undefined>> = {
   "job.status_changed": "job",
   "evidence.recorded": "evidence",
   "evidence.reviewed": "evidence",
+  "workspace.changed": "workspace",
 };
 
 /** Parse a flow of text chunks, including the CRLF split across two chunks. */
-function assembleFrames() {
+function assembleFrames(onSignal?: (signal: WorkspaceStreamSignal) => void) {
   let tail = "";
   let skipLf = false;
   let id = "";
@@ -63,6 +77,9 @@ function assembleFrames() {
       }
       length += line.length + 1;
       if (length > MAX_FRAME_LENGTH) throw new Error("Event frame too large.");
+      if (line === ": connected") onSignal?.("connected");
+      else if (line === ": heartbeat") onSignal?.("heartbeat");
+      else if (line === ": workbench-runtime-changed") onSignal?.("runtime-changed");
       const colon = line.indexOf(":");
       if (colon <= 0) continue;
       const field = line.slice(0, colon);
@@ -101,6 +118,12 @@ function refreshHint(
   }
   if (type === "basis_item.confirmed") return { kind: "basis-item" };
   if (type === "basis_item.retired") return { kind: "recheck" };
+  if (type === "workspace.changed") {
+    const area = CHANGED_AREAS.find((candidate) => candidate === data.area);
+    if (subject.id !== workspace || !area) return null;
+    if (data.claim_id == null) return { kind: "change", area };
+    return workspaceId(data.claim_id) ? { kind: "change", area, claimId: data.claim_id } : null;
+  }
   if (type === "verification_input.retired") {
     return subject.id === workspace && ["verifier", "environment", "source"].some((kind) => kind === data.input_kind)
       ? { kind: "recheck" }
@@ -184,10 +207,11 @@ export async function readWorkspaceEvents(
   workspace: string,
   signal: AbortSignal,
   receive: (events: WorkspaceEvent[]) => void,
+  onSignal?: (kind: WorkspaceStreamSignal) => void,
 ) {
   const reader = body.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
-  const parse = assembleFrames();
+  const parse = assembleFrames(onSignal);
   const cancel = () => {
     void reader.cancel().catch(() => {});
   };

@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.15
+
+- Update workbench views for clarifications, agent conversations and other
+  committed workspace changes. While the complete stream is connected, the
+  views update from events. Periodic refresh resumes during interruptions.
+
 ## 1.0.14
 
 - Record clarification, agent activity, intake, library and other committed

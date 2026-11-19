@@ -91,6 +91,7 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 - On database revision `0073` or later, [review evidence](proof-workbench.md#read-a-graph) under the local researcher identity from the bound workspace.
 - On database revision `0074`, new evidence approvals and returns appear automatically in an open workbench, including decisions made in the terminal.
 - On database revision `0075`, the open workbench also updates after scope confirmation, withdrawal and proof task changes, including a CLI worker's progress.
+- On revision `0076` with Research Multiplier `1.0.15` or later, clarifications, agent conversations and other workspace updates appear in the open workbench. Periodic refresh is used during disconnection and missed events are replayed after reconnecting.
 - [Search Formalpedia offline](literature-search.md#search-formalpedia-locally) without creating a research database. To replay a selected result within a confirmed Lean scope, follow the same guide after enabling its database feature.
 - Run `research-multiplier research resume --format text` to inspect progress and decisions in a configured project. [Resume and advancement](research-progress.md)
 

@@ -117,6 +117,38 @@ describe("Workspace event frames", () => {
     expect(workspaceEventCursor("9223372036854775807")).toBe(true);
   });
 
+  it("separates exact control comments from durable scoped writes", async () => {
+    const change = {
+      ...REVIEW,
+      type: "workspace.changed",
+      subject: { kind: "workspace", id: WORKSPACE },
+      actor: { kind: "system", id: null },
+      data: { area: "activity", claim_id: CLAIM },
+    };
+    const enc = new TextEncoder();
+    const receive = vi.fn();
+    const signal = vi.fn();
+    await readWorkspaceEvents(
+      source([
+        enc.encode(": connected\n\n: workbench-runtime-"),
+        enc.encode(
+          "changed\n\n: workbench-runtime-changed extra\n\n: heartbeat\n\n" +
+            frame({ ...change, id: "3", subject: { ...change.subject, id: CLAIM } }) +
+            frame({ ...change, id: "4", data: { ...change.data, claim_id: "bad" } }) +
+            frame(change),
+        ),
+      ]),
+      WORKSPACE,
+      new AbortController().signal,
+      receive,
+      signal,
+    );
+    expect(signal.mock.calls).toEqual([["connected"], ["runtime-changed"], ["heartbeat"]]);
+    expect(receive.mock.calls).toEqual([
+      [[{ id: "2", refresh: { kind: "change", area: "activity", claimId: CLAIM } }]],
+    ]);
+  });
+
   it("cancels and releases an idle body when its workspace closes", async () => {
     const cancel = vi.fn();
     const stream = new ReadableStream<Uint8Array>({ cancel });

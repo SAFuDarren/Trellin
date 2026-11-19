@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
+import { useFallbackInterval } from "../../api/liveUpdates";
 import { href } from "../../shell/route";
 
 type ProofTask = {
@@ -131,7 +132,7 @@ export function ProofTaskPane({ session, claimId }: { session: string; claimId: 
       if (task.claim_id !== claimId) throw new Error("proof_task.scope_mismatch");
       return task;
     },
-    refetchInterval: 4000,
+    refetchInterval: useFallbackInterval(4000),
     retry: false,
   });
   const action = useMutation({
