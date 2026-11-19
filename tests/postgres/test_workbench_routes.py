@@ -15,7 +15,7 @@ from research_multiplier.storage import paths
 from research_multiplier.storage.artifacts import Artifacts
 from research_multiplier.storage.postgres import Store, bind_workspace
 from research_multiplier.workbench.server import WorkbenchServer
-from research_multiplier.workflows import formalization, intake
+from research_multiplier.workflows import formalization, intake, research_plans
 from tests._native_db import disposable_project_logins
 
 
@@ -98,8 +98,8 @@ def _pending_evidence(workspace):
 
 
 @pytest.fixture
-def workbench(tmp_path, monkeypatch):
-    with disposable_project_logins() as logins:
+def workbench(tmp_path, monkeypatch, request):
+    with disposable_project_logins(revision=getattr(request, "param", "head")) as logins:
         for name in tuple(os.environ):
             if name.startswith("RM_"):
                 monkeypatch.delenv(name)
@@ -336,6 +336,57 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
         assert record["occurred_at"].endswith("Z")
     finally:
         reader.close()
+
+
+@pytest.mark.parametrize("include_legacy_name", [False, True])
+def test_legacy_review_records_the_session_identity(workbench, include_legacy_name, monkeypatch):
+    server, _, _, evidence_id = workbench
+    body = {"evidence_id": evidence_id, "action": "approve", "reason": REASON}
+    if include_legacy_name:
+        body["actor"] = "Caller-selected name"
+
+    with monkeypatch.context() as mismatched:
+        different_user = uuid4()
+        mismatched.setattr(paths, "local_user_id", lambda workspace: different_user)
+        _request(server, "POST", "/api/review", body=body, status=403)
+    created = _request(server, "POST", "/api/review", body=body)
+
+    local_user = paths.local_user_id(server.workspace)
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        records = store.query("human", "SELECT id::text, actor_ref, user_id FROM rm.decisions WHERE evidence_id=%s",
+                              evidence_id)
+    assert records == [{"id": created["id"], "actor_ref": "Local researcher", "user_id": local_user}]
+
+
+@pytest.mark.parametrize("workbench", ["0072"], indirect=True)
+def test_legacy_review_keeps_the_original_contract_before_identity(workbench):
+    server, _, _, evidence_id = workbench
+    body = {"evidence_id": evidence_id, "action": "approve", "reason": REASON}
+    _request(server, "POST", "/api/review", body=body, status=400)
+    created = _request(server, "POST", "/api/review", body={**body, "actor": ACTOR})
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        records = store.query("human", "SELECT id::text, actor_ref FROM rm.decisions WHERE evidence_id=%s", evidence_id)
+    assert records == [{"id": created["id"], "actor_ref": ACTOR}]
+
+
+def test_plan_records_creation_and_cancellation_identity(workbench):
+    server, claim_id, _, _ = workbench
+    user = paths.local_user_id(server.workspace)
+    assert user is not None
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        packet = formalization.read(store, "claim_id", claim_id)
+        plan = research_plans.create({
+            "title": "Store draft attribution",
+            "max_parallel": 1,
+            "budget_seconds": 60,
+            "steps": [{"key": "snapshot", "action": "snapshot", "packet_id": str(packet["id"])}],
+        })
+        assert plan["user_id"] == user and plan["cancelled_user_id"] is None
+        assert research_plans.cancel(plan["id"], REASON)["id"] == plan["id"]
+        queried = research_plans.show(plan["id"])
+        assert queried["plan"]["user_id"] == queried["plan"]["cancelled_user_id"] == user
+        assert queried["plan"]["body_sha256"] == plan["body_sha256"]
+        assert queried["steps"][0]["status"] == "cancelled"
 
 
 def test_opted_in_stream_notifies_lease_expiry_without_advancing_the_cursor(workbench):

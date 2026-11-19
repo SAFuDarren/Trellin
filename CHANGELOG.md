@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.16
+
+- Attribute remaining human research decisions and policy records to the
+  authenticated local researcher. The legacy review route also resolves the
+  signed-in user after upgrade and accepts its prior payload.
+- Database revision `0077` follows `0076` and preserves historical authorship.
+
 ## 1.0.15
 
 - Update workbench views for clarifications, agent conversations and other

@@ -13,6 +13,27 @@ def capability(store):
     return {}
 
 
+def _local_user(store):
+    try:
+        return store.local_user()
+    except DatabaseOperationError:
+        raise
+    except ValueError:
+        raise ReviewError("review.identity_required") from None
+
+
+def legacy(store, evidence_id, action, actor, reason):
+    """Preserve the old review response and support databases predating identity."""
+    user = _local_user(store)
+    if user is not None:
+        actor = user["display_name"]
+    elif store.local_identity_installed():
+        raise ReviewError("review.identity_required")
+    elif actor is None:
+        raise ReviewError("review.legacy_name_required")
+    return {"id": store.review(evidence_id, action, actor, reason)}
+
+
 def authenticated(store, workspace_id, evidence_id, document, idempotency_key):
     if workspace_id != store.workspace_id:
         raise ReviewError("review.not_found")
@@ -26,12 +47,7 @@ def authenticated(store, workspace_id, evidence_id, document, idempotency_key):
         reason.encode("utf-8")
     except UnicodeError:
         raise ReviewError("request.invalid") from None
-    try:
-        user = store.local_user()
-    except DatabaseOperationError:
-        raise
-    except ValueError:
-        raise ReviewError("review.identity_required") from None
+    user = _local_user(store)
     if user is None:
         raise ReviewError("review.identity_required")
     try:

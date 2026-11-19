@@ -126,6 +126,8 @@ Draft v1. It becomes stable when P1.2 lands. The OpenAPI document generated in P
 - Every state-changing request is checked for a matching `Origin` (browser) or a bearer token (CLI and workers).
 - Identity always comes from the session or token. Request bodies never name the acting user (B4).
 
+The compatibility route `POST /api/review` accepts `evidence_id`, `action`, and `reason`, and returns the original `{ "id": … }` response. On database revision `0073` or later it resolves the local researcher from the bound workspace. Older clients can still send `actor`; that field is used as the display name on databases before `0073` only. The versioned review route requires neither an actor name nor a user ID in the request body.
+
 ### Methods and actions
 
 - `GET` reads and never changes state.
