@@ -32,6 +32,9 @@ This copy matches the Research Multiplier version that wrote it. Run
    sent and to which kind of service. Unpublished work is usually `restricted`.
    Never mark material `public` or run `research release-item` unless the
    researcher says it is public.
+   In Trellin, a public intake preview authorizes one exact request. A public
+   proof task authorizes the displayed frozen scope, selected connection and
+   maximum rounds. A changed scope or connection needs renewed consent.
 3. **Leave the project's records to the program.** Do not edit or delete anything
    under `runs/`, `objects/`, `evaluation/`, `backups/` or `lean-project/`, the
    `.research-multiplier*` marker files, or the database. Write your own drafts

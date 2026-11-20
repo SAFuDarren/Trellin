@@ -7,6 +7,7 @@ import re
 import shutil
 import sqlite3
 import stat
+import sys
 from uuid import UUID, uuid4
 
 from research_multiplier.model_adapters import PROVIDERS, ModelConfig, ModelRequest, _adapter, _validate_reply
@@ -16,6 +17,7 @@ from research_multiplier.models.model_errors import ModelFailure
 from research_multiplier.models.model_http import post_json
 from research_multiplier.protocol.serialization import fingerprint
 from research_multiplier.storage import credentials
+from research_multiplier.storage.managed_workspaces import application_home
 
 
 _NATIVE_PROVIDERS = {"codex-cli": "Codex", "claude-code": "Claude Code"}
@@ -161,13 +163,21 @@ def _test(config):
         raise ModelFailure("invalid_output", "Connection check returned no complete response.")
 
 
+def _settings_file():
+    legacy = credentials.directory().parent / "model-connections.sqlite3"
+    if sys.platform != "darwin":
+        return legacy
+    installed = application_home() / "Settings" / legacy.name
+    if not installed.exists() and legacy.exists():
+        return legacy
+    return installed
+
+
 class Registry:
     """Descriptors are immutable, so removing and re-adding a connection changes its ID."""
 
     def __init__(self, settings_file=None, *, secrets=None):
-        self._file = Path(settings_file) if settings_file is not None else (
-            credentials.directory().parent / "model-connections.sqlite3"
-        )
+        self._file = Path(settings_file) if settings_file is not None else _settings_file()
         self._secrets = secrets if secrets is not None else Keychain()
 
     @contextmanager

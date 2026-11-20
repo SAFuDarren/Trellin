@@ -37,6 +37,12 @@ export function connectionModelLabel(t: TFunction, { provider, model }: { provid
     : model;
 }
 
+export function connectionChoiceLabel(t: TFunction, connection: ModelConnection) {
+  const provider = t(`team.providers.${connection.provider}`, { defaultValue: connection.provider });
+  const label = connectionLabel(connection);
+  return `${provider} · ${label === provider ? connectionModelLabel(t, connection) : label}`;
+}
+
 export function dispatchableConnection(
   connection: ModelConnection,
 ): connection is ModelConnection & { fingerprint: string } {

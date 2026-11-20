@@ -7,6 +7,8 @@
   and reuse their existing logins. Store direct API keys in the macOS Keychain.
 - Use a connected model to organize an explicitly reviewed public excerpt
   and save the result for the existing intake review.
+- Authorize a selected connection for bounded proof work on a released
+  Lean scope. Review the model and its reported usage alongside local verification.
 
 ## 1.0.22
 

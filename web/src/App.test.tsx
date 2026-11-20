@@ -8,6 +8,10 @@ import en from "./i18n/en.json";
 import zhCN from "./i18n/zh-CN.json";
 
 const CLAIM = "11111111-1111-4111-8111-111111111111";
+const NATIVE_CONNECTIONS = [
+  { provider: "codex-cli", id: "codex", label: "Codex", login: "codex login" },
+  { provider: "claude-code", id: "claude", label: "Claude Code", login: "claude auth login" },
+] as const;
 const LEMMA = "lean:22222222-2222-4222-8222-222222222222";
 const WORKSPACE = "33333333-3333-4333-8333-333333333333";
 const EVIDENCE = "44444444-4444-4444-8444-444444444444";
@@ -1010,15 +1014,16 @@ describe("App", () => {
     });
   });
 
-  it("discovers installed tools in Team and connects only the selected signed-in tool", async () => {
+  it.each(NATIVE_CONNECTIONS)("discovers both tools and connects only the selected $label login", async (choice) => {
     window.history.replaceState(null, "", "#team/runtimes");
     let existing = false;
     let scans = 0;
+    const other = NATIVE_CONNECTIONS.find(({ id }) => id !== choice.id)!;
     const connection = {
-      id: "codex",
-      provider: "codex-cli",
+      id: choice.id,
+      provider: choice.provider,
       model: "native-default",
-      label: "Codex",
+      label: choice.label,
       status: "untested",
       fingerprint: "fingerprint",
     };
@@ -1033,16 +1038,20 @@ describe("App", () => {
       if (input === "/api/model-connections/native") {
         scans++;
         return Response.json({
-          providers: [
-            { provider: "codex-cli", status: "signed_in" },
-            { provider: "claude-code", status: scans === 1 ? "connection.authentication" : "signed_in" },
-          ],
+          providers: NATIVE_CONNECTIONS.map(({ id, provider }) => ({
+            provider,
+            status: id === other.id && scans === 1 ? "connection.authentication" : "signed_in",
+          })),
         });
       }
       if (input === "/api/model-connections/add-native") {
-        expect(JSON.parse(String(init?.body))).toEqual({ provider: "codex-cli" });
+        expect(JSON.parse(String(init?.body))).toEqual({ provider: choice.provider });
         existing = true;
         return Response.json(connection);
+      }
+      if (input === "/api/model-connections/test") {
+        expect(JSON.parse(String(init?.body))).toEqual({ id: connection.id });
+        return Response.json({ status: "connected" });
       }
       if (input === "/api/model-connections/remove") {
         expect(JSON.parse(String(init?.body))).toEqual({ id: connection.id });
@@ -1058,20 +1067,22 @@ describe("App", () => {
     expect(screen.queryByText(en.team.providers.openai)).toBeNull();
     expect(scans).toBe(0);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.add }));
-    const codex = await connections.findByRole("button", { name: "Connect Codex" });
-    expect(connections.getByRole("button", { name: "Connect Claude Code" }).hasAttribute("disabled")).toBe(true);
-    expect(connections.getByText(/claude auth login/)).toBeTruthy();
+    const connect = await connections.findByRole("button", { name: `Connect ${choice.label}` });
+    const otherConnect = connections.getByRole("button", { name: `Connect ${other.label}` });
+    expect(otherConnect.hasAttribute("disabled")).toBe(true);
+    expect(connections.getByText(new RegExp(other.login))).toBeTruthy();
     expect(connections.queryByLabelText(en.modelConnections.provider)).toBeNull();
     expect(connections.queryByLabelText(en.modelConnections.model)).toBeNull();
     expect(connections.queryByLabelText(en.modelConnections.apiKey)).toBeNull();
     expect(fetch.mock.calls.some(([path]) => path.endsWith("/add-native"))).toBe(false);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.refreshNative }));
-    await waitFor(() =>
-      expect(connections.getByRole("button", { name: "Connect Claude Code" }).hasAttribute("disabled")).toBe(false),
-    );
-    fireEvent.click(codex);
+    await waitFor(() => expect(otherConnect.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(connect);
     expect(await connections.findByText(/Default model/)).toBeTruthy();
-    expect(connections.queryByText(en.team.providers["claude-code"])).toBeNull();
+    expect(connections.queryByText(other.label)).toBeNull();
+    expect(fetch.mock.calls.some(([path]) => path.endsWith("/test"))).toBe(false);
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.test }));
+    expect(await connections.findByText(en.modelConnections.status.connected)).toBeTruthy();
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.remove }));
     expect(fetch.mock.calls.filter(([path]) => path.endsWith("/remove"))).toHaveLength(0);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.removeConfirm }));
@@ -1110,13 +1121,13 @@ describe("App", () => {
     expect(fetch.mock.calls.some(([path]) => path === "/api/model-connections/add-native")).toBe(false);
   });
 
-  it("previews the exact public excerpt and recipient before calling a provider", async () => {
+  it.each(NATIVE_CONNECTIONS)("previews the exact public excerpt before calling $label", async (choice) => {
     const content = "Addition of natural numbers is commutative.";
     const connection = {
-      id: "claude",
-      provider: "claude-code",
-      label: "My Claude",
-      model: "sonnet",
+      id: choice.id,
+      provider: choice.provider,
+      label: choice.label,
+      model: "native-default",
       status: "connected",
       fingerprint: "fingerprint",
     };
@@ -1127,6 +1138,7 @@ describe("App", () => {
       if (input === "/api/project-intake/models") return Response.json({ models: [] });
       if (input.endsWith("/public-preview")) {
         proposed = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        expect(proposed.connection_id).toBe(choice.id);
         const { domain, objective, notes } = proposed;
         return Response.json({
           token: "reviewed",
@@ -1146,15 +1158,16 @@ describe("App", () => {
     renderApp("token");
     fireEvent.click(await screen.findByRole("button", { name: en.projectEntry.organize }));
     const dialog = within(await screen.findByRole("dialog"));
-    await dialog.findByRole("option", { name: /My Claude/ });
+    const recipient = `${choice.label} · ${en.modelConnections.defaultModel}`;
+    await dialog.findByRole("option", { name: recipient });
     fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.model), {
-      target: { value: "connection:claude" },
+      target: { value: `connection:${choice.id}` },
     });
     fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: content } });
     fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.analyze }));
     const preview = within(await dialog.findByRole("region", { name: en.modelConnections.publicPreview }));
     expect(preview.getByText(new RegExp(content))).toBeTruthy();
-    expect(preview.getByText(/Claude Code · sonnet/)).toBeTruthy();
+    expect(preview.getByText(recipient)).toBeTruthy();
     expect(fetch.mock.calls.some(([path]) => path.endsWith("/public-draft"))).toBe(false);
     fireEvent.click(preview.getByRole("button", { name: en.modelConnections.sendPublic }));
     expect(await dialog.findByText("Reviewed public notes")).toBeTruthy();

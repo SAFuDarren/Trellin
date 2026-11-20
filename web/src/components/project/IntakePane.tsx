@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import {
-  connectionLabel,
+  connectionChoiceLabel,
   connectionModelLabel,
   dispatchableConnection,
   useModelConnections,
@@ -265,14 +265,17 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
                 ))}
                 {available.map((connection) => (
                   <option key={connection.id} value={`connection:${connection.id}`}>
-                    {t(`team.providers.${connection.provider}`, { defaultValue: connection.provider })}
-                    {" · "}
-                    {connectionLabel(connection)}
+                    {connectionChoiceLabel(t, connection)}
                   </option>
                 ))}
               </select>
             </label>
           </div>
+          {connections.isError && (
+            <p className="project-entry-status" role="alert">
+              {t("errors.connection.unavailable")}
+            </p>
+          )}
           {!models.isPending && !connections.isPending && !canChoose && (
             <div className="project-entry-buttons">
               <a className="button" href={href("team", "runtimes")}>

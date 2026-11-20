@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { useFallbackInterval } from "../../api/liveUpdates";
 import {
-  connectionLabel,
+  connectionChoiceLabel,
   connectionModelLabel,
   dispatchableConnection,
   useModelConnections,
@@ -94,18 +94,20 @@ function StartTaskForm({
 }) {
   const { t } = useTranslation();
   const [rounds, setRounds] = useState(policy?.model_rounds ?? 0);
-  const [approved, setApproved] = useState(false);
+  const [approvedScope, setApprovedScope] = useState<string | null>(null);
   const [connectionId, setConnectionId] = useState("");
   const selected = policy?.public_model ?? connections.find(({ id }) => id === connectionId);
   const model = selected && `${t(`team.providers.${selected.provider}`)} · ${connectionModelLabel(t, selected)}`;
   const blockedSelection = Boolean((requiresExternal || connectionId) && !selected);
+  const authorization = JSON.stringify([token, rounds, selected?.id, selected?.fingerprint]);
+  const approved = approvedScope === authorization;
 
   function start(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!approved || pending || blockedSelection) return;
     const reason = String(new FormData(event.currentTarget).get("reason") ?? "").trim();
     if (!reason) return;
-    setApproved(false);
+    setApprovedScope(null);
     onStart({
       token,
       model_rounds: rounds,
@@ -125,13 +127,13 @@ function StartTaskForm({
               const id = event.target.value;
               setConnectionId(id);
               setRounds(id ? 1 : 0);
-              setApproved(false);
+              setApprovedScope(null);
             }}
           >
             <option value="">{t(requiresExternal ? "proofTask.modelConnection" : "proofTask.noExternal")}</option>
             {connections.map((connection) => (
               <option key={connection.id} value={connection.id}>
-                {connectionLabel(connection)}
+                {connectionChoiceLabel(t, connection)}
               </option>
             ))}
           </select>
@@ -146,7 +148,7 @@ function StartTaskForm({
             disabled={pending}
             onChange={(event) => {
               setRounds(Number(event.target.value));
-              setApproved(false);
+              setApprovedScope(null);
             }}
           >
             {(selected ? [1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 2, 3, 4, 5, 6, 7, 8]).map((count) => (
@@ -157,7 +159,7 @@ function StartTaskForm({
           </select>
         </label>
       )}
-      {!selected && (
+      {!selected && !requiresExternal && (
         <p className="project-entry-note">
           {t(rounds ? "proofTask.localAllowance" : "proofTask.programOnly", { count: rounds })}
         </p>
@@ -172,7 +174,7 @@ function StartTaskForm({
           checked={approved}
           disabled={pending || blockedSelection}
           required
-          onChange={(event) => setApproved(event.target.checked)}
+          onChange={(event) => setApprovedScope(event.target.checked ? authorization : null)}
         />
         {t(model ? "proofTask.externalAuthorize" : "proofTask.authorize", { model, count: rounds })}
       </label>
@@ -200,12 +202,11 @@ export function ProofTaskPane({ session, claimId }: { session: string; claimId: 
     refetchInterval: useFallbackInterval(4000),
     retry: false,
   });
-  const connections = useModelConnections(
-    session,
+  const choosingConnection =
     task.data?.external_model_allowed === true &&
-      task.data.can_start &&
-      (task.data.state === "stopped" || !task.data.policy),
-  );
+    task.data.can_start &&
+    (task.data.state === "stopped" || !task.data.policy);
+  const connections = useModelConnections(session, choosingConnection);
   const action = useMutation({
     mutationFn: ({ kind, details }: Action) =>
       api<{ policy_id: string }>(session, "/api/proof-task/" + kind, { data: { claim_id: claimId, ...details } }),
@@ -351,6 +352,11 @@ export function ProofTaskPane({ session, claimId }: { session: string; claimId: 
       {action.error && (
         <p className="project-entry-status" role="alert">
           {t(`errors.${action.error.message}`, { defaultValue: t("projectEntry.failed") })}
+        </p>
+      )}
+      {choosingConnection && connections.isError && (
+        <p className="project-entry-status" role="alert">
+          {t("errors.connection.unavailable")}
         </p>
       )}
       {task.data.can_start && scope.token && (

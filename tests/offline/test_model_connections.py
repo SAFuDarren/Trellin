@@ -61,6 +61,24 @@ def test_added_connections_are_the_only_saved_profiles_and_keys_stay_separate(tm
     assert replacement["fingerprint"] != added["fingerprint"]
 
 
+def test_macos_registry_uses_trellin_settings_and_preserves_an_earlier_registry(tmp_path, monkeypatch):
+    app_home = tmp_path / "Trellin"
+    legacy_config = tmp_path / "config"
+    secrets = Secrets()
+    monkeypatch.setattr(connections.sys, "platform", "darwin")
+    monkeypatch.setenv("RM_TRELLIN_HOME", str(app_home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(legacy_config))
+    preferred = app_home / "Settings" / "model-connections.sqlite3"
+    legacy_path = legacy_config / "research-multiplier" / preferred.name
+    assert connections.Registry(secrets=secrets).list() == []
+    assert not preferred.exists() and not legacy_path.exists()
+    fields = {"provider": "anthropic", "model": "fixture", "api_key": "test-secret"}
+    legacy = connections.Registry(legacy_path, secrets=secrets).add(fields)
+    assert connections.Registry(secrets=secrets).list() == [legacy]
+    current = connections.Registry(preferred, secrets=secrets).add(fields)
+    assert connections.Registry(secrets=secrets).list() == [current]
+
+
 def test_keychain_failure_rolls_back_saved_descriptor(tmp_path):
     class Unavailable(Secrets):
         def add(self, identifier, value):
