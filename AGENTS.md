@@ -47,7 +47,7 @@ These come from the [engineering audit](docs/audits/README.md) and apply to ever
 - **Results stay reproducible.** Research outputs must be reproducible from the recorded code version, parameters, dependencies and data. Never rewrite recorded evidence or pinned verifier sources.
 - **Rules belong in CI.** When a rule keeps being missed, propose a check that enforces it instead of another paragraph of documentation.
 
-To run the periodic maturity audit, use the project skill `.claude/skills/engineering-audit/` ("run an engineering audit"). Agents without skill support can follow its `SKILL.md` directly. Audit findings are tracked in `docs/audits/` and as roadmap tasks.
+For a periodic maturity audit, use the rubric provided by the maintainer outside the checkout. Track shared findings as issues and link the reviewed audit summaries from `docs/audits/`.
 
 ## Working in parallel with other agents
 
@@ -56,7 +56,7 @@ Several agents and people may work on this repository at the same time. Follow t
 1. **Claim before you start, with the claim tool.** Every agent uses the same GitHub account, so pick a short name for this session (for example `claude-web` or `codex-backend-1`) and use it for every claim.
    - See who holds what: `python scripts/tasks.py board`.
    - Claim: `python scripts/tasks.py claim <issue> --agent <name> --branch <type>/<issue>-<topic> --scope <paths>`. The tool refuses issues that someone else holds or that need a decision. If two agents claim at the same moment, the later one withdraws automatically: start work only when the tool says `Claimed`.
-   - Release when you stop: `python scripts/tasks.py release <issue> --agent <name> --reason "..."`.
+   - Keep the claim while you own review follow-up. When you hand off or relinquish follow-up, record the branch and remaining work in the issue, then release with `python scripts/tasks.py release <issue> --agent <name> --reason "..."`.
    - Work only on an open issue. If no issue exists for what you were asked to do, ask the maintainer instead of starting.
    - Link the claimed issue in the PR with `Closes #N` when all criteria are met, or `Refs #N` for a partial change. CI checks the linked task and branch.
 2. **One task, one branch, one worktree:** `git worktree add ../rm-<issue>-<topic> -b <type>/<issue>-<topic> origin/main`. Use the exact branch name from your claim. Never edit another agent's worktree or branch.
@@ -72,25 +72,12 @@ Several agents and people may work on this repository at the same time. Follow t
    - Put case copies, logs and build output in a temporary location outside the source tree. See [file placement](docs/engineering.md#repository-layout).
    - Never stop a process you did not start.
 6. **Integrate small and often.** Rebase on `origin/main` before asking for review and again before merging. Keep each PR to one task.
-7. **Finish cleanly.** Write `Closes #N` in the PR only when it meets every acceptance criterion, otherwise `Refs #N`. After the merge, check that the issue is closed and `status:in-progress` is removed, and close any other issue the merge resolved, with a comment naming the PR. Never close an issue with an unmet criterion; see [closing issues](docs/engineering.md#closing-issues). In the same PR, update every record the change affects: the `CHANGELOG.md` line, user guides in both languages, tracking-issue checkboxes, decisions. The table in [keeping status and records current](docs/engineering.md#keeping-status-and-records-current) lists where each record lives. Never edit the roadmap to mark progress. Report problems outside your task as new issues; do not fix them in your branch.
+7. **Finish cleanly.** Put the review link, tested revision, verification and remaining acceptance work in the original issue. See [result handoff](docs/engineering.md#hand-off-a-result). Write `Closes #N` in the PR only when it meets every acceptance criterion, otherwise `Refs #N`. After the merge, check that the issue is closed and `status:in-progress` is removed, and close any other issue the merge resolved, with a comment naming the PR. Never close an issue with an unmet criterion; see [closing issues](docs/engineering.md#closing-issues). In the same PR, update every record the change affects: the `CHANGELOG.md` line, user guides in both languages, tracking-issue checkboxes, decisions. The table in [keeping status and records current](docs/engineering.md#keeping-status-and-records-current) lists where each record lives. Never edit the roadmap to mark progress. Report problems outside your task as new issues; do not fix them in your branch.
 8. **Retire only your own branch and worktree.** Follow [branch retirement](docs/engineering.md#retire-a-branch-and-worktree) after review and integration. Check for unpublished commits, local files and dependent PRs before removing anything.
 
 ## Layout
 
 Use the [repository layout and artifact rules](docs/engineering.md#repository-layout) when adding or moving files.
-
-| Path | Contents |
-| --- | --- |
-| `research_multiplier/cli/` | Argument parsing and output only |
-| `research_multiplier/workflows/` | Research logic shared by the CLI and the API |
-| `research_multiplier/storage/`, `research_multiplier/migrations/` | PostgreSQL access, Alembic revisions and their SQL |
-| `research_multiplier/workbench/` | Local workbench server and its generated `app/` |
-| `web/` | React source, build configuration and browser tests |
-| `tests/` | Python checks and small shared test fixtures |
-| `research_multiplier/schemas/` | JSON Schemas for records and interface contracts |
-| `research_multiplier/*/_pinned/`, `_compat/` | Fingerprinted verifier and adapter sources (do not edit) |
-| `lean/` | Pinned Lean and Mathlib setup |
-| `docs/` | User and design documentation |
 
 ## Commands
 
@@ -101,7 +88,8 @@ python -m venv .venv && . .venv/bin/activate
 python -m pip install -e ".[dev,postgres]"
 ```
 
-Checks that CI runs on every push (`.github/workflows/tests.yml`):
+The [Tests workflow](.github/workflows/tests.yml) runs on pull requests and
+pushes to `main`. Run its Python checks locally with these commands.
 
 ```sh
 ruff check .
@@ -134,7 +122,7 @@ python -m venv "$scratch/venv"
 )
 ```
 
-See [tests/README.md](tests/README.md) and the [contributor guide](CONTRIBUTING.md#run-the-external-regression-suite) for the regression lanes. Follow the lane instructions for an installed wheel and a disposable workspace or database.
+See [tests/README.md](tests/README.md) and the [contributor guide](CONTRIBUTING.md#run-the-compatibility-regressions) for the regression lanes. Follow the lane instructions for an installed wheel and a disposable workspace or database.
 
 Open the workbench on a test project:
 

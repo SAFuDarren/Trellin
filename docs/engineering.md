@@ -28,13 +28,13 @@ Use the current layout below when placing new files. Keep the root for project-w
 | `research_multiplier/*/_pinned/`, `research_multiplier/_compat/` | Exact verifier and adapter sources behind recorded fingerprints (B7) | Python |
 | `lean/` | Generic Lean support and pinned Lean and Mathlib configuration | Lean |
 | `web/` | React source under `src/`, browser tests under `e2e/`, frontend configuration and lockfile | TypeScript |
-| `tests/` | Python test source and small synthetic fixtures shared by tests. P0.2 tracks the additional regression lanes | Python |
+| `desktop/macos/` | App sources and resources, build and packaging tools, and native tests | Swift, shell |
+| `brand/` | Product artwork and usage guidance | SVG, PNG, Markdown |
+| `tests/` | Offline, PostgreSQL and Lean tests, the versioned `compat_validation/` suite, and small synthetic fixtures | Python |
 | `scripts/`, `.github/` | Maintainer automation, CI workflows, and issue and PR templates | Python, YAML |
-| `docs/` | User and engineering documentation. Index guides through `docs/README.md` and keep dated audits in `docs/audits/` | Markdown |
+| `docs/` | User and engineering guides indexed in `docs/README.md`, reviewed images in `docs/images/`, and dated project audit summaries in `docs/audits/` | Markdown, images |
 
-Keep real research projects and public example projects in separate directories outside the software checkout. Keep test output, logs, screenshots produced by runs, database dumps, external validation bundles, and wheel or source distribution output outside it too. Use a disposable workspace and database for each test lane and a temporary output directory such as `RUNNER_TEMP` in CI. A local dependency environment or cache may stay in the worktree if Git ignores it. Review the paths in the PR diff before sending it.
-
-The roadmap describes future `plugins/` and `deploy/` directories. Work in the existing directories until the corresponding roadmap task introduces them.
+Keep real research projects, runnable public examples and documentation demos, personal skills, agent memory and raw audit materials in separate directories outside the software checkout. Keep test output, logs, screenshots produced by runs, database dumps, external validation bundles, and wheel or source distribution output outside it too. Use a disposable workspace and database for each test lane and a temporary output directory such as `RUNNER_TEMP` in CI. A local dependency environment or cache may stay in the worktree if Git ignores it. Review the paths in the PR diff before sending it.
 
 ---
 
@@ -126,12 +126,9 @@ Every pull request confirms each item, or says why it does not apply:
 All tasks, bugs and milestones are tracked in **GitHub Issues** and a **GitHub Project** board.
 
 - **Milestones** are the roadmap phases P0–P6. A roadmap task becomes one issue (or an epic issue with sub-issues), titled with its task number, for example `P1.3 Event log and live updates`.
-- **Labels:**
-  - `layer:kernel`, `layer:plugin`, `layer:collab`, `layer:ai`, `layer:entry`
-  - `area:web`, `area:migrations`, `area:lean`, `area:docs`
-  - `type:bug`, `type:feature`, `type:refactor`, `type:docs`, `type:chore`, `type:incident`
-  - `needs-decision` (blocked on an open question), `status:in-progress` (claimed; see [parallel work](#parallel-work)), `good first issue`, `help wanted`
-- **Board columns:** Triage → Ready (has acceptance criteria) → In progress → In review → Done.
+- **Labels by scope and type** include `layer:kernel`, `layer:plugin`, `layer:collab`, `layer:ai`, `layer:entry`, `area:web`, `area:migrations`, `area:lean`, `area:docs`, `type:bug`, `type:feature`, `type:refactor`, `type:docs`, `type:chore` and `type:incident`. Use `needs-decision` for work blocked on an open question. Use `good first issue` and `help wanted` to invite contributions.
+- **Priority.** Give each open issue one delivery label. Use `priority:now` for the current batch or active work, `priority:next` for the batch after current dependencies, and `priority:later` for the backlog.
+- **Board columns** progress from Triage to Ready, In progress, In review and Done. Use `status:triage` when scope, a dependency or a decision still needs clarification. Use `status:ready` when acceptance criteria and dependencies are clear. The claim comment and `status:in-progress` track ownership. Add `status:in-review` when a reviewable PR is open and retain any active claim. See [parallel work](#parallel-work).
 - **Triage:** the maintainer reviews new issues weekly, applies labels, assigns a milestone or closes them, and links any decision that blocks them.
 - **Roadmap upkeep:** when a task is added, split or reordered, update `roadmap.md` and `roadmap.zh-CN.md` together with the issues. Progress is tracked in the issues, not the roadmap; see [keeping status and records current](#keeping-status-and-records-current).
 
@@ -177,7 +174,7 @@ Rules:
 
 ## Engineering audits
 
-At the end of every roadmap phase, run the engineering maturity audit with the project skill in `.claude/skills/engineering-audit/`. It scores 12 dimensions × 4 checks from repository evidence, runs or records six stress tests, and writes a record to [docs/audits](audits/README.md). Findings get permanent IDs. Each one becomes a roadmap task or issue, and the next audit reports its status. Use the trend between audits, not the absolute score, to decide where to invest.
+At the end of every roadmap phase, run the engineering maturity audit with the maintainer-provided rubric kept outside the checkout. It scores 12 dimensions × 4 checks from repository evidence, runs or records six stress tests, and writes a record to [docs/audits](audits/README.md). Findings get permanent IDs. Each one becomes a roadmap task or issue, and the next audit reports its status. Use the trend between audits, not the absolute score, to decide where to invest.
 
 ## Parallel work
 
@@ -215,18 +212,19 @@ Several people and coding agents may work on the repository at once. The rules b
 
 ### Retire a branch and worktree
 
-The owner handles cleanup of their branch and worktree, or arranges an explicit handoff in the issue. The maintainer decides whether to change GitHub settings such as automatic branch deletion. Follow this order when retiring a task branch.
+The owner handles local checkout cleanup or arranges an explicit handoff in the issue. Record the branch, reviewed commit and remaining work there. Keep the claim while you own review follow-up. Release it on handoff or when you relinquish follow-up. GitHub settings remain a maintainer decision.
 
-1. Run `gh pr view "$pr" --json state,headRefName,headRefOid` with the task PR number. Check for `MERGED` and record the reviewed head. Squash merging replaces commits, so `git branch --merged` alone cannot prove the PR was merged. If work is paused, abandoned or still waiting for review, record its branch and remaining work in the issue and release the claim when appropriate. Keep the branch until the work is merged or the maintainer approves retirement of an explicitly closed task.
-2. Check that the task claim is closed or released, then run `gh pr list --state open --head "$branch"` and `gh pr list --state open --base "$branch"`. An open PR still using that branch blocks cleanup. After a stacked PR's parent merges, have the dependent owners retarget their PRs to `main`, replay only their own commits on current `origin/main`, and verify the diffs and required checks. Keep the parent branch until its dependents are integrated or have passed those checks on the new base.
-3. Fetch `origin`. Use `git worktree list` to identify the correct checkout and `git -C "$worktree" status --short --untracked-files=all --ignored=matching` to inspect its files. Compare the local branch with the reviewed head using `git log --oneline "$reviewed_head..$branch"` and check the live remote head for updates. Preserve any commits that are absent from the reviewed change. Before proceeding, also preserve local edits, untracked files and ignored artifacts that you need, and record where they went.
-4. When the checks pass, use `git worktree remove "$worktree"` and `git branch -d "$branch"` from a different checkout. If a squash merge makes the local deletion refuse and the fetched remote tracking branch still points to the verified reviewed head, run `git branch --set-upstream-to="origin/$branch" "$branch"` and retry the guarded deletion. Otherwise leave the branch for the maintainer. The owner can remove the verified remote branch after the local cleanup and a final dependency check. Never force removal, delete another worker's branch or worktree, or use cleanup to clear an active claim.
+**Remove a local worktree.** Confirm which worktree and task it serves. Use `git -C "$worktree" status --short --untracked-files=all --ignored=matching` and check for pending Git operations and active users or processes. Preserve useful changes and artifacts at the recorded recovery location, then verify the commit or files can be recovered. A maintainer-authorized handoff can remove a clean, unused checkout of an open PR while the branch and claim stay in place. Run `git worktree remove "$worktree"` from another checkout.
+
+**Retire a branch.** Keep an open task branch. After integration, use `gh pr view "$pr" --json state,headRefOid,mergeCommit,baseRefName` to verify `MERGED` and record the final reviewed head. Fetch the target and verify that the reported merge commit is in its history. A squash merge does not preserve the original head in the target history. After explicit closure without merge, record the preserved work and get the maintainer's retirement decision.
+
+Check open PRs with `gh pr list --state open --head "$branch"` and `gh pr list --state open --base "$branch"`. With stacked changes, the dependent owner retargets to the integrated base, reapplies only that PR's commits and runs the required checks before the parent branch retires. Compare the local and live remote tips with the reviewed commit and preserve any extra work. Once the task is closed or released and the checks pass, try `git branch -d "$branch"`. Leave a refusal for the maintainer. The owner may remove a verified remote task branch after one last check for dependent PRs.
 
 ### Stress tests
 
-Stress tests 3 (parallel development) and 6 (handover) in the [engineering audit](audits/README.md) check that these rules work in practice. Run them before relying on several agents for a whole phase.
+Before relying on several agents for a phase, rehearse a same-issue claim race and the independent integration of two non-overlapping changes. Verify that one claimant wins, workers use separate worktrees and test resources, and both changes pass the required checks after integration. Record the result in the [engineering audit](audits/README.md).
 
-For the repository-only [handover exercise #9](https://github.com/SAFuDarren/research-multiplier/issues/9), ask the next agent to find the source, generated interface, test and output paths from `AGENTS.md`, then name what would block retirement of a task branch. Record the result in the issue.
+For the repository-only [handover exercise #9](https://github.com/SAFuDarren/Trellin/issues/9), ask the next agent to find the source, generated interface, test and output paths from `AGENTS.md`, then name what would block retirement of a task branch. Record the result in the issue.
 
 ## Keeping status and records current
 
@@ -234,7 +232,7 @@ Each kind of record has one home. Update it in the same pull request that change
 
 | Record | Single source of truth | When to update it |
 | --- | --- | --- |
-| Task status (open, claimed, done) | The GitHub issue and its milestone | Claim with `status:in-progress`. Close it as soon as it is resolved; see [closing issues](#closing-issues). Remove the label if work stops |
+| Task status and results | The original GitHub issue and its milestone | Record ownership through the claim tool. [Hand off reviewable results](#hand-off-a-result) on the issue. Complete [issue closure](#closing-issues) after acceptance |
 | Plan and acceptance criteria | `docs/roadmap.md` and `.zh-CN.md` | Only when a task is added, split, reordered or its criteria change. Never edit it to mark progress. Update the issue in the same PR |
 | Tracking issues (for example the publication gate, #18) | The checklist in that issue | Tick an item when the PR that completes it is merged |
 | Decisions and open questions | `docs/architecture.md` and `.zh-CN.md` | When a question is answered: move it from section G to the "Decided" line, add or change the numbered decision, close its `needs-decision` issue |
@@ -245,6 +243,12 @@ Each kind of record has one home. Update it in the same pull request that change
 | Audit findings | The audit record in `docs/audits/` (never edited afterwards) | The next audit reports each finding's status. Progress happens in the issue or task the finding names |
 
 A milestone is closed when all its issues are closed and its phase exit criteria hold.
+
+### Hand off a result
+
+Update the original issue when there is a result to review or test. Use a `Result and acceptance` section so the next person can find the linked PR or trial build, the exact commit or build tested, the verification evidence, and any remaining acceptance work. Refresh that section when a new result supersedes it. Keep the issue open while the remaining acceptance work is pending.
+
+Apply `status:in-review` when a reviewable PR is open. Keep the claim while you own review follow-up. If you hand off that responsibility, record the branch, revision and remaining work in the issue before releasing the claim with the claim tool.
 
 ## Closing issues
 

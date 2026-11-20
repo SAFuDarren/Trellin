@@ -28,13 +28,13 @@
 | `research_multiplier/*/_pinned/`、`research_multiplier/_compat/` | 已记录指纹对应的验证器和适配器源码（B7） | Python |
 | `lean/` | 通用 Lean 支持文件，以及固定版本的 Lean 和 Mathlib 配置 | Lean |
 | `web/` | `src/` 中的 React 源码、`e2e/` 中的浏览器测试、前端配置和锁文件 | TypeScript |
-| `tests/` | Python 测试源码和供测试共用的小型合成夹具。新增回归测试线由 P0.2 跟踪 | Python |
+| `desktop/macos/` | App 源码和资源、构建及打包工具和原生测试 | Swift、Shell |
+| `brand/` | 产品品牌原稿和使用指南 | SVG、PNG、Markdown |
+| `tests/` | 离线、PostgreSQL 和 Lean 测试、跟随版本的 `compat_validation/` 套件及小型合成夹具 | Python |
 | `scripts/`、`.github/` | 维护脚本、CI 工作流、issue 和 PR 模板 | Python、YAML |
-| `docs/` | 用户文档和工程文档。指南通过 `docs/README.md` 索引，带日期的审计记录归入 `docs/audits/` | Markdown |
+| `docs/` | `docs/README.md` 索引用户和工程文档，`docs/images/` 存放审阅过的图片，`docs/audits/` 存放带日期的项目审计摘要 | Markdown、图片 |
 
-实际科研项目和公开示例项目放在软件仓库之外，各用独立目录。测试输出、运行日志和截图、数据库转储、外部验证包，以及 wheel 或源码分发包也放在仓库之外。每条测试线都使用独立的临时工作区和数据库，CI 输出放到 `RUNNER_TEMP` 一类的临时目录。Git 忽略的本地依赖环境或缓存可以留在 worktree。送审前通过 PR 差异检查文件路径。
-
-路线图里还有未来的 `plugins/` 和 `deploy/` 目录。对应任务引入这些目录之前，按现有目录分工开发。
+实际科研项目、可运行的公开示例和文档演示、个人 skill、Agent memory 和原始审计材料各用软件仓库外的独立目录。测试输出、运行日志和截图、数据库转储、外部验证包，以及 wheel 或源码分发包也放在仓库之外。每条测试线都使用独立的临时工作区和数据库，CI 输出放到 `RUNNER_TEMP` 一类的临时目录。Git 忽略的本地依赖环境或缓存可以留在 worktree。送审前通过 PR 差异检查文件路径。
 
 ---
 
@@ -129,12 +129,9 @@
 所有任务、缺陷和里程碑都在 **GitHub Issues** 和 **GitHub Projects** 看板上跟踪。
 
 - **里程碑**就是路线图的 P0–P6 各阶段。路线图里的每个任务对应一个 issue，大任务可以开一个总 issue 再拆子 issue。标题带任务编号，例如 `P1.3 Event log and live updates`。
-- **标签：**
-  - 按层：`layer:kernel`、`layer:plugin`、`layer:collab`、`layer:ai`、`layer:entry`
-  - 按模块：`area:web`、`area:migrations`、`area:lean`、`area:docs`
-  - 按类型：`type:bug`、`type:feature`、`type:refactor`、`type:docs`、`type:chore`、`type:incident`
-  - 其他：`needs-decision`（卡在待定问题上）、`status:in-progress`（已认领，见[并行开发](#并行开发)）、`good first issue`、`help wanted`
-- **看板列：** 待分诊 → 可开工（已写验收标准）→ 进行中 → 评审中 → 已完成。
+- **范围和类型标签**包括 `layer:kernel`、`layer:plugin`、`layer:collab`、`layer:ai`、`layer:entry`、`area:web`、`area:migrations`、`area:lean`、`area:docs`、`type:bug`、`type:feature`、`type:refactor`、`type:docs`、`type:chore` 和 `type:incident`。卡在待定问题上的任务使用 `needs-decision`。用 `good first issue` 和 `help wanted` 邀请贡献。
+- **优先级。** 每个开放 issue 使用一个交付优先级标签。本批次或正在推进的工作用 `priority:now`，当前依赖完成后的下一批用 `priority:next`，后续积压用 `priority:later`。
+- **看板列**依次为待分诊、可开工、进行中、评审中、已完成。范围、依赖或决定尚待澄清时用 `status:triage`。验收条件和依赖明确时用 `status:ready`。认领评论和 `status:in-progress` 记录负责人。有可评审的 PR 时加 `status:in-review`，并保留有效的认领。见[并行开发](#并行开发)。
 - **分诊：** 维护者每周过一遍新 issue：打标签，归入里程碑或关闭，并关联卡住它的决定。
 - **维护路线图：** 新增、拆分或调整任务顺序时，`roadmap.md` 和 `roadmap.zh-CN.md` 要与 issue 一起更新。进度记在 issue 里，不记在路线图里；见[及时更新状态和记录](#及时更新状态和记录)。
 
@@ -180,7 +177,7 @@
 
 ## 工程审计
 
-每个路线图阶段结束时，用项目内的 skill（`.claude/skills/engineering-audit/`）做一次工程成熟度审计：根据仓库里的证据给 12 个维度 × 4 项检查打分，运行或记录六项压力测试，结果写进 [docs/audits](audits/README.zh-CN.md)。每条发现有固定编号，并转成路线图任务或 issue，下一次审计报告它的进展。决定把精力投在哪里，看审计之间的变化趋势，而不是某一次的绝对分数。
+每个路线图阶段结束时，用维护者保存在软件目录外的标准做一次工程成熟度审计：根据仓库里的证据给 12 个维度 × 4 项检查打分，运行或记录六项压力测试，结果写进 [docs/audits](audits/README.zh-CN.md)。每条发现有固定编号，并转成路线图任务或 issue，下一次审计报告它的进展。决定把精力投在哪里，看审计之间的变化趋势，而不是某一次的绝对分数。
 
 ## 并行开发
 
@@ -218,18 +215,19 @@
 
 ### 清理分支和 worktree
 
-分支和 worktree 由原负责人清理，或在 issue 里明确交接给别人。GitHub 自动删除分支等仓库设置由维护者决定。按以下顺序清理任务分支。
+本机检出由原负责人清理，或在 issue 里明确交接。记录分支、已评审的提交和剩余工作。负责跟进评审时保留认领，交接或退出跟进时释放认领。GitHub 设置由维护者决定。
 
-1. 用任务 PR 的编号运行 `gh pr view "$pr" --json state,headRefName,headRefOid`，确认状态为 `MERGED`，再记下评审过的分支头。Squash 合并会替换提交，因此只看 `git branch --merged` 无法判断 PR 是否已合入。如果工作暂停、放弃或仍待评审，在 issue 里记录分支和剩余工作，并在适当时释放认领。保留分支，直到改动合入，或任务已明确关闭且维护者批准清理。
-2. 确认任务认领已关闭或释放，再运行 `gh pr list --state open --head "$branch"` 和 `gh pr list --state open --base "$branch"`。还有打开的 PR 使用该分支时，先保留分支。堆叠 PR 的父 PR 合入后，由依赖方负责人把 PR 改为指向 `main`，只把各自的提交移到最新 `origin/main` 上，再验证差异和必需检查。后续 PR 已合入或在新基线上通过这些检查后，才能清理父分支。
-3. 拉取 `origin` 的最新信息，用 `git worktree list` 找到正确的检出目录，再用 `git -C "$worktree" status --short --untracked-files=all --ignored=matching` 检查文件。用 `git log --oneline "$reviewed_head..$branch"` 对照本地分支与评审过的分支头，并检查远端头有无新提交。若存在未纳入评审的提交，先保存。需要保留的本地编辑、未跟踪文件和被忽略的产物，也先保存并记录去向。
-4. 检查通过后，从另一个检出目录运行 `git worktree remove "$worktree"` 和 `git branch -d "$branch"`。如果 squash 合并导致本地删除被拒绝，且已拉取的远端跟踪分支仍指向已核对的评审提交，运行 `git branch --set-upstream-to="origin/$branch" "$branch"`，再重试受保护的删除。其他情况保留分支交维护者处理。本地清理和最后一次依赖检查完成后，原负责人才能移除已核对的远端分支。禁止强制移除、操作别人的分支或 worktree，或借清理清除仍有效的认领。
+**移除本机 worktree。** 确认检出和任务的对应关系。用 `git -C "$worktree" status --short --untracked-files=all --ignored=matching` 核对文件，同时检查未完成的 Git 操作、使用者和进程。先保存有用的改动与产物，记录恢复位置并核实能取回。维护者授权交接时，可以清理有开放 PR 的干净且闲置的本机检出，远端分支和认领继续保留。从另一个检出目录运行 `git worktree remove "$worktree"`。
+
+**清理分支。** 开放任务的分支继续保留。合入后用 `gh pr view "$pr" --json state,headRefOid,mergeCommit,baseRefName` 确认 `MERGED`，记录已评审的最终分支头。拉取目标分支，确认 GitHub 报告的合并提交在其历史中。Squash 合并后，原分支头可能不在目标分支的提交历史里。任务未合入但已明确关闭时，记录已保存的内容，并由维护者决定是否清理。
+
+用 `gh pr list --state open --head "$branch"` 和 `gh pr list --state open --base "$branch"` 查找依赖。堆叠 PR 的负责人先改用已合入的基线，只重放自己的改动并通过必需检查，再清理父分支。对照本机分支头、远端分支头和评审提交，保存额外改动。任务关闭或释放且检查通过后，尝试 `git branch -d "$branch"`。Git 拒绝时交维护者处理。远端任务分支由负责人最后一次核查依赖后清理。
 
 ### 压力测试
 
-[工程审计](audits/README.zh-CN.md)里的压力测试 3（并行开发）和 6（交接）用来检验这些规则在实际中是否有效。在依赖多个 agent 完成整个阶段之前，先跑一遍这两项测试。
+一个阶段开始并行开发之前，演练多人同时认领同一 issue，以及两个互不重叠的任务独立合入。核对只有一人认领成功，各自使用独立的 worktree 和测试资源，合入后两项改动的必需检查都通过。把结果记入[工程审计](audits/README.zh-CN.md)。
 
-只使用仓库内容的[交接演练 #9](https://github.com/SAFuDarren/research-multiplier/issues/9)应让下一位 agent 从 `AGENTS.md` 找到源码、生成界面、测试和输出的位置，并指出哪些情况会阻止清理任务分支。把结果记录到 issue。
+只使用仓库内容的[交接演练 #9](https://github.com/SAFuDarren/Trellin/issues/9)应让下一位 agent 从 `AGENTS.md` 找到源码、生成界面、测试和输出的位置，并指出哪些情况会阻止清理任务分支。把结果记录到 issue。
 
 ## 及时更新状态和记录
 
@@ -237,7 +235,7 @@
 
 | 记录 | 唯一依据 | 何时更新 |
 | --- | --- | --- |
-| 任务状态（未开始、已认领、已完成） | GitHub issue 及其里程碑 | 用 `status:in-progress` 认领。一旦解决就关闭，见[关闭 issue](#关闭-issue)。工作中止时去掉标签 |
+| 任务状态和结果 | 原 GitHub issue 及其里程碑 | 用认领工具记录负责人。在 issue 里[交接可验收的结果](#交接验收结果)，验收完成后[关闭 issue](#关闭-issue) |
 | 计划和验收标准 | `docs/roadmap.md` 和 `.zh-CN.md` | 只在新增、拆分、调整任务顺序或修改验收标准时更新，不用它标记进度。同一个 PR 里同步更新 issue |
 | 跟踪类 issue（例如公开条件，#18） | 该 issue 里的勾选清单 | 完成某项的 PR 合并后，勾掉对应条目 |
 | 架构决定和待定问题 | `docs/architecture.md` 和 `.zh-CN.md` | 某个问题有了结论时：把它从 G 节移到「已决定」那一行，新增或修改对应编号的决定，并关闭它的 `needs-decision` issue |
@@ -248,6 +246,12 @@
 | 审计发现 | `docs/audits/` 里的审计记录（写完后不再修改） | 由下一次审计报告每条发现的进展；实际进展记在该发现指向的 issue 或任务里 |
 
 一个里程碑的所有 issue 都关闭、并且满足该阶段的出口标准后，关闭这个里程碑。
+
+### 交接验收结果
+
+有可评审或试用的结果时，更新原 issue。用 `Result and acceptance` 小节记录 PR 或试用版本的入口、实际验证的提交或构建、验证证据和剩余验收项。新结果替换旧结果时，更新这一个小节。验收仍有剩余项时保留开放状态。
+
+有可评审的 PR 时加 `status:in-review`。负责跟进评审期间保留认领。交接跟进责任时，先在 issue 里记下分支、版本和剩余项，再用认领工具释放任务。
 
 ## 关闭 issue
 
