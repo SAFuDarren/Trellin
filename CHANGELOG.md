@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.28
+
+- Keep newly added proof goals on the active project canvas.
+
 ## 1.0.27
 
 - Manage model connections from Workbench and Chats without losing the current draft or conversation.
