@@ -227,6 +227,7 @@ export function Workbench({
       ? t("sidebar.connected", { count: claims.data.claims.length })
       : t("sidebar.connecting");
   const reviewCount = view === "impact" ? 0 : queueEntries(t, graph, view, assumption, impact.data).length;
+  const goal = graph?.claim.id === claimId && claimId ? graph.nodes.get(`goal:${claimId}`) : undefined;
   const claimTitle =
     graph?.claim.title || claims.data?.claims.find((claim) => claim.id === claimId)?.title || t("toolbar.defaultTitle");
   const meta = graph
@@ -243,6 +244,24 @@ export function Workbench({
   };
   const resize = (key: "side" | "right" | "chat", value: number) =>
     setLive((current) => ({ ...current, [key]: clampSize(key, value, layout.windowHeight) }));
+
+  const lean = goal?.reference;
+  const lemmaPlanScope =
+    claimId &&
+    graph?.claim.lemma_plan_ready &&
+    goal?.formalization &&
+    typeof lean?.statement_id === "string" &&
+    typeof lean.statement_version === "number" &&
+    typeof lean.statement_sha256 === "string"
+      ? {
+          claimId,
+          title: claimTitle,
+          statementId: lean.statement_id,
+          version: lean.statement_version,
+          checksum: lean.statement_sha256,
+          statement: goal.formalization,
+        }
+      : null;
 
   return (
     <div
@@ -285,6 +304,7 @@ export function Workbench({
               claimId={graph?.claim.id === claimId ? claimId : null}
               claimCode={graph?.claim.id === claimId ? graph.claim.code : null}
               claimCodesAvailable={Boolean(claims.data?.claim_codes)}
+              lemmaPlanScope={lemmaPlanScope}
               onRecorded={openRecorded}
               onGoalRecorded={showRecordedGoal}
               onOpenReference={openReference}

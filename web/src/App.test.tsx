@@ -6,6 +6,7 @@ import type { ReleaseUpdateState } from "./api/releaseUpdates";
 import { App } from "./App";
 import en from "./i18n/en.json";
 import zhCN from "./i18n/zh-CN.json";
+import type { GraphSnapshot } from "./workbench/types";
 
 const CLAIM = "11111111-1111-4111-8111-111111111111";
 const NATIVE_CONNECTIONS = [
@@ -132,6 +133,44 @@ describe("App", () => {
     expect(node.getAttribute("aria-pressed")).toBe("true");
     const detail = screen.getByLabelText(en.review.detail);
     expect(within(detail).getByText("∀ n : Nat, 0 + n = n")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: en.lemmaPlan.title })).toBeNull();
+  });
+
+  it("offers local lemmas for the confirmed statement and opens the recorded graph result", async () => {
+    const initial = responses["/api/graph"] as GraphSnapshot;
+    const goal = initial.nodes[0]!;
+    const statement = { statement_id: "s", statement_version: 2, statement_sha256: "a".repeat(64) };
+    let verified = false;
+    const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path === "/api/lemma-plans" && init?.method === "POST") {
+        verified = true;
+        return Response.json({ verified: 1 });
+      }
+      if (path.startsWith("/api/graph?")) {
+        const nodes = [{ ...goal, formalization_status: "approved", reference: statement }, ...initial.nodes.slice(1)];
+        if (verified) nodes.push({ id: "local-lemma:checked", kind: "local_lemma", title: "Checked helper" });
+        return Response.json({ ...initial, claim: { ...initial.claim, lemma_plan_ready: true }, nodes });
+      }
+      return Response.json(responses[path.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.lemmaPlan.title }));
+    const dialog = within(screen.getByRole("dialog", { name: en.lemmaPlan.title }));
+    expect(dialog.getByText(goal.formalization!)).toBeTruthy();
+    const plan = { format_version: 1, nodes: [{ name: "Helper", proposition: "True", proof: { trivial: true } }] };
+    fireEvent.change(dialog.getByLabelText(en.lemmaPlan.input), { target: { value: JSON.stringify(plan) } });
+    fireEvent.click(dialog.getByRole("button", { name: en.lemmaPlan.verify }));
+    await dialog.findByText("1 lemma verified. See the proof graph.");
+    const post = fetch.mock.calls.find(([path]) => path === "/api/lemma-plans");
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({
+      claim_id: CLAIM,
+      statement_id: statement.statement_id,
+      statement_sha256: statement.statement_sha256,
+      plan,
+    });
+    fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.close }));
+    expect(await screen.findByRole("button", { name: /^Checked helper/ })).toBeTruthy();
   });
 
   it("checks for releases by request, opens official notes, and remembers the dismissed notice", async () => {

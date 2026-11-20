@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ClaimCodesPane } from "./ClaimCodesPane";
 import { IntakePane } from "./IntakePane";
+import { LemmaPlanPane, type LemmaPlanScope } from "./LemmaPlanPane";
 import { ProofTaskPane } from "./ProofTaskPane";
 import { TheoremPane } from "./TheoremPane";
 import "../../styles/project-entry.css";
@@ -10,6 +11,7 @@ const captions = {
   intake: "projectEntry.organize",
   theorem: "projectEntry.addTheorem",
   proof: "proofTask.title",
+  lemmas: "lemmaPlan.title",
   references: "claimCodes.title",
 } as const;
 
@@ -21,6 +23,7 @@ export function ProjectActions({
   claimId,
   claimCode,
   claimCodesAvailable,
+  lemmaPlanScope,
   onRecorded,
   onGoalRecorded,
   onOpenReference,
@@ -29,6 +32,7 @@ export function ProjectActions({
   claimId: string | null;
   claimCode?: string | null;
   claimCodesAvailable: boolean;
+  lemmaPlanScope: LemmaPlanScope | null;
   onRecorded: (claimId?: string) => void | Promise<void>;
   onGoalRecorded: (claimId: string) => void | Promise<void>;
   onOpenReference: (claimId: string, nodeId: string | null) => void;
@@ -53,6 +57,11 @@ export function ProjectActions({
       {claimId && (
         <button className="button" type="button" onClick={() => setMode("proof")}>
           {t("proofTask.title")}
+        </button>
+      )}
+      {lemmaPlanScope && (
+        <button className="button" type="button" onClick={() => setMode("lemmas")}>
+          {t("lemmaPlan.title")}
         </button>
       )}
       {(claimCode || claimCodesAvailable) && (
@@ -85,6 +94,12 @@ export function ProjectActions({
                 />
               )}
               {mode === "proof" && claimId && <ProofTaskPane key={claimId} session={session} claimId={claimId} />}
+              {mode === "lemmas" &&
+                (lemmaPlanScope ? (
+                  <LemmaPlanPane key={lemmaPlanScope.statementId} session={session} scope={lemmaPlanScope} />
+                ) : (
+                  <p role="status">{t("lemmaPlan.stale")}</p>
+                ))}
               {mode === "references" && (
                 <ClaimCodesPane
                   key={claimId ?? "workspace"}

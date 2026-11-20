@@ -1,0 +1,125 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Check the authenticated local lemma plan through Lean and the proof graph."""
+
+import json
+import os
+from http.client import HTTPConnection
+from threading import Thread
+from uuid import uuid4
+
+import pytest
+
+from research_multiplier import general_lean, local_lemma_kernel
+from research_multiplier.storage import paths
+from research_multiplier.storage.postgres import Store, bind_workspace
+from research_multiplier.workbench.server import WorkbenchServer
+from research_multiplier.workflows import intake, lean_workflow
+from tests._native_db import disposable_project_logins
+
+pytestmark = pytest.mark.lean
+
+
+def _confirmed_statement():
+    target = json.dumps({
+        "title": "Reusing one reviewed premise", "domain": "lean-core", "sensitivity": "restricted",
+        "statement": "Two copies of True hold.", "formal": {"lean": {"proposition": "True ∧ True"}},
+    }).encode()
+    basis = json.dumps({"items": [{
+        "kind": "hypothesis", "natural": "Assume True.", "formal": {"lean": {"proposition": "True"}},
+    }]}).encode()
+    actor, reason = "Fixture", "Reviewed the exact synthetic premise and goal."
+    with Store() as store:
+        preview = intake.preview_target(store, target)
+        frozen = intake.freeze_target(store, target, preview["target_sha256"], actor, reason)
+        draft = intake.draft(store, basis, target_id=frozen["id"])
+        intake.confirm(store, draft["id"], draft["intake_sha256"],
+                       {"i1": {"action": "accept", "reason": reason}}, actor, reason)
+        packet = intake.target(store, frozen["id"])
+    statement = general_lean.propose(packet["packet_id"])
+    lean_workflow.confirm(statement["id"], statement["version"], statement["statement_sha256"], actor, reason)
+    return {
+        "claim_id": str(statement["claim_id"]), "statement_id": str(statement["id"]),
+        "statement_sha256": statement["statement_sha256"],
+    }
+
+
+def _request(server, route, document=None):
+    headers = {"X-RM-Session": server.session}
+    if document is not None:
+        headers.update({"Origin": server.origin, "Content-Type": "application/json"})
+    connection = HTTPConnection("127.0.0.1", server.server_port, timeout=90)
+    try:
+        connection.request("GET" if document is None else "POST", route, headers=headers,
+                           body=None if document is None else json.dumps(document).encode())
+        reply = connection.getresponse()
+        return reply.status, json.loads(reply.read())
+    finally:
+        connection.close()
+
+
+def test_lemma_plan_verifies_only_intermediate_nodes_in_current_scope(tmp_path, monkeypatch):
+    with disposable_project_logins() as logins:
+        for name in tuple(os.environ):
+            if name.startswith("RM_"):
+                monkeypatch.delenv(name)
+        for name, value in logins.items():
+            monkeypatch.setenv(name, value)
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+        workspace = paths.initialize_workspace(tmp_path / "project")
+        with paths.use_workspace(workspace, strict=True):
+            bind_workspace(workspace)
+            scope = _confirmed_statement()
+        with WorkbenchServer(workspace, port=0) as server:
+            thread = Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                _check_plan_and_graph(server, scope, monkeypatch)
+            finally:
+                server.shutdown()
+                thread.join()
+
+
+def _check_plan_and_graph(server, scope, monkeypatch):
+    route = "/api/lemma-plans"
+    graph = f"/api/graph?claim={scope['claim_id']}"
+    proof = {"intro": {"count": 1, "body": {"use": 0}}}
+    first = {"name": "First", "proposition": "True", "proof": proof}
+    plan = {"format_version": 1, "nodes": [first]}
+    document = {**scope, "plan": plan}
+
+    for data in (
+        {**document, "plan": {**plan, "goal_proof": proof}},
+        {**document, "plan": {**plan, "nodes": [first] * 17}},
+        {**document, "plan": {**plan, "nodes": [{**first, "source_path": "/tmp/example.lean"}]}},
+        {**document, "output": "/tmp/example.lean"},
+    ):
+        assert _request(server, route, data) == (400, {"error": "lemmaPlan.invalid"})
+    for data in (
+        {**document, "claim_id": str(uuid4())},
+        {**document, "statement_id": str(uuid4())},
+        {**document, "statement_sha256": "0" * 64},
+    ):
+        assert _request(server, route, data) == (409, {"error": "lemmaPlan.stale"})
+
+    def unavailable(*args, **kwargs):
+        raise OSError("The local verifier is temporarily unavailable.")
+
+    with monkeypatch.context() as fault:
+        fault.setattr(local_lemma_kernel, "check", unavailable)
+        assert _request(server, route, document) == (422, {"error": "lemmaPlan.checkFailed"})
+
+    bad = {"name": "Unproved", "proposition": "False", "proof": proof}
+    incomplete = {**document, "plan": {**plan, "nodes": [first, bad]}}
+    assert _request(server, route, incomplete) == (422, {"error": "lemmaPlan.checkFailed"})
+
+    status, snapshot = _request(server, graph)
+    assert status == 200
+    verified, = [node for node in snapshot["nodes"] if node["kind"] == "local_lemma"]
+    assert verified["proposition"] == "True" and verified["verification_status"] == "verified"
+
+    assert _request(server, route, document) == (200, {"verified": 1})
+    status, snapshot = _request(server, graph)
+    assert status == 200
+    assert [node for node in snapshot["nodes"] if node["kind"] == "local_lemma"] == [verified]
+    assert snapshot["claim"]["status"] == "open"
+    assert snapshot["claim"]["lemma_plan_ready"] is True

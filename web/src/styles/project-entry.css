@@ -81,6 +81,12 @@
   font-family: var(--mono);
 }
 
+.lemma-plan-statement {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .project-entry-form .project-entry-check,
 .project-entry-form .project-entry-file {
   display: flex;

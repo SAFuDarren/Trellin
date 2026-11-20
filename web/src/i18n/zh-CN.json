@@ -864,6 +864,22 @@
       "progress": "research-progress.md：推进规则和 worker"
     }
   },
+  "lemmaPlan": {
+    "title": "本地引理",
+    "destination": "已确认的 Lean 陈述 · 版本 {{version}}",
+    "input": "引理计划（JSON）",
+    "hint": "粘贴只含中间引理的第 1 版计划。Lean 会在本机按当前已确认的范围核验，并把通过的引理记入证明图谱。",
+    "verify": "核验引理计划",
+    "checking": "正在用本机 Lean 核验引理计划…",
+    "verified_one": "已核验 {{count}} 条引理，可在证明图谱查看。",
+    "verified_other": "已核验 {{count}} 条引理，可在证明图谱查看。",
+    "invalid": "请输入有效的 JSON，内容为只含引理节点的第 1 版计划。",
+    "identity": "请使用此项目绑定的本机研究者身份核验。",
+    "stale": "已确认的 Lean 范围当前无法核验。请检查最新陈述和依据。",
+    "busy": "已有本地引理计划正在运行，完成后可再试。",
+    "checkFailed": "Lean 未能核验整份计划。请检查计划和本机 Lean 配置。已通过的引理可以在图谱中查看。",
+    "unavailable": "此项目当前无法核验引理计划。"
+  },
   "proofTask": {
     "modelConnection": "证明模型",
     "noExternal": "运行确定性检查并复用已有证明",

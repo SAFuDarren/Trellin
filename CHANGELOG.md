@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.32
+
+- Verify scoped local lemma plans in Workbench and show checked lemmas in the proof graph.
+
 ## 1.0.31
 
 - Record repository handover verification and align guidance on candidate versions.

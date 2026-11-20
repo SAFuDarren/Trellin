@@ -20,7 +20,7 @@ packet AS (
     ORDER BY p.approved DESC, p.proposed_at DESC, p.id LIMIT 1
 ),
 statement AS (
-    SELECT s.id, s.version, s.statement_sha256, s.approved, s.body
+    SELECT s.id, s.version, s.statement_sha256, s.approved, s.check_ready, s.body
     FROM rm.lean_statement_status s JOIN packet ON packet.id = s.packet_id
     WHERE s."current"
     ORDER BY s.proposed_at DESC, s.id LIMIT 1
@@ -382,12 +382,17 @@ def atlas(store, limit=40):
     return {"claims": overview}
 
 
-def snapshot(store, claim_id, *, references=True):
+def snapshot(store, claim_id, *, references=True, include_lemma_plan=False):
     """Project the selected frozen packet and its current Lean history in one snapshot."""
     rows = store.query("human", _GRAPH, claim_id)
     if not rows:
         raise ValueError("No frozen research claim matches this ID.")
     graph = _snapshot(rows[0])
+    if include_lemma_plan:
+        statement = rows[0]["lean"]
+        graph["claim"]["lemma_plan_ready"] = bool(
+            statement and statement["check_ready"] and statement["body"].get("theorem") == general_lean.THEOREM
+        )
     codes = claim_references.snapshot(store, claim_id) if references else None
     if codes:
         prefix = codes["code"]
