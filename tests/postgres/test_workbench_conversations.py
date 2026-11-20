@@ -37,6 +37,7 @@ def test_workbench_conversation_consent_and_archive(workbench, monkeypatch):
     base = "/api/conversations"
     thread = _request(server, "POST", base + "/create", body={"title": "A free discussion"})["thread"]
     assert thread["claim_id"] is None and thread["messages"] == []
+    assert _request(server, "GET", base)["threads"][0]["latest_turn"] is None
     request = {"thread_id": thread["id"], "connection_id": identity["id"],
                "request_id": str(uuid4()), "text": "What is the next question?"}
     preview = _request(server, "POST", base + "/preview", body=request)
@@ -73,6 +74,13 @@ def test_workbench_conversation_consent_and_archive(workbench, monkeypatch):
 
     threads = _request(server, "GET", base)["threads"]
     assert [item["id"] for item in threads] == [thread["id"]]
+    latest = threads[0]["latest_turn"]
+    assert threads[0]["running"] is False
+    assert latest == {
+        "provider": identity["provider"], "requested_model": identity["model"], "model": "gpt-fixture-actual",
+        "preview": "The premise remains unchanged.", "status": "answered", "at": latest["at"],
+    }
+    assert latest["at"].startswith(result["messages"][-1]["at"][:19])
     with paths.use_workspace(server.workspace, strict=True), Store() as store:
         with pytest.raises(DatabaseOperationError) as denied:
             store.query("agent", "SELECT * FROM rm.visible_conversation_threads")

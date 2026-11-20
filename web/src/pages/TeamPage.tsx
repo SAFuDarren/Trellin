@@ -6,22 +6,38 @@ import { api } from "../api/client";
 import { useTeam, type Doctor, type Job, type Team } from "../api/sections";
 import { Clock, Mark, Spin } from "../components/Icons";
 import { ModelConnections } from "../components/ModelConnections";
-import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
+import { PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
-import { harnessName, modelName, timeText } from "../workbench/text";
+import { harnessName, modelName, prettyModel, timeText } from "../workbench/text";
+import "../styles/team.css";
 
-const PAGES = ["runtimes", "agents", "usage", "jobs"] as const;
+const PAGES = ["runtimes", "agents", "models", "usage", "jobs"] as const;
 type Page = (typeof PAGES)[number];
-const LIVE = new Set(["running"]);
+type Option = { value: string; label: string };
 const WAITING = new Set(["queued", "waiting_retry"]);
 
+function measurement(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function recordedSum(values: (string | number | null | undefined)[]): number | null {
+  const recorded = values.map(measurement).filter((value) => value !== null);
+  return recorded.length ? recorded.reduce((sum, value) => sum + value, 0) : null;
+}
+
 function duration(t: TFunction, ms: string | number | null | undefined): string {
-  const value = Number(ms);
-  if (!ms || !Number.isFinite(value)) return "—";
+  const value = measurement(ms);
+  if (value === null) return t("team.unknown");
   const seconds = Math.round(value / 1000);
   return seconds < 60
     ? t("team.seconds", { count: seconds })
     : t("team.minutes", { minutes: Math.floor(seconds / 60), seconds: seconds % 60 });
+}
+
+function providerName(t: TFunction, provider: string): string {
+  return t(`team.providers.${provider}`, { defaultValue: harnessName(provider) });
 }
 
 function jobLabel(t: TFunction, job: Job): string {
@@ -31,6 +47,57 @@ function jobLabel(t: TFunction, job: Job): string {
       t("activityKind.lean") + (job.target ? " · " + t(`team.targets.${job.target}`, { defaultValue: job.target }) : "")
     );
   return t("activityKind.task") + " · " + job.kind;
+}
+
+function includes(query: string, ...values: (string | null | undefined)[]) {
+  const needle = query.trim().toLowerCase();
+  return !needle || values.some((value) => value?.toLowerCase().includes(needle));
+}
+
+function Filters({
+  searchLabel,
+  filterLabel,
+  all,
+  query,
+  onSearch,
+  filter,
+  onFilter,
+  options,
+}: {
+  searchLabel: string;
+  filterLabel: string;
+  all: string;
+  query: string;
+  onSearch: (query: string) => void;
+  filter: string;
+  onFilter: (filter: string) => void;
+  options: Option[];
+}) {
+  return (
+    <div className="team-tools">
+      <label className="search-field">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m20 20-4.2-4.2" />
+        </svg>
+        <input
+          type="search"
+          aria-label={searchLabel}
+          placeholder={searchLabel}
+          value={query}
+          onChange={(event) => onSearch(event.target.value)}
+        />
+      </label>
+      <select aria-label={filterLabel} value={filter} onChange={(event) => onFilter(event.target.value)}>
+        <option value="">{all}</option>
+        {options.map(({ value, label }) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 export function TeamPage({
@@ -46,15 +113,14 @@ export function TeamPage({
   const team = useTeam(session);
   const page: Page = (PAGES as readonly string[]).includes(sub) ? (sub as Page) : "runtimes";
   const data = team.data;
-  const running = data?.jobs.filter((job) => LIVE.has(job.state)).length ?? 0;
-  const queued = data?.jobs.filter((job) => WAITING.has(job.state)).length ?? 0;
-  const entry = (key: Page, count?: string | number, tone?: "good" | "live") => ({
+  const running = data?.jobs.filter((job) => job.state === "running").length ?? 0;
+  const entry = (key: Page, count?: number) => ({
     key,
     label: t(`team.pages.${key}`),
     href: href("team", key),
     current: page === key,
     count,
-    countTone: tone,
+    countTone: key === "jobs" && running > 0 ? ("live" as const) : undefined,
   });
   return (
     <SectionLayout
@@ -62,24 +128,26 @@ export function TeamPage({
       groups={[
         {
           name: t("team.groups.agents"),
-          entries: [
-            entry("agents", data ? data.agents.length + 1 : ""),
-            entry("jobs", running || queued ? `${running}/${queued}` : "", running ? "live" : undefined),
-          ],
+          entries: [entry("agents"), entry("models"), entry("jobs", running || undefined)],
         },
-        {
-          name: t("team.groups.resources"),
-          entries: [entry("runtimes", data ? t("team.online", { count: 1 }) : "", "good"), entry("usage")],
-        },
+        { name: t("team.groups.resources"), entries: [entry("runtimes"), entry("usage")] },
       ]}
     >
       <PageHead title={t(`team.pages.${page}`)} note={t(`team.notes.${page}`)} />
-      {team.isError ? (
-        <Empty>{team.error.message}</Empty>
+      {page === "models" ? (
+        <div className="page-body team-body">
+          <ModelConnections session={session} />
+        </div>
+      ) : team.isError ? (
+        <p className="page-empty" role="alert">
+          {t("team.unavailable")}
+        </p>
       ) : !data ? (
-        <Empty>{t("common.loading")}</Empty>
+        <p className="page-empty" role="status">
+          {t("common.loading")}
+        </p>
       ) : page === "runtimes" ? (
-        <Runtimes session={session} data={data} running={running} />
+        <Runtimes session={session} data={data} />
       ) : page === "agents" ? (
         <Agents data={data} />
       ) : page === "usage" ? (
@@ -91,7 +159,7 @@ export function TeamPage({
   );
 }
 
-function Runtimes({ session, data, running }: { session: string; data: Team; running: number }) {
+function Runtimes({ session, data }: { session: string; data: Team }) {
   const { t } = useTranslation();
   const [fresh, setFresh] = useState(0);
   const doctor = useQuery({
@@ -101,48 +169,26 @@ function Runtimes({ session, data, running }: { session: string; data: Team; run
   });
   const failing = doctor.data?.checks.filter((check) => check.status === "fail" || check.status === "warn") ?? [];
   return (
-    <div className="page-body">
+    <div className="page-body team-body">
       <div className="table-wrap">
-        <table className="table">
+        <table className="table team-table">
           <thead>
             <tr>
-              <th scope="col">{t("team.name")}</th>
-              <th scope="col">{t("team.channel")}</th>
-              <th scope="col" className="num">
-                {t("team.runs")}
-              </th>
-              <th scope="col">{t("team.load")}</th>
-              <th scope="col">{t("team.status")}</th>
+              <th scope="col">{t("team.computer")}</th>
+              <th scope="col">{t("team.system")}</th>
+              <th scope="col">{t("team.architecture")}</th>
+              <th scope="col">{t("team.python")}</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="group-row">
-              <td colSpan={5}>
-                {t("team.machines")}
-                <span>1</span>
-              </td>
-            </tr>
             <tr>
-              <td>
-                <b>{data.machine.name || t("team.unnamedMachine")}</b>{" "}
-                <span className="muted">{t("team.thisMachine")}</span>
-              </td>
-              <td className="mono">{t("activityKind.lean")}</td>
-              <td className="num">
-                {data.agents.reduce((sum, agent) => sum + Number(agent.runs), 0) + data.verifier.runs}
-              </td>
-              <td>{running ? t("team.runningNow", { count: running }) : t("team.idle")}</td>
-              <td>
-                <span className="pill">
-                  <span className="status-dot" data-tone="ok" />
-                  {t("team.online", { count: 1 })}
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td colSpan={5} className="muted">
-                {t("team.remoteSoon")}
-              </td>
+              <th scope="row">
+                <strong>{data.machine.name || t("team.unnamedMachine")}</strong>
+                <span className="team-secondary">{t("team.thisMachine")}</span>
+              </th>
+              <td>{data.machine.system || t("team.unknown")}</td>
+              <td>{data.machine.arch || t("team.unknown")}</td>
+              <td>{data.machine.python || t("team.unknown")}</td>
             </tr>
           </tbody>
         </table>
@@ -204,83 +250,118 @@ function Runtimes({ session, data, running }: { session: string; data: Team; run
 
 function Agents({ data }: { data: Team }) {
   const { t, i18n } = useTranslation();
+  const [query, setQuery] = useState("");
+  const [provider, setProvider] = useState("");
+  const agents = data.agents.map((agent) => ({
+    ...agent,
+    name: providerName(t, agent.provider),
+    key: agent.provider + "/" + (agent.model ?? ""),
+  }));
+  const verifier = {
+    ...data.verifier,
+    name: t("team.verifier"),
+    provider: "lean",
+    model: null,
+    key: "verifier",
+  };
+  const entries = data.verifier.runs > 0 ? [...agents, verifier] : agents;
+  const providers = new Map(entries.map(({ provider: value, name }) => [value, name]));
+  if (provider && !providers.has(provider)) providers.set(provider, providerName(t, provider));
+  const filtered = entries.filter(
+    (agent) =>
+      (!provider || provider === agent.provider) &&
+      includes(query, agent.name, agent.provider, agent.model, agent.model && prettyModel(agent.model)),
+  );
   return (
-    <div className="page-body">
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th scope="col">{t("team.name")}</th>
-              <th scope="col">{t("team.channel")}</th>
-              <th scope="col" className="num">
-                {t("team.runs")}
-              </th>
-              <th scope="col">{t("team.lastRun")}</th>
-              <th scope="col" className="num">
-                {t("team.average")}
-              </th>
-              <th scope="col" className="num">
-                {t("team.failures")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.agents.map((agent) => (
-              <tr key={agent.provider + (agent.model ?? "")}>
-                <td className="mono">{modelName(t, agent)}</td>
-                <td className="muted">{harnessName(agent.provider)}</td>
-                <td className="num">{agent.runs}</td>
-                <td className="muted">{timeText(i18n.language, agent.last_at, true)}</td>
-                <td className="num">{duration(t, agent.average_ms)}</td>
-                <td className="num">{agent.failures}</td>
+    <div className="page-body team-body">
+      <Filters
+        searchLabel={t("team.filters.searchAgents")}
+        filterLabel={t("team.filters.provider")}
+        all={t("team.filters.allProviders")}
+        query={query}
+        onSearch={setQuery}
+        filter={provider}
+        onFilter={setProvider}
+        options={[...providers].map(([value, label]) => ({ value, label }))}
+      />
+      {filtered.length ? (
+        <div className="table-wrap">
+          <table className="table team-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("team.agent")}</th>
+                <th scope="col">{t("team.recordedModel")}</th>
+                <th scope="col">{t("team.lastRun")}</th>
+                <th scope="col" className="num">
+                  {t("team.runs")}
+                </th>
+                <th scope="col" className="num">
+                  {t("team.average")}
+                </th>
+                <th scope="col" className="num">
+                  {t("team.failures")}
+                </th>
               </tr>
-            ))}
-            <tr>
-              <td>{t("team.verifier")}</td>
-              <td className="muted">{"Lean"}</td>
-              <td className="num">{data.verifier.runs}</td>
-              <td className="muted">{timeText(i18n.language, data.verifier.last_at, true)}</td>
-              <td className="num">{duration(t, data.verifier.average_ms)}</td>
-              <td className="num">{data.verifier.failures}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      {data.agents.length === 0 && <p className="inline-note">{t("team.noModels")}</p>}
+            </thead>
+            <tbody>
+              {filtered.map((agent) => (
+                <tr key={agent.key}>
+                  <th scope="row">{agent.name}</th>
+                  <td>{agent.model ? prettyModel(agent.model) : t("team.unknown")}</td>
+                  <td>{timeText(i18n.language, agent.last_at, true) || t("team.unknown")}</td>
+                  <td className="num">{agent.runs}</td>
+                  <td className="num">{duration(t, agent.average_ms)}</td>
+                  <td className="num">{agent.failures}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="team-empty" role="status">
+          {t(entries.length ? "team.noResults" : "team.noAgents")}
+        </p>
+      )}
     </div>
   );
 }
 
 function Usage({ data }: { data: Team }) {
-  const { t } = useTranslation();
-  const tokens = data.agents.reduce(
-    (sum, agent) => sum + Number(agent.input_tokens ?? 0) + Number(agent.output_tokens ?? 0),
-    0,
-  );
-  const cost = data.agents.reduce((sum, agent) => sum + Number(agent.cost_usd ?? 0), 0);
-  const limit =
-    data.budget.policy && typeof data.budget.policy.limit_usd === "string" ? data.budget.policy.limit_usd : null;
+  const { t, i18n } = useTranslation();
+  const count = new Intl.NumberFormat(i18n.language);
+  const usd = new Intl.NumberFormat(i18n.language, { style: "currency", currency: "USD" });
+  const tokens = recordedSum(data.agents.flatMap((agent) => [agent.input_tokens, agent.output_tokens]));
+  const cost = recordedSum(data.agents.map((agent) => agent.cost_usd));
+  const limit = typeof data.budget.policy?.limit_usd === "string" ? measurement(data.budget.policy.limit_usd) : null;
+  const reserved = measurement(data.budget.month.reserved_usd);
+  const unknown = t("team.unknown");
   return (
-    <div className="page-body">
-      <div className="stats">
-        <div className="stat">
-          <span className="label">{t("team.usage.month")}</span>
-          <span className="value">{"$" + Number(data.budget.month.reserved_usd ?? 0).toFixed(2)}</span>
-          <span className="note">
-            {limit ? t("team.usage.limit", { limit: "$" + Number(limit).toFixed(2) }) : t("team.usage.noLimit")}
-          </span>
+    <div className="page-body team-body">
+      <dl className="team-usage">
+        <div>
+          <dt>{t("team.usage.month")}</dt>
+          <dd>
+            {reserved === null ? unknown : usd.format(reserved)}
+            <span className="team-secondary">
+              {limit === null ? t("team.usage.noLimit") : t("team.usage.limit", { limit: usd.format(limit) })}
+            </span>
+          </dd>
         </div>
-        <div className="stat">
-          <span className="label">{t("team.usage.tokens")}</span>
-          <span className="value">{tokens.toLocaleString()}</span>
-          <span className="note">{t("team.usage.allTime")}</span>
+        <div>
+          <dt>{t("team.usage.tokens")}</dt>
+          <dd>
+            {tokens === null ? unknown : count.format(tokens)}
+            <span className="team-secondary">{t("team.usage.allTime")}</span>
+          </dd>
         </div>
-        <div className="stat">
-          <span className="label">{t("team.usage.cost")}</span>
-          <span className="value">{"$" + cost.toFixed(2)}</span>
-          <span className="note">{t("team.usage.recorded")}</span>
+        <div>
+          <dt>{t("team.usage.cost")}</dt>
+          <dd>
+            {cost === null ? unknown : usd.format(cost)}
+            <span className="team-secondary">{t("team.usage.recorded")}</span>
+          </dd>
         </div>
-      </div>
+      </dl>
       <p className="inline-note">{t("team.usage.howToLimit")}</p>
       <pre className="code-block">
         {'research-multiplier research model-budget limit --usd 20 --actor NAME --reason "..."'}
@@ -291,53 +372,92 @@ function Usage({ data }: { data: Team }) {
 
 function Jobs({ data, onOpen }: { data: Team; onOpen: (claimId: string, nodeId?: string) => void }) {
   const { t, i18n } = useTranslation();
-  if (!data.jobs.length) return <Empty>{t("team.noJobs")}</Empty>;
+  const [query, setQuery] = useState("");
+  const [state, setState] = useState("");
+  const stateLabel = (value: string) => t(`activityState.${value}`, { defaultValue: value });
+  const states = [...new Set([...data.jobs.map((job) => job.state), state])].filter(Boolean);
+  const filtered = data.jobs.filter(
+    (job) =>
+      (!state || state === job.state) && includes(query, job.claim_title, job.model, job.provider, jobLabel(t, job)),
+  );
   return (
-    <div className="page-body">
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th scope="col">{t("team.status")}</th>
-              <th scope="col">{t("team.what")}</th>
-              <th scope="col">{t("team.claim")}</th>
-              <th scope="col">{t("team.when")}</th>
-              <th scope="col" className="num">
-                {t("team.took")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.jobs.map((job) => (
-              <tr
-                key={job.id}
-                data-row="true"
-                tabIndex={0}
-                onClick={() => job.claim_id && onOpen(job.claim_id, job.node_id ?? undefined)}
-              >
-                <td>
-                  <span className="pill">
-                    {LIVE.has(job.state) ? (
-                      <Spin />
-                    ) : WAITING.has(job.state) ? (
-                      <Clock />
-                    ) : (
-                      <Mark tone={job.state === "failed" || job.failure_code ? "bad" : "ok"} />
-                    )}
-                    {t(`activityState.${job.state}`, { defaultValue: job.state })}
-                  </span>
-                </td>
-                <td className={job.model ? "mono" : undefined}>{jobLabel(t, job)}</td>
-                <td>{job.claim_title || t("sidebar.untitled")}</td>
-                <td className="muted">
-                  {timeText(i18n.language, job.running_since || job.submitted_at || job.enqueued_at, true)}
-                </td>
-                <td className="num">{duration(t, job.execution_ms)}</td>
+    <div className="page-body team-body">
+      <Filters
+        searchLabel={t("team.filters.searchJobs")}
+        filterLabel={t("team.filters.state")}
+        all={t("team.filters.allStates")}
+        query={query}
+        onSearch={setQuery}
+        filter={state}
+        onFilter={setState}
+        options={states.map((value) => ({ value, label: stateLabel(value) }))}
+      />
+      {filtered.length ? (
+        <div className="table-wrap">
+          <table className="table team-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("team.status")}</th>
+                <th scope="col">{t("team.what")}</th>
+                <th scope="col">{t("team.claim")}</th>
+                <th scope="col">{t("team.when")}</th>
+                <th scope="col" className="num">
+                  {t("team.took")}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {filtered.map((job) => {
+                const claimId = job.claim_id;
+                const claim = job.claim_title || (claimId ? t("sidebar.untitled") : t("team.unknown"));
+                return (
+                  <tr key={job.id}>
+                    <td>
+                      <span className="team-job-state">
+                        {job.state === "running" ? (
+                          <Spin />
+                        ) : WAITING.has(job.state) ? (
+                          <Clock />
+                        ) : (
+                          <Mark
+                            tone={
+                              job.state === "failed" || job.failure_code ? "bad" : job.state === "succeeded" ? "ok" : ""
+                            }
+                          />
+                        )}
+                        {stateLabel(job.state)}
+                      </span>
+                    </td>
+                    <td>{jobLabel(t, job)}</td>
+                    <td>
+                      {claimId ? (
+                        <button
+                          type="button"
+                          className="relation team-relation"
+                          onClick={() => onOpen(claimId, job.node_id ?? undefined)}
+                        >
+                          {claim}
+                        </button>
+                      ) : (
+                        claim
+                      )}
+                    </td>
+                    <td>
+                      {timeText(i18n.language, job.running_since || job.submitted_at || job.enqueued_at, true) ||
+                        t("team.unknown")}
+                    </td>
+                    <td className="num">{duration(t, job.execution_ms)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="team-empty" role="status">
+          {t(data.jobs.length ? "team.noResults" : "team.noJobs")}
+        </p>
+      )}
     </div>
   );
 }

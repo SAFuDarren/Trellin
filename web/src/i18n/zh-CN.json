@@ -273,11 +273,12 @@
     "emptyClaim": "这个课题还没有任何动态。",
     "emptyNode": "这里还没有内容。点「全部节点」可查看整个课题。",
     "you": "你",
-    "sentTo": "发给 {{audience}}",
-    "submittedCodex": "已发给 Codex",
-    "submittedLocal": "本地模型已读取",
-    "waitingCodex": "等 Codex 下次运行",
-    "waitingLocal": "等本地模型下次运行",
+    "sentTo": "供 {{audience}} 使用",
+    "submittedCodex": "已纳入 Codex 证明尝试",
+    "submittedLocal": "已纳入本机证明尝试",
+    "waitingCodex": "等待已授权的 Codex 证明尝试",
+    "waitingLocal": "等待已授权的本机证明尝试",
+    "staleGuidance": "保存于较早的 Lean 陈述版本",
     "workerRunning": "正在搜索证明…",
     "taskRunning": "正在处理…",
     "lean": "Lean 核验",
@@ -323,18 +324,29 @@
     "codex": "Codex"
   },
   "composer": {
-    "label": "给模型的意见",
-    "placeholder": "回复在这个节点上工作的模型，或者提个思路",
-    "audience": "发给",
-    "unavailable": "暂时不能发送",
+    "label": "证明意见",
+    "placeholder": "为后续证明尝试提供一个思路",
+    "draftPlaceholder": "为此节点起草意见",
+    "draftOnly": "草稿留在当前打开的工作台，尚未保存或共享。",
+    "audience": "证明意见接收方",
+    "unavailable": "暂无可用的证明意见接收方",
+    "chooseNode": "选择证明节点，即可起草意见。",
+    "blockers": {
+      "schema": "更新此工作区的数据库，即可记录证明意见。",
+      "scope": "核对并确认 Lean 陈述及其依据后，即可将意见排队。",
+      "codex_schema": "更新此工作区的数据库，即可将 Codex 证明意见排队。",
+      "legacy_policy": "在此数据库版本中，请先核对公开依据并批准 Codex 证明策略。",
+      "connected_schema": "更新此工作区的数据库，即可让 Team 连接使用证明意见。",
+      "public_basis": "核对可共享的证明范围后，即可将 Codex 证明意见排队。"
+    },
     "viewOnly": "这个课题只能查看动态，不能发送意见。",
-    "confirmHint": "会和公开课题一起发给 Codex。再点一次发送。",
-    "confirm": "发给 Codex",
-    "confirmLabel": "发给 Codex",
-    "send": "发送意见",
-    "sending": "正在发送",
-    "sentCodex": "已保存，Codex 下次运行时会读到。",
-    "sentLocal": "已保存，本地模型下次运行时会读到。"
+    "confirmHint": "请确认这条意见可以随之后已授权的 Codex 证明尝试发送。",
+    "confirm": "允许 Codex 使用此意见",
+    "confirmLabel": "允许 Codex 使用此意见",
+    "send": "将证明意见排队",
+    "sending": "正在保存",
+    "sentCodex": "已保存，等待后续已授权的 Codex 证明尝试。",
+    "sentLocal": "已保存，等待后续已授权的本机证明尝试。"
   },
   "model": {
     "fallback": "模型"
@@ -528,6 +540,15 @@
     }
   },
   "conversations": {
+    "noConversations": "暂无对话。",
+    "backToList": "返回对话列表",
+    "actions": "对话操作",
+    "nodeScope": "关联证明节点",
+    "claimScope": "关联命题",
+    "projectScope": "项目对话",
+    "lastSendFailed": "发送失败",
+    "replied": "已回复",
+    "conversationMissing": "此对话不可用。请从列表选择另一条对话。",
     "contextMenu": "消息上下文",
     "messageOnly": "仅本条消息",
     "hideRequestDetails": "收起请求详情",
@@ -577,20 +598,22 @@
   },
   "team": {
     "groups": {
-      "agents": "Agent",
+      "agents": "执行",
       "resources": "资源"
     },
     "pages": {
       "runtimes": "运行环境",
-      "agents": "模型",
+      "agents": "执行者",
       "usage": "用量",
-      "jobs": "任务队列"
+      "jobs": "任务队列",
+      "models": "模型"
     },
     "notes": {
-      "runtimes": "模型和 Lean 在哪里运行",
-      "agents": "在这个项目里工作过的模型",
+      "runtimes": "本机和环境检查",
+      "agents": "这个项目的模型和 Lean 运行记录",
       "usage": "模型费用与额度",
-      "jobs": "运行中、排队中和最近的任务"
+      "jobs": "这个项目中正在运行、等待或最近完成的任务",
+      "models": "这台电脑上已保存的模型连接"
     },
     "online_one": "{{count}} 在线",
     "online_other": "{{count}} 在线",
@@ -619,7 +642,7 @@
     },
     "check": {
       "title": "环境检查",
-      "hint": "检查 Python、数据库、四个登录角色、Lean 和 Mathlib。只读取，不做修改。",
+      "hint": "检查 Python、PostgreSQL、模型配置、Lean 和 Mathlib。",
       "running": "正在检查…包含 Lean 时可能需要一分钟。",
       "allGood": "{{count}} 项检查全部通过。",
       "problems_one": "{{count}} 项检查需要处理。",
@@ -636,13 +659,13 @@
     "seconds_other": "{{count}} 秒",
     "minutes": "{{minutes}} 分 {{seconds}} 秒",
     "usage": {
-      "month": "本月已用",
+      "month": "本月预留",
       "limit": "月度额度 {{limit}}",
       "noLimit": "未设置月度额度",
-      "tokens": "Token 数",
-      "allTime": "全部已记录的运行",
+      "tokens": "已记录的 Token 数",
+      "allTime": "来自报告了 Token 数的运行",
       "cost": "已记录费用",
-      "recorded": "以模型报告为准",
+      "recorded": "来自报告了费用的运行",
       "howToLimit": "在命令行里设置月度额度："
     },
     "noJobs": "还没有任务。",
@@ -661,7 +684,27 @@
       "local": "本地服务",
       "endpoint": "自定义地址"
     },
-    "unnamedMachine": "本机"
+    "unnamedMachine": "本机",
+    "agent": "执行者",
+    "recordedModel": "记录的模型",
+    "computer": "计算机",
+    "system": "操作系统",
+    "architecture": "架构",
+    "python": "Python",
+    "connectionStatus": "连接状态",
+    "actions": "操作",
+    "unknown": "未记录",
+    "noAgents": "这个项目还没有运行记录。",
+    "noResults": "没有符合筛选条件的记录。",
+    "unavailable": "无法加载这个项目的团队数据。",
+    "filters": {
+      "searchAgents": "搜索执行者或模型",
+      "searchJobs": "搜索最近任务",
+      "provider": "按服务商筛选",
+      "allProviders": "所有服务商",
+      "state": "按状态筛选",
+      "allStates": "所有状态"
+    }
   },
   "progressPage": {
     "filter": {

@@ -205,7 +205,7 @@ function Composer({
   const refresh = () => rerender((value) => value + 1);
   const node = graph && selected ? graph.nodes.get(selected) : undefined;
   const statement = graph?.statementId ?? null;
-  const key = claimId && node ? [claimId, statement, node.id].join("/") : null;
+  const key = claimId && node ? JSON.stringify([session, claimId, statement, node.id]) : null;
   const draft: Draft | null = key ? (drafts.current.get(key) ?? drafts.current.set(key, { text: "" }).get(key)!) : null;
 
   const declared = Array.isArray(activity?.guidance_channels);
@@ -228,8 +228,18 @@ function Composer({
   const disabled = !available || Boolean(draft?.sending);
   const confirming = Boolean(towardsCodex && draft?.confirmRelease && !draft?.sending);
   const canSend = !disabled && Boolean(draft?.text.trim()) && channels.includes(audience);
-  const viewOnly = !available && activity ? activity.guidance_reason || t("composer.viewOnly") : "";
-  const status = confirming ? t("composer.confirmHint") : draft?.message || viewOnly;
+  const blocker = !node
+    ? t("composer.chooseNode")
+    : activityError ||
+      (!activity
+        ? t("chat.loading")
+        : activity.guidance_blocker
+          ? t(`composer.blockers.${activity.guidance_blocker}`, {
+              defaultValue: activity.guidance_reason || t("composer.viewOnly"),
+            })
+          : activity.guidance_reason || t("composer.viewOnly"));
+  const status = !available ? blocker : confirming ? t("composer.confirmHint") : draft?.message || "";
+  const draftOnly = Boolean(draft && !available);
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -297,9 +307,9 @@ function Composer({
         rows={2}
         maxLength={1500}
         required
-        placeholder={t("composer.placeholder")}
-        aria-describedby="guidance-status"
-        disabled={disabled}
+        placeholder={t(draftOnly ? "composer.draftPlaceholder" : "composer.placeholder")}
+        aria-describedby={draftOnly ? "guidance-status guidance-draft" : "guidance-status"}
+        disabled={!draft || Boolean(draft.sending)}
         value={draft?.text ?? ""}
         onChange={(event) => {
           if (!draft) return;
@@ -318,7 +328,7 @@ function Composer({
         <select
           id="guidance-audience"
           disabled={disabled}
-          value={audience}
+          value={available ? audience : ""}
           onChange={(event) => {
             if (!draft) return;
             draft.audience = event.target.value;
@@ -329,7 +339,7 @@ function Composer({
             refresh();
           }}
         >
-          {channels.length === 0 ? (
+          {!available ? (
             <option value="">{t("composer.unavailable")}</option>
           ) : (
             channels.map((channel) => (
@@ -361,6 +371,11 @@ function Composer({
       >
         {status}
       </p>
+      {draftOnly && (
+        <p id="guidance-draft" className="composer-status">
+          {t("composer.draftOnly")}
+        </p>
+      )}
     </form>
   );
 }

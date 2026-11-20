@@ -35,6 +35,9 @@ This copy matches the Research Multiplier version that wrote it. Run
    In Trellin, a public intake preview authorizes one exact request. A public
    proof task authorizes the displayed frozen scope, selected connection and
    maximum rounds. A changed scope or connection needs renewed consent.
+   On database revision `0081`, a public Codex proof note also needs explicit
+   release for the exact note and statement. Saving a draft keeps it local.
+   A recorded attempt identifies when an authorized task used a released note.
    For an external discussion in Chats or Workbench, the composer identifies
    the recipient and included context. The researcher's send action authorizes
    one request. Use the request details to review exactly what will go out.

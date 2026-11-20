@@ -1,15 +1,13 @@
 .direct-composer {
-  --composer-accent: #494783;
-  --composer-accent-ink: #fff;
-  --composer-elevation: 0 6px 22px #2020301a;
+  --composer-accent: var(--ink);
+  --composer-accent-ink: var(--on-ink);
+  --composer-elevation: 0 6px 22px #0000001a;
   position: relative;
   padding: 10px 10px 8px;
   gap: 8px;
 }
 @media (prefers-color-scheme: dark) {
   .direct-composer {
-    --composer-accent: #a89de9;
-    --composer-accent-ink: #201a38;
     --composer-elevation: 0 6px 22px #0006;
   }
 }

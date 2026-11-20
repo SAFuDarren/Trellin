@@ -256,6 +256,7 @@ def _run_lean_policy(item: PendingLeanPass, *, lean, mathlib_project, lean_searc
         options = {"author_config": author} if author is not None else {}
         if public_model is not None:
             options.update(policy_id=item.policy_id, public_model=public_model, use_public_model=use_public_model)
+            options["workbench_guidance_enabled"] = public_model["provider"] == "codex-cli"
         elif rounds:
             options["workbench_guidance_enabled"] = True
         route_width = setting.route_parallelism

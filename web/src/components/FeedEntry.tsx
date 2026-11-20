@@ -12,7 +12,9 @@ export function FeedEntry({ record, link }: { record: ActivityRecord & { kind: s
     const towardsCodex = record.audience === "codex";
     const progress = record.submitted_at
       ? t(towardsCodex ? "chat.submittedCodex" : "chat.submittedLocal")
-      : t(towardsCodex ? "chat.waitingCodex" : "chat.waitingLocal");
+      : record.current_scope === false
+        ? t("chat.staleGuidance")
+        : t(towardsCodex ? "chat.waitingCodex" : "chat.waitingLocal");
     const audience = t(`audience.${record.audience ?? "local"}`);
     return (
       <li data-from="you">

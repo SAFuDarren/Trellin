@@ -91,10 +91,32 @@ def _thread(store, identifier):
 def threads(store, claim_id=None):
     _identity(store)
     return {"threads": store.query("human", f"""
-        SELECT {_THREAD_FIELDS}, {_RUNNING} AS running
-        FROM rm.visible_conversation_threads t
-        WHERE %s::uuid IS NULL OR t.claim_id = %s
-        ORDER BY updated_at DESC, id LIMIT 200
+        WITH recent_threads AS MATERIALIZED (
+            SELECT {_THREAD_FIELDS}
+            FROM rm.visible_conversation_threads t
+            WHERE %s::uuid IS NULL OR t.claim_id = %s
+            ORDER BY updated_at DESC, id LIMIT 200
+        )
+        SELECT t.*, coalesce(turn.running, false) AS running,
+               CASE WHEN turn.id IS NOT NULL THEN jsonb_build_object(
+                   'provider', turn.connection ->> 'provider',
+                   'requested_model', turn.connection ->> 'model',
+                   'model', CASE WHEN turn.model #>> '{{parameters,model_id_reported}}' = 'true'
+                                 THEN turn.model ->> 'id' END,
+                   'preview', left(coalesce(turn.reply, turn.text), 180),
+                   'at', coalesce(turn.finished_at, turn.accepted_at),
+                   'status', CASE WHEN turn.running THEN 'running'
+                                  WHEN turn.reply IS NOT NULL THEN 'answered' ELSE 'failed' END
+               ) END AS latest_turn
+        FROM recent_threads t
+        LEFT JOIN LATERAL (
+            SELECT id, text, connection, accepted_at, finished_at, reply, model,
+                   finished_at IS NULL AND deadline > statement_timestamp() AS running
+            FROM rm.visible_conversation_turns
+            WHERE thread_id = t.id
+            ORDER BY position DESC LIMIT 1
+        ) turn ON true
+        ORDER BY t.updated_at DESC, t.id
     """, claim_id, claim_id)}
 
 

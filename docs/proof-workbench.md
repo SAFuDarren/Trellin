@@ -71,7 +71,9 @@ are outside that payload.
 The conversation and attribution are saved with the project. Removing a
 conversation hides it from the active list and preserves its history.
 
-Use **Proof activity** for guidance that a proof worker can read on a later run.
+Use **Proof activity** to leave an opinion on the selected proof node. When the
+workbench explains a blocker, you can keep typing a draft in that panel. Leaving
+the workbench or quitting Trellin clears unsent drafts.
 
 On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
 
@@ -84,6 +86,16 @@ Select a node, write a short method or focus suggestion, choose the recipient, t
 Each note is local to the project and eligible on its original statement version.
 
 ## Send a public note to Codex
+
+On database revision `0081`, open **Proof activity** for a node with a
+confirmed public statement and shareable basis. Choose **Queue proof note**
+and **Allow Codex to use this note**. Start a bounded **Proof task** with a
+Codex connection from Team. The task checks its signed model, statement,
+basis and budget before using the queued note. Proof activity distinguishes
+a queued note from one included in a recorded model attempt.
+
+The terminal-started workflow is also available. On earlier database
+revisions use it to deliver released guidance.
 
 Use a public project with a confirmed Lean scope, a released basis and an approved Lean advancement policy with model rounds available. Configure the existing [Codex CLI adapter](model-adapters.md#choose-a-model-for-each-task) as the worker's Lean author.
 

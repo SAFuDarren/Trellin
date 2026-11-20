@@ -175,72 +175,91 @@ export function ModelConnections({ session }: { session: string }) {
   const list = connections.data?.connections ?? [];
   const discovered = native.data?.providers ?? [];
   return (
-    <section id="model-connections" aria-labelledby="model-connections-title">
-      <h3 id="model-connections-title">{t("modelConnections.title")}</h3>
+    <section id="model-connections" className="team-connections" aria-labelledby="model-connections-title">
+      <div className="team-heading">
+        <h3 id="model-connections-title">{t("modelConnections.title")}</h3>
+        {!adding && (
+          <button className="button" type="button" disabled={pending} onClick={() => setAdding("native")}>
+            {t("modelConnections.add")}
+          </button>
+        )}
+      </div>
       {connections.isPending && <p role="status">{t("common.loading")}</p>}
       {connections.isError && <p role="alert">{t("modelConnections.failed")}</p>}
       {!connections.isPending && !connections.isError && !list.length && <p>{t("modelConnections.empty")}</p>}
       {list.length > 0 && (
-        <ul className="project-entry-items">
-          {list.map((connection) => {
-            const provider = t(`team.providers.${connection.provider}`, { defaultValue: connection.provider });
-            const label = connectionLabel(connection);
-            return (
-              <li className="project-entry-item" key={connection.id}>
-                <strong>{label}</strong>
-                <p>
-                  {label !== provider && (
-                    <>
-                      {provider}
-                      {" · "}
-                    </>
-                  )}
-                  {connectionModelLabel(t, connection)}
-                  {" · "}
-                  {t(`modelConnections.status.${connection.status}`, { defaultValue: errorMessage(connection.status) })}
-                </p>
-                <div className="choices">
-                  <button
-                    type="button"
-                    className="button"
-                    disabled={pending}
-                    onClick={() => void change("test", { id: connection.id })}
-                  >
-                    {t("modelConnections.test")}
-                  </button>
-                  <button
-                    type="button"
-                    className="button"
-                    disabled={pending}
-                    onClick={() => {
-                      setRemoving(connection.id);
-                      setStatus("");
-                      setFailure("");
-                    }}
-                  >
-                    {t("modelConnections.remove")}
-                  </button>
-                </div>
-                {removing === connection.id && (
-                  <div className="choices">
-                    <p>{t("modelConnections.removeHint")}</p>
-                    <button
-                      type="button"
-                      className="button"
-                      disabled={pending}
-                      onClick={() => void change("remove", { id: connection.id })}
-                    >
-                      {t("modelConnections.removeConfirm")}
-                    </button>
-                    <button type="button" className="button" disabled={pending} onClick={() => setRemoving("")}>
-                      {t("modelConnections.cancel")}
-                    </button>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="table-wrap">
+          <table className="table team-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("team.name")}</th>
+                <th scope="col">{t("modelConnections.model")}</th>
+                <th scope="col">{t("team.connectionStatus")}</th>
+                <th scope="col">{t("team.actions")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((connection) => {
+                const provider = t(`team.providers.${connection.provider}`, { defaultValue: connection.provider });
+                const label = connectionLabel(connection);
+                return (
+                  <tr key={connection.id}>
+                    <th scope="row">
+                      {label}
+                      {label !== provider && <span className="team-secondary">{provider}</span>}
+                    </th>
+                    <td>{connectionModelLabel(t, connection)}</td>
+                    <td>
+                      {t(`modelConnections.status.${connection.status}`, {
+                        defaultValue: errorMessage(connection.status),
+                      })}
+                    </td>
+                    <td>
+                      <div className="choices team-model-actions">
+                        <button
+                          type="button"
+                          className="button"
+                          disabled={pending}
+                          onClick={() => void change("test", { id: connection.id })}
+                        >
+                          {t("modelConnections.test")}
+                        </button>
+                        <button
+                          type="button"
+                          className="button"
+                          disabled={pending}
+                          onClick={() => {
+                            setRemoving(connection.id);
+                            setStatus("");
+                            setFailure("");
+                          }}
+                        >
+                          {t("modelConnections.remove")}
+                        </button>
+                      </div>
+                      {removing === connection.id && (
+                        <div className="choices team-model-actions">
+                          <p>{t("modelConnections.removeHint")}</p>
+                          <button
+                            type="button"
+                            className="button"
+                            disabled={pending}
+                            onClick={() => void change("remove", { id: connection.id })}
+                          >
+                            {t("modelConnections.removeConfirm")}
+                          </button>
+                          <button type="button" className="button" disabled={pending} onClick={() => setRemoving("")}>
+                            {t("modelConnections.cancel")}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
       {adding === "native" && (
         <div className="project-entry-form">
@@ -323,13 +342,6 @@ export function ModelConnections({ session }: { session: string }) {
             </button>
           </div>
         </form>
-      )}
-      {!adding && (
-        <div className="choices">
-          <button className="button" type="button" disabled={pending} onClick={() => setAdding("native")}>
-            {t("modelConnections.add")}
-          </button>
-        </div>
       )}
       {status && <p role="status">{status}</p>}
       {pending && <p role="status">{t("common.loading")}</p>}

@@ -7,6 +7,12 @@
 - Send messages directly from a shared Workbench and Chats composer. Pick a
   model in the app, inspect request details when needed, and resume conversations
   when reopening the workspace.
+- Browse conversations beside their message history, with a fixed input area.
+  Team groups model connections, recorded activity, jobs, runtimes and usage.
+  Both views use neutral gray workbench surfaces.
+- Leave a node-specific draft in Proof activity. On database revision `0081`,
+  release an exact public note for a later authorized Codex proof task and
+  see the attempt that received it.
 - Use a compact icon rail with keyboard and hover labels. Claim and section
   lists remain in the sidebar.
 - Expand a Claims card in place, keep long graph labels inside their nodes, and

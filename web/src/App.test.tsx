@@ -1082,7 +1082,7 @@ describe("App", () => {
       target: { value: choice.model },
     });
     fireEvent.click(connect);
-    expect(await connections.findByText(new RegExp(`${choice.model} ·`))).toBeTruthy();
+    expect(await connections.findByRole("cell", { name: choice.model })).toBeTruthy();
     expect(connections.queryByText(other.label)).toBeNull();
     expect(fetch.mock.calls.some(([path]) => path.endsWith("/test"))).toBe(false);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.test }));

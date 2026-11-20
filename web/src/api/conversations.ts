@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { api, ApiError } from "./client";
 import { useFallbackInterval } from "./liveUpdates";
+import { connectionModelLabel } from "./modelConnections";
 
 export type ConversationAnchor = { claim_id?: string; statement_id?: string; node_id?: string };
 
@@ -15,6 +16,14 @@ export type ConversationSummary = {
   running: boolean;
   revision: number;
   created_at: string;
+  latest_turn?: {
+    provider: string;
+    requested_model: string;
+    model: string | null;
+    preview: string;
+    at: string;
+    status: "running" | "answered" | "failed";
+  } | null;
 };
 
 export type ConversationMessage = {
@@ -51,7 +60,14 @@ export function conversationErrorText(t: TFunction, error: unknown): string {
   return t(`errors.${code}`, { defaultValue: t("conversations.failed") });
 }
 
+export function conversationRecipientLabel(t: TFunction, provider: string, model: string): string {
+  if (provider === "ollama-native") return t("conversations.localModel", { name: model });
+  const name = t(`team.providers.${provider}`, { defaultValue: provider });
+  return name + " · " + connectionModelLabel(t, { provider, model });
+}
+
 export function useConversations(session: string, claimId?: string) {
+  const fallback = useFallbackInterval(8000);
   return useQuery({
     queryKey: [...conversationKey(session), "list", claimId ?? ""],
     queryFn: ({ signal }) =>
@@ -60,7 +76,8 @@ export function useConversations(session: string, claimId?: string) {
         claimId ? `${ROOT}?claim_id=${encodeURIComponent(claimId)}` : ROOT,
         { signal },
       ),
-    refetchInterval: useFallbackInterval(8000),
+    // A running turn can reach its deadline without a notification.
+    refetchInterval: (query) => (query.state.data?.threads?.some((thread) => thread.running) ? 8000 : fallback),
     retry: false,
   });
 }

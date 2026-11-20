@@ -13,6 +13,10 @@ private struct LastWorkspace: Codable {
 
 @main
 final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, NSWindowDelegate {
+    private static let windowSurface = NSColor(name: nil) { appearance in
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return NSColor(white: dark ? 0.10 : 0.91, alpha: 1)
+    }
     private let defaults = UserDefaults.standard
     private let lastKey = "lastWorkspaceV1"
     private let bridge = "trellinPosition"
@@ -52,6 +56,9 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpMenu()
         window.title = "Trellin"
+        // Keep AppKit's window controls while matching the rail's gray surface.
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = Self.windowSurface
         window.minSize = NSSize(width: 640, height: 460)
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
@@ -303,6 +310,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
             ))
         }
         let web = WKWebView(frame: .zero, configuration: configuration)
+        web.underPageBackgroundColor = Self.windowSurface
         web.navigationDelegate = self
         web.uiDelegate = self
         webView = web

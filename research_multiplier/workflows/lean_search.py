@@ -1051,6 +1051,10 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
         else:
             config = author_config() if author_config is not None else ModelConfig.from_env("LEAN_AUTHOR")
         allow_codex_guidance = workbench_guidance_enabled and not private and config.provider == "codex-cli"
+        if allow_codex_guidance and public_model is not None:
+            from . import workbench_guidance
+
+            allow_codex_guidance = workbench_guidance.connected_installed(store, "verifier")
         guidance_statement_id = statement["id"] if workbench_guidance_enabled and (private or allow_codex_guidance) else None
         guidance_audience = "codex" if allow_codex_guidance else "local"
         prompt = PROMPT.replace("public research statements", "local research statements") if private else PROMPT

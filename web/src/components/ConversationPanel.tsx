@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 import {
   conversationErrorText,
+  conversationRecipientLabel,
   useConversation,
   useConversationActions,
   type ConversationMessage,
@@ -34,10 +35,12 @@ export function ConversationPanel({
   session,
   thread,
   onRemove,
+  header,
 }: {
   session: string;
   thread: ConversationSummary;
   onRemove: () => void;
+  header?: (removeControl: ReactNode) => ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   const detail = useConversation(session, thread.id);
@@ -76,6 +79,7 @@ export function ConversationPanel({
   const currentScope = useRef<string | null>(null);
   const formId = useId();
   const feed = useRef<HTMLOListElement>(null);
+  const nearEnd = useRef(true);
   const messages = detail.data?.thread.messages ?? [];
   const running = detail.data?.thread.running ?? thread.running;
   const connection = options.find((option) => option.id === selected);
@@ -98,7 +102,7 @@ export function ConversationPanel({
   }, [scope]);
 
   useLayoutEffect(() => {
-    if (feed.current) feed.current.scrollTop = feed.current.scrollHeight;
+    if (feed.current && nearEnd.current) feed.current.scrollTop = feed.current.scrollHeight;
   }, [messages.length]);
 
   function errorText(code: string) {
@@ -180,13 +184,7 @@ export function ConversationPanel({
     }
   }
 
-  const recipient = (provider: string, model: string) =>
-    provider === "ollama-native"
-      ? t("conversations.localModel", { name: model })
-      : [
-          t(`team.providers.${provider}`, { defaultValue: provider }),
-          connectionModelLabel(t, { provider, model }),
-        ].join(" · ");
+  const recipient = (provider: string, model: string) => conversationRecipientLabel(t, provider, model);
 
   function speaker(message: ConversationMessage): string {
     if (message.role === "user") return t("conversations.you");
@@ -196,14 +194,28 @@ export function ConversationPanel({
     }
     return t("model.fallback");
   }
+  const remove = (
+    <button type="button" className="conversation-text-action" disabled={disabled} onClick={() => setRemoving(true)}>
+      {t("conversations.remove")}
+    </button>
+  );
   return (
     <section className="conversation-panel" aria-label={thread.title}>
+      {header?.(remove)}
       {detail.isPending ? (
         <p role="status">{t("common.loading")}</p>
       ) : detail.isError ? (
         <p role="alert">{conversationErrorText(t, detail.error)}</p>
       ) : (
-        <ol className="chat-feed" ref={feed} aria-label={t("chat.feed")}>
+        <ol
+          className="chat-feed"
+          ref={feed}
+          aria-label={t("chat.feed")}
+          tabIndex={0}
+          onScroll={({ currentTarget }) => {
+            nearEnd.current = currentTarget.scrollHeight - currentTarget.scrollTop - currentTarget.clientHeight < 72;
+          }}
+        >
           {messages.length === 0 && <li className="chat-empty">{t("conversations.emptyThread")}</li>}
           {messages.map((message) => (
             <li key={message.id} data-from={message.role === "user" ? "you" : "model"}>
@@ -329,16 +341,7 @@ export function ConversationPanel({
       </form>
       <div className="conversation-context">
         <p id={formId + "-scope"}>{[destination, ...context].filter(Boolean).join(" · ")}</p>
-        <div className="conversation-secondary">
-          <button
-            type="button"
-            className="conversation-text-action"
-            disabled={disabled}
-            onClick={() => setRemoving(true)}
-          >
-            {t("conversations.remove")}
-          </button>
-        </div>
+        {!header && <div className="conversation-secondary">{remove}</div>}
       </div>
       <div className="conversation-request" id={formId + "-request"} hidden={!showDetails}>
         {details ? (

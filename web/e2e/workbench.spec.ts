@@ -70,7 +70,7 @@ test("the impact view previews what withdrawing an assumption affects", async ({
   await expect(page.locator('.graph-node[data-affected="true"]')).toHaveCount(4);
 });
 
-test("sending a note to Codex takes two explicit clicks", async ({ page }) => {
+test("releasing a proof note to Codex takes two explicit clicks", async ({ page }) => {
   await open(page);
   await card(page, /^Proof obligation 2$/).click();
   await page.getByRole("button", { name: "Proof activity" }).click();
@@ -78,11 +78,11 @@ test("sending a note to Codex takes two explicit clicks", async ({ page }) => {
   await page.locator("#guidance-text").fill("Try the reduction route first.");
   const send = page.locator("#guidance-send");
   await send.click();
-  await expect(send).toHaveAccessibleName("Send to Codex");
-  await expect(page.locator("#guidance-status")).toContainText("Click again to send");
+  await expect(send).toHaveAccessibleName("Allow Codex to use this note");
+  await expect(page.locator("#guidance-status")).toContainText("later authorized Codex proof attempt");
   await expect(page.locator(".chat-feed")).not.toContainText("Try the reduction route first.");
   await send.click();
-  await expect(page.locator("#guidance-status")).toHaveText("Saved. Codex will read it on its next run.");
+  await expect(page.locator("#guidance-status")).toHaveText("Saved for a later authorized Codex proof attempt.");
   await expect(page.locator(".chat-feed")).toContainText("Try the reduction route first.");
 });
 
@@ -365,6 +365,7 @@ for (const inspect of [false, true]) {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await page.reload();
     await expect(page.getByText("Check closure.")).toBeVisible();
+    await page.getByLabel("Conversation actions").click();
     await page.getByRole("button", { name: "Remove conversation" }).click();
     const remove = page.getByRole("dialog", { name: "Remove conversation" });
     await expect(remove.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();

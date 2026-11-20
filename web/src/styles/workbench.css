@@ -1,31 +1,32 @@
 /* Layout: sidebar | graph over conversation | review column, each border draggable. */
 :root {
   color-scheme: light;
-  --rail: #e8ebf1;
-  --side: #eff1f5;
-  --main: #fafbfc;
-  --canvas: #f3f5f9;
-  --code: #edf0f5;
-  --track: #e7ebf1;
-  --pick: #dfe6f1;
-  --hair: #dfe3eb;
-  --grip: #bfc7d5;
-  --ink: #202534;
-  --sub: #525c6c;
-  --edge: #7d8799;
-  --edge-soft: #a8b3c5;
+  accent-color: var(--live);
+  --rail: #e8e8e8;
+  --side: #efefef;
+  --main: #fafafa;
+  --canvas: #f4f4f4;
+  --code: #ededed;
+  --track: #e8e8e8;
+  --pick: #dedede;
+  --hair: #dedede;
+  --grip: #bdbdbd;
+  --ink: #222222;
+  --sub: #555555;
+  --edge: #787878;
+  --edge-soft: #a4a4a4;
   --node: #ffffff;
-  --node-line: #ced6e3;
+  --node-line: #cecece;
   --composer: #ffffff;
-  --composer-line: #cfd7e4;
+  --composer-line: #cecece;
   --good: #23724e;
   --warn: #fab219;
   --warn-soft: #fdf3dc;
   --crit: #d03b3b;
   --crit-soft: #fbedec;
-  --live: #395f9e;
-  --live-soft: #e2eaf8;
-  --on-ink: #fcfcfb;
+  --live: #4b4b4b;
+  --live-soft: #e3e3e3;
+  --on-ink: #fafafa;
   --cat-1: #6250d6;
   --cat-2: #eb6834;
   --cat-3: #1baf7a;
@@ -42,31 +43,31 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --rail: #1e2127;
-    --side: #24272e;
-    --main: #202228;
-    --canvas: #191b21;
-    --code: #292d36;
-    --track: #2e323b;
-    --pick: #333a48;
-    --hair: #353943;
-    --grip: #535b69;
-    --ink: #eeeff4;
-    --sub: #b0b6c3;
-    --edge: #8995aa;
-    --edge-soft: #566275;
-    --node: #242831;
-    --node-line: #3d4657;
-    --composer: #2b2f38;
-    --composer-line: #414956;
+    --rail: #191919;
+    --side: #222222;
+    --main: #1e1e1e;
+    --canvas: #171717;
+    --code: #2b2b2b;
+    --track: #2b2b2b;
+    --pick: #343434;
+    --hair: #363636;
+    --grip: #555555;
+    --ink: #f1f1f1;
+    --sub: #b7b7b7;
+    --edge: #909090;
+    --edge-soft: #636363;
+    --node: #252525;
+    --node-line: #434343;
+    --composer: #2a2a2a;
+    --composer-line: #454545;
     --good: #7ab99a;
     --warn: #fab219;
     --warn-soft: #3a2e12;
     --crit: #e05252;
     --crit-soft: #2c1c1b;
-    --live: #a4bfed;
-    --live-soft: #2b3a54;
-    --on-ink: #1d212b;
+    --live: #cdcdcd;
+    --live-soft: #353535;
+    --on-ink: #1e1e1e;
     --cat-1: #9085e9;
     --cat-2: #d95926;
     --cat-3: #199e70;
@@ -93,6 +94,9 @@ body {
   color: var(--ink);
   font: 13px/1.45 var(--font);
   -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
 }
 h1,
 h2,
