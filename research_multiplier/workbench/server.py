@@ -22,7 +22,8 @@ from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
                                           workbench_activity, workbench_clarification, workbench_conversations, workbench_goal_review,
                                           workbench_guidance, workbench_library,
-                                          workbench_intake, workbench_lemma_plans, workbench_premises, workbench_proof_tasks,
+                                          workbench_intake, workbench_lemma_plans, workbench_premises,
+                                          workbench_proof_drafts, workbench_proof_tasks,
                                           workbench_review, workbench_sections,
                                           workbench_theorems, workspace_events)
 
@@ -66,6 +67,14 @@ _CONNECTION_WRITES = {
 }
 _INTAKE_PUBLIC = ("/api/project-intake/public-preview", "/api/project-intake/public-draft")
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
+_PROOF_DRAFT_ROUTE = "/api/proof-drafts"
+_PROOF_DRAFT_DISCARD = "/api/proof-drafts/discard"
+_PROOF_DRAFT_ERRORS = {
+    "proof_draft_invalid": HTTPStatus.BAD_REQUEST,
+    "proof_draft_missing": HTTPStatus.NOT_FOUND,
+    "proof_draft_conflict": HTTPStatus.CONFLICT,
+    "proof_draft_unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
+}
 _LEMMA_PLAN_ROUTE = "/api/lemma-plans"
 _LEMMA_PLAN_ERRORS = {
     "lemmaPlan.invalid": HTTPStatus.BAD_REQUEST,
@@ -305,11 +314,9 @@ class WorkbenchServer(ThreadingHTTPServer):
                 self._doctor = (time.monotonic(), report)
             return report
 
-    def add_guidance(self, claim_id, statement_id, request_id, node_id, text, audience, confirmed):
-        with paths.use_workspace(self.workspace, strict=True), Store() as store:
-            return store.transaction("human", lambda: workbench_guidance.add(
-                store, claim_id, statement_id, request_id, node_id, text, audience=audience, confirm_release=confirmed,
-            ))
+    def add_guidance(self, claim_id, statement_id, request_id, node_id, text, audience, confirmed, draft_revision=None):
+        return self.write(workbench_proof_drafts.queue_guidance, claim_id, statement_id, request_id,
+                          node_id, text, audience, confirmed, draft_revision)
 
     def _local_proof_worker(self):
         with self._proof_task_lock:
@@ -366,7 +373,10 @@ class WorkbenchServer(ThreadingHTTPServer):
 
 
 def _activity(store, claim_id):
-    return {**workbench_activity.snapshot(store, claim_id), **workbench_guidance.activity(store, claim_id)}
+    return {
+        **workbench_activity.snapshot(store, claim_id), **workbench_guidance.activity(store, claim_id),
+        "proof_draft_available": workbench_proof_drafts.installed(store),
+    }
 
 
 def _workspace_claims(store, workspace_id):
@@ -469,6 +479,15 @@ class _Handler(BaseHTTPRequestHandler):
             return self.server.read(proof_graph.impact, *_uuid_parameters(route.query, "claim", "basis"))
         if route.path == _GOAL_REVIEW_ROUTE:
             return self.server.read(workbench_goal_review.detail, *_uuid_parameters(route.query, "goal"))
+        if route.path == _PROOF_DRAFT_ROUTE:
+            try:
+                parameters = parse_qs(route.query, keep_blank_values=True, strict_parsing=True, max_num_fields=2)
+                if parameters.keys() != {"claim_id", "node_id"} or any(len(v) != 1 for v in parameters.values()):
+                    raise ValueError
+                claim_id = UUID(parameters["claim_id"][0])
+            except ValueError:
+                raise _BadRequest("proof_draft_invalid") from None
+            return self.server.read(workbench_proof_drafts.read, claim_id, parameters["node_id"][0])
         if route.path == "/api/activity":
             return self.server.read(_activity, *_uuid_parameters(route.query, "claim"))
         if route.path == "/api/proof-task":
@@ -508,6 +527,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, result)
         except _BadRequest as error:
             self._error(HTTPStatus.BAD_REQUEST, str(error))
+        except workbench_proof_drafts.ProofDraftError as error:
+            self._error(_PROOF_DRAFT_ERRORS[str(error)], str(error))
         except workbench_proof_tasks.ProofTaskError as error:
             self._error(HTTPStatus.NOT_FOUND, error.code)
         except connections.ConnectionError as error:
@@ -521,7 +542,9 @@ class _Handler(BaseHTTPRequestHandler):
         except claim_references.ClaimCodeError as error:
             self._error(*_claim_code_error(error))
         except DatabaseOperationError as error:
-            if self.path.startswith(_GOAL_REVIEW_ROUTE):
+            if self.path.startswith(_PROOF_DRAFT_ROUTE + "?"):
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "proof_draft_unavailable")
+            elif self.path.startswith(_GOAL_REVIEW_ROUTE):
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "goalReview.unavailable")
             elif error.state in _SCHEMA_SQLSTATES:
                 self._error(HTTPStatus.CONFLICT, "This project database needs the workbench schema. See the workbench guide.")
@@ -767,12 +790,30 @@ class _Handler(BaseHTTPRequestHandler):
         body = self._body()
         try:
             required = {"claim_id", "statement_id", "request_id", "node_id", "text"}
-            if not isinstance(body, dict) or not required <= body.keys() <= required | {"audience", "confirm_release"}:
+            if not isinstance(body, dict) or not required <= body.keys() <= required | {"audience", "confirm_release", "draft_revision"}:
                 raise ValueError
             return (UUID(body["claim_id"]), UUID(body["statement_id"]), UUID(body["request_id"]),
-                    body["node_id"], body["text"], body.get("audience", "local"), body.get("confirm_release", False))
+                    body["node_id"], body["text"], body.get("audience", "local"), body.get("confirm_release", False),
+                    UUID(body["draft_revision"]) if "draft_revision" in body else None)
         except (ValueError, AttributeError, TypeError, RecursionError):
             raise _BadRequest("Supply one valid guidance message with a claim, a node and a request ID.") from None
+
+    def _proof_draft_write(self):
+        body = self._body()
+        discard = self.path == _PROOF_DRAFT_DISCARD
+        fields = {"claim_id", "node_id", "expected_revision"}
+        if not discard:
+            fields.add("text")
+        try:
+            if not isinstance(body, dict) or body.keys() != fields:
+                raise ValueError
+            revision = body["expected_revision"]
+            values = (UUID(body["claim_id"]), body["node_id"], UUID(revision) if discard or revision is not None else None)
+        except (ValueError, AttributeError, TypeError):
+            raise _BadRequest("proof_draft_invalid") from None
+        if discard:
+            return self.server.write(workbench_proof_drafts.discard, *values)
+        return self.server.write(workbench_proof_drafts.save, *values, body["text"])
 
     def _change_connection(self, method):
         document = self._body()
@@ -798,6 +839,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(HTTPStatus.FORBIDDEN, "Submit guidance from the local workbench session.")
             elif self.path == "/api/guidance":
                 self._json(HTTPStatus.OK, self.server.add_guidance(*self._guidance_body()))
+            elif self.path in {_PROOF_DRAFT_ROUTE, _PROOF_DRAFT_DISCARD}:
+                self._json(HTTPStatus.OK, self._proof_draft_write())
             elif self.path in _CONVERSATION_WRITES:
                 self._json(HTTPStatus.OK, self.server.write(_CONVERSATION_WRITES[self.path], self._body()))
             elif self.path == "/api/conversations/preview":
@@ -856,6 +899,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(*_V1_ERRORS[str(error)])
         except workbench_guidance.GuidanceError as error:
             self._error(HTTPStatus.CONFLICT, str(error))
+        except workbench_proof_drafts.ProofDraftError as error:
+            self._error(_PROOF_DRAFT_ERRORS[str(error)], str(error))
         except workbench_proof_tasks.ProofTaskError as error:
             status = HTTPStatus.BAD_REQUEST if error.code == "proof_task.invalid" else HTTPStatus.CONFLICT
             self._error(status, error.code)
@@ -882,6 +927,8 @@ class _Handler(BaseHTTPRequestHandler):
                     "23514": "stale", "23505": "stale",
                 }.get(error.state, "unavailable")
                 self._conversation_error(f"conversation.{code}")
+            elif self.path in {_PROOF_DRAFT_ROUTE, _PROOF_DRAFT_DISCARD}:
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "proof_draft_unavailable")
             elif self.path in _PROOF_WRITES:
                 status = HTTPStatus.SERVICE_UNAVAILABLE if error.retryable else HTTPStatus.CONFLICT
                 self._error(status, "proof_task.unavailable" if error.retryable else "proof_task.stale")
@@ -910,7 +957,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
         except Exception as error:
             _LOG.error("Workbench write failed (%s).", type(error).__name__)
-            if self.path in _PROOF_WRITES:
+            if self.path in {_PROOF_DRAFT_ROUTE, _PROOF_DRAFT_DISCARD}:
+                message = "proof_draft_unavailable"
+            elif self.path in _PROOF_WRITES:
                 message = "proof_task.unavailable"
             elif self.path == _LEMMA_PLAN_ROUTE:
                 message = "lemmaPlan.unavailable"

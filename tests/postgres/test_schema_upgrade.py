@@ -47,7 +47,7 @@ def test_upgrade_from_0068_preserves_database_identity():
             assert connection.execute("SELECT rm.current_database_id()").fetchone() == (original_identity,)
 
 
-@pytest.mark.parametrize("revision", ["0070", "0080"])
+@pytest.mark.parametrize("revision", ["0070", "0080", "0081"])
 def test_native_upgrade_archives_bound_project_and_reopens_same_database(tmp_path, monkeypatch, revision):
     import psycopg
 
@@ -98,4 +98,5 @@ def test_native_upgrade_archives_bound_project_and_reopens_same_database(tmp_pat
             )
             assert connection.execute("""
                 SELECT to_regprocedure('rm.workbench_codex_release_available(uuid)') IS NOT NULL
+                       AND to_regprocedure('rm.read_workbench_proof_draft(uuid,uuid,text)') IS NOT NULL
             """).fetchone() == (True,)

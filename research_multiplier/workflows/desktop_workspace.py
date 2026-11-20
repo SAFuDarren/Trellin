@@ -6,12 +6,12 @@ import sys
 import unicodedata
 
 from research_multiplier.storage import credentials, migrate, paths, project_archive
-from research_multiplier.workflows import agent_guide, workbench_guidance
+from research_multiplier.workflows import agent_guide, workbench_proof_drafts
 from research_multiplier.workflows.setup import Setup
 
 
-_PROOF_NOTES_REVISION = "0081"
-_UPGRADABLE_REVISIONS = frozenset(f"{revision:04d}" for revision in range(70, 81))
+_PROOF_DRAFT_REVISION = "0082"
+_UPGRADABLE_REVISIONS = frozenset(f"{revision:04d}" for revision in range(70, 82))
 
 
 class WorkspaceCreationError(ValueError):
@@ -28,7 +28,7 @@ def _upgrade_status(dsn, workspace):
     from research_multiplier.storage.postgres import Store
 
     with Store() as store:
-        installed = workbench_guidance.connected_installed(store, "human")
+        installed = workbench_proof_drafts.installed(store)
     expected = paths.database_id(workspace), paths.workspace_id(workspace)
     with psycopg.connect(dsn, connect_timeout=5, options="-c default_transaction_read_only=on -c statement_timeout=10000") as connection:
         state = connection.execute("""
@@ -49,9 +49,9 @@ def upgrade_project_database(workspace):
         raise WorkspaceUpgradeError("login-missing")
     migrate.migration_url(dsn)
     revision, installed = _upgrade_status(dsn, workspace)
-    if revision == _PROOF_NOTES_REVISION and installed:
+    if revision == _PROOF_DRAFT_REVISION and installed:
         return None
-    if revision not in _UPGRADABLE_REVISIONS or installed or migrate.migration_head() != _PROOF_NOTES_REVISION:
+    if revision not in _UPGRADABLE_REVISIONS or installed or migrate.migration_head() != _PROOF_DRAFT_REVISION:
         raise WorkspaceUpgradeError("upgrade-unsupported")
 
     try:
@@ -62,8 +62,8 @@ def upgrade_project_database(workspace):
     except Exception:
         raise WorkspaceUpgradeError("upgrade-backup") from None
 
-    migrate.upgrade(dsn, _PROOF_NOTES_REVISION)
-    if _upgrade_status(dsn, workspace) != (_PROOF_NOTES_REVISION, True):
+    migrate.upgrade(dsn, _PROOF_DRAFT_REVISION)
+    if _upgrade_status(dsn, workspace) != (_PROOF_DRAFT_REVISION, True):
         raise WorkspaceUpgradeError("upgrade-failed")
     return backup
 

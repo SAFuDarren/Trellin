@@ -270,7 +270,7 @@ def test_project_upgrade_does_not_run_migration_without_a_verified_backup(
         assert dsn == saved_owner
         assert workspace == paths.require_workspace() == bound_workspace
         assert paths.strict_workspace()
-        return "0080", False
+        return "0081", False
 
     def migration(*_):
         pytest.fail("Upgrade ran without verifying a project backup.")
@@ -280,7 +280,7 @@ def test_project_upgrade_does_not_run_migration_without_a_verified_backup(
 
     monkeypatch.setattr(desktop_workspace, "_upgrade_status", status)
     monkeypatch.setattr(desktop_workspace.migrate, "migration_url", lambda dsn: dsn)
-    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0081")
+    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0082")
     monkeypatch.setattr(desktop_workspace.migrate, "upgrade", migration)
     monkeypatch.setattr(desktop_workspace.project_archive, "backup", lambda: {"directory": "/fixture/archive"})
     monkeypatch.setattr(desktop_workspace.project_archive, fails_at, backup_failure)

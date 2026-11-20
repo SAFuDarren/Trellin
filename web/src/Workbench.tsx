@@ -252,13 +252,13 @@ export function Workbench({
       : t("sidebar.connecting");
   const reviewCount = view === "impact" ? 0 : queueEntries(t, graph, view, assumption, impact.data).length;
   const goal = graph?.claim.id === claimId && claimId ? graph.nodes.get(`goal:${claimId}`) : undefined;
-  // A premise under review has no conversation or proof-note scope in the kernel.
-  const chatSelected =
-    selected && graph?.nodes.get(selected)?.kind === "proposed_premise"
-      ? premiseChatAnchor && graph.nodes.has(premiseChatAnchor)
-        ? premiseChatAnchor
-        : (goal?.id ?? null)
-      : selected;
+  // A premise under review can keep the previous conversation, but is not a proof-note target.
+  const reviewingPremise = Boolean(selected && graph?.nodes.get(selected)?.kind === "proposed_premise");
+  const chatSelected = reviewingPremise
+    ? premiseChatAnchor && graph?.nodes.has(premiseChatAnchor)
+      ? premiseChatAnchor
+      : (goal?.id ?? null)
+    : selected;
   const claimTitle =
     graph?.claim.title || claims.data?.claims.find((claim) => claim.id === claimId)?.title || t("toolbar.defaultTitle");
   const meta = graph
@@ -437,6 +437,7 @@ export function Workbench({
           graph={graph}
           claimId={claimId}
           selected={chatSelected}
+          proofSelected={reviewingPremise ? null : selected}
           activity={activity.data}
           activityError={activityError}
           scopeReady={
