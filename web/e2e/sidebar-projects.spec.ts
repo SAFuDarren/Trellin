@@ -49,9 +49,15 @@ test("the sidebar opens registered desktop projects and keeps the claims navigat
   const openProjects = sidebar.getByRole("button", { name: "Projects", exact: true });
   await expect(projects).toHaveCount(0);
   await openProjects.press("Enter");
-  await expect(projects.getByRole("heading", { name: "Projects" })).toBeFocused();
+  const heading = projects.getByRole("heading", { name: "Projects" });
+  await expect(heading).toBeFocused();
+  await expect(heading).toHaveCSS("font-size", "15px");
+  await expect(heading).toHaveCSS("font-weight", "600");
   await expect(firstRow).toHaveAttribute("aria-current", "page");
   await expect(secondRow).toBeEnabled();
+  await expect(secondRow).toHaveCSS("font-size", "14px");
+  await expect(secondRow).toHaveCSS("font-weight", "400");
+  await expect(projects.getByText("Unavailable", { exact: true })).toHaveCSS("font-size", "12px");
   await expect(projects.getByRole("button", { name: "Offline Research Unavailable" })).toBeDisabled();
   expect(await sidebar.evaluate((element) => element.scrollWidth)).toBe(
     await sidebar.evaluate((element) => element.clientWidth),
