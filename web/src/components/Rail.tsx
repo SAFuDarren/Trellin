@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { href, type Section } from "../shell/route";
 
@@ -16,7 +18,15 @@ const ICONS: Record<string, string> = {
     "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8",
 };
 
-const MAIN: Section[] = ["workbench", "review", "claims", "library", "chat", "team", "progress"];
+const GROUPS: Section[][] = [
+  ["workbench", "claims", "library", "review"],
+  ["chat", "team", "progress"],
+];
+const FOOT: Section[] = ["help", "settings"];
+const brandMark = new URL("../brand/favicon.svg", import.meta.url).href;
+const HOVER_DELAY = 300;
+const SWITCH_WINDOW = 450;
+type Hint = { label: string; x: number; y: number };
 
 export function Icon({ name }: { name: string }) {
   return (
@@ -34,42 +44,91 @@ export function Rail({
   badges: Partial<Record<Section, { count: number; live?: boolean }>>;
 }) {
   const { t } = useTranslation();
+  const [hint, setHint] = useState<Hint | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const warmUntil = useRef(0);
+
+  const hide = () => {
+    window.clearTimeout(timer.current);
+    setHint(null);
+  };
+  const show = (anchor: HTMLAnchorElement, label: string, delay: number) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      const bounds = anchor.getBoundingClientRect();
+      setHint({ label, x: bounds.right + 11, y: bounds.top + bounds.height / 2 });
+    }, delay);
+  };
+
+  useEffect(() => {
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      window.clearTimeout(timer.current);
+      setHint(null);
+    };
+    window.addEventListener("keydown", dismiss);
+    return () => {
+      window.removeEventListener("keydown", dismiss);
+      window.clearTimeout(timer.current);
+    };
+  }, []);
+
+  const link = (section: Section) => {
+    const label = t(`rail.${section}`);
+    const badge = badges[section];
+    const badgeLabel = badge?.count ? t(`rail.badge.${section}`, { count: badge.count }) : "";
+    return (
+      <li key={section}>
+        <a
+          className="rail-link"
+          href={href(section)}
+          aria-label={badgeLabel ? `${label} · ${badgeLabel}` : label}
+          aria-current={current === section ? "page" : undefined}
+          onPointerEnter={(event) => {
+            if (event.pointerType === "mouse")
+              show(event.currentTarget, label, performance.now() < warmUntil.current ? 0 : HOVER_DELAY);
+          }}
+          onPointerLeave={() => {
+            if (hint) warmUntil.current = performance.now() + SWITCH_WINDOW;
+            hide();
+          }}
+          onPointerDown={hide}
+          onFocus={(event) => {
+            if (event.currentTarget.matches(":focus-visible")) show(event.currentTarget, label, 0);
+          }}
+          onBlur={hide}
+        >
+          <Icon name={section} />
+          {badge && badge.count > 0 && (
+            <b className={badge.live ? "rail-badge live" : "rail-badge"} aria-hidden="true">
+              {badge.count > 99 ? "99+" : badge.count}
+            </b>
+          )}
+        </a>
+      </li>
+    );
+  };
+
   return (
     <nav className="rail" aria-label={t("rail.label")}>
       <a className="rail-brand" href={href("workbench")} title={t("app.name")} aria-label={t("app.name")}>
-        R
+        <img src={brandMark} alt="" width={32} height={32} />
       </a>
-      {MAIN.map((section) => {
-        const badge = badges[section];
-        return (
-          <a key={section} href={href(section)} aria-current={current === section ? "page" : undefined}>
-            <Icon name={section} />
-            <span>{t(`rail.${section}`)}</span>
-            {badge && badge.count > 0 && (
-              <b
-                className={badge.live ? "rail-badge live" : "rail-badge"}
-                aria-label={t(`rail.badge.${section}`, { count: badge.count })}
-              >
-                {badge.count}
-              </b>
-            )}
-          </a>
-        );
-      })}
-      <div className="rail-foot">
-        {(["help", "settings"] as const).map((section) => (
-          <a
-            key={section}
-            href={href(section)}
-            className="rail-icon"
-            title={t(`rail.${section}`)}
-            aria-label={t(`rail.${section}`)}
-            aria-current={current === section ? "page" : undefined}
-          >
-            <Icon name={section} />
-          </a>
+      <div className="rail-main" onScroll={hide}>
+        {GROUPS.map((sections) => (
+          <ul className="rail-group" key={sections[0]}>
+            {sections.map(link)}
+          </ul>
         ))}
       </div>
+      <ul className="rail-foot">{FOOT.map(link)}</ul>
+      {hint &&
+        createPortal(
+          <span className="rail-hint" role="tooltip" style={{ left: hint.x, top: hint.y }}>
+            {hint.label}
+          </span>,
+          document.body,
+        )}
     </nav>
   );
 }

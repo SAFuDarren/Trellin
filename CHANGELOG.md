@@ -4,8 +4,11 @@
 
 - Choose a specific Codex or Claude Code model in Team. Direct model conversations
   work in Chats before the first claim and in the graph beside the selected node.
-- Send messages directly from a compact composer and inspect the exact model
-  request from the composer when needed. Reopen the workspace to resume a conversation.
+- Send messages directly from a shared Workbench and Chats composer. Pick a
+  model in the app, inspect request details when needed, and resume conversations
+  when reopening the workspace.
+- Use a compact icon rail with keyboard and hover labels. Claim and section
+  lists remain in the sidebar.
 - Expand a Claims card in place, keep long graph labels inside their nodes, and
   see the recorded Library state in both the table and inspector.
 - Drag the corner of a proof graph node to resize it horizontally and vertically.

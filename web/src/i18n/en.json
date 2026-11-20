@@ -528,6 +528,11 @@
     }
   },
   "conversations": {
+    "contextMenu": "Message context",
+    "messageOnly": "This message only",
+    "hideRequestDetails": "Hide request details",
+    "connectedModels": "Connected services",
+    "manageModels": "Manage model connections",
     "requestedModel": "{{name}} requested · actual model unreported",
     "localModel": "Local · {{name}}",
     "views": "Conversation views",

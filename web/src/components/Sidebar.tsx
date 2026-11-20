@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
 import type { AtlasClaim } from "../workbench/types";
@@ -31,6 +31,13 @@ export function Sidebar({
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const search = useRef<HTMLInputElement>(null);
+  const focusSearch = useRef(false);
+  useEffect(() => {
+    if (!open || !focusSearch.current) return;
+    focusSearch.current = false;
+    search.current?.focus();
+  }, [open]);
 
   const counts = new Map(atlasClaims.map((claim) => [claim.id, claim]));
   const needle = query.trim().toLowerCase();
@@ -46,6 +53,12 @@ export function Sidebar({
     (groups.get(domain) ?? groups.set(domain, []).get(domain)!).push(claim);
   }
   const sorted = [...groups].sort(([a], [b]) => a.localeCompare(b));
+  const searchIcon = (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </svg>
+  );
 
   return (
     <nav className="sidebar" id="sidebar" aria-label={t("sidebar.label")}>
@@ -53,7 +66,7 @@ export function Sidebar({
         <span className="brand-name">{t("sidebar.label")}</span>
         <button
           type="button"
-          className="icon-button"
+          className="icon-button sidebar-refresh"
           aria-label={t("sidebar.refresh")}
           title={t("sidebar.refresh")}
           disabled={refreshing}
@@ -79,23 +92,38 @@ export function Sidebar({
         </button>
       </div>
       <div className="menu">
-        <label className="menu-item search" title={t("sidebar.search")}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="11" cy="11" r="6.5" />
-            <path d="m20 20-4.2-4.2" />
-          </svg>
-          <input
-            type="search"
-            placeholder={t("sidebar.search")}
-            autoComplete="off"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+        {open ? (
+          <label className="menu-item search">
+            {searchIcon}
+            <input
+              ref={search}
+              type="search"
+              aria-label={t("sidebar.search")}
+              placeholder={t("sidebar.search")}
+              autoComplete="off"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        ) : (
+          <button
+            type="button"
+            className="menu-item"
+            aria-label={t("sidebar.search")}
+            title={t("sidebar.search")}
+            onClick={() => {
+              focusSearch.current = true;
+              onToggle();
+            }}
+          >
+            {searchIcon}
+          </button>
+        )}
         <button
           type="button"
           className="menu-item"
           aria-pressed={atlasOpen}
+          aria-label={t("sidebar.atlas")}
           title={t("sidebar.atlas")}
           onClick={onToggleAtlas}
         >
@@ -121,19 +149,31 @@ export function Sidebar({
                 : record?.blocked
                   ? t("sidebar.blocked", { count: record.blocked })
                   : statusText(t, claim.status);
+              const title = claim.title || t("sidebar.untitled");
+              const tone = record?.awaiting_review
+                ? "warn"
+                : record?.blocked || ["needs_recheck", "refuted"].includes(claim.status)
+                  ? "bad"
+                  : claim.status === "awaiting_interpretation_review"
+                    ? "warn"
+                    : claim.status === "proved"
+                      ? "ok"
+                      : "none";
               return (
                 <button
                   type="button"
                   className="claim"
                   key={claim.id}
+                  title={title}
                   aria-current={claim.id === claimId ? "page" : undefined}
                   onClick={() => claim.id !== claimId && onSelect(claim.id)}
                 >
-                  <span className="claim-title">{claim.title || t("sidebar.untitled")}</span>
+                  <span className="claim-title">{title}</span>
                   <span
                     className="claim-status"
                     data-attention={String(Boolean(record?.awaiting_review || record?.blocked))}
                   >
+                    <span className="status-dot" data-tone={tone} aria-hidden="true" />
                     {badge}
                   </span>
                 </button>
@@ -143,7 +183,7 @@ export function Sidebar({
         ))}
       </div>
       <footer className="sidebar-foot">
-        <span>{workspaceState}</span>
+        <span title={workspaceState}>{workspaceState}</span>
       </footer>
     </nav>
   );

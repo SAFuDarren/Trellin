@@ -62,11 +62,12 @@ Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around
 
 With database revision `0079`, use **Chats** to start a workspace discussion
 before creating a claim. In **Workbench**, select a claim or node and open
-**Conversation**. Choose an available on-device model or a connection you
-added in Team. The composer identifies the external recipient and the recent
-turns and selected node excerpt that may be included. Expand the request
-details to inspect the exact contents. The send button authorizes and submits
-that request in one step. Project files are outside that payload.
+**Conversation**. Open the model menu to choose an available on-device model
+or a connection you added in Team. The composer identifies the external
+recipient and the recent turns and selected node excerpt that may be included.
+Open the + menu and choose **Request details** to inspect the exact contents.
+The send button authorizes and submits that request in one step. Project files
+are outside that payload.
 The conversation and attribution are saved with the project. Removing a
 conversation hides it from the active list and preserves its history.
 

@@ -259,8 +259,14 @@ for (const inspect of [false, true]) {
     let previewModel = model.model;
     const outgoing = JSON.stringify({ system: "Discuss the question.", user: "What structure is missing?" });
     await page.route("**/api/claims", (route) => route.fulfill({ json: { claims: [], claim_id: null } }));
-    await page.route("**/api/project-intake/models", (route) => route.fulfill({ json: { models: [] } }));
-    await page.route("**/api/model-connections", (route) => route.fulfill({ json: { connections: [model] } }));
+    await page.route("**/api/project-intake/models", (route) =>
+      route.fulfill({ json: { models: ["local-research"] } }),
+    );
+    await page.route("**/api/model-connections", (route) =>
+      route.fulfill({
+        json: { connections: [model, { ...model, id: "unavailable", model: "unavailable-model", fingerprint: null }] },
+      }),
+    );
     await page.route(/\/api\/conversations(?:[/?]|$)/, async (route) => {
       switch (new URL(route.request().url()).pathname) {
         case "/api/conversations/create":
@@ -304,17 +310,42 @@ for (const inspect of [false, true]) {
     await page.goto("/#session=fixture");
     await railLink(page, "Chats").click();
     await page.getByRole("button", { name: "New conversation" }).click();
-    const picker = page.getByRole("combobox", { name: "Conversation model" });
-    await expect(picker).toHaveValue("");
+    const picker = page.getByRole("button", { name: "Conversation model" });
+    await expect(picker).toHaveText("Choose a model");
     expect(created).toEqual([{ title: story.title }]);
-    await picker.selectOption(model.id);
+    if (inspect) await page.setViewportSize({ width: 820, height: 720 });
+    await picker.press("ArrowDown");
+    const pickerMenu = page.getByRole("menu", { name: "Conversation model" });
+    const localChoice = pickerMenu.getByRole("group", { name: "On this device" }).getByRole("menuitemradio");
+    const remoteChoice = pickerMenu.getByRole("group", { name: "Connected services" }).getByRole("menuitemradio");
+    await expect(localChoice).toBeFocused();
+    await expect(remoteChoice).toHaveText(/Claude Code · sonnet/);
+    await expect(pickerMenu.getByText("unavailable-model")).toHaveCount(0);
+    await page.keyboard.press("ArrowDown");
+    await expect(remoteChoice).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(pickerMenu).toBeHidden();
+    await expect(picker).toBeFocused();
+    await expect(picker).toHaveText(/sonnet/);
+    await picker.press("Enter");
+    await expect(remoteChoice).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("Escape");
+    await expect(pickerMenu).toBeHidden();
+    await expect(picker).toBeFocused();
     await page.getByRole("textbox", { name: "Write a message" }).fill("What structure is missing?");
     const send = page.getByRole("button", { name: "Send message" });
     await expect(send).toHaveAccessibleDescription("External model");
     expect(sent).toHaveLength(0);
     expect(previews).toHaveLength(0);
     if (inspect) {
-      await page.getByRole("button", { name: "Request details" }).click();
+      const context = page.getByRole("button", { name: "Message context" });
+      await context.press("Enter");
+      const contextMenu = page.getByRole("menu", { name: "Message context" });
+      await expect(contextMenu.getByText("This message only")).toBeVisible();
+      const detailsItem = contextMenu.getByRole("menuitem", { name: "Request details" });
+      await expect(detailsItem).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(contextMenu).toBeHidden();
       await expect(page.locator(".conversation-request pre")).toHaveText(outgoing);
       expect(sent).toHaveLength(0);
       expect(previews).toHaveLength(1);
@@ -397,7 +428,13 @@ test("Workbench creates an anchored conversation and can choose a verified local
   const node = card(page, /^Proof obligation 2$/);
   await node.click();
   await page.getByRole("button", { name: "New conversation" }).click();
-  await page.getByRole("combobox", { name: "Conversation model" }).selectOption("local:local-research");
+  const picker = page.getByRole("button", { name: "Conversation model" });
+  const pickerMenu = page.getByRole("menu", { name: "Conversation model" });
+  await picker.click();
+  await page.getByRole("textbox", { name: "Write a message" }).click();
+  await expect(pickerMenu).toBeHidden();
+  await picker.click();
+  await pickerMenu.getByRole("menuitemradio", { name: "Local · local-research" }).click();
   expect(created).toEqual([
     {
       title: "Proof obligation 2",

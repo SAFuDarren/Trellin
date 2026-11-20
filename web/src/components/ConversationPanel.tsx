@@ -1,4 +1,13 @@
-import { useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   conversationErrorText,
@@ -18,7 +27,8 @@ import {
 import { useLocalTextModels } from "../api/localModels";
 import { href } from "../shell/route";
 import { timeText } from "../workbench/text";
-import { SendArrow, Spin } from "./Icons";
+import { Chevron, SendArrow, Spin } from "./Icons";
+import "../styles/conversation-composer.css";
 
 export function ConversationPanel({
   session,
@@ -42,12 +52,16 @@ export function ConversationPanel({
       model: name + ":local",
       fingerprint: null,
       local: true,
+      description: null,
     })),
     ...(models.data?.connections ?? []).filter(dispatchableConnection).map((connection) => {
       const choice = connectionChoiceLabel(t, connection);
       const model = connectionModelLabel(t, connection);
       const label = choice.endsWith(" · " + model) ? choice : choice + " · " + model;
-      return { ...connection, label, local: false };
+      const provider = t(`team.providers.${connection.provider}`, { defaultValue: connection.provider });
+      const description =
+        connection.label && ![provider, connection.model].includes(connection.label) ? connection.label : null;
+      return { ...connection, label, description, local: false };
     }),
   ];
   const [selected, setSelected] = useState("");
@@ -70,6 +84,11 @@ export function ConversationPanel({
   const scope = JSON.stringify([thread.id, detail.data?.thread.revision, connection?.id, connection?.fingerprint]);
   const details = prepared?.scope === scope ? prepared.preview : null;
   const hasHistory = messages.some((message) => message.role === "assistant");
+  const context = [
+    thread.node_id && t("conversations.includesNode"),
+    hasHistory && t("conversations.includesRecent"),
+  ].filter(Boolean);
+  const destination = connection && t(connection.local ? "conversations.onDevice" : "conversations.external");
 
   useLayoutEffect(() => {
     currentScope.current = scope;
@@ -214,30 +233,82 @@ export function ConversationPanel({
           }}
         />
         <div className="composer-row">
-          <label className="sr-only" htmlFor={formId + "-model"}>
-            {t("conversations.model")}
-          </label>
-          <span className="conversation-model-picker">
-            <select
-              id={formId + "-model"}
-              value={connection?.id ?? ""}
-              disabled={disabled || !options.length}
-              onChange={(event) => {
-                setSelected(event.target.value);
-                changeDraft();
+          <ComposerMenu
+            kind="context"
+            label={t("conversations.contextMenu")}
+            trigger={<ContextIcon />}
+            disabled={removing}
+          >
+            <p className="composer-context-title" aria-hidden="true">
+              {t("conversations.contextMenu")}
+            </p>
+            <p className="composer-context-summary">{context.join(" · ") || t("conversations.messageOnly")}</p>
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="composer-menu-item"
+              onClick={() => {
+                setShowDetails(!showDetails);
+                if (!showDetails && !details) void prepare(false);
               }}
             >
-              <option value="">{t("conversations.chooseModel")}</option>
-              {options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </span>
-          {!models.isPending && !local.isPending && !options.length && (
-            <a href={href("team", "runtimes")}>{t("conversations.connect")}</a>
-          )}
+              {t(showDetails ? "conversations.hideRequestDetails" : "conversations.requestDetails")}
+            </button>
+          </ComposerMenu>
+          <ComposerMenu
+            kind="model"
+            label={t("conversations.model")}
+            tooltip={connection?.label ?? t("conversations.chooseModel")}
+            valueId={connection ? formId + "-model-label" : undefined}
+            trigger={
+              <>
+                <span id={formId + "-model-label"} className="composer-model-label">
+                  {connection?.label ?? t("conversations.chooseModel")}
+                </span>
+                <Chevron />
+              </>
+            }
+            disabled={disabled}
+          >
+            {[
+              { label: t("conversations.onDevice"), matches: options.filter((model) => model.local) },
+              { label: t("conversations.connectedModels"), matches: options.filter((model) => !model.local) },
+            ].map(
+              ({ label, matches }) =>
+                matches.length > 0 && (
+                  <div className="composer-model-group" key={label} role="group" aria-label={label}>
+                    <p aria-hidden="true">{label}</p>
+                    {matches.map((model) => (
+                      <button
+                        key={model.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={connection?.id === model.id}
+                        tabIndex={-1}
+                        className="composer-menu-item"
+                        onClick={() => {
+                          setSelected(model.id);
+                          changeDraft();
+                        }}
+                      >
+                        <span>{model.description ? recipient(model.provider, model.model) : model.label}</span>
+                        {model.description && <small>{model.description}</small>}
+                      </button>
+                    ))}
+                  </div>
+                ),
+            )}
+            {models.isPending || local.isPending ? <p role="status">{t("common.loading")}</p> : null}
+            <a
+              className="composer-menu-item composer-model-settings"
+              role="menuitem"
+              tabIndex={-1}
+              href={href("team", "runtimes")}
+            >
+              {t(options.length ? "conversations.manageModels" : "conversations.connect")}
+            </a>
+          </ComposerMenu>
           <button
             type="submit"
             className="send"
@@ -257,28 +328,8 @@ export function ConversationPanel({
         )}
       </form>
       <div className="conversation-context">
-        <p id={formId + "-scope"}>
-          {[
-            connection && t(connection.local ? "conversations.onDevice" : "conversations.external"),
-            thread.node_id && t("conversations.includesNode"),
-            hasHistory && t("conversations.includesRecent"),
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
+        <p id={formId + "-scope"}>{[destination, ...context].filter(Boolean).join(" · ")}</p>
         <div className="conversation-secondary">
-          <button
-            type="button"
-            className="conversation-text-action"
-            aria-expanded={showDetails}
-            aria-controls={formId + "-request"}
-            onClick={() => {
-              setShowDetails(!showDetails);
-              if (!showDetails && !details) void prepare(false);
-            }}
-          >
-            {t("conversations.requestDetails")}
-          </button>
           <button
             type="button"
             className="conversation-text-action"
@@ -317,6 +368,144 @@ export function ConversationPanel({
         </Confirmation>
       )}
     </section>
+  );
+}
+
+function ComposerMenu({
+  kind,
+  label,
+  tooltip,
+  valueId,
+  trigger,
+  disabled,
+  children,
+}: {
+  kind: "context" | "model";
+  label: string;
+  tooltip?: string;
+  valueId?: string;
+  trigger: ReactNode;
+  disabled: boolean;
+  children: ReactNode;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const opening = useRef<"last" | "selected">("selected");
+  const visible = open && !disabled;
+
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const items = menu.current?.querySelectorAll<HTMLElement>(".composer-menu-item");
+    const selected = menu.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+    const initial = opening.current === "last" ? items?.[items.length - 1] : (selected ?? items?.[0]);
+    initial?.focus();
+    opening.current = "selected";
+  }, [visible]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (disabled) {
+      setOpen(false);
+      return;
+    }
+    function outside(event: PointerEvent) {
+      if (event.target instanceof Node && !container.current?.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [open, disabled]);
+
+  function dismiss() {
+    setOpen(false);
+    button.current?.focus();
+  }
+
+  function move(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      dismiss();
+      return;
+    }
+    const items = Array.from(menu.current?.querySelectorAll<HTMLElement>(".composer-menu-item") ?? []);
+    const index = items.findIndex((item) => item === document.activeElement);
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? items.length - 1
+          : event.key === "ArrowDown"
+            ? (index + 1) % items.length
+            : event.key === "ArrowUp"
+              ? (index - 1 + items.length) % items.length
+              : -1;
+    if (!items[next]) return;
+    event.preventDefault();
+    items[next].focus();
+  }
+
+  return (
+    <div
+      className="composer-menu"
+      data-kind={kind}
+      ref={container}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        ref={button}
+        className="composer-menu-trigger"
+        aria-label={label}
+        aria-describedby={valueId}
+        title={tooltip ?? label}
+        aria-haspopup="menu"
+        aria-expanded={visible}
+        aria-controls={id}
+        disabled={disabled}
+        onClick={() => setOpen(!visible)}
+        onKeyDown={(event) => {
+          if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+            event.preventDefault();
+            opening.current = event.key === "ArrowUp" ? "last" : "selected";
+            if (visible) {
+              const items = menu.current?.querySelectorAll<HTMLElement>(".composer-menu-item");
+              items?.[event.key === "ArrowUp" ? items.length - 1 : 0]?.focus();
+            } else {
+              setOpen(true);
+            }
+          }
+        }}
+      >
+        {trigger}
+      </button>
+      <div
+        id={id}
+        ref={menu}
+        hidden={!visible}
+        role="menu"
+        aria-label={label}
+        className="composer-popover"
+        onKeyDown={move}
+        onClick={(event) => {
+          if (event.target instanceof Element && event.target.closest(".composer-menu-item")) dismiss();
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ContextIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M3.5 8h9 M8 3.5v9" />
+    </svg>
   );
 }
 

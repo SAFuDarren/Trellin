@@ -98,7 +98,7 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 - In the Mac app, add your installed Codex or Claude Code from [Team → Runtimes](project-intake.md#connect-a-model) and select its model. Choose that connection for a public intake excerpt or for a released proof scope on database revision `0078`.
 - Use [Research references](proof-workbench.md#work-with-the-models) to rename a claim's short code and reopen a saved proof node by its permanent number.
 - Expand a **Claims** card to read its statement and Lean in place. In **Library**, the table and inspector show each entry's recorded state.
-- On database revision `0079` or later, start a conversation in **Chats** before the first claim, or beside a selected node in **Workbench**. Pick a model and use the send button. The composer identifies the destination and any included context. You can inspect the full request before sending.
+- On database revision `0079` or later, start a conversation in **Chats** before the first claim, or beside a selected node in **Workbench**. Open the model menu, select a model and use the send button. The composer identifies the destination and any included context. Choose **Request details** from the + menu to see the full request before sending.
 - Resize a graph node by dragging its lower-right corner.
 - On revision `0080`, open **Edit** from either Library view. Compare the exact wording and Lean statement before confirming the new version. Old proof receipts follow their original claim, and affected checks of a replaced basis require recheck.
 - On database revision `0073` or later, [review evidence](proof-workbench.md#read-a-graph) under the local researcher identity from the bound workspace.

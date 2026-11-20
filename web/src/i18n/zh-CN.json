@@ -528,6 +528,11 @@
     }
   },
   "conversations": {
+    "contextMenu": "消息上下文",
+    "messageOnly": "仅本条消息",
+    "hideRequestDetails": "收起请求详情",
+    "connectedModels": "已连接的服务",
+    "manageModels": "管理模型连接",
     "requestedModel": "请求使用 {{name}} · 服务未报告实际模型",
     "localModel": "本机 · {{name}}",
     "views": "对话视图",
