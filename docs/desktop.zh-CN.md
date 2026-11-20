@@ -10,6 +10,8 @@ Trellin 在 macOS 原生窗口中打开 Research Multiplier 工作台。本地�
 4. 选择图谱节点，再按 **⌘Q**。下次会恢复上次成功打开的课题，原节点仍存在时也会恢复。已有课题从登记位置打开。
 5. 数据库暂时离线时，服务恢复后点「重试」。应用使用装有 pgvector 的本机 PostgreSQL 18，默认是 `/tmp` 下的 Unix 套接字和 `5432` 端口。其他本机安装可通过 `RM_DESKTOP_PG_SOCKET` 和 `RM_DESKTOP_PG_PORT` 指定。数据库升级按[工作台设置说明](proof-workbench.md)操作。
 
+在[「Team → 运行环境」](project-intake.zh-CN.md#连接模型)选择已安装的模型。集中部署如需使用非标准目录下的命令，可在 Trellin 的启动环境中用 `RM_DESKTOP_TOOL_PATH` 指定工具目录。目录必须是绝对路径，以冒号分隔。
+
 ## 存储管理
 
 从 macOS 菜单点「Trellin → 设置… → 存储」，或按 **⌘,**，查看当前库的位置并在 Finder 中打开。点「迁移数据…」选择新位置的上级文件夹。Trellin 会在预览显示当前路径和新建的 **Trellin Library** 目录。确认后先复制并核对文件、课题 ID 和数据库绑定，再切换登记位置。旧库保留为恢复副本，迁移中断或校验失败时原库继续可用。已管理课题的新路径可从「打开课题…」进入。

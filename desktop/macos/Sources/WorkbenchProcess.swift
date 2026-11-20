@@ -147,11 +147,14 @@ final class WorkbenchProcess {
         var environment = base.filter { key, _ in
             !(key.hasPrefix("RM_") && key.hasSuffix("_DSN")) && key != "RM_DATA_ROOT"
         }
-        // Finder launches without the user's shell startup files.
-        let defaults = ["\(home)/.elan/bin", "/opt/homebrew/opt/postgresql@18/bin", "/opt/homebrew/bin",
-                        "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
-        let inherited = (base["PATH"] ?? "").components(separatedBy: ":").filter { $0.hasPrefix("/") }
-        environment["PATH"] = (defaults + inherited.filter { !defaults.contains($0) }).joined(separator: ":")
+        // LaunchServices does not preserve shell PATH overrides. Keep a separate setting for custom tool directories.
+        let configured = (base["RM_DESKTOP_TOOL_PATH"] ?? "").components(separatedBy: ":")
+        let defaults = ["\(home)/.elan/bin", "\(home)/.local/bin", "/opt/homebrew/opt/postgresql@18/bin",
+                        "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        let inherited = (base["PATH"] ?? "").components(separatedBy: ":")
+        var seen = Set<String>()
+        environment["PATH"] = (configured + defaults + inherited)
+            .filter { $0.hasPrefix("/") && seen.insert($0).inserted }.joined(separator: ":")
         return environment
     }
 

@@ -10,6 +10,8 @@ Trellin opens the Research Multiplier workbench in a native macOS window. This l
 4. Select a graph node and quit with **⌘Q**. On the next open, Trellin restores the last successfully opened project and, when it still exists, the selected node. Existing projects reopen at their registered paths.
 5. If the database service is temporarily unavailable, restart that service and use **Try Again**. The app uses the local PostgreSQL 18 server with pgvector. Defaults are the Unix socket at `/tmp` and port `5432`. For another local setup, set `RM_DESKTOP_PG_SOCKET` and `RM_DESKTOP_PG_PORT`. The [workbench guide](proof-workbench.md) covers database upgrades.
 
+Add installed models from [Team → Runtimes](project-intake.md#connect-a-model). For a managed installation with tools outside the standard locations, the Trellin launch environment can supply colon-separated absolute directories through `RM_DESKTOP_TOOL_PATH`.
+
 ## Manage storage
 
 Open **Trellin → Settings… → Storage** or press **⌘,** to see the active library location and open it in Finder. **Move Data…** lets you select the parent for a new **Trellin Library** folder. Review the exact old and new paths and confirm the move. Trellin copies the managed library, verifies its files, workspace IDs and existing database bindings, then switches the registered location. The original is retained as a recovery copy. An interrupted or failed check leaves the original library active. Open a managed project's new location from **Open Project…**.
