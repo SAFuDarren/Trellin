@@ -53,3 +53,27 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   await expect(needsRecheck).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".section-main")).toBeInViewport();
 });
+
+test("dark navigation and conversation tabs use flat gray selection", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/#session=fixture");
+
+  const proofActivity = page.getByRole("button", { name: "Proof activity" });
+  await proofActivity.focus();
+  await proofActivity.press("Enter");
+  await expect(proofActivity).toHaveCSS("outline-style", "solid");
+  await expect(proofActivity).toHaveCSS("outline-width", "2px");
+  await expect(proofActivity).toHaveAttribute("aria-pressed", "true");
+  await expect(proofActivity).toHaveCSS("background-color", "rgb(52, 52, 52)");
+  await expect(proofActivity).toHaveCSS("color", "rgb(241, 241, 241)");
+
+  const rail = page.locator("nav.rail");
+  const claims = rail.getByRole("link", { name: "Claims", exact: true });
+  await claims.click();
+  const allClaims = page.locator(".section-nav").getByRole("link", { name: /^All claims/ });
+  for (const selected of [claims, allClaims]) {
+    await expect(selected).toHaveAttribute("aria-current", "page");
+    await expect(selected).toHaveCSS("background-color", "rgb(52, 52, 52)");
+    await expect(selected).toHaveCSS("box-shadow", "none");
+  }
+});

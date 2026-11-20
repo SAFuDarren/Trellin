@@ -20,6 +20,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     private let defaults = UserDefaults.standard
     private let lastKey = "lastWorkspaceV1"
     private let bridge = "trellinPosition"
+    private let upgradeBridge = "trellinUpgradeProject"
     private let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1260, height: 820),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable],
                                   backing: .buffered, defer: false)
@@ -31,12 +32,15 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     private var serverURL: URL?
     private var starting = false
     private var movingStorage = false
+    private var upgradingProject = false
+
+    private var storageBusy: Bool { movingStorage || upgradingProject }
     private lazy var storageSettings = StorageSettings(window: window) { [weak self] plan in
         self?.moveStorage(plan)
     }
 
     private var canPresent: Bool {
-        !starting && !movingStorage && !storageSettings.busy && window.attachedSheet == nil
+        !starting && !storageBusy && !storageSettings.busy && window.attachedSheet == nil
     }
 
     private var runtime: URL? {
@@ -75,10 +79,10 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        movingStorage ? .terminateCancel : .terminateNow
+        storageBusy ? .terminateCancel : .terminateNow
     }
 
-    func windowShouldClose(_ sender: NSWindow) -> Bool { !movingStorage }
+    func windowShouldClose(_ sender: NSWindow) -> Bool { !storageBusy }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
@@ -160,7 +164,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     private func moveStorage(_ plan: StoragePlan) {
-        guard !starting, !movingStorage, let runtime else { return }
+        guard !starting, !storageBusy, let runtime else { return }
         movingStorage = true
         let resume = requestedLaunch
         let worker = child
@@ -178,6 +182,59 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         // Closing the lifetime pipe drains in-flight project writes before the copy.
         if let worker { worker.waitForExit(perform) }
         else { perform() }
+    }
+
+    private func confirmProjectUpgrade() {
+        guard canPresent, let workspace = requested, let runtime else { return }
+        let sheet = NSAlert()
+        sheet.messageText = localized("upgrade.confirm.title")
+        sheet.informativeText = String(format: localized("upgrade.confirm.detail"), workspace.path)
+        sheet.addButton(withTitle: localized("cancel"))
+        sheet.addButton(withTitle: localized("upgrade.action"))
+        sheet.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertSecondButtonReturn, let self, self.requested == workspace else { return }
+            self.upgradeProject(workspace, runtime: runtime)
+        }
+    }
+
+    private func upgradeProject(_ workspace: URL, runtime: URL) {
+        upgradingProject = true
+        let worker = child
+        stop()
+        showStatus("upgrade.running", retry: false)
+        let perform = { [weak self] in
+            StorageProcess.run(.upgrade(workspace), runtime: runtime) { [weak self] reply in
+                guard let self else { return }
+                self.upgradingProject = false
+                self.open(.restore(workspace))
+                self.showUpgradeResult(reply)
+            }
+        }
+        if let worker { worker.waitForExit(perform) }
+        else { perform() }
+    }
+
+    private func showUpgradeResult(_ reply: StorageReply?) {
+        let sheet = NSAlert()
+        if reply?.isReady == true {
+            sheet.messageText = localized("upgrade.complete.title")
+            if let backup = reply?.backupURL {
+                sheet.informativeText = String(format: localized("upgrade.complete.detail"), backup.path)
+            } else {
+                sheet.informativeText = localized("upgrade.current.detail")
+            }
+        } else {
+            sheet.alertStyle = .warning
+            sheet.messageText = localized("upgrade.failed.title")
+            switch reply?.code {
+            case "upgrade-backup": sheet.informativeText = localized("upgrade.backup.detail")
+            case "upgrade-unsupported": sheet.informativeText = localized("upgrade.unsupported.detail")
+            case "login-missing", "login-invalid", "upgrade-login":
+                sheet.informativeText = localized("upgrade.login.detail")
+            default: sheet.informativeText = localized("upgrade.failed.detail")
+            }
+        }
+        sheet.beginSheetModal(for: window, completionHandler: nil)
     }
 
     private func showStatus(_ key: String, retry: Bool) {
@@ -217,7 +274,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         let choices = NSStackView()
         choices.orientation = .horizontal
         choices.spacing = 12
-        if key != "loading" && !movingStorage {
+        if key != "loading" && !storageBusy {
             let choose = NSButton(title: localized("choose"), target: self, action: #selector(chooseWorkspace))
             choose.keyEquivalent = "\r"
             choose.bezelStyle = .rounded
@@ -304,6 +361,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(self, name: bridge)
+        configuration.userContentController.add(self, name: upgradeBridge)
         if let position = last?.position {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: position.script, injectionTime: .atDocumentStart, forMainFrameOnly: true
@@ -333,6 +391,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         starting = false
         serverURL = nil
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: bridge)
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: upgradeBridge)
         webView?.stopLoading()
         webView = nil
     }
@@ -398,8 +457,12 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == bridge, message.webView === webView, trusted(message.frameInfo),
-              let position = WorkbenchPosition(message: message.body),
+        guard message.webView === webView, trusted(message.frameInfo) else { return }
+        if message.name == upgradeBridge {
+            if message.body as? String == "confirm" { confirmProjectUpgrade() }
+            return
+        }
+        guard message.name == bridge, let position = WorkbenchPosition(message: message.body),
               last?.position != position else { return }
         last?.position = position
         saveLast()

@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
+import { desktopProjectUpgrade } from "../workbench/desktop";
 import { activityNode, type Graph } from "../workbench/graph";
 import { isCodex, modelName, nodeTitle } from "../workbench/text";
 import type { ActivityRecord, ActivitySnapshot } from "../workbench/types";
 import { FeedEntry } from "./FeedEntry";
-import { SendArrow, Spin } from "./Icons";
+import { Chevron, SendArrow, Spin } from "./Icons";
 import { WorkbenchConversations } from "./WorkbenchConversations";
 
 type Draft = {
@@ -240,6 +241,9 @@ function Composer({
           : activity.guidance_reason || t("composer.viewOnly"));
   const status = !available ? blocker : confirming ? t("composer.confirmHint") : draft?.message || "";
   const draftOnly = Boolean(draft && !available);
+  const needsUpgrade =
+    activity?.guidance_blocker === "connected_schema" || activity?.guidance_blocker === "codex_schema";
+  const upgrade = draftOnly && needsUpgrade && !activityError ? desktopProjectUpgrade() : undefined;
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -321,47 +325,48 @@ function Composer({
           refresh();
         }}
       />
-      <div className="composer-row">
-        <label htmlFor="guidance-audience" className="sr-only">
-          {t("composer.audience")}
-        </label>
-        <select
-          id="guidance-audience"
-          disabled={disabled}
-          value={available ? audience : ""}
-          onChange={(event) => {
-            if (!draft) return;
-            draft.audience = event.target.value;
-            draft.confirmRelease = false;
-            draft.requestId = undefined;
-            draft.message = "";
-            draft.error = false;
-            refresh();
-          }}
-        >
-          {!available ? (
-            <option value="">{t("composer.unavailable")}</option>
-          ) : (
-            channels.map((channel) => (
-              <option key={channel} value={channel}>
-                {recipient(channel)}
-              </option>
-            ))
-          )}
-        </select>
-        <button
-          id="guidance-send"
-          type="submit"
-          className="send"
-          data-confirm={String(confirming)}
-          disabled={!canSend}
-          aria-label={
-            draft?.sending ? t("composer.sending") : confirming ? t("composer.confirmLabel") : t("composer.send")
-          }
-        >
-          {confirming ? t("composer.confirm") : <SendArrow />}
-        </button>
-      </div>
+      {available && (
+        <div className="composer-row">
+          <div className="proof-recipient">
+            <label htmlFor="guidance-audience" className="sr-only">
+              {t("composer.audience")}
+            </label>
+            <select
+              id="guidance-audience"
+              disabled={disabled}
+              value={audience}
+              onChange={(event) => {
+                if (!draft) return;
+                draft.audience = event.target.value;
+                draft.confirmRelease = false;
+                draft.requestId = undefined;
+                draft.message = "";
+                draft.error = false;
+                refresh();
+              }}
+            >
+              {channels.map((channel) => (
+                <option key={channel} value={channel}>
+                  {recipient(channel)}
+                </option>
+              ))}
+            </select>
+            <Chevron />
+          </div>
+          <button
+            id="guidance-send"
+            type="submit"
+            className="send"
+            data-confirm={String(confirming)}
+            disabled={!canSend}
+            aria-label={
+              draft?.sending ? t("composer.sending") : confirming ? t("composer.confirmLabel") : t("composer.send")
+            }
+          >
+            {confirming ? t("composer.confirm") : <SendArrow />}
+          </button>
+        </div>
+      )}
       <p
         id="guidance-status"
         className="composer-status"
@@ -371,6 +376,13 @@ function Composer({
       >
         {status}
       </p>
+      {upgrade && (
+        <div>
+          <button type="button" className="button" onClick={upgrade}>
+            {t("composer.upgrade")}
+          </button>
+        </div>
+      )}
       {draftOnly && (
         <p id="guidance-draft" className="composer-status">
           {t("composer.draftOnly")}

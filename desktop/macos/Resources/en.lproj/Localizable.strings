@@ -77,3 +77,16 @@
 "storage.error.storage-project" = "A registered project is unavailable. Check its folder before retrying.";
 "storage.error.storage-database" = "Trellin could not verify a managed project’s database connection. Check its PostgreSQL server and saved connection, then retry.";
 "storage.error.storage-verification" = "Trellin could not verify the library data. Reopen Storage and try again.";
+"upgrade.confirm.title" = "Back up and upgrade this project?";
+"upgrade.confirm.detail" = "Trellin will verify a local project backup before updating the database to version 0081. This project will reopen. Copy any unsaved notes before continuing.\n\n%@";
+"upgrade.action" = "Back Up and Upgrade";
+"upgrade.running.title" = "Upgrading the project";
+"upgrade.running.detail" = "Verifying a local backup and updating the project database.";
+"upgrade.complete.title" = "Project database is up to date";
+"upgrade.complete.detail" = "Verified project backup\n%@";
+"upgrade.current.detail" = "This project already supports proof notes for Team connections.";
+"upgrade.failed.title" = "Project upgrade could not finish";
+"upgrade.failed.detail" = "Reopen Proof activity to check the current state. If the issue persists, check the database connection.";
+"upgrade.backup.detail" = "Trellin could not verify a project backup. Check free space and the database connection, then try again.";
+"upgrade.unsupported.detail" = "This database version needs the project’s manual upgrade procedure.";
+"upgrade.login.detail" = "This project needs a saved database owner login to back up and upgrade from Trellin.";

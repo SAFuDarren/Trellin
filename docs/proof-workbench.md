@@ -87,6 +87,10 @@ Each note is local to the project and eligible on its original statement version
 
 ## Send a public note to Codex
 
+If the Mac workbench shows a database upgrade is required, select **Back up and
+upgrade** in **Proof activity**. Confirm the project in the native dialog. The
+app reopens the same project after verifying its backup and updating to `0081`.
+
 On database revision `0081`, open **Proof activity** for a node with a
 confirmed public statement and shareable basis. Choose **Queue proof note**
 and **Allow Codex to use this note**. Start a bounded **Proof task** with a

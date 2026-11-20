@@ -22,7 +22,7 @@ it("keeps a blocked proof opinion on its exact node until a later explicit relea
   });
   const fetch = vi.fn<typeof window.fetch>(async () => Response.json({}));
   vi.stubGlobal("fetch", fetch);
-  const panel = (selected: string, available = false) => (
+  const panel = (selected: string, available = false, blocker = "public_basis") => (
     <ChatPanel
       session="test"
       graph={graph}
@@ -32,7 +32,7 @@ it("keeps a blocked proof opinion on its exact node until a later explicit relea
         claim_id: claim,
         activity: [],
         guidance_channels: available ? ["codex"] : [],
-        guidance_blocker: available ? null : "public_basis",
+        guidance_blocker: available ? null : blocker,
       }}
       activityError=""
       scopeReady={false}
@@ -54,7 +54,17 @@ it("keeps a blocked proof opinion on its exact node until a later explicit relea
   expect(screen.getByText(en.composer.draftOnly)).toBeTruthy();
   fireEvent.change(opinion(), { target: { value: note } });
   expect(opinion().value).toBe(note);
-  expect(screen.getByRole<HTMLButtonElement>("button", { name: en.composer.send }).disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: en.composer.send })).toBeNull();
+  expect(screen.queryByRole("combobox", { name: en.composer.audience })).toBeNull();
+  expect(screen.queryByRole("button", { name: en.composer.upgrade })).toBeNull();
+  const postMessage = vi.fn();
+  vi.stubGlobal("webkit", { messageHandlers: { trellinUpgradeProject: { postMessage } } });
+  rerender(panel(node, false, "connected_schema"));
+  expect(screen.getByText(en.composer.blockers.connected_schema)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: en.composer.upgrade }));
+  expect(postMessage).toHaveBeenCalledExactlyOnceWith("confirm");
+  expect(fetch).not.toHaveBeenCalled();
+  expect(opinion().value).toBe(note);
   rerender(panel(other));
   expect(opinion().value).toBe("");
   rerender(panel(node, true));

@@ -9,7 +9,6 @@ _BLOCKERS = {
     "schema": "Notes need database version 0070 to be enabled.",
     "scope": "Confirm the Lean statement and its basis for this claim first.",
     "codex_schema": "Notes to Codex need database version 0071 to be enabled.",
-    "legacy_policy": "Notes to Codex need a public basis that may be shared and an approved public automation policy.",
     "connected_schema": "Update this workspace’s database to use proof notes with a Team connection.",
     "public_basis": "This proof scope includes material that has not been released to Codex.",
 }
@@ -64,9 +63,7 @@ def _availability(store, anchor, codex_schema):
                 AND (p.policy #>> '{lean,model_rounds}')::integer > 0
         ) AS legacy
     """, anchor["id"], anchor["id"])
-    if not row["allowed"]:
-        return [], "legacy_policy"
-    return (["codex"], None) if row["legacy"] else ([], "connected_schema")
+    return (["codex"], None) if row["allowed"] and row["legacy"] else ([], "connected_schema")
 
 
 def _response(rows, channels, blocker):

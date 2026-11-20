@@ -329,14 +329,14 @@
     "draftPlaceholder": "Draft an opinion for this node",
     "draftOnly": "Draft stays in this open workbench. It has not been saved or shared.",
     "audience": "Proof recipient",
-    "unavailable": "No permitted proof recipient",
+    "upgrade": "Back up and upgrade",
     "chooseNode": "Select a proof node to draft an opinion.",
     "blockers": {
       "schema": "Update this workspace’s database to record proof notes.",
       "scope": "Review and confirm the Lean statement and its basis to queue this opinion.",
       "codex_schema": "Update this workspace’s database to queue Codex proof notes.",
       "legacy_policy": "Review the public basis and approve a Codex proof policy before queuing a note in this database version.",
-      "connected_schema": "Update this workspace’s database to queue proof notes for a Team connection.",
+      "connected_schema": "Upgrade this project to database version 0081 to queue proof notes for Team’s Codex.",
       "public_basis": "Review the shareable proof scope before queuing an opinion for Codex."
     },
     "viewOnly": "You can read the activity on this claim but not send notes.",

@@ -17,9 +17,11 @@ from research_multiplier.storage.artifacts import Artifacts
 from research_multiplier.storage.migrate import upgrade
 from research_multiplier.storage.postgres import DatabaseOperationError, Store, bind_workspace
 from research_multiplier.workbench.server import WorkbenchServer
-from research_multiplier.workflows import lean_search, runtime, workbench_guidance, workbench_proof_tasks
+from research_multiplier.workflows import (
+    lean_search, research_progress, runtime, workbench_guidance, workbench_proof_tasks,
+)
 from tests._native_db import disposable_database, project_logins
-from tests.postgres.test_workbench_routes import REASON, _approved_statement, _request, workbench  # noqa: F401
+from tests.postgres.test_workbench_routes import ACTOR, REASON, _approved_statement, _request, workbench  # noqa: F401
 
 
 pytestmark = pytest.mark.postgres
@@ -175,6 +177,9 @@ def test_upgrade_preserves_notes_and_enables_waiting_connected_task(tmp_path, mo
                 claim, statement = _approved_statement(title="Old schema connected guidance", sensitivity="public")
 
             with WorkbenchServer(workspace, claim_id=claim, port=0) as server:
+                activity = server.read(workbench_guidance.activity, UUID(claim))
+                assert activity["guidance_blocker"] == "connected_schema"
+                assert activity["guidance_channels"] == []
                 identity = _connection(environment)
                 server.write(workbench_proof_tasks.start, _approval(server, claim, identity))
                 activity = server.read(workbench_guidance.activity, UUID(claim))
@@ -183,6 +188,12 @@ def test_upgrade_preserves_notes_and_enables_waiting_connected_task(tmp_path, mo
                 opinion = "Check the original premise before the next route."
                 with pytest.raises(workbench_guidance.GuidanceError, match="Update this workspace"):
                     server.add_guidance(UUID(claim), UUID(statement), uuid4(), "goal:" + claim, opinion, "codex", True)
+                with paths.use_workspace(workspace, strict=True), Store() as store:
+                    [legacy] = store.query("human", "SELECT * FROM rm.propose_lean_progress(%s,%s,%s)", statement, 1, 0)
+                    research_progress.approve(legacy["id"], legacy["policy_sha256"], ACTOR, REASON, store=store)
+                    assert workbench_guidance.activity(store, UUID(claim))["guidance_channels"] == ["codex"]
+                    research_progress.stop(legacy["id"], REASON, store=store)
+                assert server.read(workbench_guidance.activity, UUID(claim))["guidance_blocker"] == "connected_schema"
                 local_id = uuid4()
                 server.add_guidance(UUID(private_claim), UUID(private_statement), local_id, "goal:" + private_claim,
                                     opinion, "local", False)

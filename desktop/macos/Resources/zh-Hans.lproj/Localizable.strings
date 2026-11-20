@@ -77,3 +77,16 @@
 "storage.error.storage-project" = "有一个已登记的课题不可用。请检查它的文件夹后重试。";
 "storage.error.storage-database" = "Trellin 无法核验一个库内课题的数据库连接。请检查对应的 PostgreSQL 服务和已保存的连接设置，然后重试。";
 "storage.error.storage-verification" = "Trellin 无法核验库数据。请重新打开存储设置并重试。";
+"upgrade.confirm.title" = "备份并升级此课题？";
+"upgrade.confirm.detail" = "Trellin 会先验证本地课题备份，再将数据库升级到 0081 并重新打开课题。请先复制尚未保存的意见。\n\n%@";
+"upgrade.action" = "备份并升级";
+"upgrade.running.title" = "正在升级课题";
+"upgrade.running.detail" = "正在验证本地备份并更新课题数据库。";
+"upgrade.complete.title" = "课题数据库已是最新版本";
+"upgrade.complete.detail" = "已验证的课题备份\n%@";
+"upgrade.current.detail" = "此课题已支持通过团队连接使用证明意见。";
+"upgrade.failed.title" = "课题升级未完成";
+"upgrade.failed.detail" = "请重新打开「证明活动」查看当前状态。若问题仍在，请检查数据库连接。";
+"upgrade.backup.detail" = "Trellin 无法验证课题备份。请检查可用空间和数据库连接，然后重试。";
+"upgrade.unsupported.detail" = "此数据库版本需要按课题的手动升级说明操作。";
+"upgrade.login.detail" = "请先保存此课题的数据库所有者登录信息，再从 Trellin 备份并升级。";

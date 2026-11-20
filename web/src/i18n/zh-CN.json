@@ -329,14 +329,14 @@
     "draftPlaceholder": "为此节点起草意见",
     "draftOnly": "草稿留在当前打开的工作台，尚未保存或共享。",
     "audience": "证明意见接收方",
-    "unavailable": "暂无可用的证明意见接收方",
+    "upgrade": "备份并升级",
     "chooseNode": "选择证明节点，即可起草意见。",
     "blockers": {
       "schema": "更新此工作区的数据库，即可记录证明意见。",
       "scope": "核对并确认 Lean 陈述及其依据后，即可将意见排队。",
       "codex_schema": "更新此工作区的数据库，即可将 Codex 证明意见排队。",
       "legacy_policy": "在此数据库版本中，请先核对公开依据并批准 Codex 证明策略。",
-      "connected_schema": "更新此工作区的数据库，即可让 Team 连接使用证明意见。",
+      "connected_schema": "将此课题数据库升级到 0081，即可通过团队的 Codex 连接提交证明意见。",
       "public_basis": "核对可共享的证明范围后，即可将 Codex 证明意见排队。"
     },
     "viewOnly": "这个课题只能查看动态，不能发送意见。",

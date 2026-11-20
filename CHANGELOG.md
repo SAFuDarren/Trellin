@@ -13,6 +13,9 @@
 - Leave a node-specific draft in Proof activity. On database revision `0081`,
   release an exact public note for a later authorized Codex proof task and
   see the attempt that received it.
+- Use **Back up and upgrade** in Proof activity to enable Team Codex guidance
+  on an older Mac project after verifying its archive. Selected navigation
+  rows and proof activity tabs use a flat gray background.
 - Use a compact icon rail with keyboard and hover labels. Claim and section
   lists remain in the sidebar.
 - Expand a Claims card in place, keep long graph labels inside their nodes, and

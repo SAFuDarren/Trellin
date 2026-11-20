@@ -287,7 +287,6 @@ select {
 }
 .menu-item[aria-pressed="true"] {
   background: var(--pick);
-  box-shadow: inset 2px 0 var(--live);
 }
 .menu-item svg {
   flex: none;
@@ -423,7 +422,6 @@ select {
 }
 .claim[aria-current="page"] {
   background: var(--pick);
-  box-shadow: inset 2px 0 var(--live);
   font-weight: 600;
 }
 .claim-title {
@@ -1058,6 +1056,11 @@ select {
   border-color: var(--ink);
   color: var(--on-ink);
 }
+.conversation-tabs .chip[aria-pressed="true"] {
+  background: var(--pick);
+  border-color: var(--pick);
+  color: var(--ink);
+}
 #toggle-chat svg {
   transition: transform 0.15s;
 }
@@ -1191,15 +1194,30 @@ select {
   align-items: center;
   gap: 8px;
 }
-.composer-row select {
+.proof-recipient {
+  position: relative;
   max-width: 100%;
-  height: 26px;
-  padding: 0 6px;
-  border: 0;
+}
+.proof-recipient select {
+  appearance: none;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 26px 0 9px;
+  border: 1px solid var(--edge-soft);
   border-radius: 6px;
   background: var(--track);
   color: var(--ink);
-  font: 500 12px/1 var(--mono);
+  font: 500 12px/1 var(--font);
+  text-overflow: ellipsis;
+}
+.proof-recipient .chevron {
+  position: absolute;
+  top: calc(50% - 6px);
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  transform: rotate(90deg);
+  pointer-events: none;
 }
 .composer-row .send {
   margin-left: auto;
@@ -1494,7 +1512,6 @@ select {
 .rail-link[aria-current="page"] {
   background: var(--pick);
   color: var(--ink);
-  box-shadow: inset 2px 0 var(--live);
 }
 .rail :focus-visible {
   outline-offset: -2px;
@@ -1621,7 +1638,6 @@ select {
 .nav-item[aria-current="true"],
 .nav-item[aria-current="page"] {
   background: var(--pick);
-  box-shadow: inset 2px 0 var(--live);
   font-weight: 600;
 }
 .nav-line {
