@@ -5,6 +5,7 @@ import type { TFunction } from "i18next";
 import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
 import { ClarificationReview } from "../components/ClarificationReview";
+import { GoalReview } from "../components/GoalReview";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { WorkbenchViewMenu } from "../components/WorkbenchViewMenu";
 import { href } from "../shell/route";
@@ -12,6 +13,8 @@ import { nodeFormula, nodeTitle, statusText, timeText } from "../workbench/text"
 import type { GraphSnapshot } from "../workbench/types";
 
 const REVIEWER_KEY = "research-multiplier-reviewer";
+const GOAL_ROUTE = "goal:";
+const GOAL_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function readReviewer(): string {
   try {
@@ -54,7 +57,12 @@ export function ReviewPage({
       priority: 1,
     })),
   ];
-  const selected = items.find((item) => item.item_id === sub) ?? items[0];
+  const requestedGoal = sub.startsWith(GOAL_ROUTE) ? sub.slice(GOAL_ROUTE.length).toLowerCase() : null;
+  const selected =
+    requestedGoal === null
+      ? (items.find((item) => item.item_id === sub) ?? items[0])
+      : items.find((item) => item.kind === "choose_conjecture" && item.item_id === requestedGoal);
+  const goalId = requestedGoal ?? (selected?.kind === "choose_conjecture" ? selected.item_id : null);
   // A decided item leaves the inbox, so its confirmation is kept here rather than on the item.
   const [notice, setNotice] = useState("");
   useEffect(() => setNotice(""), [sub]);
@@ -70,7 +78,8 @@ export function ReviewPage({
             key: item.item_id,
             label:
               item.claim_title ||
-              (item.kind === "clarify_formalization" && typeof item.detail?.title === "string"
+              (["clarify_formalization", "choose_conjecture"].includes(item.kind) &&
+              typeof item.detail?.title === "string"
                 ? item.detail.title
                 : t("sidebar.untitled")),
             sub: `${
@@ -78,7 +87,7 @@ export function ReviewPage({
                 ? t(`clarifications.status.${item.detail.clarification_status}`)
                 : kindLabel(t, item)
             } · ${timeText(i18n.language, item.waiting_since, true)}`,
-            href: href("review", item.item_id),
+            href: href("review", item.kind === "choose_conjecture" ? GOAL_ROUTE + item.item_id : item.item_id),
             current: item === selected,
             dot: item.priority <= 1 ? "bad" : "warn",
           })),
@@ -90,7 +99,16 @@ export function ReviewPage({
           {notice}
         </p>
       )}
-      {inbox.isError ? (
+      {goalId !== null ? (
+        GOAL_ID.test(goalId) ? (
+          <GoalReview key={goalId} session={session} goalId={goalId} onOpen={onOpen} />
+        ) : (
+          <>
+            <PageHead title={t("review.kinds.choose_conjecture")} />
+            <Empty>{t("goalReview.errors.invalid")}</Empty>
+          </>
+        )
+      ) : inbox.isError ? (
         <Empty>{inbox.error.message}</Empty>
       ) : !selected ? (
         <>

@@ -13,6 +13,7 @@ describe("Workspace event read models", () => {
     expect(keys).toEqual([
       ["project-intake-drafts", "session"],
       ["manual-theorems", "session"],
+      ["goal-review", "session"],
       ["library"],
       ["claims"],
       ["atlas"],

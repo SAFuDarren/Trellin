@@ -72,6 +72,12 @@ research-multiplier goal select CONJECTURE_ID --hash CONJECTURE_SHA \
   --actor Researcher --reason "Checked the intended statement and exact formalization"
 ```
 
+## Reopen a prepared conjecture in Workbench
+
+Open **Review** and choose a **Conjectures to compare** for a confirmed Lean goal. The panel shows the goal, approved basis with its exact versions, formal statements and recorded sources, and any saved discussion. Prepared candidates show their exact formal statements. A saved discussion can be read locally.
+
+Choose a prepared candidate and record your reason to confirm it. Workbench opens the resulting claim with the frame's complete approved basis. A withdrawn basis or open interpretation question prevents selection. Use [the ordinary proof task flow](proof-workbench.md#start-a-proof-task) to confirm the Lean statement and approve proof work for the resulting claim.
+
 ## Handle a questioned condition
 
 Use `goal condition GOAL_ID FILE` when a possible condition materially changes interpretation or a proof route. The JSON file includes `kind` (`interpretation` or `route_condition`), `statement`, `formal`, `question`, and `impact`. Optionally include `replaces_version_id` if it concerns a specific hypothesis already in the frame.

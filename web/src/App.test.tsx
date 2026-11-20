@@ -122,6 +122,167 @@ describe("App", () => {
     expect(screen.getByText(en.session.missing)).toBeTruthy();
   });
 
+  it("compares prepared conjectures with the full basis and confirms only the explicit choice", async () => {
+    const goal = "55555555-5555-4555-8555-555555555555";
+    const first = "66666666-6666-4666-8666-666666666666";
+    const second = "77777777-7777-4777-8777-777777777777";
+    const legacy = "88888888-8888-4888-8888-888888888888";
+    const basis = "99999999-9999-4999-8999-999999999999";
+    const frameDigest = "a".repeat(64);
+    const candidateDigest = "b".repeat(64);
+    const reason = "This exact target matches my intended scope.";
+    const proposal = {
+      goal_id: goal,
+      title: "Compare two equality statements",
+      objective: "Discuss which equality follows from the approved basis.",
+      domain: "lean-core",
+      sensitivity: "restricted",
+      frame_sha256: frameDigest,
+      status: "ready",
+      claim_id: null,
+      basis: [
+        {
+          id: basis,
+          version: 2,
+          sha256: "c".repeat(64),
+          kind: "hypothesis",
+          wording: "The approved equality on naturals.",
+          formal: { lean: { proposition: "n = n", parameters: [{ name: "n", type: "Nat" }] } },
+          source: { note: "Recorded equality source" },
+          stale: false,
+        },
+      ],
+      discussion: {
+        state: "available",
+        alternatives: [{ wording: "A broader archived idea.", reason: "Keep it for discussion.", basis_ids: [basis] }],
+      },
+      candidates: [
+        {
+          id: first,
+          sha256: "d".repeat(64),
+          wording: "Formal alternative one.",
+          formal: { lean: { proposition: "True" } },
+          provenance_kind: "human",
+        },
+        {
+          id: second,
+          sha256: candidateDigest,
+          wording: "Formal alternative two.",
+          formal: { lean: { proposition: "n = 0 + n", parameters: [{ name: "n", type: "Nat" }] } },
+          provenance_kind: "ai",
+        },
+        {
+          id: legacy,
+          sha256: "e".repeat(64),
+          wording: "Older record.",
+          formal: { formula: "x = x" },
+          provenance_kind: "program",
+        },
+      ],
+    };
+    let selected = false;
+    const requests: unknown[] = [];
+    const inboxItem = {
+      kind: "choose_conjecture",
+      item_id: goal,
+      claim_id: null,
+      claim_title: null,
+      detail: { title: proposal.title },
+      waiting_since: "2026-01-01T00:00:00Z",
+      priority: 2,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string, init?: RequestInit) => {
+        if (path === "/api/inbox") return Response.json({ items: selected ? [] : [inboxItem] });
+        if (path === `/api/goal-review?goal=${goal}`) {
+          return Response.json(
+            selected ? { ...proposal, status: "selected", claim_id: CLAIM, selected_candidate_id: second } : proposal,
+          );
+        }
+        if (path === "/api/goal-review/select" && init?.method === "POST") {
+          requests.push(JSON.parse(String(init.body)));
+          selected = true;
+          return Response.json({ claim_id: CLAIM });
+        }
+        return Response.json(responses[path.split("?")[0]!] ?? {});
+      }),
+    );
+    window.history.replaceState(null, "", "#review");
+    renderApp("token");
+    expect(await screen.findByRole("link", { name: new RegExp(proposal.title) })).toHaveProperty(
+      "hash",
+      `#review/goal%3A${goal}`,
+    );
+    expect(await screen.findByText("Version 2", { exact: false })).toBeTruthy();
+    expect(screen.getByText("Recorded equality source", { exact: false })).toBeTruthy();
+    expect(screen.getByText("A broader archived idea.")).toBeTruthy();
+    expect(screen.getByText("n = 0 + n")).toBeTruthy();
+    expect(screen.getAllByText(en.detail.parameters)).toHaveLength(2);
+    expect(screen.queryByRole("radio", { name: "Older record." })).toBeNull();
+    expect(screen.getByText("x = x", { exact: false })).toBeTruthy();
+    const confirm = screen.getByRole("button", { name: en.goalReview.confirm });
+    expect(confirm).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("radio", { name: "Formal alternative two." }));
+    fireEvent.submit(confirm.closest("form")!);
+    expect(requests).toHaveLength(0);
+    fireEvent.change(screen.getByRole("textbox", { name: en.review.reason }), { target: { value: reason } });
+    fireEvent.click(confirm);
+    expect(await screen.findByRole("heading", { level: 1, name: "Left zero" })).toBeTruthy();
+    expect(requests).toEqual([
+      { goal_id: goal, frame_sha256: frameDigest, candidate_id: second, candidate_sha256: candidateDigest, reason },
+    ]);
+  });
+
+  it("reopens a stale goal review by its saved link after it leaves the inbox", async () => {
+    const goal = "55555555-5555-4555-8555-555555555555";
+    const goalReview = {
+      goal_id: goal,
+      title: "Prior research scope",
+      objective: "A basis entry was withdrawn.",
+      domain: "lean-core",
+      sensitivity: "public",
+      frame_sha256: "a".repeat(64),
+      status: "stale",
+      claim_id: null,
+      basis: [
+        {
+          id: "66666666-6666-4666-8666-666666666666",
+          version: 2,
+          sha256: "b".repeat(64),
+          kind: "hypothesis",
+          wording: "A retained withdrawn premise.",
+          formal: { lean: { proposition: "True" } },
+          stale: true,
+        },
+      ],
+      discussion: { state: "unavailable", alternatives: [] },
+      candidates: [
+        {
+          id: "77777777-7777-4777-8777-777777777777",
+          sha256: "c".repeat(64),
+          wording: "An archived formalization.",
+          formal: { lean: { proposition: "True" } },
+          provenance_kind: "human",
+        },
+      ],
+    };
+    window.history.replaceState(null, "", `#review/goal:${goal}`);
+    const fetch = vi.fn(async (path: string) => {
+      if (path === `/api/goal-review?goal=${goal}`) return Response.json(goalReview);
+      return Response.json(responses[path.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    expect(await screen.findByRole("heading", { name: goalReview.title })).toBeTruthy();
+    expect(screen.getByText(en.goalReview.statusHelp.stale)).toBeTruthy();
+    expect(screen.getByText(en.goalReview.basisStale, { exact: false })).toBeTruthy();
+    expect(screen.getByText("An archived formalization.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: en.goalReview.confirm })).toBeNull();
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(fetch.mock.calls.some(([path]) => path === "/api/goal-review/select")).toBe(false);
+  });
+
   it("shows the claim, its graph and its details", async () => {
     vi.stubGlobal(
       "fetch",

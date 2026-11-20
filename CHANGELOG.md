@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.36
+
+- Review the approved basis and compare and confirm saved conjectures in Workbench.
+
 ## 1.0.35
 
 - Return to the selected graph node from Review and open Settings or Help from the rail menu.

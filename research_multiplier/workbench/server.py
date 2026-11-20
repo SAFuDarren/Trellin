@@ -20,7 +20,7 @@ from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
-                                          workbench_activity, workbench_clarification, workbench_conversations,
+                                          workbench_activity, workbench_clarification, workbench_conversations, workbench_goal_review,
                                           workbench_guidance, workbench_library,
                                           workbench_intake, workbench_lemma_plans, workbench_premises, workbench_proof_tasks,
                                           workbench_review, workbench_sections,
@@ -85,6 +85,15 @@ _PREMISE_ERRORS = {
     "premise.stale": HTTPStatus.CONFLICT,
     "premise.duplicate": HTTPStatus.CONFLICT,
     "premise.conflicts": HTTPStatus.CONFLICT,
+}
+_GOAL_REVIEW_ROUTE = "/api/goal-review"
+_GOAL_SELECT_ROUTE = "/api/goal-review/select"
+_GOAL_REVIEW_ERRORS = {
+    "goalReview.invalid": HTTPStatus.BAD_REQUEST,
+    "goalReview.identity": HTTPStatus.FORBIDDEN,
+    "goalReview.missing": HTTPStatus.NOT_FOUND,
+    "goalReview.stale": HTTPStatus.CONFLICT,
+    "goalReview.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
 }
 _CONVERSATION_WRITES = {
     "/api/conversations/create": workbench_conversations.create,
@@ -458,6 +467,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self.server.read(workbench_library.item, *_uuid_parameters(route.query, "version"))
         if route.path == "/api/impact":
             return self.server.read(proof_graph.impact, *_uuid_parameters(route.query, "claim", "basis"))
+        if route.path == _GOAL_REVIEW_ROUTE:
+            return self.server.read(workbench_goal_review.detail, *_uuid_parameters(route.query, "goal"))
         if route.path == "/api/activity":
             return self.server.read(_activity, *_uuid_parameters(route.query, "claim"))
         if route.path == "/api/proof-task":
@@ -503,12 +514,16 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.SERVICE_UNAVAILABLE, error.code)
         except workbench_conversations.ConversationError as error:
             self._conversation_error(error.code)
+        except workbench_goal_review.GoalReviewError as error:
+            self._error(_GOAL_REVIEW_ERRORS[str(error)], str(error))
         except workbench_library.LibraryError as error:
             self._error(_LIBRARY_ERRORS[str(error)], str(error))
         except claim_references.ClaimCodeError as error:
             self._error(*_claim_code_error(error))
         except DatabaseOperationError as error:
-            if error.state in _SCHEMA_SQLSTATES:
+            if self.path.startswith(_GOAL_REVIEW_ROUTE):
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "goalReview.unavailable")
+            elif error.state in _SCHEMA_SQLSTATES:
                 self._error(HTTPStatus.CONFLICT, "This project database needs the workbench schema. See the workbench guide.")
             else:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "Could not read the selected research database.")
@@ -804,6 +819,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.verify_lemma_plan(document))
             elif self.path in _PREMISE_WRITES:
                 self._json(HTTPStatus.OK, self.server.write(_PREMISE_WRITES[self.path], self._body(_MAX_PROJECT_BYTES)))
+            elif self.path == _GOAL_SELECT_ROUTE:
+                self._json(HTTPStatus.OK, self.server.write(workbench_goal_review.select, self._body(12_000)))
             elif self.path == "/api/claim-code":
                 self._json(HTTPStatus.OK, self.server.write(claim_references.rename, self._body()))
             elif self.path == "/api/release-updates":
@@ -854,6 +871,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._conversation_error(error.code)
         except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:
             self._error(HTTPStatus.CONFLICT, str(error))
+        except workbench_goal_review.GoalReviewError as error:
+            self._error(_GOAL_REVIEW_ERRORS[str(error)], str(error))
         except workbench_library.LibraryError as error:
             self._error(_LIBRARY_ERRORS[str(error)], str(error))
         except DatabaseOperationError as error:
@@ -875,6 +894,8 @@ class _Handler(BaseHTTPRequestHandler):
                         "23505": "stale", "23514": "stale"}.get(error.state, "unavailable")
                 message = f"premise.{code}"
                 self._error(_PREMISE_ERRORS[message], message)
+            elif self.path == _GOAL_SELECT_ROUTE:
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "goalReview.unavailable")
             elif self.path == "/api/claim-code":
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "claim_code.save_failed")
             elif self.path in _LIBRARY_WRITES:
@@ -895,6 +916,8 @@ class _Handler(BaseHTTPRequestHandler):
                 message = "lemmaPlan.unavailable"
             elif self.path in _PREMISE_WRITES:
                 message = "premise.unavailable"
+            elif self.path == _GOAL_SELECT_ROUTE:
+                message = "goalReview.unavailable"
             elif self.path == "/api/claim-code":
                 message = "claim_code.save_failed"
             elif self.path in _LIBRARY_WRITES:

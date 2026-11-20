@@ -17,6 +17,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
   const add = (...key: string[]) => keys.set(JSON.stringify(key), key);
   const inbox = () => add("inbox", session);
   const clarifications = () => add("clarification", session);
+  const goals = () => add("goal-review", session);
   const intake = () => {
     add("project-intake-drafts", session);
     add("manual-theorems", session);
@@ -33,6 +34,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
       case "library":
       case "basis-item":
         inbox();
+        goals();
         add("library");
         if (event.kind === "basis-item") {
           add("atlas");
@@ -43,6 +45,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
         break;
       case "recheck":
         inbox();
+        goals();
         clarifications();
         add("claims");
         add("atlas");
@@ -56,6 +59,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
       case "basis":
       case "claim":
         inbox();
+        goals();
         clarifications();
         add("claims");
         add("atlas");
@@ -105,6 +109,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
         };
         switch (event.area) {
           case "activity":
+            if (!event.claimId) goals();
             add("conversations", session);
             add("activity", ...claim);
             add("threads");
@@ -130,16 +135,19 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
             break;
           case "clarification":
             clarifications();
+            goals();
             claims();
             break;
           case "intake":
           case "library":
             intake();
+            goals();
             add("library");
             claims();
             break;
           case "workspace":
             add("conversations", session);
+            goals();
             clarifications();
             intake();
             runtime();
