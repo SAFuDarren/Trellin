@@ -262,6 +262,9 @@ def test_native_login_check_never_receives_project_credentials(provider, command
 
 @pytest.mark.parametrize("provider,signal,code", [
     ("codex-cli", 'provider HTTP 400 {"code":"model_not_found"}', "model_unavailable"),
+    ("claude-code", "There's an issue with the selected model (claude-fixture). "
+                    "It may not exist or you may not have access to it. Run /model to pick a different model.",
+     "model_unavailable"),
     ("claude-code", "Too many requests. Usage limit.", "rate_limit"),
     ("claude-code", "Network error: connection refused", "transport"),
 ])

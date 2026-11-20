@@ -160,8 +160,14 @@ def _failed_completion(provider, signal):
         return ModelFailure("authentication", f"{provider} is not signed in. Complete login using the native CLI.")
     if any(word in signal for word in ("rate limit", "too many requests", "usage limit", "quota", "out of credits")):
         return ModelFailure("rate_limit", f"{provider} reached a rate or usage limit.", retryable=True)
-    if any(word in signal for word in ("model_not_found", "model not found", "model is not available",
-                                      "model is not supported", "unsupported model", "no access to model")):
+    claude_selection_error = (
+        provider == "claude-code" and "issue with the selected model" in signal
+        and ("may not exist" in signal or "may not have access" in signal)
+    )
+    if claude_selection_error or any(word in signal for word in (
+        "model_not_found", "model not found", "model is not available",
+        "model is not supported", "unsupported model", "no access to model",
+    )):
         return ModelFailure("model_unavailable", f"The selected model is unavailable from {provider}.")
     if any(word in signal for word in ("failed to connect", "connection refused", "network error",
                                       "network unreachable", "stream disconnected", "service unavailable")):

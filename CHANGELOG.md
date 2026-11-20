@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.38
+
+- Show when a selected Claude Code model is unavailable for the configured account.
+
 ## 1.0.37
 
 - Save and reopen private proof-note drafts for individual nodes, including while delivery is blocked.
