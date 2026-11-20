@@ -117,7 +117,7 @@ research-multiplier --workspace "PATH" workbench
 
 「对话」左栏可以打开历史会话，点顶部的「+」新建。「Team → 模型」和「Team → 运行环境」共用已保存的模型连接。
 
-升级到 `0081` 后，在「证明活动」选中节点，可逐条确认放行符合条件的公开意见，供之后获授权的 Codex 证明任务读取。回到该节点可查看意见正在等待还是已进入某次尝试。[证明意见说明](proof-workbench.md#send-a-public-note-to-codex)
+升级到 `0081` 后，在「证明活动」选中节点，点「证明意见加入队列」并确认放行，供之后获授权的 Codex 证明任务读取。每条意见旁会显示正在等待授权、当前受阻、陈述已变更，或已有回执表明意见已纳入一次尝试。[证明意见说明](proof-workbench.md#send-a-public-note-to-codex)
 
 拖动图谱节点的右下角可调整宽度和高度。
 

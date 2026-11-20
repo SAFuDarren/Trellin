@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import i18n from "../i18n";
 import en from "../i18n/en.json";
 import { buildGraph } from "../workbench/graph";
+import type { GuidanceNote } from "../workbench/types";
 import { ChatPanel } from "./ChatPanel";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -22,7 +23,7 @@ it("keeps a blocked proof opinion on its exact node until a later explicit relea
   });
   const fetch = vi.fn<typeof window.fetch>(async () => Response.json({}));
   vi.stubGlobal("fetch", fetch);
-  const panel = (selected: string, available = false, blocker = "public_basis") => (
+  const panel = (selected: string, available = false, blocker = "public_basis", guidance: GuidanceNote[] = []) => (
     <ChatPanel
       session="test"
       graph={graph}
@@ -31,6 +32,7 @@ it("keeps a blocked proof opinion on its exact node until a later explicit relea
       activity={{
         claim_id: claim,
         activity: [],
+        guidance,
         guidance_channels: available ? ["codex"] : [],
         guidance_blocker: available ? null : blocker,
       }}
@@ -71,7 +73,7 @@ it("keeps a blocked proof opinion on its exact node until a later explicit relea
   expect(opinion().value).toBe(note);
   fireEvent.click(screen.getByRole("button", { name: en.composer.send }));
   expect(fetch).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: en.composer.confirmLabel }));
+  fireEvent.click(screen.getByRole("button", { name: en.composer.confirm }));
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   const [url, options] = fetch.mock.calls[0]!;
   expect(url).toBe("/api/guidance");
@@ -83,4 +85,36 @@ it("keeps a blocked proof opinion on its exact node until a later explicit relea
     audience: "codex",
     confirm_release: true,
   });
+
+  const receipt = {
+    id: "saved-note",
+    node_id: node,
+    text: note,
+    created_at: "2026-11-20T09:00:00Z",
+    audience: "codex",
+    current_scope: true,
+  };
+  const noteStatus = () => {
+    const history = within(screen.getByRole("list", { name: en.chat.feed }));
+    return within(history.getByText(note).closest("li")!).getByRole("status").textContent;
+  };
+  rerender(panel(node, true, "public_basis", [receipt]));
+  expect(noteStatus()).toContain(en.chat.waitingCodex);
+  expect(noteStatus()).toContain(en.chat.guidanceNextCodex);
+  expect(noteStatus()).not.toContain(en.chat.submittedCodex);
+
+  rerender(panel(node, false, "public_basis", [receipt]));
+  expect(noteStatus()).toContain(en.chat.blockedGuidance);
+  expect(noteStatus()).toContain(en.composer.blockers.public_basis);
+  expect(noteStatus()).not.toContain(en.chat.guidanceNextCodex);
+
+  const oldScope = { ...receipt, current_scope: false };
+  rerender(panel(node, true, "public_basis", [oldScope]));
+  expect(noteStatus()).toContain(en.chat.staleGuidance);
+  expect(noteStatus()).toContain(en.chat.staleGuidanceNext);
+
+  rerender(panel(node, false, "public_basis", [{ ...oldScope, submitted_at: "2026-11-20T09:05:00Z" }]));
+  expect(noteStatus()).toContain(en.chat.submittedCodex);
+  expect(noteStatus()).not.toContain(en.chat.staleGuidance);
+  expect(noteStatus()).not.toContain(en.chat.blockedGuidance);
 });

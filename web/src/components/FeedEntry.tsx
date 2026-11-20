@@ -4,23 +4,47 @@ import { modelName, statusText, timeText } from "../workbench/text";
 import type { ActivityRecord } from "../workbench/types";
 import { Chevron, Mark, Spin } from "./Icons";
 
+type GuidanceContext = { channels?: string[]; blocker: string };
+
 /** One line of a model conversation: your note, a live run, a model or Lean reply, or a recorded step. */
-export function FeedEntry({ record, link }: { record: ActivityRecord & { kind: string }; link?: ReactNode }) {
+export function FeedEntry({
+  record,
+  link,
+  guidanceContext,
+}: {
+  record: ActivityRecord & { kind: string };
+  link?: ReactNode;
+  guidanceContext?: GuidanceContext;
+}) {
   const { t, i18n } = useTranslation();
   const at = record.at || record.created_at;
   if (record.kind === "guidance") {
-    const towardsCodex = record.audience === "codex";
-    const progress = record.submitted_at
-      ? t(towardsCodex ? "chat.submittedCodex" : "chat.submittedLocal")
+    const channel = record.audience ?? "local";
+    const towardsCodex = channel === "codex";
+    const blocked = guidanceContext?.channels && !guidanceContext.channels.includes(channel);
+    const [progress, detail] = record.submitted_at
+      ? [
+          t(towardsCodex ? "chat.submittedCodex" : "chat.submittedLocal"),
+          timeText(i18n.language, record.submitted_at, true),
+        ]
       : record.current_scope === false
-        ? t("chat.staleGuidance")
-        : t(towardsCodex ? "chat.waitingCodex" : "chat.waitingLocal");
-    const audience = t(`audience.${record.audience ?? "local"}`);
+        ? [t("chat.staleGuidance"), guidanceContext && t("chat.staleGuidanceNext")]
+        : blocked
+          ? [t("chat.blockedGuidance"), guidanceContext.blocker]
+          : [
+              t(towardsCodex ? "chat.waitingCodex" : "chat.waitingLocal"),
+              guidanceContext && t(towardsCodex ? "chat.guidanceNextCodex" : "chat.guidanceNextLocal"),
+            ];
+    const audience = t(`audience.${channel}`);
     return (
       <li data-from="you">
         <p className="bubble">{record.text ?? ""}</p>
+        <div className="guidance-note-status" role="status">
+          <strong>{progress}</strong>
+          {detail && <span>{detail}</span>}
+        </div>
         <span className="speaker">
-          {[t("chat.you"), timeText(i18n.language, at, true), t("chat.sentTo", { audience }), progress]
+          {[t("chat.you"), timeText(i18n.language, at, true), t("chat.sentTo", { audience })]
             .filter(Boolean)
             .join(" · ")}
         </span>
