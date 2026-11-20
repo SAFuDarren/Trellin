@@ -1,6 +1,6 @@
 # Changes
 
-## 1.0.23
+## 1.0.24
 
 - Choose a specific Codex or Claude Code model in Team. Direct model conversations
   work in Chats before the first claim and in the graph beside the selected node.
@@ -33,6 +33,10 @@
   and save the result for the existing intake review.
 - Authorize a selected connection for bounded proof work on a released
   Lean scope. Review the model and its reported usage alongside local verification.
+
+## 1.0.23
+
+- Document repository layout, task branch retirement, and issue pickup by urgency.
 
 ## 1.0.22
 
