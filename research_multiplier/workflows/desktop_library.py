@@ -347,10 +347,14 @@ class Library:
             raise LibraryError("storage-verification")
         return workspace
 
-    def resolve_project(self, identifier):
+    def resolve_project(self, identifier, *, verify_database=False):
         with self._locked(exclusive=False):
             root, data = self._state()
-            return self._registered_path(root, self._project_row(data, uuid_text(identifier)))
+            row = self._project_row(data, uuid_text(identifier))
+            workspace = self._registered_path(root, row)
+            if verify_database:
+                _check_binding(workspace, row)
+            return workspace
 
     def _managed_row(self, data, workspace, registration):
         anchor, slot = registration

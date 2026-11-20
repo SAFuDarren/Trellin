@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import sys
 from uuid import uuid4
 
 import pytest
@@ -10,6 +11,7 @@ import pytest
 from research_multiplier.cli import main
 from research_multiplier.storage import paths
 from research_multiplier.storage.managed_workspaces import LOCATION_FILE, MANAGED_FILE, LibraryError, workspace_registration
+from research_multiplier.workbench import desktop
 from research_multiplier.workflows import desktop_library
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError
 
@@ -153,6 +155,29 @@ def test_incidental_external_alias_does_not_block_managed_library(library, tmp_p
     assert library.register_external(relocated_parent / legacy.name) == saved
     move = library.preview(tmp_path / "new library")
     assert move["project_count"] == 1
+
+
+def test_sidebar_preflight_rejects_a_reused_registered_path(library, tmp_path, monkeypatch, capsys):
+    external = paths.initialize_workspace(tmp_path / "external")
+    paths.bind_database(external, uuid4())
+    registered = library.register_external(external)
+    monkeypatch.setattr(sys, "argv", ["desktop", "--storage-resolve", registered["id"]])
+    assert desktop.main() == 0
+    assert json.loads(capsys.readouterr().out) == {"version": 1, "status": "ready", "workspace": str(external)}
+
+    with monkeypatch.context() as unavailable:
+        def offline(_path, _row):
+            raise LibraryError("storage-database")
+
+        unavailable.setattr(desktop_library, "_check_binding", offline)
+        assert desktop.main() == 2
+        assert json.loads(capsys.readouterr().out) == {"version": 1, "status": "error", "code": "storage-database"}
+
+    external.rename(tmp_path / "moved")
+    replacement = paths.initialize_workspace(external)
+    paths.bind_database(replacement, uuid4())
+    assert desktop.main() == 2
+    assert json.loads(capsys.readouterr().out) == {"version": 1, "status": "error", "code": "storage-verification"}
 
 
 def test_default_recovers_after_registry_publication_interruption(library):

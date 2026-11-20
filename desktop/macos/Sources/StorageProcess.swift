@@ -16,13 +16,14 @@ func sameStorageDestination(_ first: URL, _ second: URL) -> Bool {
 
 enum StorageCommand {
     case information
+    case resolve(UUID)
     case preview(URL)
     case move(StoragePlan)
     case upgrade(URL)
 
     var timeout: TimeInterval {
         switch self {
-        case .information: return 15
+        case .information, .resolve: return 15
         case .preview: return 300
         case .move, .upgrade: return 1_800
         }
@@ -32,6 +33,7 @@ enum StorageCommand {
         let options: [String]
         switch self {
         case .information: options = ["--storage-info"]
+        case let .resolve(id): options = ["--storage-resolve", id.uuidString.lowercased()]
         case let .preview(destination): options = ["--storage-preview", destination.path]
         case let .move(plan): options = ["--storage-move", plan.destination.path, plan.confirmation]
         case let .upgrade(workspace): options = ["--upgrade-project", workspace.path]
@@ -40,11 +42,40 @@ enum StorageCommand {
     }
 }
 
+enum DesktopProjectsRequest: Equatable {
+    case list
+    case open(UUID)
+    case newProject
+    case folder
+
+    init?(message: Any) {
+        guard let fields = message as? [String: String] else { return nil }
+        switch fields["action"] {
+        case "list" where fields.count == 1: self = .list
+        case "new" where fields.count == 1: self = .newProject
+        case "folder" where fields.count == 1: self = .folder
+        case "open" where fields.count == 2:
+            guard let value = fields["id"], let id = UUID(uuidString: value) else { return nil }
+            self = .open(id)
+        default: return nil
+        }
+    }
+}
+
 struct StorageProject: Decodable {
+    let id: UUID
     let name: String
     let path: String
 
     var workspace: URL? { localDirectoryURL(path) }
+
+    var sidebarEntry: [String: Any] {
+        var directory: ObjCBool = false
+        let available = workspace.map {
+            FileManager.default.fileExists(atPath: $0.path, isDirectory: &directory) && directory.boolValue
+        } ?? false
+        return ["id": id.uuidString.lowercased(), "name": name, "available": available]
+    }
 }
 
 struct StoragePlan {
@@ -67,11 +98,13 @@ struct StorageReply: Decodable {
     let files: Int?
     let bytes: Int64?
     let backup: String?
+    let workspace: String?
     let projects: [StorageProject]?
 
     var isReady: Bool { version == 1 && status == "ready" }
     var rootURL: URL? { isReady ? localDirectoryURL(root) : nil }
     var backupURL: URL? { isReady ? localDirectoryURL(backup) : nil }
+    var workspaceURL: URL? { isReady ? localDirectoryURL(workspace) : nil }
 
     var plan: StoragePlan? {
         guard let root = rootURL, let destination = localDirectoryURL(destination), root != destination,
