@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.39
+
+- Make the intake response format explicit so connected models can produce reviewable drafts.
+
 ## 1.0.38
 
 - Show when a selected Claude Code model is unavailable for the configured account.
