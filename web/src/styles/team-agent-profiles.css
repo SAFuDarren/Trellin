@@ -66,9 +66,24 @@
   min-width: 0;
 }
 
-.team-agent-field select {
+.team-agent-select {
+  position: relative;
+}
+
+.team-agent-select select {
+  appearance: none;
   height: auto;
   min-height: 38px;
+  padding-inline-end: 28px;
+}
+
+.team-agent-select .chevron {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 10px;
+  color: var(--sub);
+  transform: translateY(-50%) rotate(90deg);
+  pointer-events: none;
 }
 
 .team-agent-runtime-list,

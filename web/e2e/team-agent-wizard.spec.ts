@@ -76,7 +76,13 @@ test("the Team wizard preserves drafts, retries the same create, and reopens the
   await add.click();
   await connect();
   await expect(name).toHaveValue("");
-  await expect(wizard.getByRole("combobox", { name: "Avatar", exact: true })).toHaveCSS("min-height", "38px");
+  await expect
+    .poll(() =>
+      wizard
+        .getByRole("combobox", { name: "Avatar", exact: true })
+        .evaluate((element) => element.getBoundingClientRect().height),
+    )
+    .toBeGreaterThanOrEqual(38);
   const create = wizard.getByRole("button", { name: "Create agent", exact: true });
   await name.fill("   ");
   await expect(create).toBeDisabled();

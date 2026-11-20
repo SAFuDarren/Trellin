@@ -10,6 +10,7 @@ import {
   type ModelConnection,
 } from "../api/modelConnections";
 import { AGENT_AVATARS, useSaveTeamAgent, useTeamAgents, type TeamAgent } from "../api/teamAgents";
+import { Chevron } from "./Icons";
 import { ModelConnections } from "./ModelConnections";
 import "../styles/team-agent-profiles.css";
 
@@ -350,21 +351,24 @@ function TeamAgentWizard({
                 </label>
                 <div className="team-agent-field">
                   <label htmlFor={`${title}-avatar`}>{t("teamAgents.avatar")}</label>
-                  <select
-                    id={`${title}-avatar`}
-                    value={draft.avatar}
-                    onChange={(event) => {
-                      const avatar = AGENT_AVATARS.find((option) => option === event.target.value);
-                      if (avatar) update({ avatar });
-                    }}
-                    disabled={busy}
-                  >
-                    {AGENT_AVATARS.map((avatar) => (
-                      <option key={avatar} value={avatar}>
-                        {t(`teamAgents.avatars.${avatar}`)}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="team-agent-select">
+                    <select
+                      id={`${title}-avatar`}
+                      value={draft.avatar}
+                      onChange={(event) => {
+                        const avatar = AGENT_AVATARS.find((option) => option === event.target.value);
+                        if (avatar) update({ avatar });
+                      }}
+                      disabled={busy}
+                    >
+                      {AGENT_AVATARS.map((avatar) => (
+                        <option key={avatar} value={avatar}>
+                          {t(`teamAgents.avatars.${avatar}`)}
+                        </option>
+                      ))}
+                    </select>
+                    <Chevron />
+                  </div>
                 </div>
               </div>
               <label>
