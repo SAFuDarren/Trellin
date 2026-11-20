@@ -103,7 +103,7 @@ export function ReviewPanel(props: Props) {
             ))}
         </ul>
       </section>
-      <section className="node-detail" aria-label={t("review.detail")}>
+      <section className="node-detail" id="node-detail" aria-label={t("review.detail")}>
         <NodeDetail {...props} />
       </section>
     </aside>

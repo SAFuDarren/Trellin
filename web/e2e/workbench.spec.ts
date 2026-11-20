@@ -121,6 +121,45 @@ test("the global map can be moved and resized", async ({ page }) => {
   await expect.poll(async () => (await page.locator(".atlas").boundingBox())?.width ?? 0).toBeGreaterThan(width);
 });
 
+test("graph controls and Help retain accessible structure", async ({ page }) => {
+  await open(page);
+  const inspect = page.locator("#node-detail");
+  const nodes = page.locator('.graph-node[aria-controls="node-detail"]');
+  await expect(nodes).toHaveCount(7);
+  await expect(inspect).toBeVisible();
+  await page.getByRole("button", { name: "Collapse review column" }).click();
+  await expect(inspect).toBeHidden();
+  await expect(inspect).toBeAttached();
+  await expect(nodes).toHaveCount(7);
+
+  const resize = page.getByRole("separator", { name: "Drag to resize the overview" });
+  const width = () => page.locator(".atlas").evaluate((map) => Math.round(map.getBoundingClientRect().width));
+  await expect(resize).toHaveAttribute("aria-valuemin", "110");
+  await expect(resize).toHaveAttribute("aria-valuemax", "420");
+  const initialWidth = await width();
+  await expect(resize).toHaveAttribute("aria-valuenow", String(initialWidth));
+  await resize.press("ArrowRight");
+  await expect.poll(width).toBeGreaterThan(initialWidth);
+  await expect(resize).toHaveAttribute("aria-valuenow", String(await width()));
+
+  await page.setViewportSize({ width: 360, height: 560 });
+  await expect
+    .poll(async () => {
+      const stageWidth = await page.locator(".stage").evaluate((stage) => stage.clientWidth);
+      const maximumWidth = Number(await resize.getAttribute("aria-valuemax"));
+      return maximumWidth < 420 && maximumWidth === Math.max(110, stageWidth - 24);
+    })
+    .toBe(true);
+  expect(Number(await resize.getAttribute("aria-valuenow"))).toBeLessThanOrEqual(
+    Number(await resize.getAttribute("aria-valuemax")),
+  );
+
+  await railLink(page, "Help").click();
+  const definitions = page.locator(".help dl.keys");
+  await expect(definitions).toHaveCount(2);
+  await expect(definitions.locator(":scope > div > dt + dd")).toHaveCount(13);
+});
+
 test("every rail section opens without errors", async ({ page }) => {
   const errors = await open(page);
   const sections: [string, string][] = [

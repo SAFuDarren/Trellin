@@ -19,14 +19,14 @@ export function HelpPage() {
           <h3>{t("help.sections")}</h3>
           <dl className="keys">
             {(["workbench", "review", "claims", "library", "chat", "team", "progress"] as const).map((section) => (
-              <span key={section} className="contents">
+              <div key={section} className="contents">
                 <dt>
                   <a className="relation" href={href(section)}>
                     {t(`rail.${section}`)}
                   </a>
                 </dt>
                 <dd>{t(`help.about.${section}`)}</dd>
-              </span>
+              </div>
             ))}
           </dl>
         </section>
@@ -34,12 +34,12 @@ export function HelpPage() {
           <h3>{t("help.canvas")}</h3>
           <dl className="keys">
             {KEYS.map((key) => (
-              <span key={key} className="contents">
+              <div key={key} className="contents">
                 <dt>
                   <kbd>{t(`help.keys.${key}.key`)}</kbd>
                 </dt>
                 <dd>{t(`help.keys.${key}.what`)}</dd>
-              </span>
+              </div>
             ))}
           </dl>
         </section>

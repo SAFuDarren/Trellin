@@ -443,7 +443,7 @@ export function GraphView(props: Props) {
             claims={props.atlasClaims}
             claimId={props.claimId}
             box={box}
-            stored={props.atlasBox}
+            maximumWidth={atlasMaximumWidth(stageSize.width)}
             onBox={props.onAtlasBox}
           />
         )}
@@ -493,11 +493,16 @@ export function GraphView(props: Props) {
   );
 }
 
+const ATLAS_MIN_WIDTH = 110;
+function atlasMaximumWidth(stageWidth: number) {
+  return stageWidth ? Math.max(ATLAS_MIN_WIDTH, Math.min(420, stageWidth - 24)) : 420;
+}
+
 // Until moved, the map sits top-left on a wide canvas and as a small map bottom-left on a narrow one.
 function atlasPlacement(stored: AtlasBox | null, width: number, height: number): AtlasBox {
   const base =
     stored ?? (width && width < 640 ? { x: 12, y: Math.max(56, height - 128), w: 124 } : { x: 18, y: 14, w: 186 });
-  const w = Math.round(Math.max(110, Math.min(420, base.w, width ? width - 24 : base.w)));
+  const w = Math.round(Math.max(ATLAS_MIN_WIDTH, Math.min(atlasMaximumWidth(width), base.w)));
   if (!width || !height) return { ...base, w };
   const tall = w * 0.95;
   return {
@@ -511,12 +516,13 @@ function AtlasMap({
   claims,
   claimId,
   box,
+  maximumWidth,
   onBox,
 }: {
   claims: AtlasClaim[];
   claimId: string;
   box: AtlasBox;
-  stored: AtlasBox | null;
+  maximumWidth: number;
   onBox: (box: AtlasBox, persist: boolean) => void;
 }) {
   const { t } = useTranslation();
@@ -618,6 +624,9 @@ function AtlasMap({
         className="atlas-resize"
         role="separator"
         tabIndex={0}
+        aria-valuemin={ATLAS_MIN_WIDTH}
+        aria-valuemax={maximumWidth}
+        aria-valuenow={box.w}
         aria-label={t("atlas.resize")}
         title={t("atlas.resize")}
         onPointerDown={(event) => drag(event, "resize")}

@@ -21,6 +21,8 @@
 - Expand a Claims card in place, keep long graph labels inside their nodes, and
   see the recorded Library state in both the table and inspector.
 - Drag the corner of a proof graph node to resize it horizontally and vertically.
+- Screen readers can follow graph nodes to the inspector, read the overview
+  resize range and current width, and navigate Help definitions.
 - Edit an entry from the Library table or inspector and review both statements
   before confirming a new version. Frozen claims retain their original evidence.
 
