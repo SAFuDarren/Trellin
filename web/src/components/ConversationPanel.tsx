@@ -27,6 +27,7 @@ import {
   useModelConnections,
 } from "../api/modelConnections";
 import { useLocalTextModels } from "../api/localModels";
+import { useComposerKeyboard } from "../hooks/useComposerKeyboard";
 import { timeText } from "../workbench/text";
 import { Chevron, SendArrow, Spin } from "./Icons";
 import { ModelConnections } from "./ModelConnections";
@@ -80,11 +81,16 @@ export function ConversationPanel({
   const request = useRef<ConversationRequest | null>(null);
   const busy = useRef(false);
   const currentScope = useRef<string | null>(null);
+  const composerKeyboard = useComposerKeyboard();
+  const textarea = useRef<HTMLTextAreaElement>(null);
   const formId = useId();
   const feed = useRef<HTMLOListElement>(null);
   const nearEnd = useRef(true);
   const messages = detail.data?.thread.messages ?? [];
   const running = detail.data?.thread.running ?? thread.running;
+  const sending = pending === "send";
+  const latestError = detail.data?.thread.latest_error;
+  const latestMessage = messages[messages.length - 1];
   const connection = options.find((option) => option.id === selected);
   const disabled = Boolean(pending || running || removing);
   const canPrepare = Boolean(!disabled && !detail.isError && detail.data && connection && text.trim());
@@ -106,7 +112,7 @@ export function ConversationPanel({
 
   useLayoutEffect(() => {
     if (feed.current && nearEnd.current) feed.current.scrollTop = feed.current.scrollHeight;
-  }, [messages.length]);
+  }, [latestMessage?.id, running, sending]);
 
   function errorText(code: string) {
     return t(`errors.${code}`, { defaultValue: t("conversations.failed") });
@@ -133,6 +139,7 @@ export function ConversationPanel({
         : { thread_id: thread.id, connection_id: connection.id, text: textToSend, request_id: crypto.randomUUID() };
     request.current = body;
     busy.current = true;
+    if (send) nearEnd.current = true;
     setError("");
     setPending(send ? "send" : "preview");
     try {
@@ -219,7 +226,9 @@ export function ConversationPanel({
             nearEnd.current = currentTarget.scrollHeight - currentTarget.scrollTop - currentTarget.clientHeight < 72;
           }}
         >
-          {messages.length === 0 && <li className="chat-empty">{t("conversations.emptyThread")}</li>}
+          {messages.length === 0 && !sending && !running && (
+            <li className="chat-empty">{t("conversations.emptyThread")}</li>
+          )}
           {messages.map((message) => (
             <li key={message.id} data-from={message.role === "user" ? "you" : "model"}>
               <span className="speaker">
@@ -229,6 +238,11 @@ export function ConversationPanel({
               <p className={message.role === "user" ? "bubble" : "message"}>{message.text}</p>
             </li>
           ))}
+          {(sending || running) && (
+            <li className="chat-send-status">
+              <span role="status">{t(running ? "conversations.awaitingReply" : "conversations.sending")}</span>
+            </li>
+          )}
         </ol>
       )}
       <form className="composer direct-composer" onSubmit={send}>
@@ -236,6 +250,8 @@ export function ConversationPanel({
           {t("conversations.message")}
         </label>
         <textarea
+          {...composerKeyboard}
+          ref={textarea}
           id={formId + "-text"}
           value={text}
           rows={2}
@@ -338,10 +354,23 @@ export function ConversationPanel({
           </button>
         </div>
         {models.isError && <p role="alert">{t("modelConnections.failed")}</p>}
-        {(error || detail.data?.thread.latest_error) && (
+        {!sending && (error || latestError) && (
           <p className="composer-status" data-error="true" role="alert">
-            {error || errorText(detail.data?.thread.latest_error ?? "")}
+            {error || errorText(latestError ?? "")}
           </p>
+        )}
+        {!disabled && !error && latestError && !text && latestMessage?.role === "user" && (
+          <button
+            type="button"
+            className="conversation-text-action chat-reuse-draft"
+            onClick={() => {
+              changeDraft();
+              setText(latestMessage.text);
+              textarea.current?.focus();
+            }}
+          >
+            {t("conversations.reuseDraft")}
+          </button>
         )}
       </form>
       <div className="conversation-context">

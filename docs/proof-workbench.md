@@ -102,7 +102,7 @@ private note in the project. Saving works while proof guidance is blocked,
 including before the Lean statement is confirmed. Reopen the same node to
 continue editing the saved draft or discard it. To make a draft available to an
 eligible proof task, use **Queue proof note** once the panel shows an available
-recipient and complete any requested confirmation. Saving a draft requires
+recipient and explains how the note may be used. Saving a draft requires
 database revision `0082` or later.
 
 On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
@@ -122,8 +122,9 @@ upgrade** in **Proof activity**. Confirm the project in the native dialog. The
 app reopens the same project after verifying its backup and applying the bundled database upgrade.
 
 On database revision `0081` or later, open **Proof activity** for a node with a
-confirmed public statement and shareable basis. Choose **Queue proof note**
-and **Allow Codex to use this note**. Start a bounded **Proof task** with a
+confirmed public statement and shareable basis. Select the recipient and use
+**Queue proof note** or Enter to release this note for a later authorized attempt.
+Start a bounded **Proof task** with a
 Codex connection from Team. The task checks its signed model, statement,
 basis and budget before using the queued note. The status beside each note tells you whether it is waiting for an authorized
 proof task, blocked, tied to an older statement, or included in an attempt.
@@ -140,6 +141,6 @@ export RESEARCH_MULTIPLIER_LEAN_AUTHOR_MODEL=YOUR_CODEX_MODEL
 research-multiplier --workspace "/path/to/my-research" advance worker --policy POLICY_UUID --watch 5
 ```
 
-In the workbench, select a node, choose the **Codex** recipient (for example `FLT-09 · Codex · GPT-6.2 Sol xhigh`) and send the note. The send button then asks for a second click, which confirms that this individual note may be sent to Codex with the released scope. The next eligible Codex request reads it within the signed budget. The note stays bound to the selected Lean version. The running job names the model and links to the selected node. A recorded response appears in the conversation alongside the separate Lean verification result.
+In the workbench, select a node, choose the **Codex** recipient (for example `FLT-09 · Codex · GPT-6.2 Sol xhigh`) and queue the note. This action releases the displayed note for Codex use with the released scope. The next eligible Codex request reads it within the signed budget. The note stays bound to the selected Lean version. The running job names the model and links to the selected node. A recorded response appears in the conversation alongside the separate Lean verification result.
 
 Private claims expose only the local guidance channel. Codex requests require public authorization for the exact statement, existing proof context and individual note. The same worker still governs scheduled retries and verifies candidates through Lean.

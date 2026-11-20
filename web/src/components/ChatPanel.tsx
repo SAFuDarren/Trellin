@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "../api/client";
+import { useComposerKeyboard } from "../hooks/useComposerKeyboard";
 import { desktopProjectUpgrade } from "../workbench/desktop";
 import { activityNode, type Graph } from "../workbench/graph";
 import { isCodex, modelName, nodeTitle } from "../workbench/text";
@@ -20,7 +21,6 @@ type Draft = {
   discarded?: boolean;
   text: string;
   audience?: string;
-  releaseStatement?: string;
   requestId?: string;
   requestStatement?: string;
   requestText?: string;
@@ -117,6 +117,7 @@ export function ChatPanel({
     .filter((record) => allNodes || (proofSelected && activityNode(graph, record) === proofSelected))
     .sort((a, b) => live(a) - live(b) || time(a) - time(b));
 
+  const latestGuidance = guidance[0]?.id;
   const onScroll = () => {
     const element = feed.current;
     if (element) nearBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 40;
@@ -124,7 +125,7 @@ export function ChatPanel({
   useLayoutEffect(() => {
     const element = feed.current;
     if (element && nearBottom.current) element.scrollTop = element.scrollHeight;
-  }, [shown.length, proofSelected, allNodes, tab]);
+  }, [shown.length, latestGuidance, proofSelected, allNodes, tab]);
 
   const relation = (id: string) => {
     const node = graph?.nodes.get(id);
@@ -217,6 +218,9 @@ export function ChatPanel({
             allNodes={allNodes}
             activity={activity}
             activityError={activityError}
+            onQueue={() => {
+              nearBottom.current = true;
+            }}
             onSent={onSent}
           />
         </div>
@@ -234,6 +238,7 @@ function Composer({
   allNodes,
   activity,
   activityError,
+  onQueue,
   onSent,
 }: {
   session: string;
@@ -244,9 +249,11 @@ function Composer({
   allNodes: boolean;
   activity: ActivitySnapshot | undefined;
   activityError: string;
+  onQueue: () => void;
   onSent: () => void;
 }) {
   const { t } = useTranslation();
+  const composerKeyboard = useComposerKeyboard();
   const drafts = useRef(new Map<string, Draft>());
   const [, rerender] = useState(0);
   const refresh = useCallback(() => rerender((value) => value + 1), []);
@@ -269,24 +276,20 @@ function Composer({
   useEffect(() => {
     if (draft?.audience && declared && !channels.includes(draft.audience)) {
       draft.audience = undefined;
-      draft.releaseStatement = undefined;
       draft.requestId = undefined;
-      refresh();
-    } else if (draft?.releaseStatement && (!available || draft.releaseStatement !== statement)) {
-      draft.releaseStatement = undefined;
       refresh();
     }
   });
   const audience = draft?.audience ?? (channels.includes("local") ? "local" : (channels[0] ?? ""));
   const towardsCodex = audience === "codex";
   const busy = Boolean(draft?.sending || draft?.draftOperation);
-  const confirming = Boolean(towardsCodex && draft?.releaseStatement && draft.releaseStatement === statement && !busy);
   const canSend = available && !busy && Boolean(draft?.text.trim()) && channels.includes(audience);
   const blocker = !node
     ? t("composer.chooseNode")
     : activityError ||
       (currentActivity ? guidanceBlockerText(t, currentActivity, t("composer.viewOnly")) : t("chat.loading"));
-  const status = !available ? blocker : confirming ? t("composer.confirmHint") : draft?.message || "";
+  const queueHint = available ? t(towardsCodex ? "composer.confirmHint" : "composer.localQueueHint") : "";
+  const status = draft?.sending ? t("composer.sending") : !available ? blocker : draft?.message || "";
   const draftOnly = Boolean(draft && !available);
   const needsUpgrade =
     currentActivity?.proof_draft_available === false ||
@@ -323,7 +326,6 @@ function Composer({
         if (signal?.aborted) return;
         if (replaceText || draft.text === (draft.saved?.text ?? "")) {
           draft.text = saved?.text ?? "";
-          draft.releaseStatement = undefined;
           draft.requestId = undefined;
         }
         draft.saved = saved;
@@ -369,7 +371,6 @@ function Composer({
       });
       if (discard && matchesSaved) {
         draft.text = "";
-        draft.releaseStatement = undefined;
         draft.requestId = undefined;
       }
       draft.saved = saved;
@@ -384,12 +385,17 @@ function Composer({
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!draft || !nodeId || !claimId || !statement || !canSend || draft.draftOperation || draft.sending) return;
-    if (towardsCodex && !confirming) {
-      draft.releaseStatement = statement;
-      refresh();
+    if (
+      !draft ||
+      !nodeId ||
+      !claimId ||
+      !statement ||
+      !canSend ||
+      !draft.text.trim() ||
+      draft.draftOperation ||
+      draft.sending
+    )
       return;
-    }
     const text = draft.text;
     const draftRevision = matchesSaved ? draft.saved?.revision : undefined;
     if (draft.requestStatement !== statement || draft.requestText !== text) draft.requestId = undefined;
@@ -399,9 +405,10 @@ function Composer({
     draft.sending = true;
     draft.message = "";
     draft.error = false;
+    onQueue();
     refresh();
     try {
-      const reply = await api<{ draft_consumed?: boolean }>(session, "/api/guidance", {
+      const reply = await api<{ draft_consumed?: boolean; submitted_at?: string | null }>(session, "/api/guidance", {
         data: {
           claim_id: claimId,
           statement_id: statement,
@@ -422,14 +429,15 @@ function Composer({
       draft.discarded = undefined;
       draft.requestId = undefined;
       draft.audience = undefined;
-      draft.releaseStatement = undefined;
-      draft.message = t(towardsCodex ? "composer.sentCodex" : "composer.sentLocal");
+      draft.message = t(
+        reply.submitted_at ? "composer.sentDelivered" : towardsCodex ? "composer.sentCodex" : "composer.sentLocal",
+      );
       onSent();
     } catch (error) {
-      draft.message =
+      const reason =
         error instanceof Error ? t(`errors.${error.message}`, { defaultValue: error.message }) : String(error);
+      draft.message = t("composer.queueFailed", { reason });
       draft.error = true;
-      draft.releaseStatement = undefined;
     } finally {
       draft.sending = false;
       refresh();
@@ -458,19 +466,24 @@ function Composer({
         {t("composer.label")}
       </label>
       <textarea
+        {...composerKeyboard}
         id="guidance-text"
         rows={2}
         maxLength={1500}
         required
         placeholder={t(draftOnly ? "composer.draftPlaceholder" : "composer.placeholder")}
-        aria-describedby={[allNodes && node && "guidance-target", "guidance-status", draftStatus && "guidance-draft"]
+        aria-describedby={[
+          allNodes && node && "guidance-target",
+          queueHint && "guidance-queue-hint",
+          "guidance-status",
+          draftStatus && "guidance-draft",
+        ]
           .filter(Boolean)
           .join(" ")}
         disabled={!draft || busy}
         value={draft?.text ?? ""}
         onChange={(event) => {
           if (!draft) return;
-          if (draft.text !== event.target.value) draft.releaseStatement = undefined;
           draft.text = event.target.value;
           draft.discarded = undefined;
           if (draft.text !== draft.requestText) draft.requestId = undefined;
@@ -493,7 +506,6 @@ function Composer({
               onChange={(event) => {
                 if (!draft) return;
                 draft.audience = event.target.value;
-                draft.releaseStatement = undefined;
                 draft.requestId = undefined;
                 draft.message = "";
                 draft.error = false;
@@ -508,17 +520,27 @@ function Composer({
             </select>
             <Chevron />
           </div>
-          <button id="guidance-send" type="submit" className="button proof-queue-button" disabled={!canSend}>
-            {t(draft?.sending ? "composer.sending" : confirming ? "composer.confirm" : "composer.send")}
+          <button
+            id="guidance-send"
+            type="submit"
+            className="button proof-queue-button"
+            aria-describedby="guidance-queue-hint"
+            disabled={!canSend}
+          >
+            {t(draft?.sending ? "composer.sending" : draft?.error ? "composer.retry" : "composer.send")}
           </button>
         </div>
+      )}
+      {queueHint && (
+        <p id="guidance-queue-hint" className="composer-status">
+          {queueHint}
+        </p>
       )}
       <p
         id="guidance-status"
         className="composer-status"
-        role="status"
+        role={draft?.error ? "alert" : "status"}
         data-error={String(Boolean(draft?.error))}
-        data-confirm={String(confirming)}
       >
         {status}
       </p>

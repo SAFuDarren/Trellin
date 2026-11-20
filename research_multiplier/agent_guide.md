@@ -36,7 +36,9 @@ This copy matches the Research Multiplier version that wrote it. Run
    proof task authorizes the displayed frozen scope, selected connection and
    maximum rounds. A changed scope or connection needs renewed consent.
    On database revision `0081`, a public Codex proof note also needs explicit
-   release for the exact note and statement. Saving a draft keeps it local.
+   release for the exact note and statement. In Proof activity, the Queue proof
+   note action grants that release for the displayed recipient and note.
+   Saving a draft keeps it local.
    A recorded attempt identifies when an authorized task used a released note.
    For an external discussion in Chats or Workbench, the composer identifies
    the recipient and included context. The researcher's send action authorizes

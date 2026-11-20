@@ -444,12 +444,15 @@
       "public_basis": "Review the shareable proof scope before queuing an opinion for Codex."
     },
     "viewOnly": "You can read the activity on this claim but not send notes.",
-    "confirmHint": "Confirm that this note may accompany a later authorized Codex proof attempt.",
-    "confirm": "Allow Codex to use this note",
+    "confirmHint": "Queuing lets this note accompany a later authorized Codex proof attempt for the selected node.",
+    "localQueueHint": "Queues this note for a later authorized local proof attempt.",
     "send": "Queue proof note",
-    "sending": "Saving",
-    "sentCodex": "Saved for a later authorized Codex proof attempt.",
-    "sentLocal": "Saved for a later authorized local proof attempt."
+    "retry": "Retry proof note",
+    "sending": "Queueing proof note…",
+    "queueFailed": "Could not confirm queueing. Your note is still here. {{reason}}",
+    "sentCodex": "Queued for a later authorized Codex proof attempt.",
+    "sentLocal": "Queued for a later authorized local proof attempt.",
+    "sentDelivered": "Delivery was recorded for this proof note."
   },
   "model": {
     "fallback": "Model"
@@ -679,6 +682,9 @@
     "connect": "Set up a model",
     "message": "Write a message",
     "send": "Send message",
+    "sending": "Sending…",
+    "awaitingReply": "Message sent. Waiting for a reply…",
+    "reuseDraft": "Use message as draft",
     "working": "Working…",
     "you": "You",
     "remove": "Remove conversation",
