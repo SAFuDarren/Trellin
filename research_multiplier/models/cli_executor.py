@@ -5,6 +5,7 @@ from contextvars import ContextVar
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -37,9 +38,59 @@ def workbench_connection(provider):
         _WORKBENCH_PROVIDER.reset(token)
 
 
-def _isolated_codex_command(command, environment):
+def _require_mac_sandbox(provider):
     if sys.platform != "darwin" or not os.access(_MAC_SANDBOX, os.X_OK):
-        raise ModelFailure("configuration", "A registered Codex connection needs the macOS sandbox.")
+        raise ModelFailure("configuration", f"A registered {provider} connection needs the macOS sandbox.")
+
+
+def _sandbox_rules(matcher, locations):
+    rules = []
+    for location in locations:
+        for path in sorted({str(location.absolute()), str(location.resolve())}):
+            if not path.isprintable():
+                raise ValueError
+            rules.append(f"({matcher} {json.dumps(path, ensure_ascii=False)})")
+    return " ".join(rules)
+
+
+def _isolated_claude_command(command, environment, directory):
+    _require_mac_sandbox("Claude Code")
+    from research_multiplier.storage import paths
+
+    try:
+        home = Path.home()
+        config = Path(environment.get("CLAUDE_CONFIG_DIR", str(home / ".claude")))
+        binary = Path(command[0])
+        if not config.is_absolute() or not binary.is_absolute():
+            raise ValueError
+        denied = [Path("/Users"), home, Path("/Volumes"), Path("/private/tmp"), Path("/private/var/folders")]
+        allowed = [Path(directory), home / "Library" / "Keychains"]
+        files = [binary, home / ".claude.json", config / ".claude.json", config / ".credentials.json",
+                 config / "settings.json"]
+        # The official npm distribution may use a script and load its package.
+        for parent in binary.resolve().parents:
+            if parent.name == "claude-code" and parent.parent.name == "@anthropic-ai":
+                allowed.append(parent)
+                node = shutil.which("node", path=environment.get("PATH", ""))
+                if node:
+                    files.append(Path(node))
+                break
+        block = _sandbox_rules("subpath", denied)
+        readable = " ".join((_sandbox_rules("subpath", allowed), _sandbox_rules("literal", files)))
+        profile = f"(version 1)(allow default)(deny file-read-data {block})(allow file-read-data {readable})"
+        workspace = paths.active_workspace()
+        if workspace is not None:
+            protected = workspace.parent if workspace.name == "Trellin" else workspace
+            profile += f'(deny file-read* file-write* {_sandbox_rules("subpath", [protected])})'
+    except (OSError, RuntimeError, ValueError):
+        raise ModelFailure("configuration", "Could not isolate the registered Claude Code connection.") from None
+    # Managed hooks still run in Claude Code safe mode. Keep user files outside
+    # the process's read boundary even if those hooks start another process.
+    return [_MAC_SANDBOX, "-p", profile, *command]
+
+
+def _isolated_codex_command(command, environment):
+    _require_mac_sandbox("Codex")
     try:
         home = Path.home()
         configured = environment.get("CODEX_HOME")
@@ -48,16 +99,10 @@ def _isolated_codex_command(command, environment):
             raise ValueError
         instructions = [codex / name for name in _CODEX_INSTRUCTIONS]
         skills = [home / ".agents" / "skills", codex / "skills", codex / "plugins"]
-        rules = []
-        for matcher, locations in (("literal", instructions), ("subpath", skills)):
-            for location in locations:
-                for path in sorted({str(location.absolute()), str(location.resolve())}):
-                    if not path.isprintable():
-                        raise ValueError
-                    rules.append(f"({matcher} {json.dumps(path, ensure_ascii=False)})")
+        rules = " ".join((_sandbox_rules("literal", instructions), _sandbox_rules("subpath", skills)))
     except (OSError, RuntimeError, ValueError):
         raise ModelFailure("configuration", "Could not isolate the registered Codex connection.") from None
-    profile = "(version 1)(allow default)(deny file-read* " + " ".join(rules) + ")"
+    profile = f"(version 1)(allow default)(deny file-read* {rules})"
     return [
         _MAC_SANDBOX, "-p", profile, *command[:-1],
         "-c", "project_doc_max_bytes=0", "--disable", "plugins", "--disable", "browser_use",
@@ -145,6 +190,9 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
         command = _isolated_codex_command(command, environment)
     try:
         with TemporaryDirectory(prefix="rm-proof-worker-") as directory:
+            if provider == "claude-code" and workbench:
+                command = _isolated_claude_command(command, environment, directory)
+                environment["TMPDIR"] = directory
             remaining = deadline - monotonic()
             if remaining <= 0:
                 raise TimeoutError

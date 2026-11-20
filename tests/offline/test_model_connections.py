@@ -254,6 +254,7 @@ def test_native_default_leaves_model_selection_to_the_registered_cli(provider, m
         return CompletedProcess(command, 0, response, "")
 
     monkeypatch.setattr(cli_executor, "_isolated_codex_command", isolate)
+    monkeypatch.setattr(cli_executor, "_isolated_claude_command", lambda command, env, _: isolate(command, env))
     monkeypatch.setattr(cli_executor.subprocess, "run", run)
     with cli_executor.workbench_connection(provider):
         reply = cli_executor.complete(provider, "/fixture/native", cli_executor.NATIVE_DEFAULT_MODEL, [], 10)
@@ -265,7 +266,31 @@ def test_native_default_leaves_model_selection_to_the_registered_cli(provider, m
     assert explicitly_selected[explicitly_selected.index("--model") + 1] == "selected-model"
     assert legacy[legacy.index("--model") + 1] == cli_executor.NATIVE_DEFAULT_MODEL
     assert reply["model"] == "actual-model" and reply["model_id_reported"]
-    assert guard_calls == ([native, explicitly_selected] if provider == "codex-cli" else [])
+    assert guard_calls == [native, explicitly_selected]
+
+
+def test_registered_claude_confines_user_files_and_the_selected_workspace(tmp_path, monkeypatch):
+    from research_multiplier.storage import paths
+
+    home = tmp_path / "home"
+    workspace = tmp_path / "public case" / "Trellin"
+    config = home / "claude-settings"
+    launch = tmp_path / "scratch"
+    binary = tmp_path / "claude"
+    monkeypatch.setattr(cli_executor.Path, "home", lambda: home)
+    monkeypatch.setattr(cli_executor.sys, "platform", "darwin")
+    monkeypatch.setattr(cli_executor.os, "access", lambda *args: True)
+    monkeypatch.setattr(paths, "active_workspace", lambda: workspace)
+    guarded = cli_executor._isolated_claude_command(
+        [str(binary), "--safe-mode"], {"CLAUDE_CONFIG_DIR": str(config)}, launch,
+    )
+    assert guarded[:2] == ["/usr/bin/sandbox-exec", "-p"]
+    assert guarded[-2:] == [str(binary), "--safe-mode"]
+    rule = guarded[2]
+    assert f"(subpath {json.dumps(str(home.resolve()))})" in rule.split("(allow file-read-data", 1)[0]
+    assert f"(subpath {json.dumps(str(launch.resolve()))})" in rule
+    assert f"(literal {json.dumps(str((config / '.credentials.json').resolve()))})" in rule
+    assert f'(deny file-read* file-write* (subpath {json.dumps(str(workspace.parent.resolve()))})' in rule
 
 
 @pytest.mark.parametrize("platform", ["darwin", "linux"])
