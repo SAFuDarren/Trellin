@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.30
+
+- Configure scheduled dependency updates for Python, the web interface, and GitHub Actions.
+
 ## 1.0.29
 
 - Show whether each proof note is waiting, blocked, stale, or included in a proof attempt.
