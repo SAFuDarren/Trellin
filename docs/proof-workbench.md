@@ -37,6 +37,12 @@ For example, if the frozen scope assumes `True` and has the original goal `True 
 
 Complete the frozen goal through the existing proof workflow.
 
+## Propose a premise
+
+Open **Premises** on the selected Lean claim. Enter the proposed wording, its exact Lean proposition, the question to decide, and the expected impact. The pending item appears beside the current proof without adding a dependency. The interpretation review pauses new proof work on that scope. Reopen the project to continue the same review.
+
+Review the target, approved starting basis, and proposed premise before recording your reason. Reject the proposal to keep the current basis. Confirm the revised claim to approve the exact premise and freeze a separate claim with the same conclusion. The original claim retains its statement and proof history. Open the revised claim from the decision and use the ordinary [Lean statement review](lean-core.md) before proving it. Other pending interpretation questions must be resolved before confirming a revision. See [the condition workflow](research-goals.md#handle-a-questioned-condition).
+
 ## Read a graph
 
 - **Proof** shows the frozen goal, checked steps, reductions and open obligations. Choose a node to see the stored statement and its current status. Long Lean statements start folded. The fold opens the exact stored text, including any binders already in the record.

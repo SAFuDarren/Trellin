@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.33
+
+- Propose and review a premise in Workbench, with explicit confirmation of a separate revised claim.
+
 ## 1.0.32
 
 - Verify scoped local lemma plans in Workbench and show checked lemmas in the proof graph.

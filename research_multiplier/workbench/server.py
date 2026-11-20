@@ -1,6 +1,5 @@
 """Serve a project-bound proof graph on the IPv4 loopback interface."""
 
-from functools import partial
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -23,7 +22,7 @@ from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
                                           workbench_activity, workbench_clarification, workbench_conversations,
                                           workbench_guidance, workbench_library,
-                                          workbench_intake, workbench_lemma_plans, workbench_proof_tasks,
+                                          workbench_intake, workbench_lemma_plans, workbench_premises, workbench_proof_tasks,
                                           workbench_review, workbench_sections,
                                           workbench_theorems, workspace_events)
 
@@ -74,6 +73,18 @@ _LEMMA_PLAN_ERRORS = {
     "lemmaPlan.stale": HTTPStatus.CONFLICT,
     "lemmaPlan.busy": HTTPStatus.CONFLICT,
     "lemmaPlan.checkFailed": HTTPStatus.UNPROCESSABLE_ENTITY,
+}
+_PREMISE_WRITES = {
+    "/api/premises/propose": workbench_premises.propose,
+    "/api/premises/decide": workbench_premises.decide,
+}
+_PREMISE_ERRORS = {
+    "premise.invalid": HTTPStatus.BAD_REQUEST,
+    "premise.identity": HTTPStatus.FORBIDDEN,
+    "premise.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
+    "premise.stale": HTTPStatus.CONFLICT,
+    "premise.duplicate": HTTPStatus.CONFLICT,
+    "premise.conflicts": HTTPStatus.CONFLICT,
 }
 _CONVERSATION_WRITES = {
     "/api/conversations/create": workbench_conversations.create,
@@ -442,8 +453,7 @@ class _Handler(BaseHTTPRequestHandler):
                 raise _BadRequest("Use fresh=1 to repeat the check.")
             return self.server.doctor(fresh=route.query == "fresh=1")
         if route.path == "/api/graph":
-            return self.server.read(partial(proof_graph.snapshot, include_lemma_plan=True),
-                                    *_uuid_parameters(route.query, "claim"))
+            return self.server.read(workbench_premises.graph, *_uuid_parameters(route.query, "claim"))
         if route.path == "/api/library/item":
             return self.server.read(workbench_library.item, *_uuid_parameters(route.query, "version"))
         if route.path == "/api/impact":
@@ -792,6 +802,8 @@ class _Handler(BaseHTTPRequestHandler):
             elif self.path == _LEMMA_PLAN_ROUTE:
                 document = self._body(workbench_lemma_plans.MAX_REQUEST_BYTES)
                 self._json(HTTPStatus.OK, self.server.verify_lemma_plan(document))
+            elif self.path in _PREMISE_WRITES:
+                self._json(HTTPStatus.OK, self.server.write(_PREMISE_WRITES[self.path], self._body(_MAX_PROJECT_BYTES)))
             elif self.path == "/api/claim-code":
                 self._json(HTTPStatus.OK, self.server.write(claim_references.rename, self._body()))
             elif self.path == "/api/release-updates":
@@ -832,6 +844,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(status, error.code)
         except workbench_lemma_plans.LemmaPlanError as error:
             self._error(_LEMMA_PLAN_ERRORS[str(error)], str(error))
+        except workbench_premises.PremiseError as error:
+            self._error(_PREMISE_ERRORS[str(error)], str(error))
         except claim_references.ClaimCodeError as error:
             self._error(*_claim_code_error(error))
         except connections.ConnectionError as error:
@@ -856,6 +870,11 @@ class _Handler(BaseHTTPRequestHandler):
                 changed = error.state in {"P0002", "23514"}
                 self._error(HTTPStatus.CONFLICT if changed else HTTPStatus.SERVICE_UNAVAILABLE,
                             "lemmaPlan.stale" if changed else "lemmaPlan.unavailable")
+            elif self.path in _PREMISE_WRITES:
+                code = {"42501": "identity", "22023": "invalid", "P0002": "stale",
+                        "23505": "stale", "23514": "stale"}.get(error.state, "unavailable")
+                message = f"premise.{code}"
+                self._error(_PREMISE_ERRORS[message], message)
             elif self.path == "/api/claim-code":
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "claim_code.save_failed")
             elif self.path in _LIBRARY_WRITES:
@@ -874,6 +893,8 @@ class _Handler(BaseHTTPRequestHandler):
                 message = "proof_task.unavailable"
             elif self.path == _LEMMA_PLAN_ROUTE:
                 message = "lemmaPlan.unavailable"
+            elif self.path in _PREMISE_WRITES:
+                message = "premise.unavailable"
             elif self.path == "/api/claim-code":
                 message = "claim_code.save_failed"
             elif self.path in _LIBRARY_WRITES:

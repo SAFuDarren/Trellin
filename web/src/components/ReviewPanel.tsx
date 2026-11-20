@@ -36,6 +36,7 @@ type Props = {
   impactLoading: boolean;
   impactError: string;
   onSelect: (id: string) => void;
+  onReviewPremise: (id: string) => void;
   onClose: () => void;
 };
 
@@ -131,6 +132,7 @@ function NodeDetail({
   impactLoading,
   impactError,
   onSelect,
+  onReviewPremise,
 }: Props) {
   const { t } = useTranslation();
   const node = graph && selected ? graph.nodes.get(selected) : undefined;
@@ -177,6 +179,7 @@ function NodeDetail({
     const claimTitle = entry.claim_title ?? claims.find((claim) => claim.id === entry.claim_id)?.title;
     return relation(entry.id, claimTitle && entry.claim_id !== claimId ? `${title} · ${claimTitle}` : title);
   };
+  const conditionId = node.kind === "proposed_premise" ? node.reference?.condition_id : undefined;
   const affectedList = impact?.affected ?? [];
   const scope = impact?.scope ?? [];
   return (
@@ -189,6 +192,11 @@ function NodeDetail({
         </span>
       </div>
       <h2>{nodeTitle(t, node)}</h2>
+      {conditionId && (
+        <button type="button" className="button" onClick={() => onReviewPremise(conditionId)}>
+          {t("premise.review")}
+        </button>
+      )}
       {blockers.map((blockage, position) => {
         const explanation = blockage.reason || blockage.detail || blockage.status;
         return explanation ? (

@@ -49,6 +49,8 @@ export function Workbench({
   const [selected, setSelected] = useState<string | null>(null);
   const [assumption, setAssumption] = useState<string | null>(null);
   const [allNodes, setAllNodes] = useState(false);
+  const [premiseDialog, setPremiseDialog] = useState<{ id?: string } | null>(null);
+  const [premiseChatAnchor, setPremiseChatAnchor] = useState<string | null>(null);
   const [live, setLive] = useState<{ side?: number; right?: number; chat?: number }>({});
 
   const claims = useQuery({
@@ -91,6 +93,7 @@ export function Workbench({
     setView("proof");
     pendingNode.current = focus.nodeId;
     setReferencedClaim(null);
+    setPremiseChatAnchor(null);
     setMissingReferenceNode(false);
     onFocusHandled(null);
   }, [focus, onFocusHandled]);
@@ -150,6 +153,7 @@ export function Workbench({
     setRecordedGoal(null);
     setClaimId(id);
     setSelected(null);
+    setPremiseChatAnchor(null);
     setAssumption(null);
     setView("proof");
     setReferencedClaim(null);
@@ -159,6 +163,8 @@ export function Workbench({
   const selectNode = (id: string) => {
     const node = graph?.nodes.get(id);
     if (!node) return;
+    if (node.kind === "proposed_premise" && selected && graph?.nodes.get(selected)?.kind !== "proposed_premise")
+      setPremiseChatAnchor(selected);
     setSelected(id);
     setMissingReferenceNode(false);
     if (node.kind === "hypothesis" && node.reference?.basis_version_id) setAssumption(id);
@@ -196,6 +202,10 @@ export function Workbench({
     await queries.invalidateQueries();
     if (claimId) selectClaim(claimId);
   };
+  const openPremises = (id?: string) => {
+    setReferencedClaim(claimId);
+    setPremiseDialog({ id });
+  };
   const showRecordedGoal = (id: string) => {
     if (!claimId) return openRecorded(id);
     // Keep the open claim reachable even if it drops off the recent claims list.
@@ -228,6 +238,13 @@ export function Workbench({
       : t("sidebar.connecting");
   const reviewCount = view === "impact" ? 0 : queueEntries(t, graph, view, assumption, impact.data).length;
   const goal = graph?.claim.id === claimId && claimId ? graph.nodes.get(`goal:${claimId}`) : undefined;
+  // A premise under review has no conversation or proof-note scope in the kernel.
+  const chatSelected =
+    selected && graph?.nodes.get(selected)?.kind === "proposed_premise"
+      ? premiseChatAnchor && graph.nodes.has(premiseChatAnchor)
+        ? premiseChatAnchor
+        : (goal?.id ?? null)
+      : selected;
   const claimTitle =
     graph?.claim.title || claims.data?.claims.find((claim) => claim.id === claimId)?.title || t("toolbar.defaultTitle");
   const meta = graph
@@ -305,6 +322,12 @@ export function Workbench({
               claimCode={graph?.claim.id === claimId ? graph.claim.code : null}
               claimCodesAvailable={Boolean(claims.data?.claim_codes)}
               lemmaPlanScope={lemmaPlanScope}
+              claimTitle={claimTitle}
+              premiseReview={graph?.claim.id === claimId ? graph.claim.premise_review : undefined}
+              premiseDialog={premiseDialog}
+              onOpenPremises={openPremises}
+              onClosePremises={() => setPremiseDialog(null)}
+              onPremiseRecorded={openRecorded}
               onRecorded={openRecorded}
               onGoalRecorded={showRecordedGoal}
               onOpenReference={openReference}
@@ -398,13 +421,13 @@ export function Workbench({
           session={session}
           graph={graph}
           claimId={claimId}
-          selected={selected}
+          selected={chatSelected}
           activity={activity.data}
           activityError={activityError}
           scopeReady={
             claimId
               ? graph?.claim.id === claimId &&
-                (allNodes || Boolean(selected && graph.nodes.has(selected)) || !graph.nodes.size)
+                (allNodes || Boolean(chatSelected && graph.nodes.has(chatSelected)) || !graph.nodes.size)
               : claims.data?.claims.length === 0
           }
           running={work.running}
@@ -435,6 +458,7 @@ export function Workbench({
         impactLoading={impact.isFetching}
         impactError={impact.isError ? errorText(t, impact.error) : ""}
         onSelect={selectNode}
+        onReviewPremise={openPremises}
         onClose={() => layout.update({ reviewOpen: false })}
       />
     </div>

@@ -3,6 +3,7 @@
 export type Reference = Partial<Record<string, string | number>> & {
   basis_version_id?: string;
   evidence_id?: string;
+  condition_id?: string;
 };
 
 export type GraphNode = {
@@ -27,6 +28,26 @@ export type GraphNode = {
 export type GraphEdge = { source: string; target: string; kind: string };
 export type Blocker = { node_id: string; kind?: string; reason?: string; detail?: string; status?: string };
 
+export type ProposedPremise = {
+  id: string;
+  sha256: string;
+  wording: string;
+  lean: string;
+  question: string;
+  impact: string;
+  state: "pending" | "rejected" | "revised" | "resolved" | "revision_pending";
+  reason?: string;
+  revised_claim_id?: string;
+};
+
+export type PremiseReview = {
+  available: boolean;
+  frame_sha256: string;
+  target: { wording: string; lean: string };
+  basis: { id: string; kind: string; wording: string; lean?: string }[];
+  proposals: ProposedPremise[];
+};
+
 export type GraphSnapshot = {
   claim: {
     id: string;
@@ -35,6 +56,7 @@ export type GraphSnapshot = {
     domain: string | null;
     statement_id?: string | null;
     lemma_plan_ready?: boolean;
+    premise_review?: PremiseReview;
     code?: string | null;
   };
   focus_id?: string | null;

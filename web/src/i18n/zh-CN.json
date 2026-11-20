@@ -101,6 +101,7 @@
   },
   "kind": {
     "goal": "原命题",
+    "proposed_premise": "拟议前提",
     "hypothesis": "假设",
     "library": "定理库",
     "local_lemma": "引理",
@@ -863,6 +864,44 @@
       "review": "research-review.md：审阅证据和来源",
       "progress": "research-progress.md：推进规则和 worker"
     }
+  },
+  "premise": {
+    "title": "前提",
+    "destination": "研究命题「{{title}}」",
+    "proposals": "前提提案",
+    "empty": "这个命题目前没有前提提案。",
+    "propose": "提出前提",
+    "wording": "用自然语言写下前提",
+    "question": "需要审阅的问题",
+    "impact": "这个前提会怎样影响当前命题？",
+    "hold": "保存提案后，命题将等待范围审阅，证明工作会暂挂。",
+    "back": "返回前提提案",
+    "save": "保存前提提案",
+    "saved": "前提提案已保存。可以在这里或通过图谱中的节点审阅。",
+    "review": "审阅前提",
+    "details": "查看决定",
+    "target": "已冻结的目标",
+    "basis": "当前起始依据",
+    "noBasis": "这个命题没有起始假设或其他起始依据。",
+    "reviseHint": "采用前提会保留同一个目标，并以扩充后的依据创建修订命题。开始证明前，请先审阅新的 Lean 陈述。",
+    "reject": "驳回前提",
+    "revise": "采用并创建修订命题",
+    "rejected": "已驳回前提，沿用现有依据。",
+    "revised": "修订命题已创建。",
+    "openRevised": "前往修订命题",
+    "states": {
+      "pending": "待审阅",
+      "rejected": "已驳回",
+      "revised": "已在修订命题中采用",
+      "resolved": "已解决",
+      "revision_pending": "修订范围待确认"
+    },
+    "invalid": "请完整填写具体的前提和审阅信息。",
+    "unavailable": "此命题当前无法审阅前提。",
+    "identity": "请使用此项目绑定的本机研究者身份审阅前提。",
+    "stale": "前提或证明范围已变化。请重新打开「前提」查看当前状态。",
+    "duplicate": "这个前提与当前目标或一个已有假设相同。",
+    "conflicts": "请先解决此命题的其他待审问题，再创建修订命题。"
   },
   "lemmaPlan": {
     "title": "本地引理",
