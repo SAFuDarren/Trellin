@@ -72,6 +72,10 @@ research-multiplier goal select CONJECTURE_ID --hash CONJECTURE_SHA \
   --actor Researcher --reason "Checked the intended statement and exact formalization"
 ```
 
+## Find related work in the project
+
+Open **Review** and choose an approved Lean frame under **Open research goals** before preparing candidates, or open a frame under **Conjectures to compare** to continue review. Use **Related work** to search for a term, a title or an exact identifier in the current project. Results show the kind, recorded status and identifier for matching sources, claims, admitted basis versions and past attempts. Use each match as a lead and review it through the existing basis approval process before using it in a conjecture.
+
 ## Reopen a prepared conjecture in Workbench
 
 Open **Review** and choose a **Conjectures to compare** for a confirmed Lean goal. The panel shows the goal, approved basis with its exact versions, formal statements and recorded sources, and any saved discussion. Prepared candidates show their exact formal statements. A saved discussion can be read locally.

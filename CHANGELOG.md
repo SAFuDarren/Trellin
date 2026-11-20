@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.40
+
+- Reopen approved research questions and look up related work in the current project before preparing conjectures.
+
 ## 1.0.39
 
 - Make the intake response format explicit so connected models can produce reviewable drafts.

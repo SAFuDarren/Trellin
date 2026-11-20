@@ -162,6 +162,8 @@
     "waiting": "Waiting for you · {{count}}",
     "none": "Nothing is waiting.",
     "allDone": "You're all caught up. New items appear here when a check or question needs you.",
+    "openGoals": "Open research goals",
+    "chooseOpenGoal": "Choose an open research goal to review its basis and search related work.",
     "kinds": {
       "review_evidence": "Verified result to review",
       "counterexample": "Counterexample to review",
@@ -194,6 +196,7 @@
       "restricted": "Restricted research"
     },
     "status": {
+      "open": "Awaiting prepared conjectures",
       "ready": "Ready for your decision",
       "stale": "The starting basis has changed",
       "blocked": "Resolve the open scope question",
@@ -210,6 +213,33 @@
     "version": "Version {{version}}",
     "recordedVersion": "Exact version ID and digest",
     "digest": "Digest",
+    "related": {
+      "title": "Related work",
+      "help": "Search records in this workspace. Use matches as leads for review.",
+      "query": "Title, identifier, or statement",
+      "search": "Search local records",
+      "searching": "Searching local records…",
+      "results": "Related work results",
+      "empty": "No local records match this search.",
+      "failed": "Could not search local records. Try again.",
+      "category": "Record type",
+      "recordedStatus": "Recorded status",
+      "identifier": "Identifier",
+      "openClaim": "Open linked claim",
+      "openLibrary": "Open Library version",
+      "kind": {
+        "source": "Literature source",
+        "claim": "Workspace claim",
+        "basis": "Admitted Library item",
+        "failure": "Prior attempt"
+      },
+      "state": {
+        "unconfirmed": "Unconfirmed",
+        "retired": "Withdrawn",
+        "admitted": "Admitted",
+        "no_result": "No result"
+      }
+    },
     "discussion": "Archived discussion",
     "discussionHelp": "These are ideas to compare. Choose among the prepared conjectures below.",
     "discussionBasis": "Basis cited in this idea",

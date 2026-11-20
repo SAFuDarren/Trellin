@@ -234,6 +234,114 @@ describe("App", () => {
     ]);
   });
 
+  it("finds local related work from an approved open goal without changing the waiting count", async () => {
+    const first = { id: "55555555-5555-4555-8555-555555555555", title: "First open research goal" };
+    const second = { id: "66666666-6666-4666-8666-666666666666", title: "Second open research goal" };
+    const basis = "77777777-7777-4777-8777-777777777777";
+    const source = "88888888-8888-4888-8888-888888888888";
+    const needle = "doi:10.9999/fixture";
+    const matches = [
+      {
+        kind: "source",
+        id: source,
+        claim_id: CLAIM,
+        exact_key: needle,
+        title: "Recorded source",
+        state: "unconfirmed",
+      },
+      {
+        kind: "basis",
+        id: basis,
+        claim_id: null,
+        exact_key: "fixture.eq",
+        title: "Admitted equality",
+        state: "admitted",
+      },
+    ];
+    const searches: { params: unknown; signal: AbortSignal | null | undefined }[] = [];
+    let completeLate: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string, init?: RequestInit) => {
+        if (path === "/api/inbox") return Response.json({ items: [], open_research_goals: [first, second] });
+        if (path.startsWith("/api/goal-review?goal=")) {
+          const frame = [first, second].find((item) => path.endsWith(item.id));
+          if (frame)
+            return Response.json({
+              goal_id: frame.id,
+              title: frame.title,
+              objective: "Use the approved frame to explore simple examples.",
+              domain: "lean-core",
+              sensitivity: "restricted",
+              frame_sha256: "a".repeat(64),
+              status: "ready",
+              claim_id: null,
+              basis: [],
+              discussion: { state: "none", alternatives: [] },
+              candidates: [],
+            });
+        }
+        if (path === "/api/goal-review/related") {
+          expect(init?.method).toBe("POST");
+          const params = JSON.parse(String(init?.body));
+          searches.push({ params, signal: init?.signal });
+          if (params.query === needle) return Response.json({ matches });
+          if (params.query === "nothing") return Response.json({ matches: [] });
+          if (params.query === "failed") return Response.json({ error: "fixture-error" }, { status: 503 });
+          return await new Promise<Response>((resolve) => {
+            completeLate = resolve;
+          });
+        }
+        if (path === "/api/library") return Response.json({ items: [{ id: basis }] });
+        return Response.json(responses[path.split("?")[0]!] ?? {});
+      }),
+    );
+    window.history.replaceState(null, "", "#review");
+    renderApp("token");
+    const goalLink = await screen.findByRole("link", { name: first.title });
+    expect(goalLink).toHaveProperty("hash", `#review/goal%3A${first.id}`);
+    expect(screen.getByText(en.review.openGoals)).toBeTruthy();
+    expect(screen.getByText(en.review.waiting.replace("{{count}}", "0"))).toBeTruthy();
+    expect(searches).toHaveLength(0);
+    fireEvent.click(goalLink);
+    expect(await screen.findByRole("heading", { name: first.title })).toBeTruthy();
+    expect(screen.getByText(en.goalReview.status.open)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: en.goalReview.confirm })).toBeNull();
+
+    function search(query: string) {
+      const field = screen.getByRole("searchbox", { name: en.goalReview.related.query });
+      fireEvent.change(field, { target: { value: query } });
+      fireEvent.click(screen.getByRole("button", { name: en.goalReview.related.search }));
+    }
+    search(" " + needle + " ");
+    const results = await screen.findByRole("list", { name: en.goalReview.related.results });
+    expect(within(results).getByText(needle)).toBeTruthy();
+    expect(within(results).getByText(en.goalReview.related.kind.source)).toBeTruthy();
+    expect(within(results).getByText(en.goalReview.related.state.unconfirmed)).toBeTruthy();
+    expect(within(results).getByText(en.goalReview.related.kind.basis)).toBeTruthy();
+    expect(within(results).getByRole("button", { name: en.goalReview.related.openClaim })).toBeTruthy();
+    expect(await within(results).findByRole("link", { name: en.goalReview.related.openLibrary })).toHaveProperty(
+      "hash",
+      `#library/~${basis}`,
+    );
+    expect(searches[0]?.params).toEqual({ goal_id: first.id, query: needle });
+    expect(window.location.hash).toBe(`#review/goal%3A${first.id}`);
+
+    search("nothing");
+    expect(await screen.findByText(en.goalReview.related.empty)).toBeTruthy();
+    search("failed");
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", en.goalReview.related.failed);
+    search("delayed result");
+    expect(screen.getByText(en.goalReview.related.searching)).toBeTruthy();
+    expect(completeLate).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: second.title }));
+    expect(await screen.findByRole("heading", { name: second.title })).toBeTruthy();
+    expect(searches[3]?.signal?.aborted).toBe(true);
+    await act(async () => completeLate!(Response.json({ matches })));
+    expect(screen.queryByText("Recorded source")).toBeNull();
+    expect(screen.getByRole("searchbox", { name: en.goalReview.related.query })).toHaveProperty("value", "");
+  });
+
   it("reopens a stale goal review by its saved link after it leaves the inbox", async () => {
     const goal = "55555555-5555-4555-8555-555555555555";
     const goalReview = {

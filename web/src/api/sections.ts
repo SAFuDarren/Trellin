@@ -139,6 +139,7 @@ export function useInbox(session: string, streamHealthy = false) {
     queryFn: ({ signal }) =>
       api<{
         items: InboxItem[];
+        open_research_goals?: { id: string; title: string }[];
         review_identity?: { workspace_id: string };
         clarification_review?: {
           workspace_id: string;
@@ -148,9 +149,10 @@ export function useInbox(session: string, streamHealthy = false) {
       }>(session, "/api/inbox", { signal }),
   });
 }
-export function useLibrary(session: string) {
+export function useLibrary(session: string, enabled = true) {
   return useQuery({
     queryKey: ["library"],
+    enabled,
     queryFn: ({ signal }) => api<{ items: LibraryItem[] }>(session, "/api/library", { signal }),
   });
 }

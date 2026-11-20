@@ -1,10 +1,10 @@
-"""Resume and select an already prepared conjecture in a local workbench."""
+"""Review a confirmed research goal and its conjectures in the local workbench."""
 
 import re
 from uuid import UUID
 
 from research_multiplier.storage.postgres import DatabaseOperationError
-from research_multiplier.workflows import goal_suggestions
+from research_multiplier.workflows import goal_suggestions, literature
 
 
 class GoalReviewError(ValueError):
@@ -40,6 +40,36 @@ def _frame(store, goal_id):
     if not frame["approved_at"] or frame["body"]["domain"] != "lean-core":
         raise GoalReviewError("goalReview.unavailable")
     return frame
+
+
+def open_goals(store):
+    """List approved Lean goals that have no candidate in the Review inbox yet."""
+    return store.query("human", """
+        SELECT g.id, g.body ->> 'title' AS title
+        FROM rm.research_goal_status g
+        WHERE g.approved_at IS NOT NULL AND g.conjecture_id IS NULL AND g.body ->> 'domain' = 'lean-core'
+          AND NOT EXISTS (SELECT FROM rm.research_conjectures c WHERE c.goal_id = g.id)
+        ORDER BY g.approved_at DESC, g.id
+        LIMIT 200
+    """)
+
+
+def related(store, document):
+    """Find local records for the researcher to compare with an approved goal."""
+    if not isinstance(document, dict) or document.keys() != {"goal_id", "query"}:
+        raise GoalReviewError("goalReview.invalid")
+    goal, query = document["goal_id"], document["query"]
+    if (not isinstance(goal, str) or not isinstance(query, str)
+            or not query.strip() or len(query) > 300 or "\0" in query):
+        raise GoalReviewError("goalReview.invalid")
+    try:
+        goal_id = UUID(goal)
+        query.encode("utf-8")
+    except ValueError:
+        raise GoalReviewError("goalReview.invalid") from None
+    _researcher(store)
+    _frame(store, goal_id)
+    return {"matches": literature.find(store, query.strip(), limit=12)}
 
 
 def _basis(store, frame):

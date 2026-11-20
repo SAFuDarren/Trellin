@@ -162,6 +162,8 @@
     "waiting": "等你处理 · {{count}}",
     "none": "没有待处理的事项。",
     "allDone": "都处理完了。有需要你确认的核验或问题时，会出现在这里。",
+    "openGoals": "开放研究目标",
+    "chooseOpenGoal": "选择一个开放研究目标，核对起始依据并查找相关工作。",
     "kinds": {
       "review_evidence": "待审阅的核验结果",
       "counterexample": "待审阅的反例",
@@ -194,6 +196,7 @@
       "restricted": "受限研究"
     },
     "status": {
+      "open": "等待已准备的猜想",
       "ready": "待你决定",
       "stale": "起始依据已变化",
       "blocked": "待解决范围问题",
@@ -210,6 +213,33 @@
     "version": "版本 {{version}}",
     "recordedVersion": "精确版本标识与摘要",
     "digest": "摘要",
+    "related": {
+      "title": "相关工作",
+      "help": "搜索此工作区的记录。匹配结果可作为待核对的线索。",
+      "query": "标题、标识或陈述",
+      "search": "搜索本地记录",
+      "searching": "正在搜索本地记录…",
+      "results": "相关工作搜索结果",
+      "empty": "没有找到匹配的本地记录。",
+      "failed": "未能搜索本地记录，请重试。",
+      "category": "记录类型",
+      "recordedStatus": "记录状态",
+      "identifier": "标识",
+      "openClaim": "打开关联课题",
+      "openLibrary": "打开库内版本",
+      "kind": {
+        "source": "文献来源",
+        "claim": "工作区课题",
+        "basis": "已采纳入库条目",
+        "failure": "过往尝试"
+      },
+      "state": {
+        "unconfirmed": "未确认",
+        "retired": "已撤回",
+        "admitted": "已采纳",
+        "no_result": "无结果"
+      }
+    },
     "discussion": "已归档的讨论",
     "discussionHelp": "这些是供比较的想法。请从下方已形式化的猜想中选择。",
     "discussionBasis": "此想法引用的依据",
