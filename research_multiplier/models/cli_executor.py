@@ -193,6 +193,8 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
             if provider == "claude-code" and workbench:
                 command = _isolated_claude_command(command, environment, directory)
                 environment["TMPDIR"] = directory
+                # Claude's own temporary files use this setting rather than TMPDIR on macOS.
+                environment["CLAUDE_CODE_TMPDIR"] = directory
             remaining = deadline - monotonic()
             if remaining <= 0:
                 raise TimeoutError

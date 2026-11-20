@@ -235,6 +235,7 @@ def test_native_failures_show_actionable_codes_without_process_output(provider, 
 def test_native_default_leaves_model_selection_to_the_registered_cli(provider, monkeypatch):
     commands = []
     guard_calls = []
+    environments = []
 
     def isolate(command, environment):
         guard_calls.append(command)
@@ -244,6 +245,7 @@ def test_native_default_leaves_model_selection_to_the_registered_cli(provider, m
         if command[-1] == "--version":
             return CompletedProcess(command, 0, "fixture version", "")
         commands.append(command)
+        environments.append((options["env"], options["cwd"]))
         if provider == "codex-cli":
             response = "\n".join(map(json.dumps, [
                 {"type": "item.completed", "item": {"type": "agent_message", "text": "fixture"}},
@@ -267,6 +269,12 @@ def test_native_default_leaves_model_selection_to_the_registered_cli(provider, m
     assert legacy[legacy.index("--model") + 1] == cli_executor.NATIVE_DEFAULT_MODEL
     assert reply["model"] == "actual-model" and reply["model_id_reported"]
     assert guard_calls == [native, explicitly_selected]
+    for environment, directory in environments[:2]:
+        if provider == "claude-code":
+            assert environment["CLAUDE_CODE_TMPDIR"] == environment["TMPDIR"] == directory
+        else:
+            assert "CLAUDE_CODE_TMPDIR" not in environment
+    assert "CLAUDE_CODE_TMPDIR" not in environments[2][0]
 
 
 def test_registered_claude_confines_user_files_and_the_selected_workspace(tmp_path, monkeypatch):
