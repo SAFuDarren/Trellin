@@ -5,7 +5,7 @@ import { activityNode, type Graph } from "../workbench/graph";
 import { isCodex, modelName, nodeTitle } from "../workbench/text";
 import type { ActivityRecord, ActivitySnapshot } from "../workbench/types";
 import { FeedEntry } from "./FeedEntry";
-import { Spin } from "./Icons";
+import { SendArrow, Spin } from "./Icons";
 import { WorkbenchConversations } from "./WorkbenchConversations";
 
 type Draft = {
@@ -349,14 +349,7 @@ function Composer({
             draft?.sending ? t("composer.sending") : confirming ? t("composer.confirmLabel") : t("composer.send")
           }
         >
-          {confirming ? (
-            t("composer.confirm")
-          ) : (
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 19V5" />
-              <path d="m5 12 7-7 7 7" />
-            </svg>
-          )}
+          {confirming ? t("composer.confirm") : <SendArrow />}
         </button>
       </div>
       <p

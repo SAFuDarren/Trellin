@@ -56,16 +56,17 @@ existing authorized views.
 
 The workbench has four areas. The left column lists the project's claims by domain, with a search field. The centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **If withdrawn**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser; **Settings** can reset them. The interface is in English by default; choose **简体中文** in **Settings** to switch to Chinese, and the choice is remembered too. The map can be dragged by its title and resized from its corner.
 
-Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. The small **Global position** map in the corner shows the recorded nodes of recent claims, with a dashed circle at the current claim.
+Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. Drag the corner of a node to adjust its width and height. With that handle focused, the arrow keys resize the node. The small **Global position** map in the corner shows the recorded nodes of recent claims, with a dashed circle at the current claim.
 
 ## Work with the models
 
 With database revision `0079`, use **Chats** to start a workspace discussion
 before creating a claim. In **Workbench**, select a claim or node and open
 **Conversation**. Choose an available on-device model or a connection you
-added in Team. Every external send asks separately about the recipient, your
-message, the included recent turns, and any selected node excerpt. Project
-files are outside that payload. A cancelled or stale preview sends nothing.
+added in Team. The composer identifies the external recipient and the recent
+turns and selected node excerpt that may be included. Expand the request
+details to inspect the exact contents. The send button authorizes and submits
+that request in one step. Project files are outside that payload.
 The conversation and attribution are saved with the project. Removing a
 conversation hides it from the active list and preserves its history.
 

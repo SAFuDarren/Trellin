@@ -18,6 +18,7 @@ import {
 import { useLocalTextModels } from "../api/localModels";
 import { href } from "../shell/route";
 import { timeText } from "../workbench/text";
+import { SendArrow, Spin } from "./Icons";
 
 export function ConversationPanel({
   session,
@@ -37,13 +38,16 @@ export function ConversationPanel({
     ...(local.data?.models ?? []).map((name) => ({
       id: "local:" + name,
       label: t("conversations.localModel", { name }),
+      provider: "ollama-native",
+      model: name + ":local",
+      fingerprint: null,
       local: true,
     })),
     ...(models.data?.connections ?? []).filter(dispatchableConnection).map((connection) => {
       const choice = connectionChoiceLabel(t, connection);
       const model = connectionModelLabel(t, connection);
       const label = choice.endsWith(" · " + model) ? choice : choice + " · " + model;
-      return { id: connection.id, label, local: false };
+      return { ...connection, label, local: false };
     }),
   ];
   const [selected, setSelected] = useState("");
@@ -51,15 +55,28 @@ export function ConversationPanel({
   const [pending, setPending] = useState<"preview" | "send" | "archive" | null>(null);
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState(false);
-  const [approval, setApproval] = useState<{ request: ConversationRequest; preview: ConversationPreview } | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [prepared, setPrepared] = useState<{ scope: string; preview: ConversationPreview } | null>(null);
   const request = useRef<ConversationRequest | null>(null);
   const busy = useRef(false);
+  const currentScope = useRef<string | null>(null);
   const formId = useId();
   const feed = useRef<HTMLOListElement>(null);
   const messages = detail.data?.thread.messages ?? [];
   const running = detail.data?.thread.running ?? thread.running;
   const connection = options.find((option) => option.id === selected);
-  const disabled = Boolean(pending || running || approval || removing);
+  const disabled = Boolean(pending || running || removing);
+  const canPrepare = Boolean(!disabled && !detail.isError && detail.data && connection && text.trim());
+  const scope = JSON.stringify([thread.id, detail.data?.thread.revision, connection?.id, connection?.fingerprint]);
+  const details = prepared?.scope === scope ? prepared.preview : null;
+  const hasHistory = messages.some((message) => message.role === "assistant");
+
+  useLayoutEffect(() => {
+    currentScope.current = scope;
+    return () => {
+      currentScope.current = null;
+    };
+  }, [scope]);
 
   useLayoutEffect(() => {
     if (feed.current) feed.current.scrollTop = feed.current.scrollHeight;
@@ -69,35 +86,52 @@ export function ConversationPanel({
     return t(`errors.${code}`, { defaultValue: t("conversations.failed") });
   }
 
-  async function post(next: ConversationRequest, token: string, external: boolean) {
-    setPending("send");
-    await actions.send(next, token, external);
-    setText("");
+  function changeDraft() {
     request.current = null;
+    setPrepared(null);
+    setError("");
   }
 
-  async function review(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!connection || !text.trim() || disabled || busy.current) return;
+  async function prepare(send: boolean) {
+    if (!canPrepare || !connection || busy.current) return;
+    if (send && prepared && !details) {
+      setPrepared(null);
+      setError(t("errors.conversation.stale"));
+      return;
+    }
+    const textToSend = text.trim();
     const previous = request.current;
     const body =
-      previous?.text === text.trim() && previous.connection_id === selected
+      previous?.text === textToSend && previous.connection_id === connection.id
         ? previous
-        : { thread_id: thread.id, connection_id: selected, text: text.trim(), request_id: crypto.randomUUID() };
+        : { thread_id: thread.id, connection_id: connection.id, text: textToSend, request_id: crypto.randomUUID() };
     request.current = body;
     busy.current = true;
     setError("");
-    setPending("preview");
+    setPending(send ? "send" : "preview");
     try {
-      const preview = await actions.preview(body);
-      if (preview.external) {
-        setApproval({ request: body, preview });
-      } else if (preview.external === false && connection.local) {
-        await post(body, preview.token, false);
+      const preview = details ?? (await actions.preview(body));
+      if (currentScope.current === null) return;
+      if (
+        currentScope.current !== scope ||
+        preview.external !== !connection.local ||
+        preview.provider !== connection.provider ||
+        preview.model !== connection.model
+      ) {
+        setPrepared(null);
+        setError(t("errors.conversation.stale"));
+        return;
+      }
+      if (send) {
+        await actions.send(body, preview.token, preview.external);
+        setText("");
+        changeDraft();
+        setShowDetails(false);
       } else {
-        setError(t("conversations.failed"));
+        setPrepared({ scope, preview });
       }
     } catch (cause) {
+      setPrepared(null);
       setError(conversationErrorText(t, cause));
     } finally {
       busy.current = false;
@@ -105,19 +139,9 @@ export function ConversationPanel({
     }
   }
 
-  async function confirm() {
-    if (!approval || running || busy.current) return;
-    busy.current = true;
-    setError("");
-    try {
-      await post(approval.request, approval.preview.token, true);
-    } catch (cause) {
-      setError(conversationErrorText(t, cause));
-    } finally {
-      setApproval(null);
-      setPending(null);
-      busy.current = false;
-    }
+  function send(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void prepare(true);
   }
 
   async function archive() {
@@ -173,7 +197,7 @@ export function ConversationPanel({
           ))}
         </ol>
       )}
-      <form className="composer" onSubmit={(event) => void review(event)}>
+      <form className="composer direct-composer" onSubmit={send}>
         <label className="sr-only" htmlFor={formId + "-text"}>
           {t("conversations.message")}
         </label>
@@ -186,45 +210,43 @@ export function ConversationPanel({
           placeholder={t("conversations.message")}
           onChange={(event) => {
             setText(event.target.value);
-            request.current = null;
-            setError("");
+            changeDraft();
           }}
         />
         <div className="composer-row">
           <label className="sr-only" htmlFor={formId + "-model"}>
             {t("conversations.model")}
           </label>
-          <select
-            id={formId + "-model"}
-            value={connection?.id ?? ""}
-            disabled={disabled || !options.length}
-            onChange={(event) => {
-              setSelected(event.target.value);
-              request.current = null;
-              setError("");
-            }}
-          >
-            <option value="">{t("conversations.chooseModel")}</option>
-            {options.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <span className="conversation-model-picker">
+            <select
+              id={formId + "-model"}
+              value={connection?.id ?? ""}
+              disabled={disabled || !options.length}
+              onChange={(event) => {
+                setSelected(event.target.value);
+                changeDraft();
+              }}
+            >
+              <option value="">{t("conversations.chooseModel")}</option>
+              {options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </span>
           {!models.isPending && !local.isPending && !options.length && (
             <a href={href("team", "runtimes")}>{t("conversations.connect")}</a>
           )}
           <button
             type="submit"
-            className="button primary"
-            disabled={disabled || !detail.data || !connection || !text.trim()}
+            className="send"
+            disabled={!canPrepare}
+            aria-label={t(pending === "send" || running ? "conversations.working" : "conversations.send")}
+            title={t("conversations.send")}
+            aria-describedby={formId + "-scope"}
           >
-            {pending === "preview" || pending === "send" || running
-              ? t("conversations.working")
-              : t("conversations.send")}
-          </button>
-          <button type="button" className="button" disabled={disabled} onClick={() => setRemoving(true)}>
-            {t("conversations.remove")}
+            {pending === "send" || running ? <Spin /> : <SendArrow />}
           </button>
         </div>
         {models.isError && <p role="alert">{t("modelConnections.failed")}</p>}
@@ -234,19 +256,54 @@ export function ConversationPanel({
           </p>
         )}
       </form>
-      {approval && (
-        <Confirmation
-          title={t("conversations.reviewTitle")}
-          confirmLabel={t("conversations.confirmSend")}
-          pending={Boolean(pending)}
-          blocked={running}
-          onCancel={() => setApproval(null)}
-          onConfirm={() => void confirm()}
-        >
-          <p>{recipient(approval.preview.provider, approval.preview.model)}</p>
-          <pre tabIndex={0}>{approval.preview.outgoing}</pre>
-        </Confirmation>
-      )}
+      <div className="conversation-context">
+        <p id={formId + "-scope"}>
+          {[
+            connection && t(connection.local ? "conversations.onDevice" : "conversations.external"),
+            thread.node_id && t("conversations.includesNode"),
+            hasHistory && t("conversations.includesRecent"),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        <div className="conversation-secondary">
+          <button
+            type="button"
+            className="conversation-text-action"
+            aria-expanded={showDetails}
+            aria-controls={formId + "-request"}
+            onClick={() => {
+              setShowDetails(!showDetails);
+              if (!showDetails && !details) void prepare(false);
+            }}
+          >
+            {t("conversations.requestDetails")}
+          </button>
+          <button
+            type="button"
+            className="conversation-text-action"
+            disabled={disabled}
+            onClick={() => setRemoving(true)}
+          >
+            {t("conversations.remove")}
+          </button>
+        </div>
+      </div>
+      <div className="conversation-request" id={formId + "-request"} hidden={!showDetails}>
+        {details ? (
+          <pre tabIndex={0} aria-label={t("conversations.requestDetails")}>
+            {details.outgoing}
+          </pre>
+        ) : pending === "preview" ? (
+          <p role="status">{t("common.loading")}</p>
+        ) : canPrepare ? (
+          <button type="button" className="conversation-text-action" onClick={() => void prepare(false)}>
+            {t("conversations.previewRequest")}
+          </button>
+        ) : (
+          <p>{t("conversations.previewHint")}</p>
+        )}
+      </div>
       {removing && (
         <Confirmation
           title={t("conversations.remove")}

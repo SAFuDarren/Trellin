@@ -62,6 +62,8 @@
     "none": "Nothing relies on this version right now."
   },
   "stage": {
+    "resizeNode": "Resize node {{title}}",
+    "resizeHelp": "Drag to resize. Arrow keys adjust width or height. Hold Shift for larger steps.",
     "label": "Dependency graph. Drag to pan; pinch or hold Ctrl while scrolling to zoom; plus and minus zoom; 0 fits the window.",
     "roleDescription": "zoomable canvas",
     "zoom": "Zoom",
@@ -426,6 +428,7 @@
     "chat": "Drag to resize the conversation"
   },
   "common": {
+    "cancel": "Cancel",
     "loading": "Loading…",
     "openInWorkbench": "Open in workbench"
   },
@@ -542,12 +545,17 @@
     "send": "Send message",
     "working": "Working…",
     "you": "You",
-    "reviewTitle": "Review what will be sent",
-    "confirmSend": "Confirm and send",
     "remove": "Remove conversation",
     "removeHint": "Remove this conversation from the list? Any linked proof and its records will be kept.",
     "confirmRemove": "Confirm removal",
-    "failed": "The conversation request did not complete. Check the connection and try again."
+    "failed": "The conversation request did not complete. Check the connection and try again.",
+    "onDevice": "On this device",
+    "external": "External model",
+    "includesNode": "Includes selected node",
+    "includesRecent": "May include recent turns",
+    "requestDetails": "Request details",
+    "previewRequest": "Load request details",
+    "previewHint": "Choose a model and enter a message to view the request."
   },
   "threads": {
     "active": "Working now",

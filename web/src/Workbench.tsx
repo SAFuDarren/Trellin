@@ -17,6 +17,7 @@ import type { ActivitySnapshot, Atlas, GraphSnapshot, ImpactPreview } from "./wo
 import { clampSize, useLayout } from "./workbench/useLayout";
 
 const ACTIVITY_MS = 4000;
+const NO_CARD_SIZES = {};
 
 function errorText(t: TFunction, error: unknown): string {
   if (!(error instanceof Error)) return String(error);
@@ -339,6 +340,8 @@ export function Workbench({
               atlasOpen={sizes.atlasOpen}
               atlasBox={sizes.atlas}
               onAtlasBox={(box, persist) => layout.update({ atlas: box }, persist)}
+              cardSizes={sizes.cards[`${claimId}:${view}`] ?? NO_CARD_SIZES}
+              onResizeCard={(id, size) => layout.resizeCard(`${claimId}:${view}`, id, size)}
               onSelect={selectNode}
               onView={changeView}
             />

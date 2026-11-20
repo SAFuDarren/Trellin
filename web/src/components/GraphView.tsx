@@ -2,22 +2,45 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useTranslation } from "react-i18next";
 import {
   CARD,
+  clampCardSize,
   highlights,
   impactItems,
   impactLineKey,
   layoutGraph,
   workLabel,
+  type CardSize,
   type Graph,
+  type Layout,
+  type Point,
   type NodeWork,
   type View,
 } from "../workbench/graph";
 import { atlasShape, ATLAS_COLOURS } from "../workbench/atlas";
 import { kindText, nodeStatus, nodeSub, nodeTitle, nodeTone, summarize, type Tone } from "../workbench/text";
 import type { AtlasClaim, ImpactPreview } from "../workbench/types";
-import type { AtlasBox } from "../workbench/useLayout";
+import type { AtlasBox, CardSizes } from "../workbench/useLayout";
 import { Clock, Mark, Spin } from "./Icons";
 
 type Camera = { x: number; y: number; k: number };
+type ResizePreview = { id: string; anchor: Point; size: CardSize };
+type ResizeDrag = ResizePreview & { pointerId: number; x: number; y: number; zoom: number };
+
+function anchoredCamera(camera: Camera, layout: Layout, id: string, anchor: Point): Camera {
+  const point = layout.points.get(id);
+  if (!point) return camera;
+  return {
+    ...camera,
+    x: camera.x + (anchor.x - point.x) * camera.k,
+    y: camera.y + (anchor.y - point.y) * camera.k,
+  };
+}
+
+function dragSize(drag: ResizeDrag, event: React.PointerEvent): CardSize {
+  return clampCardSize({
+    width: drag.size.width + (event.clientX - drag.x) / drag.zoom,
+    height: drag.size.height + (event.clientY - drag.y) / drag.zoom,
+  });
+}
 
 type Props = {
   graph: Graph;
@@ -33,6 +56,8 @@ type Props = {
   atlasOpen: boolean;
   atlasBox: AtlasBox | null;
   onAtlasBox: (box: AtlasBox, persist: boolean) => void;
+  cardSizes: CardSizes;
+  onResizeCard: (id: string, size: CardSize) => void;
   onSelect: (id: string) => void;
   onView: (view: View) => void;
 };
@@ -43,6 +68,8 @@ export function GraphView(props: Props) {
   const stage = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<string, HTMLButtonElement>());
   const [heights, setHeights] = useState(new Map<string, number>());
+  const drag = useRef<ResizeDrag | null>(null);
+  const [resizing, setResizing] = useState<ResizePreview | null>(null);
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const moved = useRef(false);
@@ -53,16 +80,34 @@ export function GraphView(props: Props) {
     () => highlights(graph, view, selected, assumption, affected),
     [graph, view, selected, assumption, affected],
   );
-  const layout = useMemo(() => layoutGraph(graph, heights), [graph, heights]);
+  const sizes = useMemo(
+    () =>
+      new Map(
+        graph.order.map((id) => [
+          id,
+          props.cardSizes[id] ?? {
+            width: CARD.width,
+            height: heights.get(id) ?? CARD.height,
+          },
+        ]),
+      ),
+    [graph.order, props.cardSizes, heights],
+  );
+  const layout = useMemo(
+    () => layoutGraph(graph, resizing ? new Map(sizes).set(resizing.id, resizing.size) : sizes),
+    [graph, sizes, resizing],
+  );
+  const positioned = resizing ? anchoredCamera(camera, layout, resizing.id, resizing.anchor) : camera;
 
   // Card heights decide where edges meet them; measure after every render that may change a card.
   // Runs after every render on purpose; it only sets state when a height actually changed.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
+    if (resizing) return;
     const next = new Map<string, number>();
     let changed = false;
     for (const id of graph.order) {
-      const height = cards.current.get(id)?.offsetHeight || 72;
+      const height = cards.current.get(id)?.offsetHeight || CARD.height;
       next.set(id, height);
       if (heights.get(id) !== height) changed = true;
     }
@@ -122,6 +167,7 @@ export function GraphView(props: Props) {
     if (!element) return;
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
+      if (drag.current) return;
       if (event.ctrlKey || event.metaKey) {
         const bounds = element.getBoundingClientRect();
         const factor = Math.exp(-event.deltaY * 0.01);
@@ -146,12 +192,13 @@ export function GraphView(props: Props) {
     if (!selected) return;
     const point = layout.points.get(selected);
     const { width, height } = stageSize;
-    if (!point || !width || !height) return;
+    const size = sizes.get(selected);
+    if (!point || !size || !width || !height) return;
     setCamera((current) => {
       const left = current.x + point.x * current.k;
       const top = current.y + point.y * current.k;
-      const right = left + CARD.width * current.k;
-      const bottom = top + (heights.get(selected) ?? 72) * current.k;
+      const right = left + size.width * current.k;
+      const bottom = top + size.height * current.k;
       if (left >= 0 && top >= 0 && right <= width && bottom <= height) return current;
       return {
         ...current,
@@ -162,6 +209,53 @@ export function GraphView(props: Props) {
     // Only react to a new selection, not to every layout change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
+
+  const commitResize = (id: string, size: CardSize, anchor: Point) => {
+    const original = sizes.get(id);
+    if (!original || (original.width === size.width && original.height === size.height)) return;
+    const next = layoutGraph(graph, new Map(sizes).set(id, size));
+    moved.current = true;
+    setCamera((current) => anchoredCamera(current, next, id, anchor));
+    props.onResizeCard(id, size);
+  };
+  const startResize = (event: React.PointerEvent<HTMLButtonElement>, id: string) => {
+    if (event.button !== 0 || drag.current) return;
+    const anchor = layout.points.get(id);
+    const size = sizes.get(id);
+    if (!anchor || !size) return;
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { id, size, anchor, pointerId: event.pointerId, x: event.clientX, y: event.clientY, zoom: camera.k };
+  };
+  const moveResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const active = drag.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    moved.current = true;
+    setResizing({ id: active.id, anchor: active.anchor, size: dragSize(active, event) });
+  };
+  const finishResize = (event: React.PointerEvent<HTMLButtonElement>, save: boolean) => {
+    const active = drag.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    drag.current = null;
+    setResizing(null);
+    if (save) commitResize(active.id, dragSize(active, event), active.anchor);
+  };
+  const resizeByKey = (event: React.KeyboardEvent<HTMLButtonElement>, id: string) => {
+    const step = event.shiftKey ? 36 : 12;
+    const delta = (
+      {
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        ArrowDown: [0, step],
+      } as Record<string, [number, number]>
+    )[event.key];
+    const anchor = layout.points.get(id);
+    const size = sizes.get(id);
+    if (!delta || !anchor || !size || drag.current) return;
+    event.preventDefault();
+    commitResize(id, clampCardSize({ width: size.width + delta[0], height: size.height + delta[1] }), anchor);
+  };
 
   const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as Element).closest("button, a, select, input, textarea, figure, .zoom"))
@@ -225,7 +319,7 @@ export function GraphView(props: Props) {
           style={{
             width: layout.width,
             height: layout.height,
-            transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.k})`,
+            transform: `translate(${positioned.x}px, ${positioned.y}px) scale(${positioned.k})`,
           }}
         >
           <svg className="graph-edges" aria-hidden="true" viewBox={`0 0 ${layout.width} ${layout.height}`}>
@@ -263,48 +357,76 @@ export function GraphView(props: Props) {
                       work: workLabel(nodeWork.queued, t("chat.listSeparator", { defaultValue: ", " })),
                     })
                   : "";
-              const sub = nodeSub(t, node);
-              const title = nodeTitle(t, node);
+              const title = nodeTitle(t, node, { full: true });
+              const sub = nodeSub(t, node, title);
+              const customSize = resizing?.id === id ? resizing.size : props.cardSizes[id];
+              const titleLines = customSize
+                ? Math.max(1, Math.floor((customSize.height - (running || queued ? 88 : 68)) / 18) + 1)
+                : 1;
               return (
-                <button
+                <div
                   key={id}
-                  ref={(element) => {
-                    if (element) cards.current.set(id, element);
-                    else cards.current.delete(id);
-                  }}
-                  type="button"
-                  className="graph-node"
-                  data-node={id}
-                  data-kind={node.kind}
-                  data-emphasis={!isImpact || lit.nodes.has(id) ? "strong" : "dim"}
-                  data-affected={String(isImpact && (Boolean(effect) || id === assumption))}
-                  data-working={String(Boolean(running))}
-                  aria-pressed={id === selected}
-                  aria-controls="node-detail"
-                  aria-label={[title, kindText(t, node.kind), caption, running || queued].filter(Boolean).join(", ")}
-                  title={title}
-                  style={{ "--x": `${point.x}px`, "--y": `${point.y}px` } as React.CSSProperties}
-                  onClick={() => props.onSelect(id)}
+                  className="graph-node-frame"
+                  style={{ left: point.x, top: point.y, width: customSize?.width ?? CARD.width }}
                 >
-                  <span className="node-head">
-                    <Mark tone={nodeTone(node, blocked)} shape={node.kind === "hypothesis" ? "square" : undefined} />
-                    <span className="node-title">{title}</span>
-                  </span>
-                  <span className="node-sub" data-math={String(sub.math)}>
-                    {sub.text}
-                  </span>
-                  <span className="node-caption">
-                    <span className="node-code">{graph.codes.get(id)}</span>
-                    {caption}
-                  </span>
-                  {(running || queued) && (
-                    <span className="work" data-state={running ? "running" : "queued"}>
-                      {running ? <Spin /> : <Clock />}
-                      <span className="work-text">{running ? runningNames : queued}</span>
-                      {running && runningCount > 1 && <span className="work-count">{"×" + runningCount}</span>}
+                  <button
+                    ref={(element) => {
+                      if (element) cards.current.set(id, element);
+                      else cards.current.delete(id);
+                    }}
+                    type="button"
+                    className="graph-node"
+                    data-node={id}
+                    data-kind={node.kind}
+                    data-emphasis={!isImpact || lit.nodes.has(id) ? "strong" : "dim"}
+                    data-affected={String(isImpact && (Boolean(effect) || id === assumption))}
+                    data-working={String(Boolean(running))}
+                    aria-pressed={id === selected}
+                    aria-controls="node-detail"
+                    aria-label={[title, kindText(t, node.kind), caption, running || queued].filter(Boolean).join(", ")}
+                    title={title}
+                    data-expanded-title={titleLines > 1 ? "true" : undefined}
+                    style={{ height: customSize?.height, "--title-lines": titleLines } as React.CSSProperties}
+                    onClick={() => props.onSelect(id)}
+                  >
+                    <span className="node-head">
+                      <Mark tone={nodeTone(node, blocked)} shape={node.kind === "hypothesis" ? "square" : undefined} />
+                      <span className="node-title">{title}</span>
                     </span>
-                  )}
-                </button>
+                    <span className="node-sub" data-math={String(sub.math)}>
+                      {sub.text}
+                    </span>
+                    <span className="node-caption">
+                      <span className="node-code">{graph.codes.get(id)}</span>
+                      {caption}
+                    </span>
+                    {(running || queued) && (
+                      <span className="work" data-state={running ? "running" : "queued"}>
+                        {running ? <Spin /> : <Clock />}
+                        <span className="work-text">{running ? runningNames : queued}</span>
+                        {running && runningCount > 1 && <span className="work-count">{"×" + runningCount}</span>}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="graph-node-resize"
+                    aria-label={t("stage.resizeNode", { title })}
+                    aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
+                    aria-description={t("stage.resizeHelp")}
+                    title={t("stage.resizeHelp")}
+                    onPointerDown={(event) => startResize(event, id)}
+                    onPointerMove={moveResize}
+                    onPointerUp={(event) => finishResize(event, true)}
+                    onPointerCancel={(event) => finishResize(event, false)}
+                    onLostPointerCapture={(event) => finishResize(event, false)}
+                    onKeyDown={(event) => resizeByKey(event, id)}
+                  >
+                    <svg viewBox="0 0 12 12" aria-hidden="true">
+                      <path d="M2 10 10 2M6 10l4-4" />
+                    </svg>
+                  </button>
+                </div>
               );
             })}
           </div>

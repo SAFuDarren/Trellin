@@ -4,10 +4,11 @@
 
 - Choose a specific Codex or Claude Code model in Team. Direct model conversations
   work in Chats before the first claim and in the graph beside the selected node.
-- Review the exact external conversation request before sending. Conversations
-  and replies stay with the workspace and resume when it reopens.
+- Send messages directly from a compact composer and inspect the exact model
+  request from the composer when needed. Reopen the workspace to resume a conversation.
 - Expand a Claims card in place, keep long graph labels inside their nodes, and
   see the recorded Library state in both the table and inspector.
+- Drag the corner of a proof graph node to resize it horizontally and vertically.
 - Edit an entry from the Library table or inspector and review both statements
   before confirming a new version. Frozen claims retain their original evidence.
 

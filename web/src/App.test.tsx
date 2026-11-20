@@ -128,7 +128,7 @@ describe("App", () => {
     );
     renderApp("token");
     expect(await screen.findByRole("heading", { level: 1, name: "Left zero" })).toBeTruthy();
-    const node = await screen.findByRole("button", { name: /Original claim/ });
+    const node = await screen.findByRole("button", { name: /^Original claim/ });
     expect(node.getAttribute("aria-pressed")).toBe("true");
     const detail = screen.getByLabelText(en.review.detail);
     expect(within(detail).getByText("∀ n : Nat, 0 + n = n")).toBeTruthy();
@@ -773,9 +773,9 @@ describe("App", () => {
       vi.fn(async (input: string) => new Response(JSON.stringify(responses[input.split("?")[0]!] ?? {}))),
     );
     renderApp("token");
-    const lemma = await screen.findByRole("button", { name: /A helper lemma/ });
+    const lemma = await screen.findByRole("button", { name: /^A helper lemma/ });
     expect(lemma.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: /Original claim/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Original claim/ }));
     await waitFor(() => expect(postMessage).toHaveBeenLastCalledWith({ claimId: CLAIM, nodeId: `goal:${CLAIM}` }));
   });
 
@@ -809,7 +809,7 @@ describe("App", () => {
     fireEvent.change(modal.getByLabelText(en.claimCodes.reference), { target: { value: "flow-09" } });
     fireEvent.click(modal.getByRole("button", { name: en.claimCodes.open }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /A helper lemma/ }).getAttribute("aria-pressed")).toBe("true"),
+      expect(screen.getByRole("button", { name: /^A helper lemma/ }).getAttribute("aria-pressed")).toBe("true"),
     );
     const post = fetch.mock.calls.find(([path, init]) => path === "/api/claim-code" && init?.method === "POST");
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ claim_id: CLAIM, code: "NEW" });

@@ -579,11 +579,12 @@ select {
   position: absolute;
   inset: 0;
 }
-.graph-node {
+.graph-node-frame {
   position: absolute;
-  left: var(--x);
-  top: var(--y);
-  width: 160px;
+}
+.graph-node {
+  width: 100%;
+  min-height: 60px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -597,6 +598,35 @@ select {
 }
 .graph-node:hover {
   border-color: var(--edge);
+}
+.graph-node-resize {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sub);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.graph-node-resize:hover,
+.graph-node-resize:focus-visible {
+  background: var(--pick);
+  color: var(--ink);
+}
+.graph-node-resize svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3px;
+  pointer-events: none;
 }
 .graph-node[aria-pressed="true"] {
   border-color: transparent;
@@ -642,6 +672,14 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.graph-node[data-expanded-title="true"] .node-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--title-lines);
+  line-height: 18px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .node-sub {
   font-size: 12.5px;
   color: var(--sub);
@@ -655,6 +693,8 @@ select {
 .node-caption {
   display: flex;
   align-items: baseline;
+  max-width: 100%;
+  padding-right: 12px;
   gap: 6px;
   font-size: 11.5px;
   color: var(--sub);
@@ -675,7 +715,7 @@ select {
   align-items: center;
   gap: 5px;
   width: fit-content;
-  max-width: 100%;
+  max-width: calc(100% - 12px);
   margin-top: 2px;
   padding: 1px 7px;
   border-radius: 5px;
@@ -2311,7 +2351,9 @@ select {
 .conversation-panel .bubble,
 .conversation-panel .message,
 .conversation-panel .speaker,
-.conversation-confirmation {
+.conversation-context,
+.conversation-confirmation,
+.conversation-request {
   overflow-wrap: anywhere;
 }
 .conversation-confirmation[open] {
@@ -2329,10 +2371,102 @@ select {
 .conversation-confirmation::backdrop {
   background: #0007;
 }
-.conversation-confirmation pre {
-  max-height: 50vh;
+.direct-composer {
+  padding: 9px 10px 7px;
+  gap: 6px;
+}
+.direct-composer:focus-within {
+  border-color: var(--edge);
+}
+.direct-composer .composer-row {
+  justify-content: flex-end;
+}
+.conversation-model-picker {
+  position: relative;
+  min-width: 0;
+  max-width: calc(100% - 38px);
+  color: var(--sub);
+}
+.conversation-model-picker::after {
+  position: absolute;
+  top: 9px;
+  right: 8px;
+  width: 5px;
+  height: 5px;
+  border: solid currentColor;
+  border-width: 0 1px 1px 0;
+  content: "";
+  pointer-events: none;
+  transform: rotate(45deg);
+}
+.direct-composer .composer-row select {
+  appearance: none;
+  max-width: 100%;
+  height: 27px;
+  padding-inline: 8px 22px;
+  background: transparent;
+  color: var(--sub);
+  font: inherit;
+  font-size: 12px;
+}
+.direct-composer .composer-row select:hover:not(:disabled) {
+  background: var(--track);
+}
+.direct-composer .composer-row .send {
+  flex: none;
+  margin-left: 0;
+}
+.direct-composer .send .spin {
+  stroke-width: 1.5;
+}
+.conversation-context,
+.conversation-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.conversation-context {
+  justify-content: space-between;
+  padding-inline: 3px;
+  color: var(--sub);
+  font-size: 11.5px;
+}
+.conversation-context p:empty {
+  display: none;
+}
+.conversation-secondary {
+  margin-left: auto;
+}
+.conversation-text-action {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sub);
+  text-underline-offset: 3px;
+}
+.conversation-text-action:hover:not(:disabled),
+.conversation-text-action[aria-expanded="true"] {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.conversation-text-action:disabled {
+  opacity: 0.7;
+}
+.conversation-request {
+  flex: 0 1 auto;
+  min-height: 38px;
+  max-height: min(32vh, 180px);
   overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  color: var(--sub);
+  font-size: 12px;
+}
+.conversation-request pre {
   margin: 0;
+  color: var(--ink);
   font: 12px/1.5 var(--mono);
   white-space: pre-wrap;
 }

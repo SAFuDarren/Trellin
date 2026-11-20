@@ -57,6 +57,32 @@ describe("graph model", () => {
     expect(layout.paths.size).toBe(6);
   });
 
+  it("spaces different card sizes and connects the centres of their opposing edges", () => {
+    const sizes = new Map([
+      ["goal:c", { width: 290, height: 180 }],
+      ["lean:e", { width: 225, height: 100 }],
+    ]);
+    const layout = layoutGraph(graph, sizes);
+    const root = layout.points.get("goal:c")!;
+    const child = layout.points.get("lean:e")!;
+    const firstDependency = layout.points.get(graph.levels.at(-2)![0]!)!;
+    expect(firstDependency.y).toBe(root.y + 180 + CARD.verticalGap);
+    expect(layout.width).toBeGreaterThanOrEqual(root.x + 290 + CARD.pad);
+    for (const nodes of graph.levels) {
+      for (let i = 1; i < nodes.length; i += 1) {
+        const previous = nodes[i - 1]!;
+        const next = nodes[i]!;
+        expect(layout.points.get(next)!.x - layout.points.get(previous)!.x).toBe(
+          (sizes.get(previous)?.width ?? CARD.width) + CARD.horizontalGap,
+        );
+      }
+    }
+    const edge = graph.edges.find(({ source, target }) => source === "lean:e" && target === "goal:c")!;
+    expect(layout.paths.get(edge.key)).toMatch(
+      new RegExp(`^M ${child.x + 112.5} ${child.y} C .* ${root.x + 145} ${root.y + 180}$`),
+    );
+  });
+
   it("names numbered nodes and evidence in the current language", () => {
     expect(nodeTitle(t, graph.nodes.get("obligation:r:1")!)).toBe("Proof obligation 1");
     expect(nodeTitle(i18n.getFixedT("zh-CN"), graph.nodes.get("obligation:r:1")!)).toBe("证明义务 1");
