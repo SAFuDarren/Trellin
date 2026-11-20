@@ -444,12 +444,15 @@
       "public_basis": "核对可共享的证明范围后，即可将 Codex 证明意见排队。"
     },
     "viewOnly": "这个课题只能查看动态，不能发送意见。",
-    "confirmHint": "请确认这条意见可以随之后已授权的 Codex 证明尝试发送。",
-    "confirm": "允许 Codex 使用此意见",
+    "confirmHint": "排队后，这条意见可随所选节点之后获授权的 Codex 证明尝试发送。",
+    "localQueueHint": "这条意见会排队，供之后获授权的本机证明尝试使用。",
     "send": "将证明意见排队",
-    "sending": "正在保存",
-    "sentCodex": "已保存，等待后续已授权的 Codex 证明尝试。",
-    "sentLocal": "已保存，等待后续已授权的本机证明尝试。"
+    "retry": "重试提交证明意见",
+    "sending": "正在提交证明意见…",
+    "queueFailed": "无法确认已排队。意见仍在输入框中。{{reason}}",
+    "sentCodex": "已排队，等待后续获授权的 Codex 证明尝试。",
+    "sentLocal": "已排队，等待后续获授权的本机证明尝试。",
+    "sentDelivered": "这条证明意见已有送达回执。"
   },
   "model": {
     "fallback": "模型"
@@ -679,6 +682,9 @@
     "connect": "接入模型",
     "message": "输入消息",
     "send": "发送消息",
+    "sending": "正在发送…",
+    "awaitingReply": "消息已发送，正在等待回复…",
+    "reuseDraft": "将这条消息放回输入框",
     "working": "处理中…",
     "you": "你",
     "remove": "移除对话",

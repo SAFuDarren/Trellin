@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.41
+
+- Send chats and queue eligible proof notes with Enter or one click, keep Shift+Enter for new lines, and see sending, waiting and recorded delivery status.
+
 ## 1.0.40
 
 - Reopen approved research questions and look up related work in the current project before preparing conjectures.

@@ -89,9 +89,10 @@ it("keeps a blocked proof opinion on its exact node until a later explicit relea
   expect(opinion().value).toBe("");
   rerender(panel(node, true));
   expect(opinion().value).toBe(note);
-  fireEvent.click(screen.getByRole("button", { name: en.composer.send }));
+  expect(button(en.composer.send).getAttribute("aria-describedby")).toBe("guidance-queue-hint");
+  expect(screen.getByText(en.composer.confirmHint)).toBeTruthy();
   expect(fetch).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: en.composer.confirm }));
+  fireEvent.click(button(en.composer.send));
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   const [url, options] = fetch.mock.calls[0]!;
   expect(url).toBe("/api/guidance");
@@ -196,9 +197,8 @@ it("restores a saved opinion for the exact proof node and consumes it only with 
   openProof();
   await screen.findByText(en.composer.draft.saved);
   expect(opinion().value).toBe(note);
-  fireEvent.click(button(en.composer.send));
   expect(fetch.mock.calls.some(([url]) => url === "/api/guidance")).toBe(false);
-  fireEvent.click(button(en.composer.confirm));
+  fireEvent.click(button(en.composer.send));
   await screen.findByText(en.composer.sentCodex);
   expect(opinion().value).toBe("");
   expect(screen.queryByText(en.composer.draft.saved)).toBeNull();
@@ -282,8 +282,42 @@ it("shows the newly saved version when an explicit queue leaves a concurrent dra
   openProof();
   await screen.findByText(en.composer.draft.saved);
   fireEvent.click(button(en.composer.send));
-  fireEvent.click(button(en.composer.confirm));
   await screen.findByText(en.composer.sentCodex);
   await screen.findByText(en.composer.draft.saved);
   expect(opinion().value).toBe(newer.text);
+});
+
+it("submits once while queueing and retries a failed receipt with the same note and identifier", async () => {
+  const note = "Check the exact premises.";
+  let finishQueue: (() => void) | undefined;
+  const fetch = vi
+    .fn<typeof window.fetch>()
+    .mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        finishQueue = resolve;
+      });
+      return Response.json({ error: "retry failed receipt" }, { status: 500 });
+    })
+    .mockResolvedValueOnce(Response.json({ submitted_at: updatedAt }));
+  vi.stubGlobal("fetch", fetch);
+
+  render(panel(node, true));
+  openProof();
+  fireEvent.change(opinion(), { target: { value: note } });
+  fireEvent.click(button(en.composer.send));
+  fireEvent.submit(opinion().form!);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(button(en.composer.sending).disabled).toBe(true);
+  expect(opinion().value).toBe(note);
+
+  finishQueue!();
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("retry failed receipt"));
+  expect(opinion().value).toBe(note);
+  fireEvent.click(button(en.composer.retry));
+  await screen.findByText(en.composer.sentDelivered);
+  const requests = fetch.mock.calls.map(([, options]) => JSON.parse(String(options?.body)));
+  expect(requests).toHaveLength(2);
+  expect(requests[0]).toEqual(requests[1]);
+  expect(requests[0]).toMatchObject({ text: note, node_id: node, statement_id: statement, confirm_release: true });
+  expect(opinion().value).toBe("");
 });

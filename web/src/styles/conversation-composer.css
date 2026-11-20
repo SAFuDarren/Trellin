@@ -19,6 +19,13 @@
   justify-content: flex-end;
   gap: 6px;
 }
+.chat-send-status {
+  color: var(--sub);
+  font-size: 12px;
+}
+.chat-reuse-draft {
+  align-self: flex-start;
+}
 .composer-menu[data-kind="context"] {
   flex: none;
   margin-inline-end: auto;

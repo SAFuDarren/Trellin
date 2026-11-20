@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openMenu } from "./navigation";
 
 // Parity checklist from docs/roadmap.md (P1.4) and the section pages (P1.5),
@@ -28,6 +28,12 @@ const railLink = (page: Page, name: string) => rail(page).getByRole("link", { na
 
 const viewMenu = (page: Page) => openMenu(page.getByRole("button", { name: "Switch view", exact: true }));
 const utilityButton = (page: Page) => rail(page).getByRole("button", { name: "Settings and help", exact: true });
+
+async function confirmImeCandidate(input: Locator) {
+  await input.dispatchEvent("compositionstart");
+  await input.dispatchEvent("keydown", { key: "Enter", code: "Enter", isComposing: true });
+  await input.dispatchEvent("compositionend");
+}
 
 async function goToSection(page: Page, section: string) {
   if (section === "Review") {
@@ -85,22 +91,71 @@ test("the impact view previews what withdrawing an assumption affects", async ({
   await expect(page.locator('.graph-node[data-affected="true"]')).toHaveCount(4);
 });
 
-test("releasing a proof note to Codex takes two explicit clicks and shows its persisted receipt", async ({ page }) => {
+test("queues a Codex proof note with one action, retaining a failed note and showing its persisted receipt", async ({
+  page,
+}) => {
+  const sent: Record<string, unknown>[] = [];
+  let finishFirstRequest = () => {};
+  const waitForRetryCheck = new Promise<void>((resolve) => {
+    finishFirstRequest = resolve;
+  });
+  await page.route("**/api/guidance", async (route) => {
+    sent.push(route.request().postDataJSON());
+    if (sent.length === 1) {
+      await waitForRetryCheck;
+      return route.fulfill({ status: 503, json: { error: "fixture guidance unavailable" } });
+    }
+    return route.continue();
+  });
+
   await open(page);
   await card(page, /^Proof obligation 2$/).click();
   await page.getByRole("button", { name: "Proof activity" }).click();
   await page.locator("#guidance-audience").selectOption("codex");
-  const note = "Try the reduction route first.";
-  await page.locator("#guidance-text").fill(note);
+  const firstLine = "先检查陈述。";
+  const secondLine = "Try the reduction route first.";
+  const note = firstLine + "\n" + secondLine;
+  const input = page.getByRole("textbox", { name: "Proof opinion" });
+  await input.fill(firstLine);
   const queue = page.locator("#guidance-send");
   await expect(queue).toHaveText("Queue proof note");
-  await queue.click();
-  await expect(queue).toHaveAccessibleName("Allow Codex to use this note");
-  await expect(page.locator("#guidance-status")).toContainText("later authorized Codex proof attempt");
+  await expect(queue).toHaveAccessibleDescription(/later authorized Codex proof attempt/);
+  await confirmImeCandidate(input);
+  await expect(input).toHaveValue(firstLine);
+  await expect(queue).toBeEnabled();
+  expect(sent).toHaveLength(0);
+  await input.press("End");
+  await input.press("Shift+Enter");
+  await page.keyboard.insertText(secondLine);
+  await expect(input).toHaveValue(note);
+  expect(sent).toHaveLength(0);
+
+  try {
+    // Dispatch both actions in one frame so a rerender cannot hide a duplicate submission.
+    await input.evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      textarea.form?.querySelector<HTMLButtonElement>("#guidance-send")?.click();
+    });
+    await expect.poll(() => sent.length).toBe(1);
+    await expect(queue).toBeDisabled();
+    await expect(queue).toContainText("Queueing proof note");
+  } finally {
+    finishFirstRequest();
+  }
+  expect(sent[0]).toMatchObject({
+    text: note,
+    audience: "codex",
+    confirm_release: true,
+    request_id: expect.any(String),
+  });
+  await expect(page.locator("#guidance-status")).toContainText("fixture guidance unavailable");
+  await expect(input).toHaveValue(note);
   const saved = page.locator(".chat-feed > li").filter({ hasText: note });
   await expect(saved).toHaveCount(0);
-  await queue.click();
-  await expect(page.locator("#guidance-status")).toHaveText("Saved for a later authorized Codex proof attempt.");
+  await expect(queue).toHaveAccessibleName("Retry proof note");
+  await input.press("Enter");
+  await expect(page.locator("#guidance-status")).toContainText("for a later authorized Codex proof attempt");
+  expect(sent).toEqual([sent[0], sent[0]]);
   const status = saved.getByRole("status");
   await expect(status).toContainText("Saved, waiting for an authorized Codex proof attempt");
   await expect(status).toContainText("Open Proof task");
@@ -397,7 +452,19 @@ for (const inspect of [false, true]) {
       messages: [] as { id: string; role: string; at: string; text: string; provider?: string; model?: string }[],
     };
     let previewModel = model.model;
+    let acceptRequest = () => {};
+    const waitForAcceptance = new Promise<void>((resolve) => {
+      acceptRequest = resolve;
+    });
     const outgoing = JSON.stringify({ system: "Discuss the question.", user: "What structure is missing?" });
+    const reply = {
+      id: "a",
+      role: "assistant",
+      provider: model.provider,
+      model: model.model,
+      at: createdAt,
+      text: "Check closure.",
+    };
     await page.route("**/api/claims", (route) => route.fulfill({ json: { claims: [], claim_id: null } }));
     await page.route("**/api/project-intake/models", (route) =>
       route.fulfill({ json: { models: ["local-research"] } }),
@@ -425,18 +492,11 @@ for (const inspect of [false, true]) {
           });
         case "/api/conversations/send":
           sent.push(route.request().postDataJSON());
+          if (inspect) await waitForAcceptance;
           story.revision++;
-          story.messages.push(
-            { id: "q", role: "user", at: createdAt, text: "What structure is missing?" },
-            {
-              id: "a",
-              role: "assistant",
-              provider: model.provider,
-              model: model.model,
-              at: createdAt,
-              text: "Check closure.",
-            },
-          );
+          story.messages.push({ id: "q", role: "user", at: createdAt, text: "What structure is missing?" });
+          story.running = inspect;
+          if (!inspect) story.messages.push(reply);
           return route.fulfill({ json: { thread: story } });
         case "/api/conversations/archive":
           archived.push(route.request().postDataJSON());
@@ -472,12 +532,17 @@ for (const inspect of [false, true]) {
     await page.keyboard.press("Escape");
     await expect(pickerMenu).toBeHidden();
     await expect(picker).toBeFocused();
-    await page.getByRole("textbox", { name: "Write a message" }).fill("What structure is missing?");
+    const input = page.getByRole("textbox", { name: "Write a message" });
+    await input.fill("What structure is missing?");
     const send = page.getByRole("button", { name: "Send message" });
     await expect(send).toHaveAccessibleDescription("External model");
     expect(sent).toHaveLength(0);
     expect(previews).toHaveLength(0);
     if (inspect) {
+      await confirmImeCandidate(input);
+      await expect(input).toHaveValue("What structure is missing?");
+      await expect(send).toBeEnabled();
+      expect(previews).toHaveLength(0);
       const context = page.getByRole("button", { name: "Message context" });
       await context.press("Enter");
       const contextMenu = page.getByRole("menu", { name: "Message context" });
@@ -498,7 +563,23 @@ for (const inspect of [false, true]) {
       expect(sent).toHaveLength(0);
       previewModel = model.model;
     }
-    await send.click();
+    if (inspect) {
+      const feed = page.locator(".conversation-panel .chat-feed");
+      const status = feed.getByRole("status");
+      try {
+        await input.press("Enter");
+        await expect(status).toHaveText("Sending…");
+      } finally {
+        acceptRequest();
+      }
+      await expect(status).toHaveText("Message sent. Waiting for a reply…");
+      await expect(feed.getByText("What structure is missing?")).toBeVisible();
+      story.running = false;
+      story.revision++;
+      story.messages.push(reply);
+    } else {
+      await send.click();
+    }
     await expect(page.getByText("Check closure.")).toBeVisible();
     expect(previews).toHaveLength(inspect ? 1 : 2);
     expect(sent).toEqual([{ ...previews.at(-1), token: "approved-context", confirm_external: true }]);
@@ -516,7 +597,9 @@ for (const inspect of [false, true]) {
   });
 }
 
-test("Workbench creates an anchored conversation and can choose a verified local model", async ({ page }) => {
+test("Workbench retries one anchored local conversation message by Enter without losing the draft", async ({
+  page,
+}) => {
   const now = "2026-11-20T02:00:00Z";
   const created: Record<string, unknown>[] = [];
   const sent: Record<string, unknown>[] = [];
@@ -554,6 +637,9 @@ test("Workbench creates an anchored conversation and can choose a verified local
       case "/api/conversations/send": {
         const body = route.request().postDataJSON();
         sent.push(body);
+        if (sent.length === 1) {
+          return route.fulfill({ status: 503, json: { error: { code: "conversation.unavailable" } } });
+        }
         thread = {
           ...thread,
           messages: [{ id: "local-answer", role: "assistant", text: "Local reply.", at: now }],
@@ -584,20 +670,24 @@ test("Workbench creates an anchored conversation and can choose a verified local
       node_id: await node.getAttribute("data-node"),
     },
   ]);
-  await page.getByRole("textbox", { name: "Write a message" }).fill("Can this obligation be reduced?");
+  const input = page.getByRole("textbox", { name: "Write a message" });
+  const question = "Can this obligation be reduced?";
+  await input.fill(question);
   const send = page.getByRole("button", { name: "Send message" });
   await expect(send).toHaveAccessibleDescription("On this device · Includes selected node");
-  await send.click();
+  await input.press("Enter");
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(input).toHaveValue(question);
+  await input.press("Enter");
   await expect(page.getByText("Local reply.")).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  expect(sent).toEqual([
-    {
-      thread_id: "anchored-thread",
-      connection_id: "local:local-research",
-      text: "Can this obligation be reduced?",
-      request_id: expect.any(String),
-      token: "local-reviewed",
-      confirm_external: false,
-    },
-  ]);
+  expect(sent[0]).toEqual({
+    thread_id: "anchored-thread",
+    connection_id: "local:local-research",
+    text: question,
+    request_id: expect.any(String),
+    token: "local-reviewed",
+    confirm_external: false,
+  });
+  expect(sent).toEqual([sent[0], sent[0]]);
 });

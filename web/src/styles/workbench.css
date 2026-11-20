@@ -1288,10 +1288,6 @@ select {
 .composer-status[data-error="true"] {
   color: var(--crit);
 }
-.composer-status[data-confirm="true"] {
-  color: var(--ink);
-  font-weight: 500;
-}
 .send {
   margin-left: auto;
   display: grid;
