@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.35
+
+- Return to the selected graph node from Review and open Settings or Help from the rail menu.
+
 ## 1.0.34
 
 - Update the web development tools to address reported advisories.

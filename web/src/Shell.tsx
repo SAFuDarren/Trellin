@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { LiveWorkspaceUpdates, WORKSPACE_WRITES } from "./api/liveUpdates";
 import { useReleaseUpdates } from "./api/releaseUpdates";
@@ -17,7 +17,7 @@ import { TeamPage } from "./pages/TeamPage";
 import { useRoute } from "./shell/route";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
-import { Workbench, type Focus } from "./Workbench";
+import { Workbench, type Focus, type WorkbenchPosition } from "./Workbench";
 import { resetLayout } from "./workbench/useLayout";
 
 /** The function rail on the left and the page it selects. */
@@ -35,6 +35,13 @@ export function Shell({ session }: { session: string }) {
   const live = comprehensive && sessionConnection?.workspace === workspace && Boolean(sessionConnection?.live);
   const team = useTeam(session, live);
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [lastWorkbench, setLastWorkbench] = useState<{ session: string; position: WorkbenchPosition } | null>(null);
+  const saveWorkbench = useCallback(
+    (position: WorkbenchPosition) => {
+      setLastWorkbench({ session, position });
+    },
+    [session],
+  );
   const previousHead = useRef<{ session: string; workspace: string; cursor: string } | null>(null);
   useEffect(() => {
     if (!comprehensive || !workspaceId(workspace) || !workspaceEventCursor(head)) {
@@ -61,10 +68,9 @@ export function Shell({ session }: { session: string }) {
     go("workbench");
   };
   const running = team.data?.jobs?.filter((job) => job.state === "running").length ?? 0;
-  const badges = {
-    review: { count: (inbox.data?.items?.length ?? 0) + (inbox.data?.clarification_review?.followups.length ?? 0) },
-    team: { count: running, live: true },
-  };
+  const pendingReviews = inbox.data
+    ? (inbox.data.items?.length ?? 0) + (inbox.data.clarification_review?.followups.length ?? 0)
+    : undefined;
   const { section, sub } = route;
   return (
     <LiveWorkspaceUpdates.Provider value={live}>
@@ -79,9 +85,9 @@ export function Shell({ session }: { session: string }) {
             onConnection={setConnection}
           />
         )}
-        <Rail current={section} badges={badges} />
+        <Rail current={section} badges={{ team: { count: running, live: true } }} />
         {section === "review" ? (
-          <ReviewPage session={session} sub={sub} onOpen={open} />
+          <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
         ) : section === "claims" ? (
           <ClaimsPage session={session} sub={sub} onOpen={open} />
         ) : section === "library" ? (
@@ -97,7 +103,15 @@ export function Shell({ session }: { session: string }) {
         ) : section === "help" ? (
           <HelpPage />
         ) : (
-          <Workbench session={session} focus={focus} onFocusHandled={setFocus} />
+          <Workbench
+            key={session}
+            session={session}
+            focus={focus}
+            onFocusHandled={setFocus}
+            pendingReviews={pendingReviews}
+            returnTo={lastWorkbench?.session === session ? lastWorkbench.position : undefined}
+            onPositionChange={saveWorkbench}
+          />
         )}
         <ReleaseUpdateNotice updates={releaseUpdates} />
       </div>

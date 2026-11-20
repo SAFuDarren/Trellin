@@ -10,7 +10,7 @@ import { ProjectActions } from "./components/project/ProjectActions";
 import { queueEntries, ReviewPanel } from "./components/ReviewPanel";
 import { Sidebar } from "./components/Sidebar";
 import { Splitter } from "./components/Splitter";
-import { desktopPosition, saveDesktopPosition } from "./workbench/desktop";
+import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type View } from "./workbench/graph";
 import { nodeTitle, statusText } from "./workbench/text";
 import type { ActivitySnapshot, Atlas, GraphSnapshot, ImpactPreview } from "./workbench/types";
@@ -25,29 +25,41 @@ function errorText(t: TFunction, error: unknown): string {
 }
 
 export type Focus = { claimId: string; nodeId?: string; nonce: number };
+export type WorkbenchPosition = DesktopPosition & { view: View; assumption: string | null; referenced: boolean };
 
 export function Workbench({
   session,
   focus,
   onFocusHandled,
+  pendingReviews,
+  returnTo,
+  onPositionChange,
 }: {
   session: string;
   focus?: Focus | null;
   onFocusHandled: (focus: null) => void;
+  pendingReviews: number | undefined;
+  returnTo?: WorkbenchPosition;
+  onPositionChange: (position: WorkbenchPosition) => void;
 }) {
   const { t } = useTranslation();
   const queries = useQueryClient();
   const layout = useLayout();
   const { sizes, clamped } = layout;
-  const [initial] = useState(() => focus ?? desktopPosition());
-  const [claimId, setClaimId] = useState<string | null>(initial?.claimId ?? null);
-  const pendingNode = useRef(initial?.nodeId);
-  const [referencedClaim, setReferencedClaim] = useState<string | null>(null);
+  const [initial] = useState(() => ({
+    position: focus ?? returnTo ?? desktopPosition(),
+    restore: focus ? undefined : returnTo,
+  }));
+  const [claimId, setClaimId] = useState<string | null>(initial.position?.claimId ?? null);
+  const pendingNode = useRef(initial.position?.nodeId);
+  const [referencedClaim, setReferencedClaim] = useState<string | null>(
+    initial.restore?.referenced ? initial.restore.claimId : null,
+  );
   const [missingReferenceNode, setMissingReferenceNode] = useState(false);
-  const [view, setView] = useState<View>("proof");
+  const [view, setView] = useState<View>(initial.restore?.view ?? "proof");
   const [recordedGoal, setRecordedGoal] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [assumption, setAssumption] = useState<string | null>(null);
+  const [assumption, setAssumption] = useState<string | null>(initial.restore?.assumption ?? null);
   const [allNodes, setAllNodes] = useState(false);
   const [premiseDialog, setPremiseDialog] = useState<{ id?: string } | null>(null);
   const [premiseChatAnchor, setPremiseChatAnchor] = useState<string | null>(null);
@@ -117,9 +129,11 @@ export function Workbench({
 
   useEffect(() => {
     if (claimId && selected && graph?.claim.id === claimId && graph.nodes.has(selected)) {
-      saveDesktopPosition({ claimId, nodeId: selected });
+      const position = { claimId, nodeId: selected };
+      onPositionChange({ ...position, view, assumption, referenced: claimId === referencedClaim });
+      saveDesktopPosition(position);
     }
-  }, [claimId, graph, selected]);
+  }, [claimId, graph, selected, view, assumption, referencedClaim, onPositionChange]);
 
   const basis = assumption ? graph?.nodes.get(assumption)?.reference?.basis_version_id : undefined;
   const impact = useQuery({
@@ -290,6 +304,7 @@ export function Workbench({
       style={{ "--side-w": `${side}px`, "--right-w": `${right}px`, "--chat-h": `${chat}px` } as React.CSSProperties}
     >
       <Sidebar
+        pendingReviews={pendingReviews}
         claims={claims.data?.claims ?? []}
         atlasClaims={atlas.data?.claims ?? []}
         claimId={claimId}

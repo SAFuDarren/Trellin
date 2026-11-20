@@ -451,6 +451,11 @@
     "loading": "Loading…",
     "openInWorkbench": "Open in workbench"
   },
+  "navigation": {
+    "home": "Home",
+    "switchView": "Switch view",
+    "utilities": "Settings and help"
+  },
   "rail": {
     "label": "Sections",
     "workbench": "Workbench",

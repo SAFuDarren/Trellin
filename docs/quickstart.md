@@ -94,6 +94,7 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 - [Set up an existing or new research database](research-foundation.md#set-up-the-workspace) for persistent research scope, evidence and model budgeting.
 - [Recover a project archive](research-foundation.md#recover-and-monitor) using a PostgreSQL URL and a fresh target database. If a later step fails after import, keep the imported database and the archive, then retry with a fresh database and an unused directory.
 - [Verify a Lean proof in your own project](lean-core.md#check-a-lean-source-file-or-compiled-declaration) and see the confirmed assumptions and facts actually used.
+- Use **Home** to open the graph and **Switch view** in the sidebar header to open Review. The bottom rail menu opens Settings and Help. [Workbench navigation](proof-workbench.md#switch-between-the-graph-and-review)
 - Open [Proof task in Trellin](proof-workbench.md#start-a-proof-task) to review the confirmed Lean scope, authorize proof work, and monitor its result.
 - Open **Premises** on a Lean claim to propose a premise and see it on the current graph. Review the exact basis before confirming a separate revised claim. [Premise review](proof-workbench.md#propose-a-premise)
 - In the Mac app, add your installed Codex or Claude Code from [Team → Runtimes](project-intake.md#connect-a-model) and select its model. Choose that connection for a public intake excerpt or for a released proof scope on database revision `0078`.

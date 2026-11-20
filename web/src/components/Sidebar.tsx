@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
 import type { AtlasClaim } from "../workbench/types";
 import { statusText } from "../workbench/text";
+import { WorkbenchViewMenu } from "./WorkbenchViewMenu";
 
 export function Sidebar({
   claims,
+  pendingReviews,
   atlasClaims,
   claimId,
   open,
@@ -18,6 +20,7 @@ export function Sidebar({
   refreshing,
 }: {
   claims: Claim[];
+  pendingReviews: number | undefined;
   atlasClaims: AtlasClaim[];
   claimId: string | null;
   open: boolean;
@@ -64,6 +67,7 @@ export function Sidebar({
     <nav className="sidebar" id="sidebar" aria-label={t("sidebar.label")}>
       <div className="brand">
         <span className="brand-name">{t("sidebar.label")}</span>
+        <WorkbenchViewMenu current="workbench" pendingReviews={pendingReviews} />
         <button
           type="button"
           className="icon-button sidebar-refresh"

@@ -14,16 +14,21 @@ export type NavEntry = {
 export function SectionLayout({
   title,
   groups,
+  headerActions,
   children,
 }: {
   title: string;
   groups: { name?: string; entries: NavEntry[]; empty?: string }[];
+  headerActions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="section">
       <nav className="section-nav" aria-labelledby="section-title">
-        <h1 id="section-title">{title}</h1>
+        <header className="section-nav-header">
+          <h1 id="section-title">{title}</h1>
+          {headerActions}
+        </header>
         {groups
           .filter((group) => group.entries.length || group.empty)
           .map((group, position) => (
