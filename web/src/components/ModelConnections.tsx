@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
@@ -13,6 +13,7 @@ import {
   type ModelConnection,
   type NativeModelProvider,
 } from "../api/modelConnections";
+import "../styles/project-entry.css";
 
 const LOGIN_COMMANDS: Record<NativeModelProvider, string> = {
   "codex-cli": "codex login",
@@ -97,11 +98,14 @@ function NativeModelChoice({
   );
 }
 
-export function ModelConnections({ session }: { session: string }) {
+export function ModelConnections({ session, onClose }: { session: string; onClose?: () => void }) {
   const { t } = useTranslation();
   const queries = useQueryClient();
+  const inDialog = Boolean(onClose);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const title = useId();
   const connections = useModelConnections(session);
-  const [adding, setAdding] = useState<"native" | "api" | null>(null);
+  const [adding, setAdding] = useState<"native" | "api" | null>(inDialog ? "native" : null);
   const [pending, setPending] = useState(false);
   const [removing, setRemoving] = useState("");
   const [status, setStatus] = useState("");
@@ -113,6 +117,10 @@ export function ModelConnections({ session }: { session: string }) {
     enabled: adding === "native",
     retry: false,
   });
+
+  useLayoutEffect(() => {
+    if (dialog.current && !dialog.current.open) dialog.current.showModal();
+  }, [inDialog]);
 
   function errorMessage(code: string) {
     return t(`errors.${code}`, { defaultValue: t("modelConnections.failed") });
@@ -174,16 +182,24 @@ export function ModelConnections({ session }: { session: string }) {
 
   const list = connections.data?.connections ?? [];
   const discovered = native.data?.providers ?? [];
-  return (
-    <section id="model-connections" className="team-connections" aria-labelledby="model-connections-title">
-      <div className="team-heading">
-        <h3 id="model-connections-title">{t("modelConnections.title")}</h3>
-        {!adding && (
-          <button className="button" type="button" disabled={pending} onClick={() => setAdding("native")}>
-            {t("modelConnections.add")}
-          </button>
-        )}
-      </div>
+  const Container = inDialog ? "div" : "section";
+  const FormHeading = inDialog ? "h3" : "h4";
+  const content = (
+    <Container
+      id={inDialog ? undefined : "model-connections"}
+      className="team-connections"
+      aria-labelledby={inDialog ? undefined : title}
+    >
+      {(!inDialog || !adding) && (
+        <div className="team-heading">
+          {!inDialog && <h3 id={title}>{t("modelConnections.title")}</h3>}
+          {!adding && (
+            <button className="button" type="button" disabled={pending} onClick={() => setAdding("native")}>
+              {t("modelConnections.add")}
+            </button>
+          )}
+        </div>
+      )}
       {connections.isPending && <p role="status">{t("common.loading")}</p>}
       {connections.isError && <p role="alert">{t("modelConnections.failed")}</p>}
       {!connections.isPending && !connections.isError && !list.length && <p>{t("modelConnections.empty")}</p>}
@@ -263,7 +279,7 @@ export function ModelConnections({ session }: { session: string }) {
       )}
       {adding === "native" && (
         <div className="project-entry-form">
-          <h4>{t("modelConnections.nativeTitle")}</h4>
+          <FormHeading>{t("modelConnections.nativeTitle")}</FormHeading>
           {native.isFetching && <p role="status">{t("modelConnections.discovering")}</p>}
           {native.isError && <p role="alert">{t("modelConnections.discoveryFailed")}</p>}
           {!native.isFetching && !native.isError && !discovered.length && <p>{t("modelConnections.nativeEmpty")}</p>}
@@ -302,7 +318,7 @@ export function ModelConnections({ session }: { session: string }) {
       )}
       {adding === "api" && (
         <form className="project-entry-form" onSubmit={addApi} autoComplete="off">
-          <h4>{t("modelConnections.addApi")}</h4>
+          <FormHeading>{t("modelConnections.addApi")}</FormHeading>
           <label>
             {t("modelConnections.provider")}
             <select name="provider" required defaultValue="" disabled={pending}>
@@ -346,6 +362,27 @@ export function ModelConnections({ session }: { session: string }) {
       {status && <p role="status">{status}</p>}
       {pending && <p role="status">{t("common.loading")}</p>}
       {failure && <p role="alert">{failure}</p>}
-    </section>
+    </Container>
+  );
+
+  if (!inDialog) return content;
+  return (
+    <dialog
+      ref={dialog}
+      className="project-entry"
+      aria-labelledby={title}
+      onClose={onClose}
+      onCancel={(event) => {
+        if (pending) event.preventDefault();
+      }}
+    >
+      <header className="project-entry-head">
+        <h2 id={title}>{t("modelConnections.title")}</h2>
+        <button className="button" type="button" disabled={pending} onClick={() => dialog.current?.close()}>
+          {t("projectEntry.close")}
+        </button>
+      </header>
+      <div className="project-entry-body">{content}</div>
+    </dialog>
   );
 }
