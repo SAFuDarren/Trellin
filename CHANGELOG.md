@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.25
+
+- Check the next package version against main before merging.
+
 ## 1.0.24
 
 - Choose a specific Codex or Claude Code model in Team. Direct model conversations
