@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.43
+
+- Use consistent heading, message, control and status text sizes across Workbench, Chats and Proof activity. Keep graph modes and long labels visible when the side panels narrow the canvas.
+
 ## 1.0.42
 
 - Open registered local projects from the Mac Workbench sidebar and restore each project's selected graph node when switching back.

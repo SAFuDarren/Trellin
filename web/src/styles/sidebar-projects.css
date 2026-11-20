@@ -16,8 +16,8 @@
 .sidebar-projects h2 {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
   overflow-wrap: anywhere;
 }
 .sidebar-projects-list {
@@ -39,6 +39,8 @@
   border-radius: 7px;
   background: transparent;
   color: var(--ink);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-regular);
   text-align: start;
 }
 .sidebar-projects-row:hover:not(:disabled, [aria-disabled="true"]) {
@@ -49,7 +51,7 @@
 }
 .sidebar-projects-row[aria-current="page"] {
   background: var(--pick);
-  font-weight: 600;
+  font-weight: var(--type-semibold);
 }
 .sidebar-projects-row:disabled[aria-current="page"] {
   opacity: 1;
@@ -69,7 +71,8 @@
 .sidebar-projects-status,
 .sidebar-projects-unavailable {
   color: var(--sub);
-  font-size: 12px;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
 }
 .sidebar-projects [role="alert"] {
   color: var(--crit);

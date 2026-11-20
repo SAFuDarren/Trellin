@@ -21,7 +21,8 @@
 }
 .chat-send-status {
   color: var(--sub);
-  font-size: 12px;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
 }
 .chat-reuse-draft {
   align-self: flex-start;
@@ -44,7 +45,8 @@
   border-radius: 5px;
   background: transparent;
   color: var(--sub);
-  font-size: 12px;
+  font-size: var(--type-control-size);
+  font-weight: var(--type-medium);
 }
 .composer-menu-trigger:hover:not(:disabled),
 .composer-menu-trigger[aria-expanded="true"] {
@@ -82,7 +84,7 @@
   border-radius: 9px;
   background: var(--main);
   box-shadow: var(--composer-elevation);
-  font-size: 12px;
+  font-size: var(--type-control-size);
 }
 .composer-menu[data-kind="context"] .composer-popover {
   inset-inline: 8px auto;
@@ -92,11 +94,12 @@
 .composer-model-group > p {
   margin: 3px 7px;
   color: var(--sub);
-  font-size: 11px;
+  font-size: var(--type-meta-size);
 }
 .composer-popover .composer-context-title {
   color: var(--ink);
-  font-weight: 600;
+  font-size: var(--type-control-size);
+  font-weight: var(--type-semibold);
 }
 .composer-popover .composer-context-summary {
   margin-block-end: 7px;
@@ -134,7 +137,7 @@
 .composer-popover .composer-menu-item[aria-checked="true"] {
   background: var(--pick);
   color: var(--composer-accent);
-  font-weight: 600;
+  font-weight: var(--type-semibold);
 }
 .composer-menu-item[aria-checked="true"]::after {
   position: absolute;
@@ -150,8 +153,8 @@
 .composer-menu-item small {
   display: block;
   color: var(--sub);
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
 }
 .direct-composer .composer-row .send {
   flex: none;

@@ -36,6 +36,14 @@
     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --math: "STIX Two Text", "Cambria Math", "Songti SC", Georgia, serif;
   --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  --type-title-size: 18px;
+  --type-section-size: 15px;
+  --type-body-size: 14px;
+  --type-control-size: 13px;
+  --type-meta-size: 12px;
+  --type-regular: 400;
+  --type-medium: 500;
+  --type-semibold: 600;
   --side-w: 240px;
   --right-w: 340px;
   --chat-h: 320px;
@@ -201,6 +209,7 @@ select {
 .main {
   flex: 1 1 auto;
   min-width: 0;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   background: var(--main);
@@ -252,8 +261,8 @@ select {
 .brand-name {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
-  font-weight: 650;
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -294,9 +303,10 @@ select {
   border-radius: 8px;
   background: transparent;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--type-control-size);
   text-align: left;
   white-space: nowrap;
+  font-weight: var(--type-medium);
 }
 .menu-item:hover,
 .search:focus-within {
@@ -318,9 +328,10 @@ select {
   text-overflow: ellipsis;
 }
 .menu-count {
-  font-size: 12px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
   font-variant-numeric: tabular-nums;
+  font-weight: var(--type-regular);
 }
 .search {
   border: 1px solid var(--hair);
@@ -337,7 +348,8 @@ select {
   outline: none;
   background: transparent;
   color: var(--ink);
-  font-size: 14px;
+  font-size: var(--type-control-size);
+  font-weight: var(--type-regular);
 }
 .search input::placeholder,
 .search svg {
@@ -415,8 +427,8 @@ select {
 }
 .claim-group > span {
   padding: 0 10px 4px;
-  font-size: 11.5px;
-  font-weight: 550;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-medium);
   color: var(--sub);
   overflow-wrap: anywhere;
 }
@@ -432,15 +444,16 @@ select {
   border-radius: 8px;
   background: transparent;
   color: var(--ink);
-  font-size: 13.5px;
+  font-size: var(--type-body-size);
   text-align: left;
+  font-weight: var(--type-regular);
 }
 .claim:hover {
   background: var(--track);
 }
 .claim[aria-current="page"] {
   background: var(--pick);
-  font-weight: 600;
+  font-weight: var(--type-semibold);
 }
 .claim-title {
   min-width: 0;
@@ -452,8 +465,8 @@ select {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
-  font-weight: 400;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
   color: var(--sub);
   overflow-wrap: anywhere;
 }
@@ -474,8 +487,9 @@ select {
   gap: 8px;
   padding: 10px 6px 2px 10px;
   border-top: 1px solid var(--hair);
-  font-size: 12px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
+  font-weight: var(--type-regular);
 }
 .sidebar-foot span {
   min-width: 0;
@@ -497,21 +511,27 @@ select {
 }
 .claim-heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 2px 10px;
   min-width: 0;
 }
 .claim-heading h1 {
-  font-size: 15px;
-  font-weight: 600;
+  max-width: 100%;
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .claim-meta {
-  font-size: 12px;
+  max-width: 100%;
+  font-size: var(--type-meta-size);
   color: var(--sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: var(--type-regular);
 }
 .segmented {
   display: inline-flex;
@@ -522,10 +542,22 @@ select {
 }
 .stage .segmented {
   position: absolute;
-  top: 12px;
+  top: 8px;
   right: 14px;
   z-index: 2;
   cursor: default;
+  max-width: calc(100% - 28px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.stage .segmented button {
+  height: auto;
+  min-height: 26px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px clamp(5px, 1vw, 14px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 .segmented button {
   height: 26px;
@@ -534,12 +566,13 @@ select {
   border-radius: 6px;
   background: transparent;
   color: var(--sub);
-  font-size: 12.5px;
+  font-size: var(--type-control-size);
+  font-weight: var(--type-medium);
 }
 .segmented button[aria-pressed="true"] {
   background: var(--live-soft);
   color: var(--live);
-  font-weight: 600;
+  font-weight: var(--type-semibold);
 }
 .impact-bar {
   display: flex;
@@ -654,8 +687,8 @@ select {
 }
 .canvas-project-heading {
   color: var(--sub);
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-semibold);
 }
 .graph-node-resize {
   position: absolute;
@@ -724,8 +757,8 @@ select {
 }
 .node-title {
   min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--type-body-size);
+  font-weight: var(--type-semibold);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -739,11 +772,12 @@ select {
   overflow-wrap: anywhere;
 }
 .node-sub {
-  font-size: 12.5px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: var(--type-regular);
 }
 .node-sub[data-math="true"] {
   font-family: var(--math);
@@ -754,8 +788,9 @@ select {
   max-width: 100%;
   padding-right: 12px;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
+  font-weight: var(--type-regular);
 }
 .work-text {
   min-width: 0;
@@ -778,8 +813,8 @@ select {
   padding: 1px 7px;
   border-radius: 5px;
   background: var(--live-soft);
-  font-size: 11.5px;
-  font-weight: 500;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -857,8 +892,9 @@ select {
   align-items: center;
   gap: 4px 14px;
   padding: 8px 18px;
-  font-size: 11px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
+  font-weight: var(--type-regular);
 }
 .legend > span {
   display: inline-flex;
@@ -886,6 +922,16 @@ select {
   width: 1px;
   height: 12px;
   background: var(--hair);
+}
+@container (max-width: 360px) {
+  .legend {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-inline: 10px;
+  }
+  .legend > span {
+    flex-shrink: 0;
+  }
 }
 
 .atlas {
@@ -1007,8 +1053,9 @@ select {
 }
 .zoom-level {
   min-width: 48px !important;
-  font-size: 12px;
+  font-size: var(--type-control-size);
   font-variant-numeric: tabular-nums;
+  font-weight: var(--type-medium);
 }
 .zoom-rule {
   width: 1px;
@@ -1039,8 +1086,8 @@ select {
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
   white-space: nowrap;
   overflow: hidden;
 }
@@ -1048,12 +1095,12 @@ select {
   white-space: nowrap;
 }
 .chat-code {
-  font: 500 11px/1 var(--mono);
+  font: var(--type-medium) var(--type-meta-size) / 1 var(--mono);
   color: var(--sub);
 }
 #chat-target {
-  font-size: 12px;
-  font-weight: 400;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
   color: var(--sub);
   white-space: nowrap;
   overflow: hidden;
@@ -1064,9 +1111,10 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
   white-space: nowrap;
+  font-weight: var(--type-regular);
 }
 .chat-state[data-error="true"] {
   color: var(--crit);
@@ -1078,7 +1126,8 @@ select {
   border-radius: 999px;
   background: transparent;
   color: var(--sub);
-  font-size: 12px;
+  font-size: var(--type-control-size);
+  font-weight: var(--type-medium);
 }
 .chip[aria-pressed="true"] {
   background: var(--ink);
@@ -1123,45 +1172,55 @@ select {
 }
 .chat-empty {
   color: var(--sub);
+  font-size: var(--type-body-size);
 }
 .bubble {
   max-width: 78%;
   padding: 7px 12px;
   border-radius: 14px;
   background: var(--track);
-  font-size: 13.5px;
+  font-size: var(--type-body-size);
+  font-weight: var(--type-regular);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .guidance-note-status {
   display: grid;
   gap: 2px;
   max-width: 78%;
   color: var(--sub);
-  font-size: 12px;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
   overflow-wrap: anywhere;
   text-align: end;
 }
 .guidance-note-status strong {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: var(--type-semibold);
 }
 .speaker {
   display: inline-flex;
   align-items: baseline;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: var(--type-meta-size);
+  overflow-wrap: anywhere;
   color: var(--sub);
+  font-weight: var(--type-regular);
 }
 .speaker b {
   font-family: var(--mono);
-  font-weight: 500;
+  font-weight: var(--type-medium);
   color: var(--ink);
 }
 .message {
   max-width: 92%;
-  font-size: 13.5px;
+  font-size: var(--type-body-size);
+  font-weight: var(--type-regular);
   line-height: 1.55;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .tool {
   display: inline-flex;
@@ -1172,7 +1231,8 @@ select {
   padding: 3px 9px;
   border: 1px solid var(--hair);
   border-radius: 7px;
-  font-size: 12px;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
   color: var(--sub);
 }
 .tool .result {
@@ -1181,11 +1241,12 @@ select {
   gap: 4px;
   color: var(--ink);
 }
-.live {
+.chat-feed .live {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
   color: var(--sub);
 }
 .live .spin {
@@ -1203,7 +1264,8 @@ select {
   border: 0;
   background: transparent;
   color: var(--sub);
-  font-size: 11.5px;
+  font-size: var(--type-control-size);
+  font-weight: var(--type-medium);
   text-decoration: underline;
   text-decoration-color: var(--edge-soft);
   text-underline-offset: 3px;
@@ -1225,7 +1287,8 @@ select {
   border: 0;
   outline: none;
   background: transparent;
-  font-size: 14px;
+  font-size: var(--type-body-size);
+  font-weight: var(--type-regular);
 }
 .composer textarea::placeholder {
   color: var(--sub);
@@ -1249,7 +1312,7 @@ select {
   border-radius: 6px;
   background: var(--track);
   color: var(--ink);
-  font: 500 12px/1 var(--font);
+  font: var(--type-medium) var(--type-control-size) / 1 var(--font);
   text-overflow: ellipsis;
 }
 .proof-recipient .chevron {
@@ -1279,8 +1342,9 @@ select {
   white-space: normal;
 }
 .composer-status {
-  font-size: 12px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
+  font-weight: var(--type-regular);
 }
 .composer-status:empty {
   display: none;
@@ -1326,12 +1390,13 @@ select {
   margin-right: auto;
 }
 .queue h2 {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
 }
 #queue-count {
-  font-size: 11.5px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
+  font-weight: var(--type-regular);
 }
 .queue-item {
   display: flex;
@@ -1366,8 +1431,8 @@ select {
 }
 .queue-item .kind {
   flex: none;
-  font-size: 11.5px;
-  font-weight: 400;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
   color: var(--sub);
 }
 .queue-empty {
@@ -1387,24 +1452,26 @@ select {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  font-size: 11.5px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
+  font-weight: var(--type-regular);
 }
 .detail-state {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-weight: 500;
+  font-weight: var(--type-medium);
   color: var(--ink);
 }
 .node-detail h2 {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--type-title-size);
+  font-weight: var(--type-semibold);
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 .detail-note {
   color: var(--sub);
+  font-size: var(--type-body-size);
 }
 .detail-block {
   display: flex;
@@ -1412,8 +1479,9 @@ select {
   gap: 4px;
 }
 .detail-block > span {
-  font-size: 11.5px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
+  font-weight: var(--type-regular);
 }
 .formula {
   font: 16px/1.45 var(--math);
@@ -1476,6 +1544,7 @@ select {
 
 @media (pointer: coarse) {
   .segmented button,
+  .stage .segmented button,
   .claim,
   .queue-item,
   .zoom button,
@@ -1773,16 +1842,17 @@ select {
   min-width: 0;
 }
 .page-head h2 {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
   white-space: nowrap;
 }
 .page-head .note {
-  font-size: 12px;
+  font-size: var(--type-meta-size);
   color: var(--sub);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-weight: var(--type-regular);
 }
 .page-actions {
   display: inline-flex;
@@ -1836,8 +1906,8 @@ select {
   border-radius: 8px;
   background: transparent;
   color: var(--ink);
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: var(--type-control-size);
+  font-weight: var(--type-medium);
   white-space: nowrap;
 }
 .button:hover:not(:disabled) {
@@ -2527,7 +2597,8 @@ select {
   justify-content: space-between;
   padding-inline: 3px;
   color: var(--sub);
-  font-size: 11.5px;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
 }
 .conversation-context p:empty {
   display: none;
@@ -2540,6 +2611,8 @@ select {
   padding: 0;
   background: transparent;
   color: var(--sub);
+  font-size: var(--type-control-size);
+  font-weight: var(--type-medium);
   text-underline-offset: 3px;
 }
 .conversation-text-action:hover:not(:disabled),
@@ -2559,7 +2632,8 @@ select {
   border: 1px solid var(--hair);
   border-radius: 8px;
   color: var(--sub);
-  font-size: 12px;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
 }
 .conversation-request pre {
   margin: 0;
