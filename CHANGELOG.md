@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.31
+
+- Record repository handover verification and align guidance on candidate versions.
+
 ## 1.0.30
 
 - Configure scheduled dependency updates for Python, the web interface, and GitHub Actions.
