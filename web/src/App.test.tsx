@@ -173,6 +173,144 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /^Checked helper/ })).toBeTruthy();
   });
 
+  it("proposes and reviews an isolated premise without leaving the original proof", async () => {
+    const original = responses["/api/graph"] as GraphSnapshot;
+    const other = { id: WORKSPACE, title: "Another project claim", status: "open", domain: "lean-core" };
+    const revised = { id: EVIDENCE, title: "Revised left zero", status: "open", domain: "lean-core" };
+    const frame = "a".repeat(64);
+    const premise = {
+      id: "55555555-5555-4555-8555-555555555555",
+      sha256: "b".repeat(64),
+      wording: "Addition commutes.",
+      lean: "∀ a b : Nat, a + b = b + a",
+      question: "Should the starting basis assume commutativity?",
+      impact: "The revised proof could use commutativity.",
+    };
+    const reason = "I reviewed the exact premise and frozen target.";
+    let saved = false;
+    let adopted = false;
+    let decisionAttempts = 0;
+    const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path === "/api/premises/propose" && init?.method === "POST") {
+        saved = true;
+        return Response.json({ id: premise.id });
+      }
+      if (path === "/api/premises/decide" && init?.method === "POST") {
+        decisionAttempts += 1;
+        if (decisionAttempts === 1) return Response.json({ error: "premise.conflicts" }, { status: 409 });
+        adopted = true;
+        return Response.json({ id: premise.id, revised_claim_id: revised.id });
+      }
+      if (path === "/api/claims")
+        return Response.json({
+          claim_id: adopted ? other.id : CLAIM,
+          claims: adopted ? [other, revised] : [original.claim, other],
+        });
+      if (path.startsWith("/api/graph?")) {
+        if (path.endsWith(revised.id))
+          return Response.json({
+            claim: revised,
+            nodes: [{ id: `goal:${revised.id}`, kind: "goal", title: "Revised result" }],
+            edges: [],
+          });
+        return Response.json({
+          claim: {
+            ...original.claim,
+            premise_review: {
+              available: !adopted,
+              frame_sha256: frame,
+              target: { wording: "Zero is a left identity.", lean: original.nodes[0]!.formalization },
+              basis: [
+                { id: "basis-1", kind: "hypothesis", wording: "The operands are natural numbers.", lean: "True" },
+              ],
+              proposals: saved
+                ? [
+                    {
+                      ...premise,
+                      state: adopted ? "revised" : "pending",
+                      ...(adopted ? { reason, revised_claim_id: revised.id } : {}),
+                    },
+                  ]
+                : [],
+            },
+          },
+          nodes: [
+            ...original.nodes,
+            ...(saved && !adopted
+              ? [
+                  {
+                    id: `proposed-premise:${premise.id}`,
+                    kind: "proposed_premise",
+                    status: "pending",
+                    title: premise.wording,
+                    formalization: premise.lean,
+                    reference: { condition_id: premise.id },
+                  },
+                ]
+              : []),
+          ],
+          edges: [{ source: LEMMA, target: original.nodes[0]!.id, kind: "actual" }],
+        });
+      }
+      if (path.startsWith("/api/activity?")) return Response.json({ claim_id: path.split("=")[1], activity: [] });
+      return Response.json(responses[path.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    const { container } = renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.premise.title }));
+    const dialog = within(screen.getByRole("dialog", { name: en.premise.title }));
+    fireEvent.click(dialog.getByRole("button", { name: en.premise.propose }));
+    expect(dialog.getByText(en.premise.hold)).toBeTruthy();
+    fireEvent.change(dialog.getByLabelText(en.premise.wording), { target: { value: premise.wording } });
+    fireEvent.change(dialog.getByLabelText(en.projectEntry.lean), { target: { value: premise.lean } });
+    fireEvent.change(dialog.getByLabelText(en.premise.question), { target: { value: premise.question } });
+    fireEvent.change(dialog.getByLabelText(en.premise.impact), { target: { value: premise.impact } });
+    fireEvent.click(dialog.getByRole("button", { name: en.premise.save }));
+    expect(await dialog.findByText(en.premise.saved)).toBeTruthy();
+    const proposalPost = fetch.mock.calls.find(([path, init]) => path === "/api/premises/propose" && init?.body);
+    expect(JSON.parse(String(proposalPost?.[1]?.body))).toEqual({
+      claim_id: CLAIM,
+      frame_sha256: frame,
+      wording: premise.wording,
+      lean: premise.lean,
+      question: premise.question,
+      impact: premise.impact,
+    });
+    fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.close }));
+    const graph = within(screen.getByRole("region", { name: en.graph.label }));
+    const node = await graph.findByRole("button", { name: /^Addition commutes/ });
+    expect(graph.getByRole("button", { name: /^Original claim/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelectorAll(".graph-edge[data-kind='actual']")).toHaveLength(1);
+    fireEvent.click(node);
+    expect(container.querySelector("#chat-target")?.textContent).toBe("Original claim");
+    const details = within(screen.getByLabelText(en.review.detail));
+    fireEvent.click(details.getByRole("button", { name: en.premise.review }));
+    expect(dialog.getByText("Zero is a left identity.")).toBeTruthy();
+    expect(dialog.getByText(/The operands are natural numbers/)).toBeTruthy();
+    expect(dialog.getByText(premise.lean)).toBeTruthy();
+    fireEvent.change(dialog.getByLabelText(en.review.reason), { target: { value: reason } });
+    fireEvent.click(dialog.getByRole("button", { name: en.premise.revise }));
+    expect((await dialog.findByRole("alert")).textContent).toBe(en.premise.conflicts);
+    expect((dialog.getByLabelText(en.review.reason) as HTMLTextAreaElement).value).toBe(reason);
+    fireEvent.click(dialog.getByRole("button", { name: en.premise.revise }));
+    expect(await dialog.findByText(en.premise.revised)).toBeTruthy();
+    const decisionPost = fetch.mock.calls.find(([path, init]) => path === "/api/premises/decide" && init?.body);
+    expect(JSON.parse(String(decisionPost?.[1]?.body))).toEqual({
+      claim_id: CLAIM,
+      frame_sha256: frame,
+      id: premise.id,
+      sha256: premise.sha256,
+      decision: "revise",
+      reason,
+    });
+    expect(screen.getByRole("heading", { level: 1, name: "Left zero" })).toBeTruthy();
+    expect(container.querySelectorAll(".graph-edge[data-kind='actual']")).toHaveLength(1);
+    expect(graph.queryByRole("button", { name: /^Addition commutes/ })).toBeNull();
+    fireEvent.click(dialog.getByRole("button", { name: en.premise.openRevised }));
+    expect(await screen.findByRole("heading", { level: 1, name: revised.title })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /^Revised result/ })).toBeTruthy();
+  });
+
   it("checks for releases by request, opens official notes, and remembers the dismissed notice", async () => {
     window.history.replaceState(null, "", "#settings");
     const path = "/api/release-updates";

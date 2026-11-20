@@ -76,6 +76,7 @@ These commands only read. Run them freely.
 | A Lean statement | `research-multiplier lean show STATEMENT_ID` |
 | The approved assumptions of a packet | `research-multiplier research basis PACKET_ID` |
 | Reusable checked theorems | `research-multiplier lean theorems` |
+| Open questions about a proposed premise | `research-multiplier goal show GOAL_ID` or **Premises** on the selected Workbench claim |
 | Verified and stale lemmas in a scope | `research-multiplier lean local-theorems STATEMENT_ID` |
 
 Start a session with `doctor` and `research resume --format text`. If `doctor`

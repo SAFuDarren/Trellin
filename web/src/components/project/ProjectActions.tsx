@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { PremiseReview } from "../../workbench/types";
 import { ClaimCodesPane } from "./ClaimCodesPane";
 import { IntakePane } from "./IntakePane";
 import { LemmaPlanPane, type LemmaPlanScope } from "./LemmaPlanPane";
+import { PremisePane } from "./PremisePane";
 import { ProofTaskPane } from "./ProofTaskPane";
 import { TheoremPane } from "./TheoremPane";
 import "../../styles/project-entry.css";
@@ -12,6 +14,7 @@ const captions = {
   theorem: "projectEntry.addTheorem",
   proof: "proofTask.title",
   lemmas: "lemmaPlan.title",
+  premises: "premise.title",
   references: "claimCodes.title",
 } as const;
 
@@ -24,6 +27,12 @@ export function ProjectActions({
   claimCode,
   claimCodesAvailable,
   lemmaPlanScope,
+  claimTitle,
+  premiseReview,
+  premiseDialog,
+  onOpenPremises,
+  onClosePremises,
+  onPremiseRecorded,
   onRecorded,
   onGoalRecorded,
   onOpenReference,
@@ -33,12 +42,19 @@ export function ProjectActions({
   claimCode?: string | null;
   claimCodesAvailable: boolean;
   lemmaPlanScope: LemmaPlanScope | null;
+  claimTitle: string;
+  premiseReview?: PremiseReview;
+  premiseDialog: { id?: string } | null;
+  onOpenPremises: (id?: string) => void;
+  onClosePremises: () => void;
+  onPremiseRecorded: () => Promise<void>;
   onRecorded: (claimId?: string) => void | Promise<void>;
   onGoalRecorded: (claimId: string) => void | Promise<void>;
   onOpenReference: (claimId: string, nodeId: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<Mode | null>(null);
+  const [localMode, setMode] = useState<Exclude<Mode, "premises"> | null>(null);
+  const mode = premiseDialog ? "premises" : localMode;
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
 
@@ -64,12 +80,25 @@ export function ProjectActions({
           {t("lemmaPlan.title")}
         </button>
       )}
+      {premiseReview && (premiseReview.available || premiseReview.proposals.length > 0) && (
+        <button className="button" type="button" onClick={() => onOpenPremises()}>
+          {t("premise.title")}
+        </button>
+      )}
       {(claimCode || claimCodesAvailable) && (
         <button className="button" type="button" onClick={() => setMode("references")}>
           {t("claimCodes.title")}
         </button>
       )}
-      <dialog ref={dialog} className="project-entry" aria-labelledby={title} onClose={() => setMode(null)}>
+      <dialog
+        ref={dialog}
+        className="project-entry"
+        aria-labelledby={title}
+        onClose={() => {
+          setMode(null);
+          onClosePremises();
+        }}
+      >
         {mode && (
           <>
             <header className="project-entry-head">
@@ -100,6 +129,21 @@ export function ProjectActions({
                 ) : (
                   <p role="status">{t("lemmaPlan.stale")}</p>
                 ))}
+              {mode === "premises" && claimId && (
+                <PremisePane
+                  key={claimId}
+                  session={session}
+                  claimId={claimId}
+                  claimTitle={claimTitle}
+                  review={premiseReview}
+                  initialProposal={premiseDialog?.id}
+                  onRecorded={onPremiseRecorded}
+                  onOpenClaim={(id) => {
+                    dialog.current?.close();
+                    onOpenReference(id, null);
+                  }}
+                />
+              )}
               {mode === "references" && (
                 <ClaimCodesPane
                   key={claimId ?? "workspace"}

@@ -101,6 +101,7 @@
   },
   "kind": {
     "goal": "Claim",
+    "proposed_premise": "Proposed premise",
     "hypothesis": "Assumption",
     "library": "Library",
     "local_lemma": "Lemma",
@@ -863,6 +864,44 @@
       "review": "research-review.md: reviewing evidence and sources",
       "progress": "research-progress.md: automation rules and workers"
     }
+  },
+  "premise": {
+    "title": "Premises",
+    "destination": "Research claim {{title}}",
+    "proposals": "Premise proposals",
+    "empty": "No premises have been proposed for this claim.",
+    "propose": "Propose a premise",
+    "wording": "Premise in your own words",
+    "question": "Question for review",
+    "impact": "How would the premise affect this claim?",
+    "hold": "Saving a premise proposal pauses proof work on this claim while its scope is under review.",
+    "back": "Back to premise proposals",
+    "save": "Save premise proposal",
+    "saved": "Premise proposal saved. You can review it here or from its node in the graph.",
+    "review": "Review premise",
+    "details": "View decision",
+    "target": "Frozen target",
+    "basis": "Current starting basis",
+    "noBasis": "This claim has no starting assumptions or other basis items.",
+    "reviseHint": "Adopting the premise creates a revised claim with the same target and an expanded basis. Review the new Lean statement before starting its proof.",
+    "reject": "Reject premise",
+    "revise": "Adopt and create revised claim",
+    "rejected": "Premise rejected. The existing basis remains in force.",
+    "revised": "Revised claim created.",
+    "openRevised": "Go to revised claim",
+    "states": {
+      "pending": "Awaiting review",
+      "rejected": "Rejected",
+      "revised": "Adopted in a revised claim",
+      "resolved": "Resolved",
+      "revision_pending": "Revised scope awaiting confirmation"
+    },
+    "invalid": "Fill in the required fields with a specific premise and review details.",
+    "unavailable": "Premise review is unavailable for this claim.",
+    "identity": "Premise review requires the local researcher bound to this project.",
+    "stale": "This premise or proof scope changed. Reopen Premises to review the current state.",
+    "duplicate": "This premise matches the current target or an existing assumption.",
+    "conflicts": "Resolve the other pending questions about this claim before creating a revised claim."
   },
   "lemmaPlan": {
     "title": "Local lemmas",

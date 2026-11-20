@@ -29,7 +29,8 @@ export function kindText(t: TFunction, kind: string): string {
 }
 
 export function nodeStatus(t: TFunction, node: GraphNode): string {
-  if (node.kind === "evidence" && node.status === "pending") return statusText(t, "awaiting_review");
+  if (["evidence", "proposed_premise"].includes(node.kind) && node.status === "pending")
+    return statusText(t, "awaiting_review");
   if (node.kind === "hypothesis" && node.status === "approved") return statusText(t, "confirmed");
   return statusText(t, node.status);
 }
@@ -78,7 +79,11 @@ export function nodeSub(t: TFunction, node: GraphNode, title = nodeTitle(t, node
 
 export function nodeTone(node: GraphNode, blocked: boolean): Tone {
   if (blocked) return "bad";
-  if (node.kind === "evidence" && ["pending", "awaiting_review"].includes(node.status ?? "")) return "review";
+  if (
+    ["evidence", "proposed_premise"].includes(node.kind) &&
+    ["pending", "awaiting_review"].includes(node.status ?? "")
+  )
+    return "review";
   // An approved premise or library entry is an input, not a checked result.
   if (
     ["hypothesis", "library"].includes(node.kind) &&
