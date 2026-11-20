@@ -737,7 +737,7 @@
     },
     "notes": {
       "runtimes": "This computer and its environment checks",
-      "agents": "Model and Lean run history in this project",
+      "agents": "Saved profiles and recorded activity in this project",
       "usage": "Model spending and allowance",
       "jobs": "Running, waiting and recent jobs in this project",
       "models": "Saved connections on this computer"
@@ -831,6 +831,53 @@
       "allProviders": "All providers",
       "state": "Filter by status",
       "allStates": "All statuses"
+    }
+  },
+  "teamAgents": {
+    "title": "Saved agents",
+    "add": "Add agent",
+    "edit": "Edit",
+    "editNamed": "Edit {{name}}",
+    "search": "Search saved agents",
+    "empty": "No agents saved for this project.",
+    "listFailed": "Could not load saved agents. Try again.",
+    "runHistory": "Run history by provider and model",
+    "runtime": "Runtime",
+    "chooseRuntime": "Choose runtime",
+    "configure": "Configure agent",
+    "manageRuntimes": "Manage model connections",
+    "unavailableRuntime": "Unavailable",
+    "runtimesFailed": "Could not load model connections.",
+    "noRuntime": "No available connections. Add or restore a model connection to continue.",
+    "connectionChanged": "This connection is unavailable. Go back and choose another runtime.",
+    "runtimeSummary": "{{runtime}} with {{model}}",
+    "avatar": "Avatar",
+    "avatars": {
+      "initials": "Initials",
+      "book": "Book",
+      "compass": "Compass",
+      "spark": "Spark"
+    },
+    "description": "Description",
+    "instructions": "Instructions",
+    "starters": "Conversation starters",
+    "starter": "Starter {{number}}",
+    "scope": "Saved on this computer for the current project. The runtime uses its configured defaults. Instructions and starters are saved for future conversations.",
+    "back": "Back",
+    "next": "Next",
+    "create": "Create agent",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "saved": "{{name}} was saved.",
+    "retry": "Try again",
+    "nameRequired": "Enter an agent name.",
+    "saveFailed": "Could not save the agent. Your entries are still here. Try again.",
+    "errors": {
+      "invalid": "Check the name and profile fields, then try again.",
+      "connection_unavailable": "This connection is unavailable. Go back and choose another runtime.",
+      "conflict": "The saved profile changed. Cancel and reopen it from Saved agents.",
+      "unavailable": "Could not reach the local agent settings. Try again.",
+      "limit": "This project has reached the limit of 100 saved agents."
     }
   },
   "progressPage": {

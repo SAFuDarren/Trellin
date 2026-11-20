@@ -7,6 +7,7 @@ import { useTeam, type Doctor, type Job, type Team } from "../api/sections";
 import { Clock, Mark, Spin } from "../components/Icons";
 import { ModelConnections } from "../components/ModelConnections";
 import { PageHead, SectionLayout } from "../components/SectionLayout";
+import { TeamAgentProfiles } from "../components/TeamAgentProfiles";
 import { href } from "../shell/route";
 import { harnessName, modelName, prettyModel, timeText } from "../workbench/text";
 import "../styles/team.css";
@@ -138,6 +139,26 @@ export function TeamPage({
         <div className="page-body team-body">
           <ModelConnections session={session} />
         </div>
+      ) : page === "agents" ? (
+        <>
+          <TeamAgentProfiles key={session} session={session} />
+          <section aria-label={t("teamAgents.runHistory")}>
+            <header className="page-body team-agent-history-heading">
+              <h3>{t("teamAgents.runHistory")}</h3>
+            </header>
+            {team.isError ? (
+              <p className="page-empty" role="alert">
+                {t("team.unavailable")}
+              </p>
+            ) : data ? (
+              <Agents data={data} />
+            ) : (
+              <p className="page-empty" role="status">
+                {t("common.loading")}
+              </p>
+            )}
+          </section>
+        </>
       ) : team.isError ? (
         <p className="page-empty" role="alert">
           {t("team.unavailable")}
@@ -148,8 +169,6 @@ export function TeamPage({
         </p>
       ) : page === "runtimes" ? (
         <Runtimes session={session} data={data} />
-      ) : page === "agents" ? (
-        <Agents data={data} />
       ) : page === "usage" ? (
         <Usage data={data} />
       ) : (

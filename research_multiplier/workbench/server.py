@@ -20,7 +20,8 @@ from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
-                                          workbench_activity, workbench_clarification, workbench_conversations, workbench_goal_review,
+                                          workbench_activity, workbench_agents, workbench_clarification,
+                                          workbench_conversations, workbench_goal_review,
                                           workbench_guidance, workbench_library,
                                           workbench_intake, workbench_lemma_plans, workbench_premises,
                                           workbench_proof_drafts, workbench_proof_tasks,
@@ -64,6 +65,15 @@ _CONNECTION_WRITES = {
     "/api/model-connections/add-native": "add_native",
     "/api/model-connections/remove": "remove",
     "/api/model-connections/test": "test",
+}
+_TEAM_AGENTS_ROUTE = "/api/team-agents"
+_TEAM_AGENTS_SAVE = "/api/team-agents/save"
+_TEAM_AGENTS_ERRORS = {
+    "team_agents.invalid": HTTPStatus.BAD_REQUEST,
+    "team_agents.connection_unavailable": HTTPStatus.CONFLICT,
+    "team_agents.conflict": HTTPStatus.CONFLICT,
+    "team_agents.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
+    "team_agents.limit": HTTPStatus.CONFLICT,
 }
 _INTAKE_PUBLIC = ("/api/project-intake/public-preview", "/api/project-intake/public-draft")
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
@@ -222,6 +232,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self._doctor_lock = threading.Lock()
         self._intake_lock = threading.Lock()
         self.connections = connections.Registry()
+        self.team_agents = workbench_agents.AgentProfiles(workspace)
         self.public_intake = workbench_intake.PublicIntake(self.connections)
         self.discussions = workbench_conversations.Discussions(self.connections)
         self._proof_task_lock = threading.Lock()
@@ -447,6 +458,10 @@ class _Handler(BaseHTTPRequestHandler):
             if route.query:
                 raise _BadRequest("connection.invalid")
             return {"providers": self.server.connections.native()}
+        if route.path == _TEAM_AGENTS_ROUTE:
+            if route.query:
+                raise _BadRequest("team_agents.invalid")
+            return {"agents": self.server.team_agents.list()}
         if route.path == "/api/project-intake/models":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -534,6 +549,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.NOT_FOUND, error.code)
         except connections.ConnectionError as error:
             self._error(HTTPStatus.SERVICE_UNAVAILABLE, error.code)
+        except workbench_agents.AgentProfileError as error:
+            self._error(_TEAM_AGENTS_ERRORS[str(error)], str(error))
         except workbench_conversations.ConversationError as error:
             self._conversation_error(error.code)
         except workbench_goal_review.GoalReviewError as error:
@@ -881,6 +898,9 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, result)
             elif self.path in _CONNECTION_WRITES:
                 self._json(HTTPStatus.OK, self._change_connection(_CONNECTION_WRITES[self.path]))
+            elif self.path == _TEAM_AGENTS_SAVE:
+                document = self._body(workbench_agents.MAX_REQUEST_BYTES)
+                self._json(HTTPStatus.OK, {"agent": self.server.team_agents.save(document, self.server.connections)})
             elif self.path == "/api/project-intake/public-preview":
                 self._json(HTTPStatus.OK, self.server.read(self.server.public_intake.preview, self._body(_MAX_PROJECT_BYTES)))
             elif self.path == "/api/project-intake/public-draft":
@@ -915,6 +935,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(*_claim_code_error(error))
         except connections.ConnectionError as error:
             self._error(HTTPStatus.CONFLICT, error.code)
+        except workbench_agents.AgentProfileError as error:
+            self._error(_TEAM_AGENTS_ERRORS[str(error)], str(error))
         except workbench_conversations.ConversationError as error:
             self._conversation_error(error.code)
         except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:

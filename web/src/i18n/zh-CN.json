@@ -737,7 +737,7 @@
     },
     "notes": {
       "runtimes": "本机和环境检查",
-      "agents": "这个项目的模型和 Lean 运行记录",
+      "agents": "当前项目的员工资料与运行记录",
       "usage": "模型费用与额度",
       "jobs": "这个项目中正在运行、等待或最近完成的任务",
       "models": "这台电脑上已保存的模型连接"
@@ -831,6 +831,53 @@
       "allProviders": "所有服务商",
       "state": "按状态筛选",
       "allStates": "所有状态"
+    }
+  },
+  "teamAgents": {
+    "title": "已保存的员工",
+    "add": "添加员工",
+    "edit": "编辑",
+    "editNamed": "编辑 {{name}}",
+    "search": "搜索已保存的员工",
+    "empty": "当前项目还没有保存的员工。",
+    "listFailed": "无法加载已保存的员工。请重试。",
+    "runHistory": "按提供方和模型查看运行记录",
+    "runtime": "运行环境",
+    "chooseRuntime": "选择运行环境",
+    "configure": "配置员工",
+    "manageRuntimes": "管理模型连接",
+    "unavailableRuntime": "不可用",
+    "runtimesFailed": "无法加载模型连接。",
+    "noRuntime": "暂无可用的连接。请添加或恢复模型连接后继续。",
+    "connectionChanged": "此连接不可用。请返回并选择另一个运行环境。",
+    "runtimeSummary": "{{runtime}} 使用 {{model}}",
+    "avatar": "头像",
+    "avatars": {
+      "initials": "名字缩写",
+      "book": "书本",
+      "compass": "罗盘",
+      "spark": "星形"
+    },
+    "description": "描述",
+    "instructions": "工作指令",
+    "starters": "对话开场建议",
+    "starter": "开场建议 {{number}}",
+    "scope": "资料保存在本机，属于当前项目。运行环境沿用已配置的默认设置。工作指令和开场建议留待之后的对话使用。",
+    "back": "上一步",
+    "next": "下一步",
+    "create": "创建员工",
+    "save": "保存更改",
+    "saving": "正在保存…",
+    "saved": "已保存 {{name}}。",
+    "retry": "重试",
+    "nameRequired": "请输入员工名称。",
+    "saveFailed": "无法保存员工。填写的内容已保留，请重试。",
+    "errors": {
+      "invalid": "请检查员工名称和资料，然后重试。",
+      "connection_unavailable": "此连接不可用。请返回并选择另一个运行环境。",
+      "conflict": "保存的资料已有更新。请取消并从员工列表重新打开。",
+      "unavailable": "无法访问本机的员工设置。请重试。",
+      "limit": "当前项目已达到 100 名员工的保存上限。"
     }
   },
   "progressPage": {

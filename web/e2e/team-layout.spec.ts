@@ -6,6 +6,7 @@ const MODEL = "gpt-5-codex";
 const TITLE = "自然数加零的对称性";
 
 async function openTeam(page: Page, name = /^Team/) {
+  await page.route("**/api/team-agents", (route) => route.fulfill({ json: { agents: [] } }));
   await page.goto("/#session=fixture");
   await page.locator("nav.rail").getByRole("link", { name }).click();
 }
@@ -129,7 +130,9 @@ test("Team reports loading, empty and failed data without placeholder rows", asy
   const main = page.locator(".section-main");
   await expect(main.getByRole("status")).toContainText("Loading");
   release();
-  await expect(main.getByRole("status")).toHaveText("No agent runs have been recorded in this project.");
+  await expect(
+    main.getByRole("status").filter({ hasText: "No agent runs have been recorded in this project." }),
+  ).toBeVisible();
   await expect(main.getByRole("table")).toHaveCount(0);
   fail = true;
   await page.reload();
