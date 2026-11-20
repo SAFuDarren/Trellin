@@ -1,0 +1,142 @@
+.team-agent-profiles {
+  padding-block-end: 16px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.team-agent-profiles > header h3,
+.team-agent-history-heading h3 {
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
+}
+
+.team-agent-history-heading {
+  padding-block-end: 0;
+}
+
+.team-agent-feedback,
+.team-agent-runtime-status {
+  color: var(--sub);
+}
+
+.team-agent-feedback:empty {
+  display: none;
+}
+
+.team-agent-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.team-agent-identity > span:last-child {
+  min-width: 0;
+}
+
+.team-agent-avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  overflow: hidden;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--track);
+  color: var(--ink);
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-semibold);
+}
+
+.team-agent-table td:last-child {
+  width: 1%;
+}
+
+.team-agent-dialog .project-entry-head h2 {
+  font-size: var(--type-title-size);
+  font-weight: var(--type-semibold);
+}
+
+.team-agent-dialog h2:focus {
+  outline: none;
+}
+
+.team-agent-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.team-agent-field select {
+  height: auto;
+  min-height: 38px;
+}
+
+.team-agent-runtime-list,
+.team-agent-starters {
+  display: grid;
+  min-inline-size: 0;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.team-agent-starters legend {
+  margin-block-end: 8px;
+  padding: 0;
+  font-weight: var(--type-semibold);
+}
+
+.project-entry-form .team-agent-runtime {
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 10rem);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.project-entry-form .team-agent-runtime input[type="radio"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.team-agent-runtime:has(input:checked) {
+  background: var(--pick);
+  border-color: var(--composer-line);
+}
+
+.team-agent-runtime:has(input:disabled) strong {
+  color: var(--sub);
+}
+
+.team-agent-runtime-status {
+  font-size: var(--type-meta-size);
+  text-align: end;
+}
+
+.team-agent-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hair);
+}
+
+.team-agent-footer-spacer {
+  flex: 1;
+}
+
+@media (max-width: 520px) {
+  .project-entry-form .team-agent-runtime {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .team-agent-runtime-status {
+    grid-column: 2;
+    text-align: start;
+  }
+}

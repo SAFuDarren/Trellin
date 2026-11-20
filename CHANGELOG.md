@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.44
+
+- Create and edit named local agent profiles in Team using existing model connections. Profiles reopen in their own project with their saved identity and instructions.
+
 ## 1.0.43
 
 - Use consistent heading, message, control and status text sizes across Workbench, Chats and Proof activity. Keep graph modes and long labels visible when the side panels narrow the canvas.

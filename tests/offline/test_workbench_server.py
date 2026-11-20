@@ -1,13 +1,16 @@
 """Workbench request checks that run before any database access (docs/interfaces.md section 4)."""
 
-from contextlib import nullcontext
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager, nullcontext
 import http.client
 import json
 import threading
-from uuid import UUID
+from types import SimpleNamespace
+from uuid import UUID, uuid4
 
 import pytest
 
+from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workbench.server import WorkbenchServer
 from research_multiplier.workflows import release_updates
@@ -41,6 +44,87 @@ def request(server, method, path, *, body=None, headers=None, session=True, orig
     content = response.read()
     connection.close()
     return response, content
+
+
+@contextmanager
+def _profile_server(workspace, connections):
+    with WorkbenchServer(workspace, port=0) as instance:
+        instance.connections = SimpleNamespace(list=lambda: list(connections))
+        thread = threading.Thread(target=instance.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield instance
+        finally:
+            instance.shutdown()
+            thread.join()
+
+
+def test_team_agent_settings_are_scoped_to_the_local_project(tmp_path, monkeypatch):
+    monkeypatch.setenv("RM_TRELLIN_HOME", str(tmp_path / "app"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    first = paths.initialize_workspace(tmp_path / "first")
+    second = paths.initialize_workspace(tmp_path / "second")
+    connection = {"id": str(uuid4()), "status": "connected", "fingerprint": "fixture"}
+    connections = [connection]
+    profile = {
+        "id": str(uuid4()), "revision": 0, "connection_id": connection["id"], "name": "Paper reviewer",
+        "description": "Check evidence", "avatar": "book", "instructions": "Review the stated assumptions.",
+        "starters": ["Which assumptions matter?"],
+    }
+    route = "/api/team-agents"
+    save = route + "/save"
+
+    def inspect(instance, method, path, *, expected=200, **options):
+        response, content = request(instance, method, path, **options)
+        assert response.status == expected
+        return json.loads(content)
+
+    with _profile_server(first, connections) as instance:
+        assert request(instance, "GET", route, session=False)[0].status == 403
+        assert request(instance, "POST", save, body=profile, origin=False)[0].status == 403
+        assert request(instance, "POST", save, body=profile, headers={"Origin": "https://foreign.test"})[0].status == 403
+        assert inspect(instance, "GET", route) == {"agents": []}
+        for invalid in ({"name": "   "}, {"starters": [""]}, {"avatar": "image.png"}, {"workspace_id": str(uuid4())}):
+            assert inspect(instance, "POST", save, body={**profile, **invalid}, expected=400) == {
+                "error": "team_agents.invalid",
+            }
+        assert inspect(instance, "POST", save, body={**profile, "connection_id": str(uuid4())}, expected=409) == {
+            "error": "team_agents.connection_unavailable",
+        }
+        with ThreadPoolExecutor(max_workers=2) as requests:
+            saved, repeated = [
+                result["agent"] for result in requests.map(
+                    lambda _: inspect(instance, "POST", save, body=profile), range(2)
+                )
+            ]
+        assert saved == {**profile, "revision": 1}
+        assert repeated == saved
+        assert inspect(instance, "GET", route) == {"agents": [saved]}
+        edited = {**saved, "name": "Method reviewer"}
+        updated = inspect(instance, "POST", save, body=edited)["agent"]
+        assert updated == {**edited, "revision": 2}
+        assert inspect(instance, "POST", save, body=edited) == {"agent": updated}
+        assert inspect(instance, "POST", save, body={**saved, "name": "Stale editor"}, expected=409) == {
+            "error": "team_agents.conflict",
+        }
+        original_session = instance.session
+
+    with _profile_server(second, connections) as instance:
+        assert request(instance, "GET", route, headers={"X-RM-Session": original_session})[0].status == 403
+        assert inspect(instance, "GET", route) == {"agents": []}
+        assert inspect(instance, "POST", save, body=updated, expected=409) == {"error": "team_agents.conflict"}
+
+    connections.clear()
+    with _profile_server(first, connections) as instance:
+        assert inspect(instance, "GET", route) == {"agents": [updated]}
+        assert inspect(instance, "POST", save, body=edited) == {"agent": updated}
+        assert inspect(instance, "POST", save, body={**updated, "name": "Unavailable"}, expected=409) == {
+            "error": "team_agents.connection_unavailable",
+        }
+        replacement = {"id": str(uuid4()), "status": "untested", "fingerprint": "replacement"}
+        connections.append(replacement)
+        relink = {**updated, "connection_id": replacement["id"]}
+        assert inspect(instance, "POST", save, body=relink) == {"agent": {**relink, "revision": 3}}
 
 
 def test_page_is_served_with_strict_security_headers(server):
