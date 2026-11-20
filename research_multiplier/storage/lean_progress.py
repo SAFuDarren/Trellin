@@ -27,12 +27,14 @@ class PendingLeanPass:
     statement_id: UUID
     model_rounds: int
     inputs_sha256: str
+    connected_model: bool = False
 
 
 def pending_lean_passes(store: Store, limit: int, policy_ids, *, public_model_policies=False) -> list[PendingLeanPass]:
     queue = "rm.lean_progress_public_model_queue" if public_model_policies else "rm.lean_progress_queue"
     rows = store.query("scheduler", f"SELECT * FROM {queue}(%s,%s::uuid[])", limit, policy_ids)
-    return [PendingLeanPass(row["id"], row["statement_id"], row["model_rounds"], row["inputs_sha256"]) for row in rows]
+    return [PendingLeanPass(row["id"], row["statement_id"], row["model_rounds"], row["inputs_sha256"],
+                            public_model_policies) for row in rows]
 
 
 @dataclass(frozen=True)
@@ -79,7 +81,8 @@ class ClaimedLeanPass:
 @contextmanager
 def hold_lean_pass(store: Store, pending: PendingLeanPass):
     """Pin the caller's scheduler connection until the pass completes or unwinds."""
-    row, = store.query("scheduler", "SELECT rm.lock_lean_progress(%s,%s) AS acquired",
+    lock = "rm.lock_public_model_lean_progress" if pending.connected_model else "rm.lock_lean_progress"
+    row, = store.query("scheduler", f"SELECT {lock}(%s,%s) AS acquired",
                        pending.policy_id, pending.inputs_sha256)
     if not row["acquired"]:
         yield None

@@ -314,19 +314,23 @@ def test_claim_code_routes_require_session_and_exact_payload(server, monkeypatch
     assert json.loads(content) == {"error": "claim_code.invalid"}
 
 
-def test_proof_task_starts_only_the_committed_policy(server, monkeypatch):
+@pytest.mark.parametrize("connected_model", [False, True])
+def test_proof_task_starts_only_the_committed_policy(server, monkeypatch, connected_model):
     claim = "0b6b2f6e-8d1a-4c2b-9f57-3a1c2d4e5f60"
     policy = "b34a1bdf-8c98-497b-b33f-2be548ca9b7f"
     started, reached_policy, release = [], threading.Event(), threading.Event()
     document = {"claim_id": claim, "token": "a" * 64, "model_rounds": 0, "reason": "Reviewed"}
+    if connected_model:
+        document.update(model_rounds=1, public_model={"id": str(UUID(int=1)), "fingerprint": "b" * 64},
+                        confirm_external=True)
 
     def write(action, supplied):
         assert action.__name__ == "start" and supplied == document
         started.append("committed")
         return {"policy_id": policy}
 
-    def advance(stage, limit, identifiers, parallel, *, lake_watch):
-        started.append((stage, limit, identifiers, parallel))
+    def advance(stage, limit, identifiers, parallel, *, lake_watch, public_model_policies):
+        started.append((stage, limit, identifiers, parallel, public_model_policies))
         reached_policy.set()
         release.wait(5)
         return {"errors": [], "lean_runs": []}
@@ -339,7 +343,7 @@ def test_proof_task_starts_only_the_committed_policy(server, monkeypatch):
         assert response.status == 200
         assert json.loads(content) == {"policy_id": policy}
         assert reached_policy.wait(5)
-        assert started == ["committed", ("combined", 1, [policy], 1)]
+        assert started == ["committed", ("combined", 1, [policy], 1, connected_model)]
         response, content = request(server, "POST", "/api/proof-task/start", body=document)
         assert response.status == 409
         assert json.loads(content) == {"error": "proof_task.busy"}

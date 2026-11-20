@@ -244,6 +244,8 @@ def _run_lean_policy(item: PendingLeanPass, *, lean, mathlib_project, lean_searc
                 raise ValueError("Use the exact private model configuration signed for this Lean policy.")
         continuation = claimed.continuation() if rounds else None
         public_model = setting.public_model
+        if item.connected_model != (public_model is not None):
+            raise ValueError("The proof worker did not select the signed model queue.")
         continue_work = claimed.is_active
         strategy, author, route_event = lean_search_strategy or "ranked", None, None
         if public_model is not None:

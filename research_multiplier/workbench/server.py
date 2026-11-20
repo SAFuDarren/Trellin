@@ -256,21 +256,23 @@ class WorkbenchServer(ThreadingHTTPServer):
             self._running_policy = identifier
             self._failed_policy = None
             try:
-                threading.Thread(target=self._work_on_proof, args=(identifier,), daemon=True).start()
+                threading.Thread(target=self._work_on_proof, args=(identifier, "public_model" in document),
+                                 daemon=True).start()
             except RuntimeError:
                 self._running_policy = None
                 self._failed_policy = identifier
                 raise workbench_proof_tasks.ProofTaskError("proof_task.worker_failed") from None
             return result
 
-    def _work_on_proof(self, identifier):
+    def _work_on_proof(self, identifier, connected_model):
         failed = True
         try:
             with paths.use_workspace(self.workspace, strict=True):
                 lake_watch = LakeWatch()
                 failed = False
                 while not self.closing.is_set():
-                    cycle = research_progress.advance_cycle("combined", 1, [identifier], 1, lake_watch=lake_watch)
+                    cycle = research_progress.advance_cycle("combined", 1, [identifier], 1, lake_watch=lake_watch,
+                                                           public_model_policies=connected_model)
                     failed = bool(cycle["errors"])
                     if failed or not cycle["lean_runs"] or cycle["lean_runs"][0]["status"] != "search_continues":
                         break

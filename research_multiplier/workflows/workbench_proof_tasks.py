@@ -29,6 +29,9 @@ LEFT JOIN rm.lean_progress_last_run run ON run.policy_id = p.id
 WHERE p.claim_id = %s AND p.packet_id = %s AND p.approved_at IS NOT NULL
   AND p.policy #>> '{{lean,statement_id}}' = %s::text
   AND p.policy #>> '{{lean,statement_sha256}}' = %s
+  AND (p.policy #> '{{lean,public_model}}' IS NULL OR p.policy #> '{{lean,public_workspace}}' = (
+      SELECT jsonb_build_array(workspace_id, database_id) FROM rm.current_workspace_binding()
+  ))
 ORDER BY (p.stopped_at IS NULL) DESC, p.approved_at DESC, p.id DESC LIMIT 1
 """
 
@@ -46,6 +49,7 @@ _BASIS = """
 SELECT item_version_id, version_sha256, packet_label, logical_key,
        body ->> 'natural' AS statement, body -> 'formal' AS formal
 FROM rm.get_packet_basis(%s)
+WHERE body ->> 'kind' IS DISTINCT FROM 'goal'
 ORDER BY packet_label NULLS LAST, logical_key, item_version_id
 """
 
