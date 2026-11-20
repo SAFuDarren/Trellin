@@ -431,6 +431,8 @@
     "claim_code.conflict": "This goal already has a different short code. Change it from Research references."
   },
   "graph": {
+    "projectClaims": "Other claims in this project",
+    "openClaim": "Open {{title}}, {{status}}",
     "label": "Dependency graph of the current claim",
     "queued": "{{work}} queued"
   },
@@ -935,6 +937,8 @@
     "lean": "Lean proposition",
     "failed": "The request could not be completed. Try again.",
     "theorem": {
+      "destination": "Destination · Current project graph",
+      "separateProject": "In the Mac app, use File → New Project for a separate project.",
       "kind": "How to record it",
       "goal": "Theorem to prove",
       "library": "Library theorem",
