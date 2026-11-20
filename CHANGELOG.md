@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.27
+
+- Manage model connections from Workbench and Chats without losing the current draft or conversation.
+
 ## 1.0.26
 
 - Show open issues in urgency and pickup order on the task board.
