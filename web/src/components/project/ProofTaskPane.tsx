@@ -3,7 +3,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { useFallbackInterval } from "../../api/liveUpdates";
+import {
+  connectionChoiceLabel,
+  connectionModelLabel,
+  dispatchableConnection,
+  useModelConnections,
+  type ModelConnection,
+} from "../../api/modelConnections";
 import { href } from "../../shell/route";
+
+type PublicModel = Pick<ModelConnection, "id" | "provider" | "model"> & { fingerprint: string };
+type AvailableConnection = ModelConnection & PublicModel;
+type ModelUsage = { input_tokens?: number; output_tokens?: number; cost_usd?: string | number };
 
 type ProofTask = {
   claim_id: string;
@@ -13,6 +24,7 @@ type ProofTask = {
   can_start: boolean;
   can_stop: boolean;
   local_model_allowed: boolean;
+  external_model_allowed?: boolean;
   scope: {
     token: string | null;
     proposition: string | null;
@@ -24,14 +36,26 @@ type ProofTask = {
     omitted_basis: number;
   };
   decisions: { kind: string; question?: string | null }[];
-  policy: { id: string; fingerprint: string; model_rounds: number } | null;
+  policy: {
+    id: string;
+    fingerprint: string;
+    model_rounds: number;
+    public_model?: PublicModel | null;
+    model_usage?: ModelUsage[];
+  } | null;
   receipt: { id: string; kind: "lean" | "counterexample"; review_status: string } | null;
   obligations?: { proposition: string; verified: boolean }[];
   phase?: string | null;
   adopted: boolean;
 };
 
-type StartDetails = { token: string; model_rounds: number; reason: string };
+type StartDetails = {
+  token: string;
+  model_rounds: number;
+  reason: string;
+  public_model?: Pick<PublicModel, "id" | "fingerprint">;
+  confirm_external?: true;
+};
 type Action =
   | { kind: "start"; details: StartDetails }
   | { kind: "stop"; details: { policy_id: string; reason: string } };
@@ -51,42 +75,83 @@ function LeanStatement({ text }: { text: string }) {
 
 function StartTaskForm({
   token,
-  existingRounds,
+  policy,
   localModelAllowed,
+  externalModelAllowed,
+  connections,
+  requiresExternal,
   pending,
   onStart,
 }: {
   token: string;
-  existingRounds: number | undefined;
+  policy: ProofTask["policy"];
   localModelAllowed: boolean;
+  externalModelAllowed: boolean;
+  connections: AvailableConnection[];
+  requiresExternal: boolean;
   pending: boolean;
   onStart: (details: StartDetails) => void;
 }) {
   const { t } = useTranslation();
-  const [rounds, setRounds] = useState(existingRounds ?? 0);
-  const [approved, setApproved] = useState(false);
+  const [rounds, setRounds] = useState(policy?.model_rounds ?? 0);
+  const [approvedScope, setApprovedScope] = useState<string | null>(null);
+  const [connectionId, setConnectionId] = useState("");
+  const selected = policy?.public_model ?? connections.find(({ id }) => id === connectionId);
+  const model = selected && `${t(`team.providers.${selected.provider}`)} · ${connectionModelLabel(t, selected)}`;
+  const blockedSelection = Boolean((requiresExternal || connectionId) && !selected);
+  const authorization = JSON.stringify([token, rounds, selected?.id, selected?.fingerprint]);
+  const approved = approvedScope === authorization;
+
   function start(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!approved || pending) return;
+    if (!approved || pending || blockedSelection) return;
     const reason = String(new FormData(event.currentTarget).get("reason") ?? "").trim();
     if (!reason) return;
-    setApproved(false);
-    onStart({ token, model_rounds: rounds, reason });
+    setApprovedScope(null);
+    onStart({
+      token,
+      model_rounds: rounds,
+      reason,
+      ...(selected && { public_model: { id: selected.id, fingerprint: selected.fingerprint }, confirm_external: true }),
+    });
   }
   return (
     <form className="project-entry-form" onSubmit={start}>
-      {localModelAllowed && existingRounds === undefined && (
+      {externalModelAllowed && !policy && (
         <label>
-          {t("proofTask.modelRounds")}
+          {t("proofTask.modelConnection")}
+          <select
+            value={connectionId}
+            disabled={pending}
+            onChange={(event) => {
+              const id = event.target.value;
+              setConnectionId(id);
+              setRounds(id ? 1 : 0);
+              setApprovedScope(null);
+            }}
+          >
+            <option value="">{t(requiresExternal ? "proofTask.modelConnection" : "proofTask.noExternal")}</option>
+            {connections.map((connection) => (
+              <option key={connection.id} value={connection.id}>
+                {connectionChoiceLabel(t, connection)}
+              </option>
+            ))}
+          </select>
+          {!connections.length && <a href={href("team", "runtimes")}>{t("proofTask.connectModel")}</a>}
+        </label>
+      )}
+      {(localModelAllowed || selected) && !policy && (
+        <label>
+          {t(selected ? "proofTask.externalRounds" : "proofTask.modelRounds")}
           <select
             value={rounds}
             disabled={pending}
             onChange={(event) => {
               setRounds(Number(event.target.value));
-              setApproved(false);
+              setApprovedScope(null);
             }}
           >
-            {Array.from({ length: 9 }, (_, count) => (
+            {(selected ? [1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 2, 3, 4, 5, 6, 7, 8]).map((count) => (
               <option key={count} value={count}>
                 {count}
               </option>
@@ -94,9 +159,11 @@ function StartTaskForm({
           </select>
         </label>
       )}
-      <p className="project-entry-note">
-        {t(rounds ? "proofTask.localAllowance" : "proofTask.programOnly", { count: rounds })}
-      </p>
+      {!selected && !requiresExternal && (
+        <p className="project-entry-note">
+          {t(rounds ? "proofTask.localAllowance" : "proofTask.programOnly", { count: rounds })}
+        </p>
+      )}
       <label>
         {t("review.reason")}
         <input name="reason" maxLength={500} required />
@@ -105,15 +172,15 @@ function StartTaskForm({
         <input
           type="checkbox"
           checked={approved}
-          disabled={pending}
+          disabled={pending || blockedSelection}
           required
-          onChange={(event) => setApproved(event.target.checked)}
+          onChange={(event) => setApprovedScope(event.target.checked ? authorization : null)}
         />
-        {t("proofTask.authorize")}
+        {t(model ? "proofTask.externalAuthorize" : "proofTask.authorize", { model, count: rounds })}
       </label>
       <div className="project-entry-buttons">
-        <button className="button primary" type="submit" disabled={pending || !approved}>
-          {t(pending ? "common.loading" : existingRounds === undefined ? "proofTask.start" : "proofTask.resume")}
+        <button className="button primary" type="submit" disabled={pending || !approved || blockedSelection}>
+          {t(pending ? "common.loading" : policy ? "proofTask.resume" : "proofTask.start")}
         </button>
       </div>
     </form>
@@ -135,6 +202,11 @@ export function ProofTaskPane({ session, claimId }: { session: string; claimId: 
     refetchInterval: useFallbackInterval(4000),
     retry: false,
   });
+  const choosingConnection =
+    task.data?.external_model_allowed === true &&
+    task.data.can_start &&
+    (task.data.state === "stopped" || !task.data.policy);
+  const connections = useModelConnections(session, choosingConnection);
   const action = useMutation({
     mutationFn: ({ kind, details }: Action) =>
       api<{ policy_id: string }>(session, "/api/proof-task/" + kind, { data: { claim_id: claimId, ...details } }),
@@ -155,6 +227,10 @@ export function ProofTaskPane({ session, claimId }: { session: string; claimId: 
     );
   }
   const { state, title, scope, receipt, decisions, blocker, policy, phase, obligations, adopted } = task.data;
+  const model = policy?.public_model;
+  const usage = policy?.model_usage?.filter(
+    ({ input_tokens, output_tokens, cost_usd }) => input_tokens != null || output_tokens != null || cost_usd != null,
+  );
   const counterexample = receipt?.kind === "counterexample";
   const stateKey = adopted
     ? counterexample
@@ -177,6 +253,31 @@ export function ProofTaskPane({ session, claimId }: { session: string; claimId: 
         {t(stateKey)}
       </p>
       {phaseText && <p className="project-entry-note">{phaseText}</p>}
+      {model && (
+        <p className="project-entry-note">
+          {t("proofTask.selectedModel", {
+            model: `${t(`team.providers.${model.provider}`)} · ${connectionModelLabel(t, model)}`,
+          })}
+        </p>
+      )}
+      {model && Boolean(usage?.length) && (
+        <details>
+          <summary>{t("proofTask.usage")}</summary>
+          <ol>
+            {usage?.map(({ input_tokens, output_tokens, cost_usd }, index) => (
+              <li key={index}>
+                {[
+                  input_tokens != null && t("proofTask.inputTokens", { count: input_tokens }),
+                  output_tokens != null && t("proofTask.outputTokens", { count: output_tokens }),
+                  cost_usd != null && t("proofTask.cost", { value: cost_usd }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
       {blocker && (
         <p className="project-entry-note">
           {t(`errors.${blocker.startsWith("proof_task.") ? blocker : "proof_task." + blocker}`, {
@@ -253,12 +354,20 @@ export function ProofTaskPane({ session, claimId }: { session: string; claimId: 
           {t(`errors.${action.error.message}`, { defaultValue: t("projectEntry.failed") })}
         </p>
       )}
+      {choosingConnection && connections.isError && (
+        <p className="project-entry-status" role="alert">
+          {t("errors.connection.unavailable")}
+        </p>
+      )}
       {task.data.can_start && scope.token && (
         <StartTaskForm
-          key={scope.token + ":" + (policy?.fingerprint ?? "") + ":" + task.data.local_model_allowed}
+          key={scope.token + ":" + (policy?.fingerprint ?? "") + ":" + (state === "stopped")}
           token={scope.token}
-          existingRounds={policy?.model_rounds}
+          policy={state === "stopped" ? null : policy}
           localModelAllowed={task.data.local_model_allowed}
+          externalModelAllowed={task.data.external_model_allowed === true}
+          connections={(connections.data?.connections ?? []).filter(dispatchableConnection)}
+          requiresExternal={state === "stopped"}
           pending={action.isPending}
           onStart={(details) => action.mutate({ kind: "start", details })}
         />

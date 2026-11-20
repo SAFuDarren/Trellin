@@ -69,6 +69,7 @@ export type ActivityRecord = {
   /** Reasoning effort the agent ran with, for example "xhigh". */
   effort?: string;
   audience?: string;
+  current_scope?: boolean;
 };
 export type GuidanceNote = {
   id: string;
@@ -77,6 +78,7 @@ export type GuidanceNote = {
   created_at: string;
   submitted_at?: string | null;
   audience?: string;
+  current_scope?: boolean;
 };
 export type ActivitySnapshot = {
   claim_id: string;
@@ -85,6 +87,7 @@ export type ActivitySnapshot = {
   guidance_channels?: string[];
   guidance_available?: boolean;
   guidance_reason?: string;
+  guidance_blocker?: string | null;
 };
 
 export type AtlasClaim = {

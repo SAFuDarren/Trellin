@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { useLibrary, type LibraryItem } from "../api/sections";
+import { LibraryRevisionDialog } from "../components/library/LibraryRevisionDialog";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
 import { summarize, timeText } from "../workbench/text";
@@ -10,6 +12,30 @@ export function itemName(t: TFunction, item: LibraryItem): string {
   if (item.declaration) return item.declaration;
   if (item.natural) return summarize(item.natural.split("\n")[0] ?? "", 48);
   return t(`library.kinds.${item.kind ?? "item"}`, { defaultValue: item.kind ?? item.logical_key });
+}
+
+const STATE_TONES = {
+  withdrawn: "bad",
+  needsRecheck: "warn",
+  admitted: "ok",
+  notAdmitted: "none",
+} as const;
+
+function LibraryItemState({ t, item }: { t: TFunction; item: LibraryItem }) {
+  const state = item.retired
+    ? "withdrawn"
+    : item.needs_recheck
+      ? "needsRecheck"
+      : item.admitted
+        ? "admitted"
+        : "notAdmitted";
+
+  return (
+    <span className="library-item-state">
+      <span className="status-dot" data-tone={STATE_TONES[state]} aria-hidden="true" />
+      <span>{t(`library.${state}`)}</span>
+    </span>
+  );
 }
 
 export function LibraryPage({
@@ -23,6 +49,8 @@ export function LibraryPage({
 }) {
   const { t, i18n } = useTranslation();
   const library = useLibrary(session);
+  const queries = useQueryClient();
+  const [editing, setEditing] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const items = library.data?.items ?? [];
   const [filterKey = "", selectedId = ""] = sub.split("~");
@@ -47,6 +75,11 @@ export function LibraryPage({
   );
   const selected = shown.find((item) => item.id === selectedId) ?? shown[0];
   const link = (filter: string) => href("library", filter);
+  const choose = (id: string) => (window.location.hash = link(filterKey + "~" + id));
+  const edit = (id: string) => {
+    choose(id);
+    setEditing(id);
+  };
   const entry = (filter: string, label: string, count: number) => ({
     key: filter,
     label,
@@ -120,6 +153,7 @@ export function LibraryPage({
                       {t("library.usedBy")}
                     </th>
                     <th scope="col">{t("library.source")}</th>
+                    <th scope="col">{t("libraryEdit.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -129,16 +163,34 @@ export function LibraryPage({
                       data-row="true"
                       aria-selected={item === selected}
                       tabIndex={0}
-                      onClick={() => (window.location.hash = link((filterKey || "") + "~" + item.id))}
+                      onClick={() => choose(item.id)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter") window.location.hash = link((filterKey || "") + "~" + item.id);
+                        if (event.target === event.currentTarget && event.key === "Enter") choose(item.id);
                       }}
                     >
-                      <td className="mono">{itemName(t, item)}</td>
+                      <td>
+                        <div className="stack">
+                          <span className="mono">{itemName(t, item)}</span>
+                          <LibraryItemState t={t} item={item} />
+                        </div>
+                      </td>
                       <td className="math">{summarize(item.lean ?? item.formula ?? "", 60)}</td>
-                      <td className="muted">{"v" + item.version}</td>
+                      <td className="muted">{"v" + (item.statement_revision ?? item.version)}</td>
                       <td className="num">{item.used_by.length}</td>
                       <td className="muted">{t(`library.origins.${item.origin}`, { defaultValue: item.origin })}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="relation"
+                          aria-label={t("libraryEdit.editItem", { name: itemName(t, item) })}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            edit(item.id);
+                          }}
+                        >
+                          {t("libraryEdit.edit")}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -156,22 +208,24 @@ export function LibraryPage({
             </span>
             <div className="title-row">
               <h3 className="mono">{itemName(t, selected)}</h3>
+              <button className="button" type="button" onClick={() => edit(selected.id)}>
+                {t("libraryEdit.edit")}
+              </button>
             </div>
             {selected.natural && <p>{selected.natural}</p>}
             {selected.formula && <p className="formula">{selected.formula}</p>}
             {selected.lean && <pre className="code-block">{selected.lean}</pre>}
             <dl className="facts">
               <dt>{t("library.version")}</dt>
-              <dd>{"v" + selected.version + " · " + timeText(i18n.language, selected.created_at, true)}</dd>
+              <dd>
+                {"v" +
+                  (selected.statement_revision ?? selected.version) +
+                  " · " +
+                  timeText(i18n.language, selected.created_at, true)}
+              </dd>
               <dt>{t("library.state")}</dt>
               <dd>
-                {selected.retired
-                  ? t("library.withdrawn")
-                  : selected.needs_recheck
-                    ? t("library.needsRecheck")
-                    : selected.admitted
-                      ? t("library.admitted")
-                      : t("library.notAdmitted")}
+                <LibraryItemState t={t} item={selected} />
               </dd>
               <dt>{t("library.usedBy")}</dt>
               <dd>
@@ -187,6 +241,20 @@ export function LibraryPage({
           </aside>
         )}
       </div>
+      {editing && (
+        <LibraryRevisionDialog
+          key={editing}
+          session={session}
+          id={editing}
+          onCancel={() => setEditing(null)}
+          onSaved={async ({ id }) => {
+            await queries.invalidateQueries({ queryKey: ["library"] });
+            setQuery("");
+            window.location.hash = link("~" + id);
+            setEditing(null);
+          }}
+        />
+      )}
     </SectionLayout>
   );
 }

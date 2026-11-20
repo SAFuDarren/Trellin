@@ -4,11 +4,17 @@ Open the local PostgreSQL-backed workbench for the workspace. Both actions are a
 
 ## Organize with AI
 
-Choose **Organize with AI** and provide the title, subject, research objective and material you want to organize. Paste the text or select a supported text file. Choose an installed model from the running local Ollama service, then request a draft. Trellin uses only the submitted text with the on-device model.
+Choose **Organize with AI** and provide the title, subject, research objective and material you want to organize. Paste the text or select a supported text file. For private material, choose an installed local Ollama model and request a draft. For a public excerpt, choose a connection you added in **Team → Runtimes → Model connections**. Check the excerpt, objective and provider in the preview, then choose **Send this public excerpt**.
 
 The suggestions quote the material they came from. Review each proposed definition, hypothesis or theorem and its suggested formalization. Decide which items belong in the starting basis and supply your review details. An unresolved statement needs a formalization or can be left out. A draft can be reopened for review. Model output stays a suggestion until you confirm it. The proof workflow and its authorization remain tied to the later confirmed claim.
 
-The list of models comes from the local Ollama service on this machine. Start that service with a supported text model available before using the button. The model choice applies to this request. This entry uses a local Ollama model and records the request with the existing intake workflow.
+### Connect a model
+
+Choose **Team → Runtimes → Model connections → Add connection**. Select an installed Codex or Claude Code instance detected by Trellin. Sign in through the native CLI if prompted, then check again. Choose a model from the list or keep the provider default. Codex supplies its model list when supported by the installed CLI. Claude Code offers model families whose availability depends on your account. You can also enter a model identifier supported by your account. Each chosen model is a separate connection so you can select it for intake and proof work. Use **Test connection** to check account access with a short example request.
+
+To connect directly to the OpenAI or Anthropic API, choose the API option and enter the model identifier and your API key. Trellin stores direct API keys in the macOS Keychain. The connection list contains only the models you added.
+
+**Test connection** sends one fixed request without project material. Choose **Remove connection** to prevent future requests on that connection. The project retains the prior model results and verification records. For on-device intake, start the local Ollama service with a supported text model.
 
 ## Add theorem
 

@@ -17,6 +17,7 @@ SUPPORTING_RELATIONS = {
     "claim_evidence_revisions": "evidence freshness fence",
     "claim_node_numbers": "assigned from the captured proof node source",
     "claim_reference_aliases": "captured on the canonical claim code change",
+    "conversation_turns": "submitted and completed in the same transaction as the captured thread update",
     "database_identity": "initial workspace binding, before a subscriber exists",
     "exploration_goal_links": "written with the captured child packet",
     "formal_item_keys": "version allocation alongside formal_item_versions",
@@ -96,7 +97,8 @@ def test_workspace_writer_relations_have_event_coverage_or_a_supporting_record()
                 FROM pg_trigger t JOIN pg_class target ON t.tgrelid = target.oid
                 JOIN pg_namespace n ON target.relnamespace = n.oid
                 JOIN pg_proc handler ON t.tgfoid = handler.oid
-                WHERE n.nspname = 'rm' AND NOT t.tgisinternal AND t.tgname LIKE 'publish_%'
+                WHERE n.nspname = 'rm' AND NOT t.tgisinternal
+                  AND (t.tgname LIKE 'publish_%' OR handler.proname = 'capture_workspace_change_event')
             """):
                 assert enabled in ("O", "A") and deferred, (name, function)
                 captures.setdefault(name, set()).add(function)
@@ -107,6 +109,7 @@ def test_workspace_writer_relations_have_event_coverage_or_a_supporting_record()
                         assert (name, SCOPE_FIELDS[scope]) in uuid_columns
             assert not (captures.keys() & SUPPORTING_RELATIONS.keys())
             assert tables == captures.keys() | SUPPORTING_RELATIONS.keys()
+            assert captures["conversation_threads"] == {"capture_workspace_change_event"}
             assert captures["workbench_guidance"] == {"capture_workspace_change_event"}
             assert captures["clarification_resolutions"] == {"capture_workspace_change_event"}
 

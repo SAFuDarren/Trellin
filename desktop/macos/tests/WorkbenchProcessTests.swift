@@ -190,11 +190,17 @@ struct WorkbenchProcessTests {
         let environment = WorkbenchProcess.environment([
             "PATH": "/usr/bin:./bin:/custom", "RM_HUMAN_DSN": "unused",
             "RM_DATA_ROOT": "unused", "XDG_CONFIG_HOME": "/config",
+            "RM_DESKTOP_TOOL_PATH": "/tool bin:./unsafe:/usr/bin:/tool bin",
         ], home: "/home")
         precondition(environment["RM_HUMAN_DSN"] == nil)
         precondition(environment["RM_DATA_ROOT"] == nil)
         precondition(environment["XDG_CONFIG_HOME"] == "/config")
         let binaries = environment["PATH"]!.split(separator: ":")
+        precondition(binaries.first == "/tool bin")
+        precondition(binaries.filter { $0 == "/tool bin" }.count == 1)
+        precondition(binaries.filter { $0 == "/usr/bin" }.count == 1)
+        precondition(!binaries.contains("./unsafe"))
+        precondition(binaries.contains("/home/.local/bin"))
         precondition(binaries.contains("/home/.elan/bin"))
         precondition(binaries.contains("/opt/homebrew/opt/postgresql@18/bin"))
         precondition(binaries.contains("/custom"))

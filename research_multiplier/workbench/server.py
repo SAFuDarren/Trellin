@@ -14,12 +14,14 @@ from uuid import UUID, uuid4
 import webbrowser
 
 from research_multiplier.cli._output import json_default
+from research_multiplier.models import connections
 from research_multiplier.proof.lean_watch import LakeWatch
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
-                                          workbench_activity, workbench_clarification, workbench_guidance,
+                                          workbench_activity, workbench_clarification, workbench_conversations,
+                                          workbench_guidance, workbench_library,
                                           workbench_intake, workbench_proof_tasks, workbench_review, workbench_sections,
                                           workbench_theorems, workspace_events)
 
@@ -55,7 +57,25 @@ _PROJECT_WRITES = {
     "/api/theorems": workbench_theorems.add,
     "/api/theorems/confirm": workbench_theorems.confirm,
 }
+_CONNECTION_WRITES = {
+    "/api/model-connections/add": "add",
+    "/api/model-connections/add-native": "add_native",
+    "/api/model-connections/remove": "remove",
+    "/api/model-connections/test": "test",
+}
+_INTAKE_PUBLIC = ("/api/project-intake/public-preview", "/api/project-intake/public-draft")
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
+_CONVERSATION_WRITES = {
+    "/api/conversations/create": workbench_conversations.create,
+    "/api/conversations/archive": workbench_conversations.archive,
+}
+_CONVERSATION_INFERENCE = {"/api/conversations/preview", "/api/conversations/send"}
+_LIBRARY_WRITES = {"/api/library/preview", "/api/library/revise"}
+_LIBRARY_ERRORS = {
+    "libraryEdit.invalid": HTTPStatus.BAD_REQUEST, "libraryEdit.missing": HTTPStatus.NOT_FOUND,
+    "libraryEdit.stale": HTTPStatus.CONFLICT, "libraryEdit.identity": HTTPStatus.FORBIDDEN,
+    "libraryEdit.unavailable": HTTPStatus.CONFLICT,
+}
 _CLARIFICATION_WRITES = {
     "answer": workbench_clarification.answer,
     "prepare": workbench_clarification.prepare,
@@ -161,6 +181,9 @@ class WorkbenchServer(ThreadingHTTPServer):
         self._doctor = (0.0, None)
         self._doctor_lock = threading.Lock()
         self._intake_lock = threading.Lock()
+        self.connections = connections.Registry()
+        self.public_intake = workbench_intake.PublicIntake(self.connections)
+        self.discussions = workbench_conversations.Discussions(self.connections)
         self._proof_task_lock = threading.Lock()
         self.closing = threading.Event()
         self._running_policy = None
@@ -194,7 +217,7 @@ class WorkbenchServer(ThreadingHTTPServer):
             return workbench_clarification.prepare(store, workspace_id, identifier, document)
 
     def write_project(self, action, document):
-        if action is not workbench_intake.draft:
+        if action not in (workbench_intake.draft, self.public_intake.draft):
             return self.write(action, document)
         if not self._intake_lock.acquire(blocking=False):
             raise workbench_intake.IntakeError("intake.busy")
@@ -205,6 +228,31 @@ class WorkbenchServer(ThreadingHTTPServer):
                 return action(store, document)
         finally:
             self._intake_lock.release()
+
+    def send_conversation(self, document):
+        result, accepted = self.write(self.discussions.accept, document)
+        if accepted:
+            identifier = result["thread"]["id"]
+            request = UUID(document["request_id"])
+            try:
+                threading.Thread(target=self._work_on_conversation, args=(identifier, request), daemon=True).start()
+            except RuntimeError:
+                self.write(workbench_conversations.interrupted, identifier, request)
+                return self.read(workbench_conversations.thread, identifier)
+        return result
+
+    def _work_on_conversation(self, thread_id, request_id):
+        try:
+            with paths.use_workspace(self.workspace, strict=True), Store() as store:
+                self.discussions.run(store, thread_id, request_id)
+        except Exception as error:
+            _LOG.error("Workbench conversation worker stopped (%s).", type(error).__name__)
+            # An ambiguous dispatch is never replayed. Recover the thread and
+            # keep its submitted message even if the worker stopped.
+            try:
+                self.write(workbench_conversations.interrupted, thread_id, request_id)
+            except (ValueError, OSError):
+                pass  # The durable deadline exposes the interruption on re-open.
 
     def doctor(self, fresh=False):
         """Run the read-only installation check, reusing a recent report unless a fresh one is requested."""
@@ -246,21 +294,23 @@ class WorkbenchServer(ThreadingHTTPServer):
             self._running_policy = identifier
             self._failed_policy = None
             try:
-                threading.Thread(target=self._work_on_proof, args=(identifier,), daemon=True).start()
+                threading.Thread(target=self._work_on_proof, args=(identifier, "public_model" in document),
+                                 daemon=True).start()
             except RuntimeError:
                 self._running_policy = None
                 self._failed_policy = identifier
                 raise workbench_proof_tasks.ProofTaskError("proof_task.worker_failed") from None
             return result
 
-    def _work_on_proof(self, identifier):
+    def _work_on_proof(self, identifier, connected_model):
         failed = True
         try:
             with paths.use_workspace(self.workspace, strict=True):
                 lake_watch = LakeWatch()
                 failed = False
                 while not self.closing.is_set():
-                    cycle = research_progress.advance_cycle("combined", 1, [identifier], 1, lake_watch=lake_watch)
+                    cycle = research_progress.advance_cycle("combined", 1, [identifier], 1, lake_watch=lake_watch,
+                                                           public_model_policies=connected_model)
                     failed = bool(cycle["errors"])
                     if failed or not cycle["lean_runs"] or cycle["lean_runs"][0]["status"] != "search_continues":
                         break
@@ -337,10 +387,23 @@ class _Handler(BaseHTTPRequestHandler):
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
             return self.server.release_updates.snapshot()
+        if route.path == "/api/model-connections":
+            if route.query:
+                raise _BadRequest("connection.invalid")
+            return {"connections": self.server.connections.list()}
+        if route.path == "/api/model-connections/native":
+            if route.query:
+                raise _BadRequest("connection.invalid")
+            return {"providers": self.server.connections.native()}
         if route.path == "/api/project-intake/models":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
             return workbench_intake.models()
+        if route.path == "/api/conversations":
+            claim = _uuid_parameters(route.query, "claim_id")[0] if route.query else None
+            return self.server.read(workbench_conversations.threads, claim)
+        if route.path == "/api/conversations/thread":
+            return self.server.read(workbench_conversations.thread, *_uuid_parameters(route.query, "thread_id"))
         if route.path == "/api/claims":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -359,6 +422,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self.server.doctor(fresh=route.query == "fresh=1")
         if route.path == "/api/graph":
             return self.server.read(proof_graph.snapshot, *_uuid_parameters(route.query, "claim"))
+        if route.path == "/api/library/item":
+            return self.server.read(workbench_library.item, *_uuid_parameters(route.query, "version"))
         if route.path == "/api/impact":
             return self.server.read(proof_graph.impact, *_uuid_parameters(route.query, "claim", "basis"))
         if route.path == "/api/activity":
@@ -402,6 +467,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.BAD_REQUEST, str(error))
         except workbench_proof_tasks.ProofTaskError as error:
             self._error(HTTPStatus.NOT_FOUND, error.code)
+        except connections.ConnectionError as error:
+            self._error(HTTPStatus.SERVICE_UNAVAILABLE, error.code)
+        except workbench_conversations.ConversationError as error:
+            self._conversation_error(error.code)
+        except workbench_library.LibraryError as error:
+            self._error(_LIBRARY_ERRORS[str(error)], str(error))
         except claim_references.ClaimCodeError as error:
             self._error(*_claim_code_error(error))
         except DatabaseOperationError as error:
@@ -656,6 +727,20 @@ class _Handler(BaseHTTPRequestHandler):
         except (ValueError, AttributeError, TypeError, RecursionError):
             raise _BadRequest("Supply one valid guidance message with a claim, a node and a request ID.") from None
 
+    def _change_connection(self, method):
+        document = self._body()
+        registry = self.server.connections
+        if method == "add":
+            return registry.add(document)
+        if method == "add_native":
+            return registry.add_native(document)
+        if not isinstance(document, dict) or document.keys() != {"id"}:
+            raise _BadRequest("connection.invalid")
+        if method == "test":
+            return registry.test(document["id"])
+        registry.remove(document["id"])
+        return {"removed": True}
+
     def do_POST(self):
         if self.path.startswith("/api/v1/"):
             self._post_v1()
@@ -666,6 +751,16 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(HTTPStatus.FORBIDDEN, "Submit guidance from the local workbench session.")
             elif self.path == "/api/guidance":
                 self._json(HTTPStatus.OK, self.server.add_guidance(*self._guidance_body()))
+            elif self.path in _CONVERSATION_WRITES:
+                self._json(HTTPStatus.OK, self.server.write(_CONVERSATION_WRITES[self.path], self._body()))
+            elif self.path == "/api/conversations/preview":
+                self._json(HTTPStatus.OK, self.server.read(self.server.discussions.preview, self._body(64_000)))
+            elif self.path == "/api/conversations/send":
+                self._json(HTTPStatus.OK, self.server.send_conversation(self._body(64_000)))
+            elif self.path == "/api/library/preview":
+                self._json(HTTPStatus.OK, self.server.read(workbench_library.preview, self._body(_MAX_PROJECT_BYTES)))
+            elif self.path == "/api/library/revise":
+                self._json(HTTPStatus.OK, self.server.write(workbench_library.confirm, self._body(_MAX_PROJECT_BYTES)))
             elif self.path == "/api/review":
                 self._json(HTTPStatus.OK, self.server.write(workbench_sections.review, *self._review_body()))
             elif self.path == "/api/proof-task/start":
@@ -684,6 +779,13 @@ class _Handler(BaseHTTPRequestHandler):
                 except ValueError as error:
                     raise _BadRequest(str(error)) from None
                 self._json(HTTPStatus.OK, result)
+            elif self.path in _CONNECTION_WRITES:
+                self._json(HTTPStatus.OK, self._change_connection(_CONNECTION_WRITES[self.path]))
+            elif self.path == "/api/project-intake/public-preview":
+                self._json(HTTPStatus.OK, self.server.read(self.server.public_intake.preview, self._body(_MAX_PROJECT_BYTES)))
+            elif self.path == "/api/project-intake/public-draft":
+                self._json(HTTPStatus.OK, self.server.write_project(self.server.public_intake.draft,
+                                                                   self._body(_MAX_PROJECT_BYTES)))
             elif self.path in _PROJECT_WRITES:
                 document = self._body(_MAX_PROJECT_BYTES)
                 if not isinstance(document, dict):
@@ -705,15 +807,29 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(status, error.code)
         except claim_references.ClaimCodeError as error:
             self._error(*_claim_code_error(error))
+        except connections.ConnectionError as error:
+            self._error(HTTPStatus.CONFLICT, error.code)
+        except workbench_conversations.ConversationError as error:
+            self._conversation_error(error.code)
         except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:
             self._error(HTTPStatus.CONFLICT, str(error))
+        except workbench_library.LibraryError as error:
+            self._error(_LIBRARY_ERRORS[str(error)], str(error))
         except DatabaseOperationError as error:
-            if self.path in _PROOF_WRITES:
+            if self.path in _CONVERSATION_WRITES or self.path in _CONVERSATION_INFERENCE:
+                code = {
+                    "42501": "identity", "P0002": "missing", "55006": "busy",
+                    "23514": "stale", "23505": "stale",
+                }.get(error.state, "unavailable")
+                self._conversation_error(f"conversation.{code}")
+            elif self.path in _PROOF_WRITES:
                 status = HTTPStatus.SERVICE_UNAVAILABLE if error.retryable else HTTPStatus.CONFLICT
                 self._error(status, "proof_task.unavailable" if error.retryable else "proof_task.stale")
             elif self.path == "/api/claim-code":
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "claim_code.save_failed")
-            elif self.path in _PROJECT_WRITES:
+            elif self.path in _LIBRARY_WRITES:
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "libraryEdit.unavailable")
+            elif self.path in _PROJECT_WRITES or self.path in _INTAKE_PUBLIC:
                 self._error(HTTPStatus.CONFLICT, "intake.save_failed")
             elif error.state == "23514" or (self.path == "/api/review" and not error.retryable):
                 self._error(HTTPStatus.CONFLICT, "The record has changed; refresh and try again.")
@@ -727,11 +843,24 @@ class _Handler(BaseHTTPRequestHandler):
                 message = "proof_task.unavailable"
             elif self.path == "/api/claim-code":
                 message = "claim_code.save_failed"
-            elif self.path in _PROJECT_WRITES:
+            elif self.path in _LIBRARY_WRITES:
+                message = "libraryEdit.unavailable"
+            elif self.path in _PROJECT_WRITES or self.path in _INTAKE_PUBLIC:
                 message = "intake.save_failed"
+            elif self.path in _CONVERSATION_WRITES or self.path in _CONVERSATION_INFERENCE:
+                message = "conversation.unavailable"
             else:
                 message = "Could not send guidance to this project."
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, message)
+
+    def _conversation_error(self, code):
+        status = {
+            "conversation.invalid": HTTPStatus.BAD_REQUEST,
+            "conversation.identity": HTTPStatus.FORBIDDEN,
+            "conversation.missing": HTTPStatus.NOT_FOUND,
+            "conversation.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
+        }.get(code, HTTPStatus.CONFLICT)
+        self._error(status, code)
 
 
 def _check_schema(store):

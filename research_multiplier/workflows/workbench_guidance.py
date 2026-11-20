@@ -5,6 +5,15 @@ from uuid import UUID
 from . import proof_graph
 
 
+_BLOCKERS = {
+    "schema": "Notes need database version 0070 to be enabled.",
+    "scope": "Confirm the Lean statement and its basis for this claim first.",
+    "codex_schema": "Notes to Codex need database version 0071 to be enabled.",
+    "connected_schema": "Update this workspace’s database to use proof notes with a Team connection.",
+    "public_basis": "This proof scope includes material that has not been released to Codex.",
+}
+
+
 def installed(store, role):
     return store.query(role, """
         SELECT to_regprocedure('rm.pending_workbench_guidance(uuid)') IS NOT NULL AS installed
@@ -17,6 +26,12 @@ def _codex_installed(store, role):
     """)[0]["installed"]
 
 
+def connected_installed(store, role):
+    return store.query(role, """
+        SELECT to_regprocedure('rm.workbench_codex_release_available(uuid)') IS NOT NULL AS installed
+    """)[0]["installed"]
+
+
 def _anchor(store, claim_id):
     rows = store.query("human", """
         SELECT s.id, c.sensitivity FROM rm.lean_statement_status s JOIN rm.claims c ON c.id = s.claim_id
@@ -26,24 +41,42 @@ def _anchor(store, claim_id):
     return rows[0] if rows else None
 
 
-def _channels(store, anchor, codex_schema):
+def _availability(store, anchor, codex_schema):
     if anchor is None:
-        return []
+        return [], "scope"
     if anchor["sensitivity"] == "restricted":
-        return ["local"]
-    if codex_schema and store.query("human", "SELECT rm.workbench_codex_available(%s) AS allowed",
-                                   anchor["id"])[0]["allowed"]:
-        return ["codex"]
-    return []
+        return ["local"], None
+    if not codex_schema:
+        return [], "codex_schema"
+    if connected_installed(store, "human"):
+        [row] = store.query("human", "SELECT rm.workbench_codex_release_available(%s) AS allowed", anchor["id"])
+        return (["codex"], None) if row["allowed"] else ([], "public_basis")
+    [row] = store.query("human", """
+        SELECT rm.workbench_codex_available(%s) AS allowed, EXISTS (
+            SELECT FROM rm.research_progress_status p
+            JOIN rm.lean_statement_status s ON s.id = %s AND p.packet_id = s.packet_id
+                AND p.claim_id = s.claim_id AND p.contract_sha256 = s.contract_sha256
+            WHERE p.approved_at IS NOT NULL AND p.stopped_at IS NULL
+                AND p.policy #>> '{lean,statement_id}' = s.id::text
+                AND p.policy #>> '{lean,statement_sha256}' = s.statement_sha256
+                AND p.policy #> '{lean,private_model}' IS NULL AND p.policy #> '{lean,public_model}' IS NULL
+                AND (p.policy #>> '{lean,model_rounds}')::integer > 0
+        ) AS legacy
+    """, anchor["id"], anchor["id"])
+    return (["codex"], None) if row["allowed"] and row["legacy"] else ([], "connected_schema")
+
+
+def _response(rows, channels, blocker):
+    return {"guidance": rows, "guidance_available": bool(channels), "guidance_channels": channels,
+            "guidance_reason": _BLOCKERS.get(blocker, ""), "guidance_blocker": blocker}
 
 
 def activity(store, claim_id):
     if not installed(store, "human"):
-        return {"guidance": [], "guidance_available": False, "guidance_channels": [],
-                "guidance_reason": "Notes need database version 0070 to be enabled."}
+        return _response([], [], "schema")
     anchor = _anchor(store, claim_id)
     codex_schema = _codex_installed(store, "human")
-    channels = _channels(store, anchor, codex_schema)
+    channels, blocker = _availability(store, anchor, codex_schema)
     audience = "n.audience" if codex_schema else "'local'::text AS audience"
     rows = store.query("human", f"""
         SELECT n.id, n.node_id, n.text, n.created_at, s.submitted_at, s.attempt_id, {audience},
@@ -54,16 +87,7 @@ def activity(store, claim_id):
         ORDER BY n.created_at DESC, n.id DESC
         LIMIT 40
     """, anchor["id"] if anchor else None, claim_id)
-    if channels:
-        reason = ""
-    elif anchor is None:
-        reason = "Confirm the Lean statement and its basis for this claim first."
-    elif not codex_schema:
-        reason = "Notes to Codex need database version 0071 to be enabled."
-    else:
-        reason = "Notes to Codex need a public basis that may be shared and an approved public automation policy."
-    return {"guidance": rows, "guidance_available": bool(channels),
-            "guidance_channels": channels, "guidance_reason": reason}
+    return _response(rows, channels, blocker)
 
 
 class GuidanceError(ValueError):
@@ -100,8 +124,9 @@ def add(store, claim_id, statement_id, request_id, node_id, text, *, audience="l
     anchor = _anchor(store, claim_id)
     if anchor is None or anchor["id"] != statement_id:
         raise GuidanceError("The Lean statement is unconfirmed or has changed; refresh and try again.")
-    if audience not in _channels(store, anchor, codex_schema):
-        raise GuidanceError("This claim does not accept notes on this channel.")
+    channels, blocker = _availability(store, anchor, codex_schema)
+    if audience not in channels:
+        raise GuidanceError(_BLOCKERS.get(blocker, "This claim does not accept notes on this channel."))
     graph = proof_graph.snapshot(store, claim_id)
     if graph["claim"]["statement_id"] != str(statement_id) or not any(node["id"] == node_id for node in graph["nodes"]):
         raise GuidanceError("This node has changed; refresh the claim first.")

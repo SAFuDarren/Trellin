@@ -2,7 +2,12 @@ export type DesktopPosition = { claimId: string; nodeId: string };
 
 type DesktopWindow = Window & {
   trellinPosition?: DesktopPosition;
-  webkit?: { messageHandlers?: { trellinPosition?: { postMessage: (position: DesktopPosition) => void } } };
+  webkit?: {
+    messageHandlers?: {
+      trellinPosition?: { postMessage: (position: DesktopPosition) => void };
+      trellinUpgradeProject?: { postMessage: (request: "confirm") => void };
+    };
+  };
 };
 
 export function desktopPosition(): DesktopPosition | undefined {
@@ -16,4 +21,9 @@ export function saveDesktopPosition(position: DesktopPosition): void {
     desktop.trellinPosition = position;
     bridge.postMessage(position);
   }
+}
+
+export function desktopProjectUpgrade(): (() => void) | undefined {
+  const bridge = (window as DesktopWindow).webkit?.messageHandlers?.trellinUpgradeProject;
+  return bridge && (() => bridge.postMessage("confirm"));
 }

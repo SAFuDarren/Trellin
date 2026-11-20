@@ -1,13 +1,13 @@
 """Advance signed research policies using stored plans and verifier observations."""
 
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from contextvars import copy_context
 from time import monotonic_ns
 from uuid import UUID
 
 from research_multiplier.workflows import research_plans
-from research_multiplier.workflows.runtime import VerificationQueueError
+from research_multiplier.workflows.runtime import BeforeDispatchUnavailable, VerificationQueueError
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.protocol.serialization import json_text
 from research_multiplier.storage.lean_progress import PendingLeanPass, hold_lean_pass, pending_lean_passes
@@ -100,14 +100,22 @@ def specification(document):
     return defaults
 
 
-def propose(document, *, store=None):
+def propose(document, *, store=None, public_model=None):
     policy = specification(document)
+    if public_model is not None and (policy["actions"] != ["lean"] or not policy["lean_model_rounds"]
+                                     or policy.get("lean_model_scope") == "local"
+                                     or policy.get("lean_route_parallelism", 1) != 1):
+        raise ValueError("A connected public model needs a bounded Lean policy.")
     with (Store() if store is None else nullcontext(store)) as store:
         if policy["actions"] == ["lean"]:
             bound = store.query("human", "SELECT packet_id FROM rm.lean_statement_status WHERE id = %s",
                                 policy["lean_statement_id"])
             if not bound or str(bound[0]["packet_id"]) != policy["packet_id"]:
                 raise ValueError("The Lean statement must belong to the selected packet.")
+            if public_model is not None:
+                return store.query("human", "SELECT * FROM rm.propose_public_model_lean_progress(%s,%s,%s,%s)",
+                                   policy["lean_statement_id"], policy["lean_model_rounds"], policy["priority"],
+                                   store.json(public_model))[0]
             private = None
             if policy.get("lean_model_scope") == "local":
                 from research_multiplier.model_adapters import ModelConfig
@@ -171,6 +179,55 @@ def _pass_summary(step):
     return {key: step[key][:1000] if isinstance(step[key], str) else step[key] for key in keys if key in step}
 
 
+def _public_model_author(binding, claimed):
+    from research_multiplier.models.connections import ConnectionError, Registry
+
+    registry = Registry()
+    connection_id = binding["id"]
+
+    def unchanged():
+        try:
+            return registry.identity(connection_id) == binding
+        except ConnectionError:
+            return False
+
+    def require_same(selected, current):
+        if (selected.private or selected.provider != binding["provider"] or selected.model != binding["model"]
+                or current != binding):
+            raise ValueError("The signed public model connection is unavailable.")
+        return selected
+
+    def config():
+        try:
+            return require_same(*registry.resolve(connection_id))
+        except ConnectionError:
+            raise ValueError("The signed public model connection is unavailable.") from None
+
+    if not unchanged():
+        raise ValueError("The signed public model connection is unavailable.")
+
+    def continue_work():
+        return claimed.is_active() and unchanged()
+
+    @contextmanager
+    def use():
+        try:
+            with registry.use(connection_id) as result:
+                try:
+                    active = claimed.is_active()
+                except DatabaseOperationError as error:
+                    if error.retryable:
+                        raise BeforeDispatchUnavailable(error) from error
+                    raise
+                if not active:
+                    raise ValueError("The signed public proof policy is no longer active.")
+                yield require_same(*result)
+        except ConnectionError:
+            raise ValueError("The signed public model connection is unavailable.") from None
+
+    return config, continue_work, use
+
+
 def _run_lean_policy(item: PendingLeanPass, *, lean, mathlib_project, lean_search_strategy=None, route_slots=1):
     from research_multiplier.workflows.lean_search import search
 
@@ -186,12 +243,21 @@ def _run_lean_policy(item: PendingLeanPass, *, lean, mathlib_project, lean_searc
             if ModelConfig.from_env("LEAN_AUTHOR", private=True).private_provenance() != private:
                 raise ValueError("Use the exact private model configuration signed for this Lean policy.")
         continuation = claimed.continuation() if rounds else None
+        public_model = setting.public_model
+        if item.connected_model != (public_model is not None):
+            raise ValueError("The proof worker did not select the signed model queue.")
+        continue_work = claimed.is_active
         strategy, author, route_event = lean_search_strategy or "ranked", None, None
-        if lean_search_strategy is None and private is None:
+        if public_model is not None:
+            author, continue_work, use_public_model = _public_model_author(public_model, claimed)
+        elif lean_search_strategy is None and private is None:
             from research_multiplier.evaluations import lean_evolution
             strategy, author, route_event = lean_evolution.selection(store, needs_model=bool(rounds))
         options = {"author_config": author} if author is not None else {}
-        if rounds:
+        if public_model is not None:
+            options.update(policy_id=item.policy_id, public_model=public_model, use_public_model=use_public_model)
+            options["workbench_guidance_enabled"] = public_model["provider"] == "codex-cli"
+        elif rounds:
             options["workbench_guidance_enabled"] = True
         route_width = setting.route_parallelism
         if route_width > 1:
@@ -201,7 +267,7 @@ def _run_lean_policy(item: PendingLeanPass, *, lean, mathlib_project, lean_searc
         try:
             outcome = search(item.statement_id, rounds=rounds, confirm_public=bool(rounds) and private is None,
                              confirm_local=private is not None, lean=lean, mathlib_project=mathlib_project,
-                             continue_work=claimed.is_active, continuation=continuation,
+                             continue_work=continue_work, continuation=continuation,
                              max_new_rounds=min(route_width, route_slots), strategy=strategy, **options)
         except VerificationQueueError as error:
             if error.retryable:
@@ -238,7 +304,7 @@ def _run_lean_policy(item: PendingLeanPass, *, lean, mathlib_project, lean_searc
 
 
 def advance_cycle(stage, limit, policy_ids=None, parallel=2, *, lean=None, mathlib_project=None, lake_watch=None,
-                  lean_search_strategy=None):
+                  lean_search_strategy=None, public_model_policies=False):
     if stage not in ("combined", "scheduler", "verifier"):
         raise ValueError("Choose combined, scheduler or verifier work.")
     if type(limit) is not int or not 1 <= limit <= 64:
@@ -246,6 +312,8 @@ def advance_cycle(stage, limit, policy_ids=None, parallel=2, *, lean=None, mathl
     if type(parallel) is not int or not 1 <= parallel <= 8:
         raise ValueError("Choose 1 to 8 local work slots.")
     scope = research_plans.worker_scope(policy_ids) if policy_ids is not None else None
+    if public_model_policies and (stage != "combined" or not scope):
+        raise ValueError("Run a connected public model only for an explicitly selected proof policy.")
     observations, started = 0, 0
     plans = []
     errors = []
@@ -276,7 +344,8 @@ def advance_cycle(stage, limit, policy_ids=None, parallel=2, *, lean=None, mathl
             if stage == "combined" and started < work_limit:
                 if lake_watch is not None:
                     lake_watch.observe(store, scope)
-                lean_ready = pending_lean_passes(store, work_limit - started, scope)
+                lean_ready = pending_lean_passes(store, work_limit - started, scope,
+                                                 public_model_policies=public_model_policies)
                 if lean_ready:
                     worker_count = min(parallel, len(lean_ready))
                     route_slots = max(1, parallel // worker_count)

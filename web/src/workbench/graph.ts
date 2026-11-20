@@ -12,7 +12,15 @@ import type {
 } from "./types";
 import { claimCode, modelName, nodeTitle } from "./text";
 
-export const CARD = { width: 160, pitch: 196, row: 132, pad: 48 };
+export const CARD = { width: 160, height: 72, horizontalGap: 36, verticalGap: 60, pad: 48 };
+export type CardSize = { width: number; height: number };
+
+export function clampCardSize({ width, height }: CardSize): CardSize {
+  return {
+    width: Math.round(Math.max(140, Math.min(540, width))),
+    height: Math.round(Math.max(60, Math.min(360, height))),
+  };
+}
 
 export type Edge = GraphEdge & { key: string; drawKind: "actual" | "planned" | "context" };
 
@@ -148,33 +156,43 @@ function nodeCodes(claim: GraphSnapshot["claim"], levels: string[][], nodes: Map
 export type Point = { x: number; y: number };
 export type Layout = { points: Map<string, Point>; width: number; height: number; paths: Map<string, string> };
 
-/** Dependencies sit below what uses them, so the claim reads from the top. Heights come from the rendered cards. */
-export function layoutGraph(graph: Graph, heights: Map<string, number>): Layout {
-  const ranks = graph.levels.length;
-  const breadth = graph.levels.reduce((largest, level) => Math.max(largest, level.length), 1);
-  const width = 2 * CARD.pad + (breadth - 1) * CARD.pitch + CARD.width;
+/** Dependencies sit below what uses them. Every rank reserves room for its tallest and widest cards. */
+export function layoutGraph(graph: Graph, sizes: ReadonlyMap<string, CardSize>): Layout {
+  const sizeOf = (id: string) => sizes.get(id) ?? CARD;
+  const rows = graph.levels
+    .slice()
+    .reverse()
+    .map((nodes) => ({
+      nodes,
+      width:
+        nodes.reduce((total, id) => total + sizeOf(id).width, 0) + CARD.horizontalGap * Math.max(0, nodes.length - 1),
+      height: nodes.reduce((tallest, id) => Math.max(tallest, sizeOf(id).height), 0),
+    }));
+  const contentWidth = rows.reduce((widest, row) => Math.max(widest, row.width), CARD.width);
+  const width = contentWidth + CARD.pad * 2;
   const points = new Map<string, Point>();
-  graph.levels.forEach((group, rank) => {
-    const y = CARD.pad + (ranks - 1 - rank) * CARD.row;
-    const start = CARD.pad + ((breadth - group.length) * CARD.pitch) / 2;
-    group.forEach((id, position) => points.set(id, { x: start + position * CARD.pitch, y }));
+  let y = CARD.pad;
+  rows.forEach((row, position) => {
+    let x = CARD.pad + (contentWidth - row.width) / 2;
+    for (const id of row.nodes) {
+      points.set(id, { x, y });
+      x += sizeOf(id).width + CARD.horizontalGap;
+    }
+    y += row.height + (position < rows.length - 1 ? CARD.verticalGap : 0);
   });
-  let height = 0;
-  for (const [id, point] of points) height = Math.max(height, point.y + (heights.get(id) ?? 72));
-  height += CARD.pad;
   const paths = new Map<string, string>();
   for (const edge of graph.edges) {
     const a = points.get(edge.source);
     const b = points.get(edge.target);
     if (!a || !b) continue;
-    const ax = a.x + CARD.width / 2;
-    const bx = b.x + CARD.width / 2;
+    const ax = a.x + sizeOf(edge.source).width / 2;
+    const bx = b.x + sizeOf(edge.target).width / 2;
     const top = a.y;
-    const bottom = b.y + (heights.get(edge.target) ?? 72);
+    const bottom = b.y + sizeOf(edge.target).height;
     const middle = (top + bottom) / 2;
     paths.set(edge.key, `M ${ax} ${top} C ${ax} ${middle}, ${bx} ${middle}, ${bx} ${bottom}`);
   }
-  return { points, width, height, paths };
+  return { points, width, height: y + CARD.pad, paths };
 }
 
 function traceEdges(first: string, edgeIndex: Map<string, Edge[]>, endpoint: "source" | "target"): Set<Edge> {

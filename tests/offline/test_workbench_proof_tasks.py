@@ -1,15 +1,20 @@
-"""Exercise the workbench's signed proof policy boundary without a model."""
+"""Exercise the workbench's signed proof policy boundary without network calls."""
 
+from contextlib import contextmanager
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
 
+from research_multiplier.models import connections
+from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workflows import workbench_proof_tasks as tasks
 
 
 pytestmark = pytest.mark.offline
 CLAIM, PACKET, STATEMENT, ITEM, POLICY = (UUID(int=value) for value in range(1, 6))
 DIGEST = "a" * 64
+PUBLIC_MODEL = {"id": str(UUID(int=6)), "fingerprint": "b" * 64, "provider": "claude-code", "model": "claude-opus-test"}
 
 
 class ProofStore:
@@ -18,6 +23,7 @@ class ProofStore:
         self.policy = None
         self.receipt = None
         self.roles = None
+        self.external_schema = True
 
     def query(self, role, sql, *values):
         assert role == "human"
@@ -32,6 +38,8 @@ class ProofStore:
             return [self.policy] if self.policy else []
         if "evidence_foundation_status" in sql:
             return [self.receipt] if self.receipt else []
+        if "to_regprocedure" in sql:
+            return [{"available": self.external_schema}]
         raise AssertionError(sql)
 
     def verify_runtime_roles(self, *, roles):
@@ -155,3 +163,104 @@ def test_stop_checks_claim_policy_and_never_confuses_verified_with_adopted(monke
     record["conclusion"] = {"reference": {"evidence_id": str(ITEM)}}
     store.receipt["review_status"] = "approved"
     assert tasks.snapshot(store, CLAIM)["adopted"] is True
+
+
+def _public_command(document):
+    return {**document, "model_rounds": 2, "confirm_external": True,
+            "public_model": {"id": PUBLIC_MODEL["id"], "fingerprint": PUBLIC_MODEL["fingerprint"]}}
+
+
+def test_public_model_policy_signs_the_exact_chosen_connection(monkeypatch, proof_context):
+    store, _, document = proof_context
+    monkeypatch.setattr(tasks, "_public_model_identity", lambda identity: PUBLIC_MODEL if identity == PUBLIC_MODEL["id"] else None)
+    changes = []
+
+    def propose(specification, *, store, public_model):
+        assert public_model == PUBLIC_MODEL
+        assert specification["lean_model_rounds"] == 2 and "lean_model_scope" not in specification
+        changes.append("propose")
+        return _policy(rounds=2)
+
+    def approve(identifier, signature, actor, reason, *, store):
+        changes.append("approve")
+        store.policy = {**_policy(rounds=2), "public_model": PUBLIC_MODEL}
+
+    monkeypatch.setattr(tasks.research_progress, "propose", propose)
+    monkeypatch.setattr(tasks.research_progress, "approve", approve)
+    command = _public_command(document)
+    assert tasks.start(store, command) == {"policy_id": str(POLICY)}
+    assert store.roles == ("scheduler", "verifier", "agent")
+    assert tasks.snapshot(store, CLAIM)["policy"]["public_model"] == PUBLIC_MODEL
+    assert tasks.start(store, command) == {"policy_id": str(POLICY)}
+    assert changes == ["propose", "approve", "propose"]
+    monkeypatch.setattr(tasks, "_public_model_identity", lambda _identity: None)
+    assert tasks.snapshot(store, CLAIM)["blocker"] == "proof_task.external_unavailable"
+    with pytest.raises(tasks.ProofTaskError, match="proof_task.external_unavailable"):
+        tasks.start(store, command)
+
+
+@pytest.mark.parametrize("change", ["old_schema", "private", "unconfirmed", "stale_connection", "restricted_basis"])
+def test_public_dispatch_denial_writes_no_approval(monkeypatch, proof_context, change):
+    store, record, document = proof_context
+    command = _public_command(document)
+    monkeypatch.setattr(tasks, "_public_model_identity", lambda _identity: PUBLIC_MODEL)
+    monkeypatch.setattr(tasks.research_progress, "approve", lambda *args, **kwargs: pytest.fail("Unexpected approval"))
+
+    def propose(*args, **kwargs):
+        if change == "restricted_basis":
+            raise DatabaseOperationError("human", "23514", "A premise is not public.", retryable=False)
+        pytest.fail("Unexpected proposal")
+
+    monkeypatch.setattr(tasks.research_progress, "propose", propose)
+    expected = "external_unavailable"
+    if change == "old_schema":
+        store.external_schema = False
+    elif change == "private":
+        record["details"]["sensitivity"] = "restricted"
+        monkeypatch.setattr(tasks, "_local_model", lambda _: None)
+    elif change == "unconfirmed":
+        command["confirm_external"] = False
+        expected = "invalid"
+    elif change == "stale_connection":
+        command["public_model"]["fingerprint"] = "f" * 64
+    else:
+        expected = "public_release_required"
+    with pytest.raises(tasks.ProofTaskError, match=f"proof_task.{expected}"):
+        tasks.start(store, command)
+
+
+def test_connected_worker_never_falls_back_when_connection_or_policy_changes(monkeypatch):
+    selected = SimpleNamespace(private=False, provider=PUBLIC_MODEL["provider"], model=PUBLIC_MODEL["model"])
+
+    class Registry:
+        live = PUBLIC_MODEL
+
+        def identity(self, identifier):
+            assert identifier == PUBLIC_MODEL["id"]
+            return self.live
+
+        def resolve(self, identifier):
+            return selected, self.identity(identifier)
+
+        @contextmanager
+        def use(self, identifier):
+            yield self.resolve(identifier)
+
+    registry = Registry()
+    claimed = SimpleNamespace(active=True)
+    claimed.is_active = lambda: claimed.active
+    monkeypatch.setattr(connections, "Registry", lambda: registry)
+    config, continue_work, use = tasks.research_progress._public_model_author(PUBLIC_MODEL, claimed)
+    assert config() is selected
+    assert continue_work()
+    with use() as dispatch:
+        assert dispatch is selected
+    claimed.active = False
+    assert not continue_work()
+    with pytest.raises(ValueError, match="no longer active"), use():
+        pytest.fail("Stopped policy sent a request")
+    claimed.active = True
+    registry.live = {**PUBLIC_MODEL, "fingerprint": "f" * 64}
+    assert not continue_work()
+    with pytest.raises(ValueError, match="connection is unavailable"), use():
+        pytest.fail("Changed connection sent a request")

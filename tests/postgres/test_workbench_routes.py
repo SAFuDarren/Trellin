@@ -14,11 +14,13 @@ import pytest
 
 from research_multiplier import general_lean, production
 from research_multiplier.cli import main
+from research_multiplier.policy import lean_budget
 from research_multiplier.storage import paths
 from research_multiplier.storage.artifacts import Artifacts
-from research_multiplier.storage.postgres import Store, bind_workspace
+from research_multiplier.storage.lean_progress import hold_lean_pass, pending_lean_passes
+from research_multiplier.storage.postgres import DatabaseOperationError, Store, bind_workspace
 from research_multiplier.workbench.server import WorkbenchServer
-from research_multiplier.workflows import formalization, intake, research_plans
+from research_multiplier.workflows import formalization, intake, research_plans, runtime, workbench_proof_tasks
 from tests._native_db import disposable_project_logins
 
 
@@ -33,17 +35,17 @@ def _document(value):
     return json.dumps(value).encode()
 
 
-def _approved_statement():
+def _approved_statement(*, title=TITLE, sensitivity="restricted"):
     target = _document({
-        "title": TITLE,
+        "title": title,
         "domain": "lean-core",
-        "sensitivity": "restricted",
-        "statement": "Zero is equal to itself.",
-        "formal": {"lean": {"proposition": "(0 : Nat) = 0"}},
+        "sensitivity": sensitivity,
+        "statement": "Zero is equal to itself." if sensitivity == "restricted" else "One is equal to itself.",
+        "formal": {"lean": {"proposition": "(0 : Nat) = 0" if sensitivity == "restricted" else "(1 : Nat) = 1"}},
     })
     starting_basis = _document({"items": [{
         "kind": "hypothesis",
-        "natural": "The fixture assumes True.",
+        "natural": "The fixture assumes True." if sensitivity == "restricted" else "The public fixture uses True.",
         "formal": {"lean": {"proposition": "True"}},
     }]})
     with Store() as store:
@@ -139,6 +141,90 @@ def _request(server, method, path, *, body=None, status=200, headers=None, respo
         return payload
     finally:
         connection.close()
+
+
+@pytest.mark.parametrize(("provider", "family"), [("codex-cli", "openai"), ("claude-code", "anthropic")])
+def test_connected_proof_policy_checks_model_scope_and_budget(workbench, monkeypatch, provider, family):
+    server, restricted_claim, *_ = workbench
+    with paths.use_workspace(server.workspace, strict=True):
+        claim, statement_id = _approved_statement(title="Public connected proof fixture", sensitivity="public")
+    identity = {"id": str(uuid4()), "provider": provider, "model": "native-default", "fingerprint": "a" * 64}
+    monkeypatch.setattr(workbench_proof_tasks, "_public_model_identity",
+                        lambda identifier: identity if identifier == identity["id"] else None)
+    selection = {key: identity[key] for key in ("id", "fingerprint")}
+    view = server.proof_task(UUID(claim))
+    assert view["external_model_allowed"] is True
+    document = {"claim_id": claim, "token": view["scope"]["token"], "model_rounds": 1, "reason": REASON,
+                "public_model": selection, "confirm_external": True}
+
+    for unexpected, error in (
+        ({"token": "b" * 64}, "stale"),
+        ({"confirm_external": False}, "invalid"),
+        ({"public_model": {**selection, "fingerprint": "b" * 64}}, "external_unavailable"),
+    ):
+        with pytest.raises(workbench_proof_tasks.ProofTaskError, match=rf"proof_task\.{error}"):
+            server.write(workbench_proof_tasks.start, {**document, **unexpected})
+    restricted = server.proof_task(UUID(restricted_claim))
+    legacy = {"claim_id": restricted_claim, "token": restricted["scope"]["token"], "reason": REASON}
+    with pytest.raises(workbench_proof_tasks.ProofTaskError, match="proof_task.external_unavailable"):
+        server.write(workbench_proof_tasks.start, {**document, **legacy})
+    legacy_id = UUID(server.write(workbench_proof_tasks.start, {**legacy, "model_rounds": 0})["policy_id"])
+    policy_id = UUID(server.write(workbench_proof_tasks.start, document)["policy_id"])
+    assert server.proof_task(UUID(claim))["policy"]["public_model"] == identity
+
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        assert [item.policy_id for item in pending_lean_passes(store, 8, [policy_id, legacy_id])] == [legacy_id]
+        assert pending_lean_passes(store, 8, None, public_model_policies=True) == []
+        [selected] = pending_lean_passes(store, 8, [policy_id, legacy_id], public_model_policies=True)
+        assert selected.policy_id == policy_id and selected.statement_id == UUID(statement_id)
+        assert store.query("scheduler", "SELECT rm.lock_lean_progress(%s,%s) AS acquired",
+                           policy_id, selected.inputs_sha256) == [{"acquired": False}]
+        with hold_lean_pass(store, selected) as held:
+            assert held is not None and held.settings().public_model == identity
+
+        [statement] = store.query("human", "SELECT * FROM rm.lean_statement_status WHERE id = %s", statement_id)
+        artifacts = Artifacts(paths.object_store(), workspace=False)
+        proof = artifacts.put({"action": "proof", "proof": {"rfl": True}})
+        body = statement["body"]
+        subject = {"claim_id": claim, "contract_sha256": statement["contract_sha256"]}
+        payload = {"lean_author": True, "lean_search": True, "formalization_id": str(statement["packet_id"]),
+                   "formalization_sha256": body["scope"]["principal_packet_sha256"],
+                   "author_statement_id": statement_id, "author_statement_sha256": statement["statement_sha256"],
+                   "lean_progress_policy_id": str(policy_id), "public_model": identity, "input": proof}
+        for unexpected in ({"public_model": {**identity, "provider": "anthropic"}},
+                           {"author_statement_sha256": "b" * 64},
+                           {"lean_progress_policy_id": str(legacy_id)}):
+            with pytest.raises(DatabaseOperationError) as blocked:
+                runtime.schedule(store, subject, "prove", {**payload, **unexpected}, 120, str(uuid4()), model_calls=1)
+            assert blocked.value.state == "23514"
+
+        job = runtime.schedule(store, subject, "prove", payload, 120, str(uuid4()), model_calls=1)
+        [lease] = lean_budget.claim(store, "connected-fixture", 120, job["id"], retry=False)
+        generation = lease["lease_generation"]
+        model = {"provider": provider, "id": "reported-fixture", "family": family, "prompt_sha256": "c" * 64,
+                 "parameters": {"requested_model": "native-default", "model_id_reported": True},
+                 "input_tokens": 20, "output_tokens": 8}
+        proposal = {"job_id": str(job["id"]), "subject": subject, "generation": generation, "role": "prove",
+                    "context_sha256": proof["sha256"], "harness_version": runtime.HARNESS, "route_key": "public-v0a",
+                    "finding": "numeric_observation", "artifact": proof, "transcript": proof}
+        for unexpected in ({"provider": "anthropic"}, {"parameters": {"requested_model": "another-model"}}):
+            with pytest.raises(DatabaseOperationError) as blocked:
+                store.submit("prove", job["id"], "connected-fixture", generation,
+                             {**proposal, "model": {**model, **unexpected}})
+            assert blocked.value.state == "23514"
+        store.submit("prove", job["id"], "connected-fixture", generation, {**proposal, "model": model})
+        result = store.latest_attempt(job["id"])
+        assert result["model_provider"] == provider and result["model_id"] == "reported-fixture"
+        assert result["finding"] == "numeric_observation"
+
+        second = runtime.schedule(store, subject, "prove", payload, 120, str(uuid4()), model_calls=1)
+        with pytest.raises(lean_budget.Exhausted):
+            lean_budget.claim(store, "connected-fixture", 120, second["id"], retry=False)
+        server.write(workbench_proof_tasks.stop, {"claim_id": claim, "policy_id": str(policy_id), "reason": REASON})
+        with pytest.raises(DatabaseOperationError) as blocked:
+            lean_budget.claim(store, "connected-fixture", 120, second["id"], retry=False)
+        assert blocked.value.state == "23514"
+        assert pending_lean_passes(store, 1, [policy_id], public_model_policies=True) == []
 
 
 def test_handoff_previews_selected_scope_and_rejects_changed_notes(workbench, capsys, tmp_path):

@@ -5,13 +5,67 @@ from pathlib import Path
 import sys
 import unicodedata
 
-from research_multiplier.storage import credentials, paths
-from research_multiplier.workflows import agent_guide
+from research_multiplier.storage import credentials, migrate, paths, project_archive
+from research_multiplier.workflows import agent_guide, workbench_guidance
 from research_multiplier.workflows.setup import Setup
+
+
+_PROOF_NOTES_REVISION = "0081"
+_UPGRADABLE_REVISIONS = frozenset(f"{revision:04d}" for revision in range(70, 81))
 
 
 class WorkspaceCreationError(ValueError):
     """Fixed launcher error. Driver responses and connection strings stay private."""
+
+
+class WorkspaceUpgradeError(ValueError):
+    """Safe error code for the native project upgrade operation."""
+
+
+def _upgrade_status(dsn, workspace):
+    import psycopg
+
+    from research_multiplier.storage.postgres import Store
+
+    with Store() as store:
+        installed = workbench_guidance.connected_installed(store, "human")
+    expected = paths.database_id(workspace), paths.workspace_id(workspace)
+    with psycopg.connect(dsn, connect_timeout=5, options="-c default_transaction_read_only=on -c statement_timeout=10000") as connection:
+        state = connection.execute("""
+            SELECT database_id, workspace_id, (SELECT version_num FROM public.rm_alembic_version)
+            FROM rm.current_workspace_binding()
+        """).fetchone()
+    if state is None or state[:2] != expected or expected != (store.database, store.workspace_id):
+        raise WorkspaceUpgradeError("unbound")
+    return state[2], installed
+
+
+def upgrade_project_database(workspace):
+    """Verify an archive before upgrading the explicitly selected and bound project."""
+    if not paths.strict_workspace() or paths.require_workspace() != workspace:
+        raise WorkspaceUpgradeError("workspace")
+    dsn = os.environ.get("RM_MIGRATION_DSN", "").strip()
+    if not dsn:
+        raise WorkspaceUpgradeError("login-missing")
+    migrate.migration_url(dsn)
+    revision, installed = _upgrade_status(dsn, workspace)
+    if revision == _PROOF_NOTES_REVISION and installed:
+        return None
+    if revision not in _UPGRADABLE_REVISIONS or installed or migrate.migration_head() != _PROOF_NOTES_REVISION:
+        raise WorkspaceUpgradeError("upgrade-unsupported")
+
+    try:
+        backup = project_archive.backup()["directory"]
+        verified = project_archive.verify(backup)
+        if verified["schema_revision"] != revision or verified["database_id"] != str(paths.database_id(workspace)):
+            raise ValueError("The archive does not match the selected database revision.")
+    except Exception:
+        raise WorkspaceUpgradeError("upgrade-backup") from None
+
+    migrate.upgrade(dsn, _PROOF_NOTES_REVISION)
+    if _upgrade_status(dsn, workspace) != (_PROOF_NOTES_REVISION, True):
+        raise WorkspaceUpgradeError("upgrade-failed")
+    return backup
 
 
 class _DesktopSetup(Setup):

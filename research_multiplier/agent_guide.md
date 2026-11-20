@@ -32,6 +32,16 @@ This copy matches the Research Multiplier version that wrote it. Run
    sent and to which kind of service. Unpublished work is usually `restricted`.
    Never mark material `public` or run `research release-item` unless the
    researcher says it is public.
+   In Trellin, a public intake preview authorizes one exact request. A public
+   proof task authorizes the displayed frozen scope, selected connection and
+   maximum rounds. A changed scope or connection needs renewed consent.
+   On database revision `0081`, a public Codex proof note also needs explicit
+   release for the exact note and statement. Saving a draft keeps it local.
+   A recorded attempt identifies when an authorized task used a released note.
+   For an external discussion in Chats or Workbench, the composer identifies
+   the recipient and included context. The researcher's send action authorizes
+   one request. Use the request details to review exactly what will go out.
+   Treat suggestions in chat as research notes.
 3. **Leave the project's records to the program.** Do not edit or delete anything
    under `runs/`, `objects/`, `evaluation/`, `backups/` or `lean-project/`, the
    `.research-multiplier*` marker files, or the database. Write your own drafts
@@ -144,6 +154,8 @@ Trellin's **Proof task** panel shows the confirmed Lean proposition, basis and
 pending decisions. The researcher can authorize and stop the selected task
 there. Its default is a program-only pass. A restricted scope can use an exact
 configured on-machine model only within the allowance the researcher approves.
+For public intake or a released proof scope, the researcher can select a
+specific Codex or Claude Code model added under **Team → Runtimes**.
 
 ## Offline questions
 

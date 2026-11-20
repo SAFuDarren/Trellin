@@ -1,5 +1,39 @@
 # Changes
 
+## 1.0.24
+
+- Choose a specific Codex or Claude Code model in Team. Direct model conversations
+  work in Chats before the first claim and in the graph beside the selected node.
+- Send messages directly from a shared Workbench and Chats composer. Pick a
+  model in the app, inspect request details when needed, and resume conversations
+  when reopening the workspace.
+- Browse conversations beside their message history, with a fixed input area.
+  Team groups model connections, recorded activity, jobs, runtimes and usage.
+  Both views use neutral gray workbench surfaces.
+- Leave a node-specific draft in Proof activity. On database revision `0081`,
+  release an exact public note for a later authorized Codex proof task and
+  see the attempt that received it.
+- Use **Back up and upgrade** in Proof activity to enable Team Codex guidance
+  on an older Mac project after verifying its archive. Selected navigation
+  rows and proof activity tabs use a flat gray background.
+- Use a compact icon rail with keyboard and hover labels. Claim and section
+  lists remain in the sidebar.
+- Expand a Claims card in place, keep long graph labels inside their nodes, and
+  see the recorded Library state in both the table and inspector.
+- Drag the corner of a proof graph node to resize it horizontally and vertically.
+- Screen readers can follow graph nodes to the inspector, read the overview
+  resize range and current width, and navigate Help definitions.
+- Edit an entry from the Library table or inspector and review both statements
+  before confirming a new version. Frozen claims retain their original evidence.
+
+- Add, test and remove user-selected Codex, Claude Code, OpenAI and Anthropic
+  connections under Team → Runtimes. Detect installed Codex and Claude Code commands
+  and reuse their existing logins. Store direct API keys in the macOS Keychain.
+- Use a connected model to organize an explicitly reviewed public excerpt
+  and save the result for the existing intake review.
+- Authorize a selected connection for bounded proof work on a released
+  Lean scope. Review the model and its reported usage alongside local verification.
+
 ## 1.0.23
 
 - Document repository layout, task branch retirement, and issue pickup by urgency.

@@ -1,6 +1,6 @@
 """Private launcher protocol between Trellin and its local workbench process."""
 
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 import json
 import os
 from pathlib import Path
@@ -14,7 +14,9 @@ from research_multiplier.storage.postgres import DatabaseOperationError
 
 from research_multiplier.workflows import release_updates
 from research_multiplier.workflows.desktop_library import Library, LibraryError
-from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, select_workspace
+from research_multiplier.workflows.desktop_workspace import (
+    WorkspaceCreationError, WorkspaceUpgradeError, select_workspace, upgrade_project_database,
+)
 
 from .server import _SCHEMA_SQLSTATES, WorkbenchServer, _check_schema, _MissingAssets, _MissingSchema
 
@@ -43,16 +45,22 @@ def _configure_database(workspace):
         raise _StartError("login-missing")
 
 
-def _open(workspace_path, resources):
-    try:
-        if not Path(workspace_path).is_absolute():
-            raise ValueError
-        with paths.use_workspace(workspace_path, strict=True):
+@contextmanager
+def _selected_workspace(workspace_path):
+    with ExitStack() as resources:
+        try:
+            if not Path(workspace_path).is_absolute():
+                raise ValueError
+            resources.enter_context(paths.use_workspace(workspace_path, strict=True))
             workspace = paths.require_workspace()
-    except (OSError, ValueError):
-        raise _StartError("workspace") from None
+        except (OSError, ValueError):
+            raise _StartError("workspace") from None
+        yield workspace
 
-    _configure_database(workspace)
+
+def _open(workspace_path, resources):
+    with _selected_workspace(workspace_path) as workspace:
+        _configure_database(workspace)
     server = resources.enter_context(WorkbenchServer(workspace))
     # Stop accepting requests when the launcher leaves, then drain handlers
     # before the process exits so a review or guidance write can complete.
@@ -72,6 +80,21 @@ def _open(workspace_path, resources):
 def _reply(output, status, **payload):
     reply = json.dumps(dict(version=1, status=status, **payload))
     print(reply, file=output, flush=True)
+
+
+def _upgrade_project(workspace_path, output):
+    try:
+        with _selected_workspace(workspace_path) as workspace:
+            _configure_database(workspace)
+            backup = upgrade_project_database(workspace)
+    except (_StartError, WorkspaceUpgradeError) as error:
+        _reply(output, "error", code=error.args[0])
+        return 2
+    except Exception:
+        _reply(output, "error", code="upgrade-failed")
+        return 2
+    _reply(output, "ready", backup=backup)
+    return 0
 
 
 def _stop_on_disconnect(server, lifetime):
@@ -173,6 +196,8 @@ def _storage(library, args, output):
 def main():
     args = sys.argv[1:]
     try:
+        if len(args) == 2 and args[0] == "--upgrade-project":
+            return _upgrade_project(args[1], sys.stdout)
         if args and args[0].startswith("--storage-"):
             return _storage(Library(), args, sys.stdout)
         if args == ["--library"]:

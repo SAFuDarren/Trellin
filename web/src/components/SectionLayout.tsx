@@ -24,35 +24,38 @@ export function SectionLayout({
     <div className="section">
       <nav className="section-nav" aria-labelledby="section-title">
         <h1 id="section-title">{title}</h1>
-        {groups.map((group, position) => (
-          <div className="nav-group" key={group.name ?? position}>
-            {group.name && <span>{group.name}</span>}
-            {group.entries.length === 0 && group.empty && <p className="nav-empty">{group.empty}</p>}
-            {group.entries.map((entry) => (
-              <a
-                key={entry.key}
-                className="nav-item"
-                href={entry.href}
-                aria-current={entry.current ? "page" : undefined}
-              >
-                <span className="nav-line">
-                  {entry.dot === "live" ? (
-                    <span className="status-dot" data-tone="live" aria-hidden="true" />
-                  ) : entry.dot && entry.dot !== "none" ? (
-                    <span className="status-dot" data-tone={entry.dot} aria-hidden="true" />
-                  ) : null}
-                  <span className="label">{entry.label}</span>
-                  {entry.count !== undefined && entry.count !== "" && (
-                    <span className="count" data-tone={entry.countTone}>
-                      {entry.count}
-                    </span>
-                  )}
-                </span>
-                {entry.sub && <span className="nav-sub">{entry.sub}</span>}
-              </a>
-            ))}
-          </div>
-        ))}
+        {groups
+          .filter((group) => group.entries.length || group.empty)
+          .map((group, position) => (
+            <div className="nav-group" key={group.name ?? position}>
+              {group.name && <span>{group.name}</span>}
+              {group.entries.length === 0 && group.empty && <p className="nav-empty">{group.empty}</p>}
+              {group.entries.map((entry) => (
+                <a
+                  key={entry.key}
+                  className="nav-item"
+                  href={entry.href}
+                  title={entry.sub ? `${entry.label}\n${entry.sub}` : entry.label}
+                  aria-current={entry.current ? "page" : undefined}
+                >
+                  <span className="nav-line">
+                    {entry.dot === "live" ? (
+                      <span className="status-dot" data-tone="live" aria-hidden="true" />
+                    ) : entry.dot && entry.dot !== "none" ? (
+                      <span className="status-dot" data-tone={entry.dot} aria-hidden="true" />
+                    ) : null}
+                    <span className="label">{entry.label}</span>
+                    {entry.count !== undefined && entry.count !== "" && (
+                      <span className="count" data-tone={entry.countTone}>
+                        {entry.count}
+                      </span>
+                    )}
+                  </span>
+                  {entry.sub && <span className="nav-sub">{entry.sub}</span>}
+                </a>
+              ))}
+            </div>
+          ))}
       </nav>
       <main className="section-main" tabIndex={-1}>
         {children}

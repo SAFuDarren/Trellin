@@ -303,7 +303,8 @@ def _model_candidate(output, allowed, *, workbench_reply=False):
     return {**candidate, "workbench_reply": reply.strip()}
 
 
-def _proposal_payload(statement, config, request, input_ref, route, private, policy_id, parallel_batch):
+def _proposal_payload(statement, config, request, input_ref, route, private, policy_id, parallel_batch,
+                      public_model=None):
     return {"lean_author": True, "lean_search": True, "formalization_id": str(statement["packet_id"]),
             "formalization_sha256": statement["body"]["scope"]["principal_packet_sha256"],
             "author_statement_id": str(statement["id"]), "author_statement_sha256": statement["statement_sha256"],
@@ -314,11 +315,13 @@ def _proposal_payload(statement, config, request, input_ref, route, private, pol
             **({"workbench_guidance_model": config.model, "workbench_focus_node_id": _workbench_focus(request)}
                if _codex_guided(config, private, request) else {}),
             **({"lean_progress_policy_id": str(policy_id)} if policy_id is not None else {}),
+            **({"public_model": public_model} if public_model is not None else {}),
             **({"parallel_batch": parallel_batch} if parallel_batch is not None else {})}
 
 
 def _propose(store, artifacts, subject, contract, statement, config, request, allowed, retry, *, key, route,
-             prompt, continue_work, private, policy_id=None, parallel_batch=None, allow_codex_guidance=False):
+             prompt, continue_work, private, policy_id=None, parallel_batch=None, allow_codex_guidance=False,
+             public_model=None, use_public_model=None):
     if len(json_text(request).encode("utf-8")) > MAX_REQUEST_BYTES:
         raise ValueError("The exact scope and checked lemma context exceed the Lean search budget.")
     input_ref = artifacts.put(request)
@@ -349,7 +352,11 @@ def _propose(store, artifacts, subject, contract, statement, config, request, al
             prompt_suffix = WORKBENCH_GUIDANCE
         else:
             prompt_suffix = ""
-        model = complete_structured(config, "lean_search", prompt + prompt_suffix, request, 3000, 90)
+        if use_public_model is not None:
+            with use_public_model() as selected:
+                model = complete_structured(selected, "lean_search", prompt + prompt_suffix, request, 3000, 90)
+        else:
+            model = complete_structured(config, "lean_search", prompt + prompt_suffix, request, 3000, 90)
         try:
             candidate = _model_candidate(model.output, allowed, workbench_reply=codex_reply)
         except (ValueError, RecursionError) as error:
@@ -359,7 +366,8 @@ def _propose(store, artifacts, subject, contract, statement, config, request, al
 
     return runtime.execute(
         store, artifacts, subject, contract, "prove", propose, seconds=120, operation_key=key, retry=retry,
-        payload=_proposal_payload(statement, config, request, input_ref, route, private, policy_id, parallel_batch),
+        payload=_proposal_payload(statement, config, request, input_ref, route, private, policy_id, parallel_batch,
+                                  public_model),
         model_calls=1, budgeted=True, resume_undispatched=True,
     )
 
@@ -842,7 +850,7 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
            mathlib_project=None, output=None,
            continue_work=None, continuation=None, max_new_rounds=None, strategy="ranked", author_config=None,
            parallel_routes=1, route_stall_limit=3, route_slots=1, policy_id=None, authorize_local=False,
-           workbench_guidance_enabled=False):
+           workbench_guidance_enabled=False, public_model=None, use_public_model=None):
     """Try deterministic proofs and optionally take one step in a durable search."""
     from ..composed_lean import NativeCompositionBlocked, select_runtime
 
@@ -859,6 +867,11 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
     independent = parallel_routes > 1
     if independent and (not ranked or policy_id is None):
         raise ValueError("Parallel Lean work requires a signed ranked progress policy.")
+    if (public_model is None) != (use_public_model is None) or (
+        public_model is not None and (not rounds or not confirm_public or not sustained or independent
+                                      or policy_id is None or author_config is None or continue_work is None)
+    ):
+        raise ValueError("A connected public model requires an explicitly bound Lean policy.")
     if sustained and (type(max_new_rounds) is not int or not 1 <= max_new_rounds <= MAX_ROUNDS):
         raise ValueError("Choose a positive per-pass Lean search budget of at most 8 rounds.")
     if continuation is not None and not sustained:
@@ -1038,6 +1051,10 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
         else:
             config = author_config() if author_config is not None else ModelConfig.from_env("LEAN_AUTHOR")
         allow_codex_guidance = workbench_guidance_enabled and not private and config.provider == "codex-cli"
+        if allow_codex_guidance and public_model is not None:
+            from . import workbench_guidance
+
+            allow_codex_guidance = workbench_guidance.connected_installed(store, "verifier")
         guidance_statement_id = statement["id"] if workbench_guidance_enabled and (private or allow_codex_guidance) else None
         guidance_audience = "codex" if allow_codex_guidance else "local"
         prompt = PROMPT.replace("public research statements", "local research statements") if private else PROMPT
@@ -1128,7 +1145,7 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                     batch_denial = "goal_call_budget"
             else:
                 operation = f"lean-search-v3:{route}:{index}:{fingerprint(history)}"
-                if independent:
+                if independent or public_model is not None:
                     operation = "lean-planner-v1:" + fingerprint({"policy": str(policy_id), "search": operation})
                 key = _model_round_key(store, subject, operation, epoch)
                 request = _request(store, artifacts, subject, key, context, index, history, model_lemmas,
@@ -1139,7 +1156,8 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                 try:
                     attempt = _propose(store, artifacts, subject, contract, statement, config, request, allowed, retry,
                                        key=key, route=route, prompt=prompt, continue_work=continue_work, private=private,
-                                       policy_id=policy_id, allow_codex_guidance=allow_codex_guidance)
+                                       policy_id=policy_id, allow_codex_guidance=allow_codex_guidance,
+                                       public_model=public_model, use_public_model=use_public_model)
                 except lean_budget.Exhausted:
                     return _record(artifacts, statement_id, history, "budget_exhausted", reason="goal_call_budget",
                                    **native_fields)
@@ -1160,6 +1178,8 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                 index = len(history) + 1
                 step = {"round": index, "model_attempt_id": attempt["id"], "proposal": attempt["artifact"],
                         "status": "proposal_unadmitted"}
+                if public_model is not None and model is not None:
+                    step["model_provider"] = model["provider"]
                 if allow_codex_guidance and _codex_guided(config, private, request):
                     if model is not None:
                         step["model_provider"] = model["provider"]

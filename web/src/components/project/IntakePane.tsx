@@ -2,6 +2,14 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
+import { useLocalTextModels } from "../../api/localModels";
+import {
+  connectionChoiceLabel,
+  connectionModelLabel,
+  dispatchableConnection,
+  useModelConnections,
+} from "../../api/modelConnections";
+import { href } from "../../shell/route";
 import { ReviewFields } from "./ReviewFields";
 import { reviewIdentity } from "./review";
 
@@ -22,6 +30,20 @@ type IntakeDraft = {
   items: Candidate[];
   confirmed: boolean;
 };
+type IntakeInput = { title: string; domain: "lean-core"; objective: string; notes: string };
+type PublicIntakeInput = IntakeInput & { connection_id: string };
+type ReleasePreview = {
+  token: string;
+  provider: string;
+  model: string;
+  outgoing: { domain: string; objective: string; notes: string };
+  limits: {
+    max_calls: number;
+    timeout_seconds: number;
+    max_output_tokens: number;
+    output_token_limit_enforced: boolean;
+  };
+};
 type Decision = { action: "accept" | "omit"; reason: string; formal?: { lean: { proposition: string } } };
 
 function formalText(value: Candidate["formal"]): string {
@@ -39,12 +61,10 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
   const [active, setActive] = useState<IntakeDraft | null>(null);
   const [fileError, setFileError] = useState("");
   const [message, setMessage] = useState("");
+  const [release, setRelease] = useState<{ input: PublicIntakeInput; preview: ReleasePreview } | null>(null);
+  const connections = useModelConnections(session);
   const queries = useQueryClient();
-  const models = useQuery({
-    queryKey: ["project-intake-models", session],
-    queryFn: ({ signal }) => api<{ models: string[] }>(session, "/api/project-intake/models", { signal }),
-    retry: false,
-  });
+  const models = useLocalTextModels(session);
   const recent = useQuery({
     queryKey: ["project-intake-drafts", session],
     queryFn: ({ signal }) => api<{ drafts: IntakeDraft[] }>(session, "/api/project-intake", { signal }),
@@ -52,20 +72,22 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
   });
   const save = () => void queries.invalidateQueries({ queryKey: ["project-intake-drafts", session] });
   const draft = useMutation({
-    mutationFn: (form: FormData) =>
-      api<IntakeDraft>(session, "/api/project-intake", {
-        data: {
-          title: String(form.get("title")).trim(),
-          domain: "lean-core",
-          objective: String(form.get("objective") ?? "").trim() || t("projectEntry.intake.objectiveDefault"),
-          model: String(form.get("model")),
-          notes: notes.trim(),
-        },
+    mutationFn: (input: (IntakeInput & { model: string }) | (PublicIntakeInput & { token: string })) =>
+      api<IntakeDraft>(session, "token" in input ? "/api/project-intake/public-draft" : "/api/project-intake", {
+        data: input,
       }),
     onSuccess: (result) => {
+      setRelease(null);
       setActive(result);
       save();
     },
+    // A dispatched preview cannot be replayed, including after a provider error.
+    onError: () => setRelease(null),
+  });
+  const preview = useMutation({
+    mutationFn: (input: PublicIntakeInput) =>
+      api<ReleasePreview>(session, "/api/project-intake/public-preview", { data: input }),
+    onSuccess: (result, input) => setRelease({ input, preview: result }),
   });
   const confirm = useMutation({
     mutationFn: (form: FormData) => {
@@ -115,7 +137,23 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
     event.preventDefault();
     setMessage("");
     setFileError("");
-    draft.mutate(new FormData(event.currentTarget));
+    setRelease(null);
+    draft.reset();
+    preview.reset();
+    const form = new FormData(event.currentTarget);
+    const selection = String(form.get("model") ?? "");
+    if (!selection) return;
+    const input: IntakeInput = {
+      title: String(form.get("title")).trim(),
+      domain: "lean-core",
+      objective: String(form.get("objective") ?? "").trim() || t("projectEntry.intake.objectiveDefault"),
+      notes: notes.trim(),
+    };
+    if (selection.startsWith("connection:")) {
+      preview.mutate({ ...input, connection_id: selection.slice("connection:".length) });
+    } else {
+      draft.mutate({ ...input, model: selection });
+    }
   }
   function confirmReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -123,8 +161,11 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
   }
 
   const modelNames = models.data?.models ?? [];
+  const available = (connections.data?.connections ?? []).filter(dispatchableConnection);
+  const canChoose = modelNames.length > 0 || available.length > 0;
+  const working = draft.isPending || preview.isPending;
   const tooLarge = new TextEncoder().encode(notes).length > MAX_NOTES_BYTES;
-  const failure = active ? confirm.error : draft.error;
+  const failure = active ? confirm.error : (draft.error ?? preview.error);
   const pending = recent.data?.drafts?.filter((item) => !item.confirmed) ?? [];
   return (
     <>
@@ -194,43 +235,77 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
         </form>
       ) : (
         <form className="project-entry-form" onSubmit={requestDraft}>
-          <p className="project-entry-note">{t("projectEntry.intake.localHint")}</p>
+          <p className="project-entry-note">{t("modelConnections.intakeHelp")}</p>
           <div className="project-entry-columns">
             <label>
               {t("projectEntry.title")}
-              <input name="title" defaultValue={t("projectEntry.intake.defaultTitle")} maxLength={300} required />
+              <input
+                name="title"
+                defaultValue={t("projectEntry.intake.defaultTitle")}
+                maxLength={300}
+                required
+                disabled={working || Boolean(release)}
+              />
             </label>
             <label>
               {t("projectEntry.intake.model")}
-              <select name="model" required disabled={!modelNames.length || draft.isPending}>
-                {modelNames.length ? (
-                  modelNames.map((model) => <option key={model}>{model}</option>)
-                ) : (
-                  <option value="">{t(models.isPending ? "common.loading" : "projectEntry.intake.noModels")}</option>
+              <select name="model" required disabled={!canChoose || working || Boolean(release)}>
+                {!modelNames.length && (
+                  <option value="">
+                    {t(canChoose ? "modelConnections.chooseConnection" : "projectEntry.intake.noModels")}
+                  </option>
                 )}
+                {modelNames.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+                {available.map((connection) => (
+                  <option key={connection.id} value={`connection:${connection.id}`}>
+                    {connectionChoiceLabel(t, connection)}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
-          {!models.isPending && !modelNames.length && (
+          {connections.isError && (
+            <p className="project-entry-status" role="alert">
+              {t("errors.connection.unavailable")}
+            </p>
+          )}
+          {!models.isPending && !connections.isPending && !canChoose && (
             <div className="project-entry-buttons">
-              <p className="project-entry-note">{t("projectEntry.intake.connectModel")}</p>
-              <button className="button" type="button" onClick={() => void models.refetch()}>
+              <a className="button" href={href("team", "runtimes")}>
+                {t("modelConnections.openTeam")}
+              </a>
+              <button
+                className="button"
+                type="button"
+                onClick={() => void Promise.all([models.refetch(), connections.refetch()])}
+              >
                 {t("projectEntry.intake.refreshModels")}
               </button>
             </div>
           )}
           <label>
             {t("projectEntry.intake.objective")}
-            <input name="objective" maxLength={4000} />
+            <input name="objective" maxLength={4000} disabled={working || Boolean(release)} />
           </label>
           <label>
             {t("projectEntry.intake.notes")}
-            <textarea rows={8} value={notes} onChange={(event) => setNotes(event.target.value)} required />
+            <textarea
+              rows={8}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              required
+              disabled={working || Boolean(release)}
+            />
           </label>
           <label className="project-entry-file">
             {t("projectEntry.intake.readFile")}
             <input
               type="file"
+              disabled={working || Boolean(release)}
               accept=".txt,.md,.lean,text/plain,text/markdown"
               onChange={(event) => void readFile(event)}
             />
@@ -244,12 +319,37 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
             <button
               className="button primary"
               type="submit"
-              disabled={draft.isPending || tooLarge || !notes.trim() || !modelNames.length}
+              disabled={working || Boolean(release) || tooLarge || !notes.trim() || !canChoose}
             >
               {t(draft.isPending ? "projectEntry.intake.analyzing" : "projectEntry.intake.analyze")}
             </button>
           </div>
-          {draft.isPending && (
+          {release && (
+            <section className="project-entry-item" aria-labelledby="intake-release">
+              <h3 id="intake-release">{t("modelConnections.publicPreview")}</h3>
+              <p>
+                {t(`team.providers.${release.preview.provider}`, { defaultValue: release.preview.provider })}
+                {" · "}
+                {connectionModelLabel(t, release.preview)}
+              </p>
+              <p>{t("modelConnections.previewLimits", { seconds: release.preview.limits.timeout_seconds })}</p>
+              <pre className="code-block">{JSON.stringify(release.preview.outgoing, null, 2)}</pre>
+              <div className="project-entry-buttons">
+                <button type="button" className="button" disabled={draft.isPending} onClick={() => setRelease(null)}>
+                  {t("modelConnections.editPreview")}
+                </button>
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={draft.isPending}
+                  onClick={() => draft.mutate({ ...release.input, token: release.preview.token })}
+                >
+                  {t("modelConnections.sendPublic")}
+                </button>
+              </div>
+            </section>
+          )}
+          {working && (
             <p className="project-entry-note" role="status">
               {t("projectEntry.intake.running")}
             </p>

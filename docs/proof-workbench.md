@@ -9,7 +9,7 @@ research-multiplier --workspace "/path/to/my-research" workbench CLAIM_UUID
 
 Use `--no-browser` to open the printed session link yourself. Keep that link local and stop the process with **Ctrl+C** when you are done. The workbench listens on the loopback address and uses the project's existing `RM_HUMAN_DSN` on the server. The browser sends project reads and, when enabled, advisory notes to the local service. Existing workers run Lean and use their signed model routes.
 
-The graph and activity view require database revision `0069`. Local-model guidance requires revision `0070`. Public Codex guidance requires revision `0071`. For an existing project, [back up the workspace](research-foundation.md#recover-and-monitor) and run the normal [migration command](research-foundation.md#set-up-the-workspace) only when you choose to enable the graph. The launcher leaves the database schema as it finds it.
+The graph and activity view require database revision `0069`. Local-model guidance requires revision `0070`. Public Codex guidance requires revision `0071`. For an existing project, [back up the workspace](research-foundation.md#recover-and-monitor) and run the normal [migration command](research-foundation.md#set-up-the-workspace) only when you choose to enable the graph. The launcher leaves the database schema as it finds it. Proof tasks with a selected public connection require revision `0078`.
 
 ## Start a research project
 
@@ -19,9 +19,9 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 Select a claim and open **Proof task**. The panel shows the confirmed Lean proposition, its basis, and any decision that blocks work. If the Lean statement still needs preparation or review, follow [the Lean scope review](lean-core.md) before starting.
 
-When the scope is ready, confirm it in the panel and record your reason to start. The worker runs deterministic checks and proof reuse first. The default allows zero model rounds. For restricted research, the panel can authorize a bounded number of rounds with the exact configured private Lean model once that route is available. Public remote model work continues through the separate [explicit release procedure](#send-a-public-note-to-codex).
+When the scope is ready, confirm it in the panel and record your reason to start. The worker runs deterministic checks and proof reuse first. The default allows zero model rounds. For restricted research, the panel can authorize a bounded number of rounds with the exact configured private Lean model once that route is available. For a public goal with a released scope, [add a connection](project-intake.md#connect-a-model) in **Team → Runtimes**. Select it in **Proof task**, set the maximum model rounds, and check the theorem and released basis before allowing the send. The authorization covers that connection, scope and cap. A changed scope or connection needs a new authorization.
 
-The panel shows the proof task state, open obligations when the worker reports them, and the verified receipt when one is issued. Review and adoption remain researcher decisions. **Stop** ends the selected policy and prevents new work on it. Reopen the same workspace and proof task to see the recorded checkpoint. If an authorized pass was interrupted, use **Continue** to return to the same policy.
+The panel shows the proof task state, selected model, reported model usage, open obligations when the worker reports them, and the verified receipt when one is issued. The existing [public Codex note flow](#send-a-public-note-to-codex) is also available. Review and adoption remain researcher decisions. **Stop** ends the selected policy and prevents new work on it. Reopen the same workspace and proof task to see the recorded checkpoint. If an authorized pass was interrupted, use **Continue** to return to the same policy.
 
 ## Read a graph
 
@@ -56,9 +56,24 @@ existing authorized views.
 
 The workbench has four areas. The left column lists the project's claims by domain, with a search field. The centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **If withdrawn**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser; **Settings** can reset them. The interface is in English by default; choose **简体中文** in **Settings** to switch to Chinese, and the choice is remembered too. The map can be dragged by its title and resized from its corner.
 
-Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. The small **Global position** map in the corner shows the recorded nodes of recent claims, with a dashed circle at the current claim.
+Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. Drag the corner of a node to adjust its width and height. With that handle focused, the arrow keys resize the node. The small **Global position** map in the corner shows the recorded nodes of recent claims, with a dashed circle at the current claim.
 
 ## Work with the models
+
+With database revision `0079`, use **Chats** to start a workspace discussion
+before creating a claim. In **Workbench**, select a claim or node and open
+**Conversation**. Open the model menu to choose an available on-device model
+or a connection you added in Team. The composer identifies the external
+recipient and the recent turns and selected node excerpt that may be included.
+Open the + menu and choose **Request details** to inspect the exact contents.
+The send button authorizes and submits that request in one step. Project files
+are outside that payload.
+The conversation and attribution are saved with the project. Removing a
+conversation hides it from the active list and preserves its history.
+
+Use **Proof activity** to leave an opinion on the selected proof node. When the
+workbench explains a blocker, you can keep typing a draft in that panel. Leaving
+the workbench or quitting Trellin clears unsent drafts.
 
 On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
 
@@ -71,6 +86,20 @@ Select a node, write a short method or focus suggestion, choose the recipient, t
 Each note is local to the project and eligible on its original statement version.
 
 ## Send a public note to Codex
+
+If the Mac workbench shows a database upgrade is required, select **Back up and
+upgrade** in **Proof activity**. Confirm the project in the native dialog. The
+app reopens the same project after verifying its backup and updating to `0081`.
+
+On database revision `0081`, open **Proof activity** for a node with a
+confirmed public statement and shareable basis. Choose **Queue proof note**
+and **Allow Codex to use this note**. Start a bounded **Proof task** with a
+Codex connection from Team. The task checks its signed model, statement,
+basis and budget before using the queued note. Proof activity distinguishes
+a queued note from one included in a recorded model attempt.
+
+The terminal-started workflow is also available. On earlier database
+revisions use it to deliver released guidance.
 
 Use a public project with a confirmed Lean scope, a released basis and an approved Lean advancement policy with model rounds available. Configure the existing [Codex CLI adapter](model-adapters.md#choose-a-model-for-each-task) as the worker's Lean author.
 

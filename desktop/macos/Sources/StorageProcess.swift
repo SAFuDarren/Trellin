@@ -18,12 +18,13 @@ enum StorageCommand {
     case information
     case preview(URL)
     case move(StoragePlan)
+    case upgrade(URL)
 
     var timeout: TimeInterval {
         switch self {
         case .information: return 15
         case .preview: return 300
-        case .move: return 1_800
+        case .move, .upgrade: return 1_800
         }
     }
 
@@ -33,6 +34,7 @@ enum StorageCommand {
         case .information: options = ["--storage-info"]
         case let .preview(destination): options = ["--storage-preview", destination.path]
         case let .move(plan): options = ["--storage-move", plan.destination.path, plan.confirmation]
+        case let .upgrade(workspace): options = ["--upgrade-project", workspace.path]
         }
         return WorkbenchLaunch.prefix + options
     }

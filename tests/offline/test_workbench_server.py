@@ -99,6 +99,76 @@ def test_release_updates_are_local_and_separate_from_research(server, tmp_path, 
     assert settings.is_file()
 
 
+def test_model_connections_are_session_bound_and_do_not_read_the_project(server, tmp_path, monkeypatch):
+    from research_multiplier.models.connections import Registry
+
+    registry = Registry(tmp_path / "connections.sqlite3")
+    monkeypatch.setattr(server, "connections", registry)
+    monkeypatch.setattr(server, "read", lambda *args: pytest.fail("Unexpected project access"))
+    path = "/api/model-connections"
+    body = {"model": "example-model", "provider": "codex-cli"}
+    assert request(server, "GET", path, session=False)[0].status == 403
+    assert request(server, "POST", path + "/add", body=body, session=False)[0].status == 403
+    assert request(server, "POST", path + "/add", body=body, origin=False)[0].status == 403
+    assert request(server, "POST", path + "/add", body=body, headers={"Origin": "https://foreign.test"})[0].status == 403
+    assert json.loads(request(server, "GET", path)[1]) == {"connections": []}
+    response, content = request(server, "POST", path + "/add", body=body)
+    assert response.status == 200
+    connection = json.loads(content)
+    assert set(connection) == {"id", "provider", "model", "label", "status", "fingerprint"}
+    assert json.loads(request(server, "GET", path)[1]) == {"connections": [connection]}
+    assert request(server, "POST", path + "/remove", body={"id": connection["id"]})[0].status == 200
+    assert json.loads(request(server, "GET", path)[1]) == {"connections": []}
+
+
+def test_native_connections_are_discovered_and_selected_only_in_the_bound_session(server, tmp_path, monkeypatch):
+    from research_multiplier.models import cli_executor, connections
+
+    executable = tmp_path / "claude"
+    executable.write_text("fixture")
+    login = []
+
+    def find_binary(provider, selected):
+        if provider == "claude-code" and selected in {None, str(executable)}:
+            return str(executable)
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("An unauthorized or native connection request must not read a project or invoke inference.")
+
+    monkeypatch.setattr(server, "connections", connections.Registry(tmp_path / "connections.sqlite3"))
+    monkeypatch.setattr(server, "read", unexpected)
+    monkeypatch.setattr(server, "write", unexpected)
+    monkeypatch.setattr(connections, "_adapter", unexpected)
+    monkeypatch.setattr(connections, "_binary", find_binary)
+    monkeypatch.setattr(cli_executor, "require_native_login", lambda *args: login.append(args))
+
+    discovery = "/api/model-connections/native"
+    connect = "/api/model-connections/add-native"
+    body = {"provider": "claude-code"}
+    assert request(server, "GET", discovery, session=False)[0].status == 403
+    assert request(server, "GET", discovery, headers={"Origin": "https://foreign.test"})[0].status == 403
+    assert request(server, "GET", discovery + "?provider=claude-code")[0].status == 400
+    assert request(server, "POST", connect, body=body, session=False)[0].status == 403
+    assert request(server, "POST", connect, body=body, origin=False)[0].status == 403
+    assert request(server, "POST", connect, body={**body, "binary": str(executable)})[0].status == 409
+    assert not login
+
+    response, content = request(server, "GET", discovery)
+    assert response.status == 200
+    assert json.loads(content) == {"providers": [{"provider": "claude-code", "status": "signed_in", "models": [
+        {"id": "sonnet", "label": "Sonnet"}, {"id": "opus", "label": "Opus"},
+        {"id": "haiku", "label": "Haiku"}, {"id": "fable", "label": "Fable"},
+    ]}]}
+    assert server.connections.list() == []
+
+    response, content = request(server, "POST", connect, body={**body, "model": "opus"})
+    assert response.status == 200
+    saved = json.loads(content)
+    assert saved["provider"] == "claude-code" and saved["model"] == "opus"
+    assert server.connections.list() == [saved]
+    assert login == [("claude-code", str(executable))] * 2
+
+
 def test_versioned_claims_rejects_unauthorized_and_invalid_requests(server, monkeypatch, capsys):
     workspace_id = "d42ca2f7-9288-47af-b7e5-1150e6df5304"
     path = f"/api/v1/workspaces/{workspace_id}/claims"
@@ -247,19 +317,23 @@ def test_claim_code_routes_require_session_and_exact_payload(server, monkeypatch
     assert json.loads(content) == {"error": "claim_code.invalid"}
 
 
-def test_proof_task_starts_only_the_committed_policy(server, monkeypatch):
+@pytest.mark.parametrize("connected_model", [False, True])
+def test_proof_task_starts_only_the_committed_policy(server, monkeypatch, connected_model):
     claim = "0b6b2f6e-8d1a-4c2b-9f57-3a1c2d4e5f60"
     policy = "b34a1bdf-8c98-497b-b33f-2be548ca9b7f"
     started, reached_policy, release = [], threading.Event(), threading.Event()
     document = {"claim_id": claim, "token": "a" * 64, "model_rounds": 0, "reason": "Reviewed"}
+    if connected_model:
+        document.update(model_rounds=1, public_model={"id": str(UUID(int=1)), "fingerprint": "b" * 64},
+                        confirm_external=True)
 
     def write(action, supplied):
         assert action.__name__ == "start" and supplied == document
         started.append("committed")
         return {"policy_id": policy}
 
-    def advance(stage, limit, identifiers, parallel, *, lake_watch):
-        started.append((stage, limit, identifiers, parallel))
+    def advance(stage, limit, identifiers, parallel, *, lake_watch, public_model_policies):
+        started.append((stage, limit, identifiers, parallel, public_model_policies))
         reached_policy.set()
         release.wait(5)
         return {"errors": [], "lean_runs": []}
@@ -272,7 +346,7 @@ def test_proof_task_starts_only_the_committed_policy(server, monkeypatch):
         assert response.status == 200
         assert json.loads(content) == {"policy_id": policy}
         assert reached_policy.wait(5)
-        assert started == ["committed", ("combined", 1, [policy], 1)]
+        assert started == ["committed", ("combined", 1, [policy], 1, connected_model)]
         response, content = request(server, "POST", "/api/proof-task/start", body=document)
         assert response.status == 409
         assert json.loads(content) == {"error": "proof_task.busy"}

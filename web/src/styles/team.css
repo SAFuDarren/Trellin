@@ -1,0 +1,130 @@
+.team-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.team-tools,
+.team-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-tools .search-field {
+  flex: 1 1 13rem;
+  min-width: 0;
+  max-width: 24rem;
+  margin: 0;
+}
+
+.team-tools select {
+  min-width: 8rem;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--hair);
+  border-radius: 7px;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.team-table {
+  table-layout: auto;
+}
+
+.team-table thead {
+  background: var(--canvas);
+}
+
+.team-table tbody th {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--hair);
+  color: var(--ink);
+  font-weight: 550;
+  text-align: left;
+  vertical-align: top;
+}
+
+.team-table :is(th, td) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.team-table tbody :is(th, td):first-child {
+  max-width: 16rem;
+}
+
+.team-connections {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.team-heading {
+  justify-content: space-between;
+}
+
+.team-heading h3 {
+  font-size: 14px;
+  font-weight: 640;
+}
+
+.team-model-actions {
+  gap: 4px;
+}
+
+.team-model-actions + .team-model-actions {
+  margin-top: 8px;
+}
+
+.team-job-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.team-job-state svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.team-relation {
+  overflow-wrap: anywhere;
+}
+
+.team-secondary {
+  display: block;
+  margin-top: 2px;
+  color: var(--sub);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.team-empty {
+  margin: 0;
+  padding: 18px 0;
+  color: var(--sub);
+}
+
+.team-usage {
+  width: min(100%, 40rem);
+}
+
+.team-usage > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hair);
+}
+
+.team-usage dd {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}

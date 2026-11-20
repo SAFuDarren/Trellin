@@ -34,7 +34,7 @@ export function nodeStatus(t: TFunction, node: GraphNode): string {
   return statusText(t, node.status);
 }
 
-export function nodeTitle(t: TFunction, node: GraphNode): string {
+export function nodeTitle(t: TFunction, node: GraphNode, { full = false } = {}): string {
   const raw = typeof node.title === "string" ? node.title : "";
   const numbered = raw.match(/^(Proof obligation|Checked reduction|Lean lemma) (\d+)$/);
   const title = numbered
@@ -53,7 +53,7 @@ export function nodeTitle(t: TFunction, node: GraphNode): string {
     return node.citation.split(".").pop() ?? node.citation;
   if (node.kind === "evidence") return kindText(t, "evidence");
   if (node.kind === "library" && node.citation) return node.citation;
-  if (title && !UUID_TITLE.test(title) && title.length <= 60) return title;
+  if (title && !UUID_TITLE.test(title) && (full || title.length <= 60)) return title;
   const formula = node.proposition || (node.kind === "hypothesis" ? node.formalization : undefined);
   if (typeof formula === "string" && formula.length <= 44 && !formula.includes("\n")) return formula;
   return t(`kind.${node.kind}`, { defaultValue: t("kind.record") });
@@ -66,13 +66,13 @@ export function nodeFormula(node: GraphNode): string {
   return "";
 }
 
-export function nodeSub(t: TFunction, node: GraphNode): { text: string; math: boolean } {
+export function nodeSub(t: TFunction, node: GraphNode, title = nodeTitle(t, node)): { text: string; math: boolean } {
   if (node.kind === "evidence") {
     const id = node.reference?.evidence_id;
     return { text: kindText(t, "evidence") + (id ? " · " + String(id).slice(0, 8) : ""), math: false };
   }
   const formula = nodeFormula(node);
-  if (formula && formula !== nodeTitle(t, node)) return { text: summarize(formula, 44), math: true };
+  if (formula && formula !== title) return { text: summarize(formula, 44), math: true };
   return { text: t(`kind.${node.kind}`, { defaultValue: "" }), math: false };
 }
 

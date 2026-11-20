@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 from queue import SimpleQueue
+import sys
 from threading import Event, Thread
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
@@ -16,6 +17,7 @@ from research_multiplier.storage import credentials, paths
 from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workbench import desktop
 from research_multiplier.workbench.server import _MissingSchema
+from research_multiplier.workflows import desktop_workspace
 
 
 pytestmark = pytest.mark.offline
@@ -253,3 +255,37 @@ def test_storage_preview_translates_the_exact_confirmation_token(tmp_path):
         "version": 1, "status": "ready", "root": source, "destination": target, "confirmation": "a" * 64,
         "files": 6, "bytes": 1024, "project_count": 1,
     }
+
+
+@pytest.mark.parametrize("fails_at", ["backup", "verify"])
+def test_project_upgrade_does_not_run_migration_without_a_verified_backup(
+    monkeypatch, bound_workspace, capsys, fails_at,
+):
+    saved_owner = "postgresql://selected/fixture"
+    _save_login(bound_workspace, RM_HUMAN_DSN="service=selected-human", RM_MIGRATION_DSN=saved_owner)
+    monkeypatch.setenv("RM_MIGRATION_DSN", "postgresql://inherited/another-workspace")
+    monkeypatch.setattr(sys, "argv", ["desktop", "--upgrade-project", str(bound_workspace)])
+
+    def status(dsn, workspace):
+        assert dsn == saved_owner
+        assert workspace == paths.require_workspace() == bound_workspace
+        assert paths.strict_workspace()
+        return "0080", False
+
+    def migration(*_):
+        pytest.fail("Upgrade ran without verifying a project backup.")
+
+    def backup_failure(*_):
+        raise ValueError("private fixture diagnostics")
+
+    monkeypatch.setattr(desktop_workspace, "_upgrade_status", status)
+    monkeypatch.setattr(desktop_workspace.migrate, "migration_url", lambda dsn: dsn)
+    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0081")
+    monkeypatch.setattr(desktop_workspace.migrate, "upgrade", migration)
+    monkeypatch.setattr(desktop_workspace.project_archive, "backup", lambda: {"directory": "/fixture/archive"})
+    monkeypatch.setattr(desktop_workspace.project_archive, fails_at, backup_failure)
+
+    assert desktop.main() == 2
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert json.loads(captured.out) == {"version": 1, "status": "error", "code": "upgrade-backup"}

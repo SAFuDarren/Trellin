@@ -105,6 +105,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
         };
         switch (event.area) {
           case "activity":
+            add("conversations", session);
             add("activity", ...claim);
             add("threads");
             add("team");
@@ -138,6 +139,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
             claims();
             break;
           case "workspace":
+            add("conversations", session);
             clarifications();
             intake();
             runtime();

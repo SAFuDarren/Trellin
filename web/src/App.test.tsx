@@ -8,6 +8,10 @@ import en from "./i18n/en.json";
 import zhCN from "./i18n/zh-CN.json";
 
 const CLAIM = "11111111-1111-4111-8111-111111111111";
+const NATIVE_CONNECTIONS = [
+  { provider: "codex-cli", id: "codex", label: "Codex", login: "codex login", model: "gpt-fixture" },
+  { provider: "claude-code", id: "claude", label: "Claude Code", login: "claude auth login", model: "sonnet" },
+] as const;
 const LEMMA = "lean:22222222-2222-4222-8222-222222222222";
 const WORKSPACE = "33333333-3333-4333-8333-333333333333";
 const EVIDENCE = "44444444-4444-4444-8444-444444444444";
@@ -124,7 +128,7 @@ describe("App", () => {
     );
     renderApp("token");
     expect(await screen.findByRole("heading", { level: 1, name: "Left zero" })).toBeTruthy();
-    const node = await screen.findByRole("button", { name: /Original claim/ });
+    const node = await screen.findByRole("button", { name: /^Original claim/ });
     expect(node.getAttribute("aria-pressed")).toBe("true");
     const detail = screen.getByLabelText(en.review.detail);
     expect(within(detail).getByText("∀ n : Nat, 0 + n = n")).toBeTruthy();
@@ -769,9 +773,9 @@ describe("App", () => {
       vi.fn(async (input: string) => new Response(JSON.stringify(responses[input.split("?")[0]!] ?? {}))),
     );
     renderApp("token");
-    const lemma = await screen.findByRole("button", { name: /A helper lemma/ });
+    const lemma = await screen.findByRole("button", { name: /^A helper lemma/ });
     expect(lemma.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: /Original claim/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Original claim/ }));
     await waitFor(() => expect(postMessage).toHaveBeenLastCalledWith({ claimId: CLAIM, nodeId: `goal:${CLAIM}` }));
   });
 
@@ -805,7 +809,7 @@ describe("App", () => {
     fireEvent.change(modal.getByLabelText(en.claimCodes.reference), { target: { value: "flow-09" } });
     fireEvent.click(modal.getByRole("button", { name: en.claimCodes.open }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /A helper lemma/ }).getAttribute("aria-pressed")).toBe("true"),
+      expect(screen.getByRole("button", { name: /^A helper lemma/ }).getAttribute("aria-pressed")).toBe("true"),
     );
     const post = fetch.mock.calls.find(([path, init]) => path === "/api/claim-code" && init?.method === "POST");
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ claim_id: CLAIM, code: "NEW" });
@@ -1008,6 +1012,169 @@ describe("App", () => {
       actor: "Reviewer",
       decisions: { i1: { action: "accept", reason: "Checked against the original" } },
     });
+  });
+
+  it.each(NATIVE_CONNECTIONS)("discovers both tools and connects only the selected $label login", async (choice) => {
+    window.history.replaceState(null, "", "#team/runtimes");
+    let existing = false;
+    let scans = 0;
+    const other = NATIVE_CONNECTIONS.find(({ id }) => id !== choice.id)!;
+    const connection = {
+      id: choice.id,
+      provider: choice.provider,
+      model: choice.model,
+      label: choice.label,
+      status: "untested",
+      fingerprint: "fingerprint",
+    };
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/team") {
+        return Response.json({
+          ...(responses[input] as object),
+          services: [{ provider: "openai", ready: false, transport: "https", via: "env", detail: "OPENAI_API_KEY" }],
+        });
+      }
+      if (input === "/api/model-connections") return Response.json({ connections: existing ? [connection] : [] });
+      if (input === "/api/model-connections/native") {
+        scans++;
+        return Response.json({
+          providers: NATIVE_CONNECTIONS.map(({ id, provider, model }) => ({
+            provider,
+            status: id === other.id && scans === 1 ? "connection.authentication" : "signed_in",
+            models: [{ id: model, label: model }],
+          })),
+        });
+      }
+      if (input === "/api/model-connections/add-native") {
+        expect(JSON.parse(String(init?.body))).toEqual({ provider: choice.provider, model: choice.model });
+        existing = true;
+        return Response.json(connection);
+      }
+      if (input === "/api/model-connections/test") {
+        expect(JSON.parse(String(init?.body))).toEqual({ id: connection.id });
+        return Response.json({ status: "connected", reported_model: `${choice.model}-reported` });
+      }
+      if (input === "/api/model-connections/remove") {
+        expect(JSON.parse(String(init?.body))).toEqual({ id: connection.id });
+        existing = false;
+        return Response.json({ removed: true });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    const connections = within(await screen.findByRole("region", { name: en.modelConnections.title }));
+    expect(await connections.findByText(en.modelConnections.empty)).toBeTruthy();
+    expect(screen.queryByText(en.team.providers.openai)).toBeNull();
+    expect(scans).toBe(0);
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.add }));
+    const connect = await connections.findByRole("button", { name: `Connect ${choice.label}` });
+    const otherConnect = connections.getByRole("button", { name: `Connect ${other.label}` });
+    expect(otherConnect.hasAttribute("disabled")).toBe(true);
+    expect(connections.getByText(new RegExp(other.login))).toBeTruthy();
+    expect(connections.queryByLabelText(en.modelConnections.provider)).toBeNull();
+    expect(connections.queryByLabelText(en.modelConnections.model)).toBeNull();
+    expect(connections.queryByLabelText(en.modelConnections.apiKey)).toBeNull();
+    expect(fetch.mock.calls.some(([path]) => path.endsWith("/add-native"))).toBe(false);
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.refreshNative }));
+    await waitFor(() => expect(otherConnect.hasAttribute("disabled")).toBe(false));
+    fireEvent.change(connections.getByRole("combobox", { name: `${choice.label} model` }), {
+      target: { value: choice.model },
+    });
+    fireEvent.click(connect);
+    expect(await connections.findByRole("cell", { name: choice.model })).toBeTruthy();
+    expect(connections.queryByText(other.label)).toBeNull();
+    expect(fetch.mock.calls.some(([path]) => path.endsWith("/test"))).toBe(false);
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.test }));
+    expect(await connections.findByText(new RegExp(`reported ${choice.model}-reported`))).toBeTruthy();
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.remove }));
+    expect(fetch.mock.calls.filter(([path]) => path.endsWith("/remove"))).toHaveLength(0);
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.removeConfirm }));
+    expect(await connections.findByText(en.modelConnections.empty)).toBeTruthy();
+  });
+
+  it("opens a separate password-masked form for API connections", async () => {
+    window.history.replaceState(null, "", "#team/runtimes");
+    const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path === "/api/model-connections") return Response.json({ connections: [] });
+      if (path === "/api/model-connections/native") return Response.json({ providers: [] });
+      if (path === "/api/model-connections/add") {
+        expect(JSON.parse(String(init?.body))).toEqual({
+          provider: "anthropic",
+          model: "claude-model",
+          api_key: "test-key",
+        });
+        return Response.json({ id: "api" });
+      }
+      return Response.json(responses[path.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    const connections = within(await screen.findByRole("region", { name: en.modelConnections.title }));
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.add }));
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.addApi }));
+    const provider = connections.getByLabelText(en.modelConnections.provider);
+    expect(within(provider).queryByRole("option", { name: "Codex" })).toBeNull();
+    fireEvent.change(provider, { target: { value: "anthropic" } });
+    fireEvent.change(connections.getByLabelText(en.modelConnections.model), { target: { value: "claude-model" } });
+    const key = connections.getByLabelText(en.modelConnections.apiKey);
+    expect(key.getAttribute("type")).toBe("password");
+    fireEvent.change(key, { target: { value: "test-key" } });
+    fireEvent.click(connections.getByRole("button", { name: en.modelConnections.save }));
+    await waitFor(() => expect(fetch.mock.calls.some(([path]) => path === "/api/model-connections/add")).toBe(true));
+    expect(fetch.mock.calls.some(([path]) => path === "/api/model-connections/add-native")).toBe(false);
+  });
+
+  it.each(NATIVE_CONNECTIONS)("previews the exact public excerpt before calling $label", async (choice) => {
+    const content = "Addition of natural numbers is commutative.";
+    const connection = {
+      id: choice.id,
+      provider: choice.provider,
+      label: choice.label,
+      model: choice.model,
+      status: "connected",
+      fingerprint: "fingerprint",
+    };
+    let proposed: Record<string, unknown> | undefined;
+    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input === "/api/claims") return Response.json({ claim_id: null, claims: [] });
+      if (input === "/api/model-connections") return Response.json({ connections: [connection] });
+      if (input === "/api/project-intake/models") return Response.json({ models: [] });
+      if (input.endsWith("/public-preview")) {
+        proposed = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        expect(proposed.connection_id).toBe(choice.id);
+        const { domain, objective, notes } = proposed;
+        return Response.json({
+          token: "reviewed",
+          provider: connection.provider,
+          model: connection.model,
+          outgoing: { domain, objective, notes },
+          limits: { timeout_seconds: 45, max_calls: 1 },
+        });
+      }
+      if (input.endsWith("/public-draft")) {
+        expect(JSON.parse(String(init?.body))).toEqual({ ...proposed, token: "reviewed" });
+        return Response.json({ id: "review", title: "Reviewed public notes", items: [], confirmed: false });
+      }
+      return Response.json(responses[input.split("?")[0]!] ?? {});
+    });
+    vi.stubGlobal("fetch", fetch);
+    renderApp("token");
+    fireEvent.click(await screen.findByRole("button", { name: en.projectEntry.organize }));
+    const dialog = within(await screen.findByRole("dialog"));
+    const recipient = `${choice.label} · ${choice.model}`;
+    await dialog.findByRole("option", { name: recipient });
+    fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.model), {
+      target: { value: `connection:${choice.id}` },
+    });
+    fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: content } });
+    fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.analyze }));
+    const preview = within(await dialog.findByRole("region", { name: en.modelConnections.publicPreview }));
+    expect(preview.getByText(new RegExp(content))).toBeTruthy();
+    expect(preview.getByText(recipient)).toBeTruthy();
+    expect(fetch.mock.calls.some(([path]) => path.endsWith("/public-draft"))).toBe(false);
+    fireEvent.click(preview.getByRole("button", { name: en.modelConnections.sendPublic }));
+    expect(await dialog.findByText("Reviewed public notes")).toBeTruthy();
   });
 
   it("saves and confirms a manual library theorem without a model", async () => {

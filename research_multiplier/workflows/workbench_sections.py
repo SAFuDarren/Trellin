@@ -50,7 +50,18 @@ LIMIT 500
 
 def library(store):
     """Every recorded definition, hypothesis and theorem version, with the claims whose checks used it."""
-    return {"items": store.query("human", _LIBRARY)}
+    items = store.query("human", _LIBRARY)
+    goals = [item["id"] for item in items if item["kind"] == "goal"]
+    if goals and store.query("human", """
+        SELECT to_regprocedure('rm.library_statement_revisions(uuid[])') IS NOT NULL AS installed
+    """)[0]["installed"]:
+        revisions = {row["id"]: row["revision"] for row in store.query(
+            "human", "SELECT * FROM rm.library_statement_revisions(%s)", goals,
+        )}
+        for item in items:
+            if item["id"] in revisions:
+                item["statement_revision"] = revisions[item["id"]]
+    return {"items": items}
 
 
 _JOBS = """
