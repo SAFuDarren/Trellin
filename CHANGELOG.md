@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.29
+
+- Show whether each proof note is waiting, blocked, stale, or included in a proof attempt.
+
 ## 1.0.28
 
 - Keep newly added proof goals on the active project canvas.
