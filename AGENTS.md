@@ -10,7 +10,7 @@ Research Multiplier is becoming a research collaboration framework and research 
 | --- | --- |
 | [docs/architecture.md](docs/architecture.md) | Numbered decisions (A1–E9). Settled decisions are binding; cite their numbers in commits and PRs. |
 | [docs/interfaces.md](docs/interfaces.md) | Contracts others build against: conventions, CLI, database boundary, API, events, plugins, MCP, workers. Schemas in `research_multiplier/schemas/`. |
-| [docs/roadmap.md](docs/roadmap.md) | Tasks P0–P6 with acceptance criteria. Work on a task means meeting its criteria. |
+| [docs/roadmap.md](docs/roadmap.md) | Roadmap phases and task acceptance criteria. Work on a task means meeting its criteria. |
 | [docs/engineering.md](docs/engineering.md) | Tooling, workflow, the change checklist, versioning, tests. |
 
 Each has a Chinese version (`*.zh-CN.md`). Update both when you change one.

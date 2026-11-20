@@ -128,9 +128,9 @@
 
 所有任务、缺陷和里程碑都在 **GitHub Issues** 和 **GitHub Projects** 看板上跟踪。
 
-- **里程碑**就是路线图的 P0–P6 各阶段。路线图里的每个任务对应一个 issue，大任务可以开一个总 issue 再拆子 issue。标题带任务编号，例如 `P1.3 Event log and live updates`。
+- **里程碑**使用路线图的阶段名称。路线图里的每个任务对应一个 issue，大任务可以开一个总 issue 再拆子 issue。已有的路线图任务编号（如 `P1.3`）保留，供引用。
 - **范围和类型标签**包括 `layer:kernel`、`layer:plugin`、`layer:collab`、`layer:ai`、`layer:entry`、`area:web`、`area:migrations`、`area:lean`、`area:docs`、`type:bug`、`type:feature`、`type:refactor`、`type:docs`、`type:chore` 和 `type:incident`。卡在待定问题上的任务使用 `needs-decision`。用 `good first issue` 和 `help wanted` 邀请贡献。
-- **优先级。** 每个开放 issue 使用一个交付优先级标签。本批次或正在推进的工作用 `priority:now`，当前依赖完成后的下一批用 `priority:next`，后续积压用 `priority:later`。
+- **优先级。** 每个开放 issue 使用一个紧急程度标签，按以下顺序处理可推进的工作。`priority:p0` 是需要立即处理的严重阻塞，`priority:p1` 是本批次的紧急事项，`priority:p2` 在更紧急的事项之后处理，`priority:p3` 是紧急程度较低的积压事项。同一级先验收已有结果并记回原 issue，再认领最早可做的 issue。遇到阻塞时，在原 issue 记录原因和依赖，再处理下一条可推进的事项。调整优先级时在原 issue 写明原因。参见 [GitHub 队列](https://github.com/SAFuDarren/Trellin/issues/112#github-queues)。
 - **看板列**依次为待分诊、可开工、进行中、评审中、已完成。范围、依赖或决定尚待澄清时用 `status:triage`。验收条件和依赖明确时用 `status:ready`。认领评论和 `status:in-progress` 记录负责人。有可评审的 PR 时加 `status:in-review`，并保留有效的认领。见[并行开发](#并行开发)。
 - **分诊：** 维护者每周过一遍新 issue：打标签，归入里程碑或关闭，并关联卡住它的决定。
 - **维护路线图：** 新增、拆分或调整任务顺序时，`roadmap.md` 和 `roadmap.zh-CN.md` 要与 issue 一起更新。进度记在 issue 里，不记在路线图里；见[及时更新状态和记录](#及时更新状态和记录)。
