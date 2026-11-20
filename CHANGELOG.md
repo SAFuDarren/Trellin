@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.23
+
+- Document repository layout, task branch retirement, and issue pickup by urgency.
+
 ## 1.0.22
 
 - Open a default Trellin library on first launch and keep new managed projects
