@@ -57,6 +57,8 @@ These commands only read. Run them freely.
 | --- | --- |
 | Is the setup complete? | `research-multiplier doctor` (add `--json` to parse it) |
 | Where do files go? | `research-multiplier research paths` |
+| Find the latest verified project archive | `research-multiplier research latest-backup` |
+| Preview a portable research handoff | `research-multiplier research handoff --claim CLAIM_UUID` or `--project`. Export with the confirmed snapshot SHA-256 after the researcher approves its contents and destination. |
 | What is going on in this project? | `research-multiplier research resume --format text` |
 | What waits for the researcher? | `research-multiplier review inbox` |
 | Evidence for one claim | `research-multiplier research evidence CLAIM_ID` |
@@ -137,6 +139,11 @@ researcher signs. They include conjecture exploration (`goal ...`,
 budgeted advancement (`advance ...`, `plan ...`) and incident handling (`trust ...`).
 Every `--actor` command in them is a researcher decision. Every
 `--confirm-public`, `--confirm-local` or `--model` flag needs consent.
+
+Trellin's **Proof task** panel shows the confirmed Lean proposition, basis and
+pending decisions. The researcher can authorize and stop the selected task
+there. Its default is a program-only pass. A restricted scope can use an exact
+configured on-machine model only within the allowance the researcher approves.
 
 ## Offline questions
 

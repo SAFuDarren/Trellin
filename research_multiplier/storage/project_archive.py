@@ -209,20 +209,71 @@ def _manifest(source):
     return archive, manifest
 
 
-def verify(source):
-    archive, manifest = _manifest(source)
+def _verification_summary(archive, manifest):
     return {"directory": str(archive), "database_id": manifest["database_id"],
             "schema_revision": manifest["schema_revision"], "files": len(manifest["files"])}
 
 
+def verify(source):
+    return _verification_summary(*_manifest(source))
+
+
+def latest(directory=None):
+    """Find the newest intact archive for the active project, without a database connection."""
+    root = paths.require_workspace()
+    database_id = paths.database_id(root)
+    workspace_id = paths.workspace_id(root)
+    if not database_id or not workspace_id:
+        raise ValueError("Bind the selected project before looking for its backups.")
+    parent = paths.external_destination(directory if directory is not None else root / "backups", "backups")
+    if not parent.exists():
+        return {"archive": None, "unusable_archives": 0}
+    if not parent.is_dir():
+        raise ValueError("Choose a directory containing project backups.")
+    candidates = []
+    unusable = 0
+    for child in parent.iterdir():
+        manifest_file = child / "manifest.json"
+        if child.is_symlink() or not child.is_dir() or manifest_file.is_symlink() or not manifest_file.is_file():
+            continue
+        try:
+            metadata = json.loads(manifest_file.read_bytes())
+            if not isinstance(metadata, dict) or metadata.get("database_id") != str(database_id):
+                continue
+            if metadata.get("workspace_id", str(workspace_id)) != str(workspace_id):
+                continue
+            candidates.append((manifest_file.stat().st_mtime_ns, child))
+        except (OSError, ValueError):
+            unusable += 1
+
+    for modified, child in sorted(candidates, reverse=True):
+        try:
+            archive, manifest = _manifest(child)
+            if manifest["database_id"] != str(database_id) or manifest.get("workspace_id", str(workspace_id)) != str(workspace_id):
+                continue
+            checked = _verification_summary(archive, manifest)
+        except (OSError, ValueError, KeyError):
+            unusable += 1
+            continue
+        return {"archive": {**checked, "manifest_modified_at": datetime.fromtimestamp(
+            modified / 1_000_000_000, timezone.utc).isoformat(timespec="seconds")}, "unusable_archives": unusable}
+    return {"archive": None, "unusable_archives": unusable}
+
+
 def restore(source, workspace, *, pg_bin=None):
-    from research_multiplier.storage.migrate import upgrade
+    from research_multiplier.storage.migrate import migration_url, upgrade
 
     archive, manifest = _manifest(source)
     target = paths.external_destination(workspace)
     if target.exists():
         raise ValueError("Choose a new destination directory for the restored project.")
     dsn = _migration_dsn()
+    try:
+        migration_url(dsn)
+    except ImportError:
+        raise ValueError("Install the PostgreSQL dependencies before restoring a project.") from None
+    except ValueError:
+        raise ValueError("Use a postgresql:// URL in RM_MIGRATION_DSN to restore a project.") from None
     with _connect(dsn) as connection:
         existing, = connection.execute("""
             SELECT to_regnamespace('rm') IS NOT NULL OR EXISTS (
@@ -235,7 +286,9 @@ def restore(source, workspace, *, pg_bin=None):
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with TemporaryDirectory(dir=target.parent, prefix=".rm-restore-") as directory:
         staging = paths.initialize_workspace(Path(directory) / "project")
-        markers = {f"project/{name}" for name in (paths.WORKSPACE_FILE, paths.WORKSPACE_ID_FILE, paths.DATABASE_FILE)}
+        markers = {f"project/{name}" for name in (
+            paths.WORKSPACE_FILE, paths.WORKSPACE_ID_FILE, paths.DATABASE_FILE, paths.LOCAL_USER_FILE,
+        )}
         files = {name: archive / name for name in manifest["files"] if name.startswith("project/") and name not in markers}
         copied = _copy(files, Path(directory))
         if any(record != manifest["files"][name] for name, record in copied.items()):
@@ -254,7 +307,10 @@ def restore(source, workspace, *, pg_bin=None):
         with _connect(dsn) as connection:
             identity, = connection.execute("SELECT rm.reidentify_restored_database(%s,%s)",
                                            (restored, paths.ensure_workspace_id(staging))).fetchone()
+            local_user = connection.execute("SELECT id FROM rm.current_local_user()").fetchone()
         paths.bind_database(staging, identity)
+        if local_user:
+            paths.bind_local_user(staging, local_user[0])
         if target.exists():
             raise FileExistsError(f"Restore destination already exists: {target}")
         staging.rename(target)

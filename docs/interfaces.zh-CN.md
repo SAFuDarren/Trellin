@@ -12,7 +12,7 @@
 | [CLI 约定](#2-cli-约定) | **稳定** | 现在 |
 | [数据库边界](#3-数据库边界) | **稳定** | 现在 |
 | [HTTP API v1](#4-http-api-v1) | v1 草案 | 路线图 P1.2 完成时 |
-| [事件 v1](#5-事件-v1) | v1 草案 | P1.3 完成时 |
+| [事件 v1](#5-事件-v1) | **稳定** | P1.3 |
 | [插件协议 v1](#6-插件协议-v1) | v1 草案 | P2.3 完成时 |
 | [MCP 工具](#7-mcp-工具) | 草案 | P2.4 完成时 |
 | [Worker 协议 v1](#8-worker-协议-v1) | v1 草案 | P3.3 完成时 |
@@ -126,6 +126,8 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 - 所有会改变状态的请求，都要校验 `Origin` 是否匹配（浏览器），或者校验 bearer 令牌（CLI 和 worker）。
 - 操作者身份一律从会话或令牌里取，请求体里绝不写「谁在操作」（B4）。
 
+兼容接口 `POST /api/review` 接收 `evidence_id`、`action` 和 `reason`，继续返回原有的 `{ "id": … }`。数据库从 `0073` 起通过绑定的工作区解析本机研究者身份。旧客户端仍可发送 `actor`，此字段只在 `0073` 之前的数据库中用作显示名。版本化审阅接口的请求体无需提供操作者姓名或用户 ID。
+
 ### 方法与动作
 
 - `GET` 只读，绝不改变状态。
@@ -149,6 +151,8 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 - 所有列表都返回一个对象：`{"items": [...], "next_cursor": "…" | null}`，绝不直接返回数组。
 - 用游标分页：`?limit=`（默认 50，最多 200）和 `?cursor=`。
 - 过滤条件用以字段命名的查询参数。排序用 `?sort=field,-other`，每个接口单独写明允许排序的字段。
+
+[工作台 OpenAPI 文档](../research_multiplier/schemas/workbench.openapi.json)的首个试点是 `GET /api/v1/workspaces/{workspace_id}/claims`。它与 `/api/claims` 使用同一份数据，最多返回最近的 100 条可见已冻结命题。试点期间不接收查询参数，`next_cursor` 始终为 `null`。响应包含启动器选中的 `claim_id`（未选中时为 `null`），支持稳定引用编号的工作区还会返回 `claim_codes: true`。调整 OpenAPI 类型后，在 `web/` 中运行 `pnpm gen:api`。前端类型检查会验证生成的类型与契约一致。
 
 ### 耗时操作
 
@@ -189,7 +193,7 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 
 ## 5. 事件 v1
 
-v1 草案，P1.3 完成时转为稳定。事件信封定义在 `event.schema.json`：
+事件信封定义在 `event.schema.json`。
 
 ```json
 {
@@ -211,6 +215,10 @@ v1 草案，P1.3 完成时转为稳定。事件信封定义在 `event.schema.jso
 - 投递语义是「至少一次」，使用方按 `id` 去重。只保证同一个工作区内的顺序。
 - 服务器推送事件：`GET /api/v1/workspaces/{id}/events`。每条消息的 `id:` 是事件 ID，`event:` 是事件类型，`data:` 是事件信封。断线后用 `Last-Event-ID` 续传。
 - `data` 只放 ID 和简短摘要，绝不放凭据。体积大或敏感的内容，由读者凭自己的权限通过 API 获取。
+
+数据库版本 `0076` 为工作区内已提交的写入增加 `workspace.changed`。事件对象是工作区，数据包含受影响的区域，以及可以确定时的命题 ID。同一事务内涉及相同区域和命题的写入可共用一条通知。客户端通过已有接口读取最新状态。原有事件类型和游标的含义继续有效。
+
+`GET /api/inbox` 通过 `workspace_events.coverage = "workspace-writes-v1"` 声明完整覆盖。工作台发送 `X-RM-Workbench-Updates: workspace-writes-v1` 后也可收到 SSE 注释 `: workbench-runtime-changed`，用于提示任务租约到期等运行状态变化。注释没有游标。
 
 ---
 

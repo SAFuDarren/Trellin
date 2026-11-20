@@ -10,7 +10,7 @@ import type {
   ImpactEntry,
   ImpactPreview,
 } from "./types";
-import { modelName, nodeTitle } from "./text";
+import { claimCode, modelName, nodeTitle } from "./text";
 
 export const CARD = { width: 160, pitch: 196, row: 132, pad: 48 };
 
@@ -28,6 +28,8 @@ export type Graph = {
   hypotheses: GraphNode[];
   evidenceAliases: Map<string, string>;
   statementId: string | null;
+  /** Durable codes from the server, or temporary labels on an older database. */
+  codes: Map<string, string>;
   focusId: string | null;
 };
 
@@ -121,7 +123,26 @@ export function buildGraph(t: TFunction, snapshot: GraphSnapshot): Graph {
     evidenceAliases,
     statementId: snapshot.claim.statement_id ?? null,
     focusId: snapshot.focus_id ?? null,
+    codes: nodeCodes(snapshot.claim, levels, nodes),
   };
+}
+
+function nodeCodes(claim: GraphSnapshot["claim"], levels: string[][], nodes: Map<string, GraphNode>) {
+  const codes = new Map<string, string>();
+  if (claim.code) {
+    for (const node of nodes.values()) {
+      if (node.code) codes.set(node.id, node.code);
+    }
+    return codes;
+  }
+  const prefix = claimCode(claim);
+  [...levels]
+    .reverse()
+    .flat()
+    .forEach((id, position) => {
+      codes.set(id, nodes.get(id)?.code || `${prefix}-${String(position + 1).padStart(2, "0")}`);
+    });
+  return codes;
 }
 
 export type Point = { x: number; y: number };

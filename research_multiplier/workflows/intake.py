@@ -95,7 +95,7 @@ def _implicit_hypotheses(outputs, *, notes, target, explicit):
     return pending
 
 
-def _extract(data, target=None, *, explicit=(), confirm_local=False):
+def _extract(data, target=None, *, explicit=(), confirm_local=False, model_config=None):
     require_model_scope(data["sensitivity"], confirm_local)
     notes = data.get("notes", "")
     if (target is None and not notes.strip()) or len(notes.encode("utf-8")) > MAX_MODEL_NOTES_BYTES:
@@ -106,8 +106,12 @@ def _extract(data, target=None, *, explicit=(), confirm_local=False):
             key: target[key] for key in ("statement", "formal", "quantifiers", "parameters", "constant_dependencies")
         }
     prompt = EXTRACT_PROMPT if target is None else TARGET_PROMPT
-    model = complete_structured(ModelConfig.from_env("EXPLORE", private=confirm_local),
-                                "intake-notes", prompt, context, 2400, 90)
+    config = model_config
+    if config is None:
+        config = ModelConfig.from_env("EXPLORE", private=confirm_local)
+    elif config.private != confirm_local:
+        raise ValueError("The model configuration must match the selected intake scope.")
+    model = complete_structured(config, "intake-notes", prompt, context, 2400, 90)
     try:
         shapes = ({"items"},) if target is None else ({"items"}, {"items", "implicit_hypotheses"})
         if not isinstance(model.output, dict) or set(model.output) not in shapes:
@@ -115,7 +119,13 @@ def _extract(data, target=None, *, explicit=(), confirm_local=False):
         outputs = model.output["items"]
         if not isinstance(outputs, list) or len(outputs) > 15:
             raise ValueError("Expected at most 15 proposed research items.")
-        items = [_item(item, "model") for item in outputs]
+        items = []
+        for output in outputs:
+            if model_config is not None and isinstance(output, dict) and output.get("question", False) is None:
+                # A local model may express an absent optional question as null.
+                # Retain the exact original reply in the model transcript.
+                output = {key: value for key, value in output.items() if key != "question"}
+            items.append(_item(output, "model"))
         if any(item["natural"] not in notes for item in items):
             raise ValueError("A stated candidate's wording must be present verbatim in the supplied notes.")
         if "implicit_hypotheses" in model.output:
@@ -170,7 +180,7 @@ def target(store, target_id):
     return rows[0]
 
 
-def draft(store, raw, *, model=False, target_id=None, confirm_local=False):
+def draft(store, raw, *, model=False, target_id=None, confirm_local=False, model_config=None):
     """Archive the input and register a comparison without approving any item."""
     frozen = target(store, target_id) if target_id is not None else None
     if frozen and frozen["intake_id"] is not None:
@@ -183,7 +193,8 @@ def draft(store, raw, *, model=False, target_id=None, confirm_local=False):
     objects = Artifacts(paths.object_store(), workspace=False)
     provenance = {}
     if model or confirm_local:
-        reply, proposed = _extract(notes, target_body, explicit=items, confirm_local=confirm_local)
+        reply, proposed = _extract(notes, target_body, explicit=items, confirm_local=confirm_local,
+                                   model_config=model_config)
         items.extend(proposed)
         provenance["model"] = {"call": reply.metadata, "transcript": objects.put(reply.transcript)}
     body = {"format_version": 1, **{key: notes[key] for key in ("title", "domain", "objective", "sensitivity")},

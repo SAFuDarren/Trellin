@@ -52,6 +52,15 @@ export function clampSize(key: SizeKey, value: number, windowHeight: number): nu
   return Math.round(Math.max(low, Math.min(Math.max(low, ceiling), value)));
 }
 
+/** Forget saved panel sizes; the workbench starts from the defaults next time it opens. */
+export function resetLayout(): void {
+  try {
+    window.localStorage.removeItem(KEY);
+  } catch {
+    // Nothing was stored.
+  }
+}
+
 export function useLayout() {
   const [sizes, setSizes] = useState<Sizes>(load);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });

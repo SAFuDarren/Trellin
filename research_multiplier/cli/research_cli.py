@@ -9,7 +9,7 @@ from uuid import UUID
 
 from research_multiplier.policy import basis, project_budget
 from research_multiplier.storage import paths, project_archive, workspace_archive
-from research_multiplier.workflows import research_followup, research_resume
+from research_multiplier.workflows import research_followup, research_handoff, research_resume
 from research_multiplier.storage.postgres import Store, bind_workspace
 
 
@@ -52,10 +52,19 @@ def add_commands(commands):
     backup.add_argument("--pg-bin", type=Path)
     verify = register(actions, "verify-project-backup", roles=(), workspace=False, help="Check a complete project archive's hashes.")
     verify.add_argument("directory", type=Path)
+    latest = register(actions, "latest-backup", roles=(), help="Find the newest checksum-verified backup of this project.")
+    latest.add_argument("--directory", type=Path, help="Search a backup directory you selected (default: this project's backups/).")
     restore = register(actions, "restore-project", roles=(), workspace=False, outputs=(Output("destination", external=True),), help="Restore a trusted archive into a new folder and empty database.")
     restore.add_argument("archive", type=Path)
     restore.add_argument("destination", type=Path)
     restore.add_argument("--pg-bin", type=Path)
+    handoff = register(actions, "handoff", help="Preview or write an offline printable and editable research handoff.")
+    selection = handoff.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--project", action="store_true", help="Include current claims and project decisions.")
+    selection.add_argument("--claim", action="append", type=UUID, help="Include this claim UUID (repeat for several).")
+    handoff.add_argument("--language", choices=("en", "zh-CN"), default="en")
+    handoff.add_argument("--out", help="Write both formats to a new directory after preview.")
+    handoff.add_argument("--confirm", help="Confirm the exact snapshot SHA-256 printed by the preview.")
     followup = register(actions, "follow-up", help="Find prospective next scopes from a current adopted Lean proof.")
     followup.add_argument("identifier", type=UUID, help="Claim ID, or the prepared frame ID with --propose.")
     next_scope = followup.add_mutually_exclusive_group()
@@ -276,8 +285,14 @@ def run(args):
         result = project_archive.backup(args.out, pg_bin=args.pg_bin)
     elif args.research_action == "verify-project-backup":
         result = project_archive.verify(args.directory)
+    elif args.research_action == "latest-backup":
+        result = project_archive.latest(args.directory)
     elif args.research_action == "restore-project":
         result = project_archive.restore(args.archive, args.destination, pg_bin=args.pg_bin)
+    elif args.research_action == "handoff":
+        with Store() as store:
+            result = research_handoff.handoff(store, claims=args.claim, language=args.language,
+                                              out=args.out, confirm=args.confirm)
     elif args.research_action == "backup-artifacts":
         result = workspace_archive.backup(args.directory)
     elif args.research_action == "restore-artifacts":

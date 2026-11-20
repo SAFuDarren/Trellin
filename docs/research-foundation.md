@@ -122,13 +122,16 @@ For research goals confirmed in Lean, use the [general Lean checking commands](l
 
 Use a paired project archive to back up the PostgreSQL snapshot, input files, saved runs, workspace objects, private evaluations, and Lean project sources together. The project binding identifies the database expected in the archive. The program excludes rebuildable Lake caches. It detects changes to files during backup and asks for a retry after writes settle.
 
-Set `RM_MIGRATION_DSN` to the authorized backup login and use PostgreSQL client tools compatible with the server. Restore a trusted archive into a new directory and a fresh database with the expected role groups.
+Set `RM_MIGRATION_DSN` to the authorized backup login and use PostgreSQL client tools compatible with the server. For restore, set it to a `postgresql://` URL for a fresh target database with the expected role groups and choose a new destination directory. Encode spaces in a socket path as `%20` in the URL. If a later failure occurs after the database import, preserve the imported database and the archive for inspection. Retry with a fresh database and an unused destination directory.
 
 ```sh
 research-multiplier research backup-project
+research-multiplier research latest-backup
 research-multiplier research verify-project-backup ARCHIVE_DIRECTORY
 research-multiplier research restore-project ARCHIVE_DIRECTORY RESTORED_DIRECTORY
 ```
+
+`latest-backup` looks in this project's `backups/`, or in a directory you choose with `--directory`. It tries the newest manifests by modification time and returns the first archive whose workspace binding and file hashes match. Run a restore drill when you need to confirm recovery in another environment. The lookup works without a running PostgreSQL server.
 
 You can schedule `backup-project` using your deployment's normal scheduler. Restore to a separate database for recovery drills. Local archives record the application and schema revisions. Maintain the release wheel, Lean and dependency archives when you need to reproduce an older environment.
 
@@ -140,3 +143,17 @@ research-multiplier research restore-artifacts /path/to/artifact-backup
 ```
 
 Artifact snapshots validate digests before restoration. Keep older runs with local-only artifacts in the backup inventory as well.
+
+## Take a research handoff with you
+
+Preview a claim with `research handoff --claim CLAIM_UUID`. Repeat `--claim` to include more claims, or use `--project` for current claims and the project's open decisions and drafts. The preview includes the exact research text and records that will appear in the report. Review them before saving a copy for someone else.
+
+```sh
+research-multiplier research handoff --claim CLAIM_UUID
+research-multiplier research handoff --claim CLAIM_UUID \
+  --out exports/first-handoff --confirm SNAPSHOT_SHA256
+```
+
+Replace `SNAPSHOT_SHA256` with the digest from the preview. If a selected record changes, preview again. Choose a new output directory under the project's `exports/` or under an existing parent folder elsewhere. Use `--language zh-CN` on both commands for Chinese headings. Research text stays as entered.
+
+The directory contains one `handoff.html` that you can open and print offline, and one editable `handoff.md`. Both show the same snapshot date and digest. They include the statement, approved assumptions, actual and planned proof dependencies, verification and review status, source links, recorded notes, and next steps. App credentials and model transcripts are outside this export. To restore a working project, keep the verified machine archive as well.

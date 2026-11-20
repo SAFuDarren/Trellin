@@ -8,10 +8,13 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from uuid import UUID, uuid4
 
+from .managed_workspaces import workspace_lease
+
 
 WORKSPACE_FILE = ".research-multiplier.json"
 WORKSPACE_ID_FILE = ".research-multiplier-workspace-id"
 DATABASE_FILE = ".research-multiplier-database"
+LOCAL_USER_FILE = ".research-multiplier-local-user-id"
 _ACTIVE_WORKSPACE = ContextVar("research_multiplier_workspace", default=None)
 _STRICT_WORKSPACE = ContextVar("research_multiplier_strict_workspace", default=False)
 _PACKAGE_PARENT = Path(__file__).resolve().parents[2]
@@ -63,22 +66,24 @@ def workspace_details(location):
     return root
 
 
-def initialize_workspace(location):
+def initialize_workspace(location, *, minimal=False):
     root = _resolve(location)
     _reject_program_path(root)
     if _workspace_above(root.parent) is not None:
         raise ValueError("Choose a workspace outside existing research workspaces.")
-    _check_layout(root)
-    marker = root / WORKSPACE_FILE
-    if marker.exists() or marker.is_symlink():
-        workspace_details(root)
-    workspace_id(root)
-    database_id(root)
-    root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    for name in _MANAGED_DIRECTORIES:
-        (root / name).mkdir(mode=0o700, exist_ok=True)
-    _publish_marker(root, WORKSPACE_FILE, b'{"format_version": 1}\n')
-    ensure_workspace_id(root)
+    with workspace_lease(root):
+        _check_layout(root)
+        marker = root / WORKSPACE_FILE
+        if marker.exists() or marker.is_symlink():
+            workspace_details(root)
+        workspace_id(root)
+        database_id(root)
+        root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if not minimal:
+            for name in _MANAGED_DIRECTORIES:
+                (root / name).mkdir(mode=0o700, exist_ok=True)
+        _publish_marker(root, WORKSPACE_FILE, b'{"format_version": 1}\n')
+        ensure_workspace_id(root)
     return root
 
 
@@ -139,6 +144,10 @@ def workspace_id(workspace):
     return _read_uuid_marker(workspace, WORKSPACE_ID_FILE, "workspace identity")
 
 
+def local_user_id(workspace):
+    return _read_uuid_marker(workspace, LOCAL_USER_FILE, "local user identity")
+
+
 def _publish_marker(workspace, name, data):
     temporary = None
     try:
@@ -172,6 +181,13 @@ def bind_database(workspace, identifier):
         raise ValueError("This research project is already bound to a different database.")
 
 
+def bind_local_user(workspace, identifier):
+    root = workspace_details(workspace)
+    _publish_marker(root, LOCAL_USER_FILE, f"{identifier}\n".encode("ascii"))
+    if local_user_id(root) != identifier:
+        raise ValueError("This research project is already bound to a different local user.")
+
+
 @contextmanager
 def use_workspace(location, *, strict=False):
     selected = _ACTIVE_WORKSPACE.set(workspace_details(location)) if location is not None else None
@@ -185,7 +201,8 @@ def use_workspace(location, *, strict=False):
             override = os.environ.get("RM_ARTIFACT_ROOT")
             if override and _resolve(override) != root / "objects":
                 raise ValueError("Use the selected workspace's objects/ directory. Clear the RM_ARTIFACT_ROOT override.")
-        yield
+        with workspace_lease(active_workspace()):
+            yield
     finally:
         if mode is not None:
             _STRICT_WORKSPACE.reset(mode)

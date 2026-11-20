@@ -2,9 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { activityNode, type Graph } from "../workbench/graph";
-import { modelName, nodeTitle, statusText, summarize, timeText } from "../workbench/text";
+import { isCodex, modelName, nodeTitle } from "../workbench/text";
 import type { ActivityRecord, ActivitySnapshot } from "../workbench/types";
-import { Chevron, Mark, Spin } from "./Icons";
+import { FeedEntry } from "./FeedEntry";
+import { Spin } from "./Icons";
 
 type Draft = {
   text: string;
@@ -51,7 +52,7 @@ export function ChatPanel({
   onSelect: (id: string) => void;
   onSent: () => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const feed = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
   const target = graph && selected ? graph.nodes.get(selected) : undefined;
@@ -97,79 +98,8 @@ export function ChatPanel({
   };
 
   const entry = (record: Entry) => {
-    const at = record.at || record.created_at;
-    const link = allNodes
-      ? (() => {
-          const node = activityNode(graph, record);
-          return node ? relation(node) : null;
-        })()
-      : null;
-    if (record.kind === "guidance") {
-      const towardsCodex = record.audience === "codex";
-      const progress = record.submitted_at
-        ? t(towardsCodex ? "chat.submittedCodex" : "chat.submittedLocal")
-        : t(towardsCodex ? "chat.waitingCodex" : "chat.waitingLocal");
-      const audience = t(`audience.${record.audience ?? "local"}`);
-      return (
-        <li key={record.id} data-from="you">
-          <p className="bubble">{record.text ?? ""}</p>
-          <span className="speaker">
-            {[t("chat.you"), timeText(i18n.language, at, true), t("chat.sentTo", { audience }), progress]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-          {link}
-        </li>
-      );
-    }
-    if (record.state === "running" && ["model", "worker", "lean", "task"].includes(record.kind)) {
-      const who = record.kind === "model" ? modelName(t, record) : t(`activityKind.${record.kind}`);
-      return (
-        <li key={record.id}>
-          <span className="live">
-            <Spin />
-            <b>{who}</b>
-            {record.kind === "worker" ? t("chat.workerRunning") : t("chat.taskRunning")}
-          </span>
-          {link}
-        </li>
-      );
-    }
-    if (record.kind === "agent_feedback" || record.kind === "verifier_feedback") {
-      return (
-        <li key={record.id}>
-          <span className="speaker">
-            <b>{record.kind === "agent_feedback" ? modelName(t, record) : t("chat.lean")}</b>
-            {timeText(i18n.language, at, true)}
-          </span>
-          <p className="message">{record.text ?? ""}</p>
-          {link}
-        </li>
-      );
-    }
-    const label =
-      record.kind === "model"
-        ? `${t("activityKind.model")} · ${modelName(t, record)}`
-        : t(`activityKind.${record.kind}`, { defaultValue: t("chat.record") });
-    const tone = ["failed", "blocked", "lease_expired"].includes(record.state)
-      ? "bad"
-      : ["queued", "waiting_retry", "waiting_dependency"].includes(record.state)
-        ? "planned"
-        : "ok";
-    return (
-      <li key={record.id}>
-        <span className="tool" title={record.text ?? ""}>
-          <Chevron />
-          {label}
-          <span className="result">
-            <Mark tone={tone} />
-            {t(`activityState.${record.state}`, { defaultValue: statusText(t, record.state) })}
-          </span>
-          {timeText(i18n.language, at, true)}
-        </span>
-        {link}
-      </li>
-    );
+    const node = allNodes ? activityNode(graph, record) : null;
+    return <FeedEntry key={record.id} record={record} link={node ? relation(node) : null} />;
   };
 
   return (
@@ -177,6 +107,9 @@ export function ChatPanel({
       <header className="chat-head">
         <h2 id="activity-title" tabIndex={-1}>
           {t("chat.title")}
+          {!allNodes && target && graph?.codes.get(target.id) && (
+            <span className="chat-code">{graph.codes.get(target.id)}</span>
+          )}
           <span id="chat-target">{allNodes ? t("chat.wholeClaim") : target ? nodeTitle(t, target) : ""}</span>
         </h2>
         <span className="chat-state" role="status" data-error={String(Boolean(activityError))}>
@@ -318,7 +251,17 @@ function Composer({
     }
   };
 
-  const name = node && graph ? summarize(nodeTitle(t, node), 14) + " · " : "";
+  // Each recipient reads as "FLT-09 · Codex · GPT-6.2 Sol xhigh": the node, the harness and the agent last seen on it.
+  const code = node && graph ? graph.codes.get(node.id) : undefined;
+  const agentFor = (channel: string) => {
+    const records = (activity?.activity ?? []).filter(
+      (record) => record.node_id === node?.id && record.model && (channel === "codex") === isCodex(record),
+    );
+    const latest = records.sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""))[0];
+    return latest ? modelName(t, latest) : "";
+  };
+  const recipient = (channel: string) =>
+    [code, t(`audience.${channel}`), agentFor(channel)].filter(Boolean).join(" · ");
   return (
     <form id="guidance-form" className="composer" onSubmit={send}>
       <label htmlFor="guidance-text" className="sr-only">
@@ -330,7 +273,7 @@ function Composer({
         maxLength={1500}
         required
         placeholder={t("composer.placeholder")}
-        aria-describedby="guidance-scope guidance-status"
+        aria-describedby="guidance-status"
         disabled={disabled}
         value={draft?.text ?? ""}
         onChange={(event) => {
@@ -349,7 +292,6 @@ function Composer({
         </label>
         <select
           id="guidance-audience"
-          aria-describedby="guidance-scope"
           disabled={disabled}
           value={audience}
           onChange={(event) => {
@@ -367,14 +309,11 @@ function Composer({
           ) : (
             channels.map((channel) => (
               <option key={channel} value={channel}>
-                {name + t(`audience.${channel}`)}
+                {recipient(channel)}
               </option>
             ))
           )}
         </select>
-        <p id="guidance-scope" className="composer-note">
-          {!available ? "" : towardsCodex ? t("composer.scopeCodex") : t("composer.scopeLocal")}
-        </p>
         <button
           id="guidance-send"
           type="submit"

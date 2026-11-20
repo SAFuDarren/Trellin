@@ -92,14 +92,52 @@ export function nodeTone(node: GraphNode, blocked: boolean): Tone {
 }
 
 const PROVIDERS: Record<string, string> = { "codex-cli": "Codex", codex: "Codex", "claude-code": "Claude Code" };
+const STOP_WORDS = new Set(["a", "an", "and", "for", "in", "of", "on", "the", "to", "with"]);
 
+/** The harness an agent runs in, for example "Codex". */
+export function harnessName(provider: string | null | undefined): string {
+  return (provider && PROVIDERS[provider]) ?? provider ?? "";
+}
+
+/** Readable model names: "gpt-6.2-sol" → "GPT-6.2 Sol", "claude-opus-5-5" → "Claude Opus 5.5". */
+export function prettyModel(model: string): string {
+  if (/[A-Z ]/.test(model)) return model;
+  const gpt = /^gpt-(\d+(?:\.\d+)?)(?:-(.+))?$/.exec(model);
+  if (gpt) return ["GPT-" + gpt[1], ...(gpt[2] ?? "").split("-").filter(Boolean).map(capitalize)].join(" ");
+  const claude = /^claude-([a-z]+)-(\d+)(?:-(\d+))?$/.exec(model);
+  if (claude) return `Claude ${capitalize(claude[1] ?? "")} ${claude[2]}${claude[3] ? "." + claude[3] : ""}`;
+  return model;
+}
+
+function capitalize(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/** An agent as people name it: model and reasoning effort, for example "GPT-6.2 Sol xhigh". */
 export function modelName(
   t: TFunction,
-  record: { model?: string; provider?: string; model_provider?: string },
+  record: { model?: string | null; provider?: string | null; model_provider?: string | null; effort?: string | null },
 ): string {
-  if (typeof record.model === "string" && record.model) return record.model;
-  const provider = record.provider ?? record.model_provider;
-  return (provider && PROVIDERS[provider]) ?? provider ?? t("model.fallback");
+  const effort = typeof record.effort === "string" && record.effort ? " " + record.effort : "";
+  if (typeof record.model === "string" && record.model) return prettyModel(record.model) + effort;
+  return (harnessName(record.provider ?? record.model_provider) || t("model.fallback")) + effort;
+}
+
+/** A short code for a claim: the server's, or the initials of its title ("Fermat's Last Theorem" → "FLT"). */
+export function claimCode(claim: { id: string; title?: string | null; code?: string | null }): string {
+  if (claim.code) return claim.code;
+  const words = (claim.title ?? "").split(/[^A-Za-z0-9']+/).filter((word) => /^[A-Za-z]/.test(word));
+  const initials = words
+    .filter((word) => !STOP_WORDS.has(word.toLowerCase()))
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("")
+    .slice(0, 4);
+  return initials.length >= 2 ? initials : "C" + claim.id.replace(/-/g, "").slice(0, 3).toUpperCase();
+}
+
+/** Canonicalize ASCII letters without turning an unsupported Unicode character into a valid code. */
+export function normalizeReferenceCode(value: string): string {
+  return value.trim().replace(/[a-z]/g, (letter) => letter.toUpperCase());
 }
 
 export function isCodex(record: { provider?: string; model_provider?: string }): boolean {

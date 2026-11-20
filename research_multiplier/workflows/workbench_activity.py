@@ -2,9 +2,11 @@
 
 from uuid import UUID
 
+from research_multiplier.storage.lean_progress import ACTIVE_LEAN_POLICY_SQL
+
 _MAX_ACTIVITY = 60
 
-_SNAPSHOT = """
+_SNAPSHOT = f"""
 WITH selected AS MATERIALIZED (
     SELECT id, contract_sha256 FROM rm.claims
     WHERE id = %s::uuid AND contract_sha256 IS NOT NULL
@@ -16,6 +18,7 @@ jobs AS (
            coalesce(a.model_provider, CASE WHEN j.payload ? 'workbench_guidance_model' THEN 'codex-cli' END)
                AS model_provider,
            coalesce(a.model_id, j.payload ->> 'workbench_guidance_model') AS model_id,
+           a.model_parameters ->> 'reasoning_effort' AS effort,
            coalesce(j.payload ->> 'lean_statement_id', j.payload ->> 'author_statement_id') AS statement_id,
            j.payload -> 'lean_search' = 'true'::jsonb AS model_job,
            j.payload -> 'lean_author' = 'true'::jsonb AS author_job,
@@ -31,14 +34,8 @@ jobs AS (
     LIMIT 36
 ),
 policies AS MATERIALIZED (
-    SELECT p.id, p.policy #>> '{lean,statement_id}' AS statement_id,
-           EXISTS (
-               SELECT FROM pg_locks active_lock, hashtextextended(p.id::text, 4801) AS key(value)
-               WHERE active_lock.locktype = 'advisory' AND active_lock.granted AND active_lock.objsubid = 1
-                 AND active_lock.database = (SELECT oid FROM pg_database WHERE datname = current_database())
-                 AND active_lock.classid::bigint = (key.value >> 32 & 4294967295::bigint)
-                 AND active_lock.objid::bigint = (key.value & 4294967295::bigint)
-           ) AS running
+    SELECT p.id, p.policy #>> '{{lean,statement_id}}' AS statement_id,
+           {ACTIVE_LEAN_POLICY_SQL} AS running
     FROM selected JOIN rm.research_progress_status p
       ON (p.claim_id,p.contract_sha256) = (selected.id,selected.contract_sha256)
     WHERE p.policy ? 'lean' AND p.approved_at IS NOT NULL
@@ -153,7 +150,7 @@ def _job_event(job, goal):
                   node=_graph_node(job["workbench_node"], goal) or goal, goal=goal,
                   policy_id=_identifier(job["policy_id"]), job_id=job["id"],
                   statement_id=_identifier(job["statement_id"]), provider=job["model_provider"],
-                  model=_text(job["model_id"]) or None)
+                  model=_text(job["model_id"]) or None, effort=_text(job.get("effort")) or None)
 
 
 def _worker_event(policy, goal):

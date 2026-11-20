@@ -5,7 +5,7 @@ Usage: python tests/fixtures/workbench_fixture.py [--port 4174], then open /#ses
 
 The data is synthetic: five claims, one graph with running model work, a blocker, an assumption with an
 impact preview, conversation records and guidance channels for both local models and Codex. Guidance
-POSTs are kept in memory. No database, credentials or network access are involved.
+and synthetic update settings are kept in memory. No database, credentials or external network access are involved.
 """
 
 import argparse
@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 APP = Path(__file__).resolve().parents[2] / "research_multiplier" / "workbench" / "app"
-TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css"}
+TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png"}
 CLAIM = "11111111-1111-4111-8111-111111111111"
 STATEMENT = "22222222-2222-4222-8222-222222222222"
 H1 = "33333333-3333-4333-8333-333333333333"
@@ -120,6 +120,77 @@ IMPACT = {"basis_version_id": H1, "affected": [
 
 
 
+INBOX = {"items": [
+    {"kind": "review_evidence", "item_id": "77777777-7777-4777-8777-777777777777", "claim_id": CLAIM,
+     "claim_title": "自然数加零的对称性", "waiting_since": at(30), "question": "Approve or return this verified result with a reason.",
+     "detail": {"kind": "lean", "sha256": "9c41e0aa" * 8}, "priority": 2},
+    {"kind": "resolve_clarification", "item_id": "88888888-8888-4888-8888-888888888888", "claim_id": "aaaaaaaa-0000-4000-8000-000000000001",
+     "claim_title": "单射映射的复合", "waiting_since": at(120), "question": "Which composition order is intended?",
+     "detail": {"question_count": 1}, "priority": 1},
+]}
+LIBRARY = {"items": [
+    {"id": LIB, "logical_key": "formalpedia:Nat.add_zero", "version": 1, "origin": "formalpedia", "admitted": True,
+     "needs_recheck": False, "retired": False, "created_at": at(3000), "kind": "theorem", "natural": "Adding zero on the right leaves a natural number unchanged.",
+     "declaration": "Nat.add_zero", "lean": "∀ n : Nat, n + 0 = n", "formula": None,
+     "used_by": [{"id": CLAIM, "title": "自然数加零的对称性"}]},
+    {"id": H1, "logical_key": "intake:h1", "version": 1, "origin": "human", "admitted": True, "needs_recheck": False,
+     "retired": False, "created_at": at(2000), "kind": "hypothesis", "natural": "Adding zero on the left leaves a natural number unchanged.",
+     "declaration": None, "lean": "∀ n : Nat, 0 + n = n", "formula": None, "used_by": [{"id": CLAIM, "title": "自然数加零的对称性"}]},
+    {"id": "99999999-9999-4999-8999-999999999999", "logical_key": "formalpedia:Nat.mul_comm", "version": 2, "origin": "formalpedia",
+     "admitted": True, "needs_recheck": True, "retired": False, "created_at": at(5000), "kind": "theorem",
+     "natural": "Multiplication of natural numbers is commutative.", "declaration": "Nat.mul_comm", "lean": "∀ n m : Nat, n * m = m * n",
+     "formula": None, "used_by": []},
+]}
+TEAM = {
+    "jobs": [
+        {"id": "j1", "claim_id": CLAIM, "claim_title": "自然数加零的对称性", "kind": "prove", "state": "running", "provider": "codex-cli",
+         "model": "gpt-5-codex", "model_job": True, "target": None, "node_id": O2, "enqueued_at": at(4), "submitted_at": None,
+         "running_since": at(3), "execution_ms": None, "failure_code": None},
+        {"id": "j2", "claim_id": CLAIM, "claim_title": "自然数加零的对称性", "kind": "prove", "state": "running", "provider": "codex-cli",
+         "model": "gpt-5-codex", "model_job": True, "target": None, "node_id": O2, "enqueued_at": at(3), "submitted_at": None,
+         "running_since": at(2), "execution_ms": None, "failure_code": None},
+        {"id": "j3", "claim_id": CLAIM, "claim_title": "自然数加零的对称性", "kind": "verify", "state": "queued", "provider": None,
+         "model": None, "model_job": False, "target": "local_lemma", "node_id": None, "enqueued_at": at(1), "submitted_at": None,
+         "running_since": None, "execution_ms": None, "failure_code": None},
+        {"id": "j0", "claim_id": CLAIM, "claim_title": "自然数加零的对称性", "kind": "verify", "state": "succeeded", "provider": None,
+         "model": None, "model_job": False, "target": "goal", "node_id": None, "enqueued_at": at(40), "submitted_at": at(38),
+         "running_since": None, "execution_ms": 5308, "failure_code": None},
+    ],
+    "agents": [{"provider": "codex-cli", "model": "gpt-5-codex", "runs": 5, "last_at": at(9), "failures": 1,
+                "average_ms": "252000", "input_tokens": "18734", "output_tokens": "1550", "cost_usd": "0.42"}],
+    "verifier": {"runs": 9, "last_at": at(8), "failures": 2, "average_ms": "38000"},
+    "services": [
+        {"provider": "codex-cli", "transport": "cli", "ready": True, "via": "command", "detail": "codex", "runs": 5},
+        {"provider": "anthropic", "transport": "messages", "ready": False, "via": "environment", "detail": "ANTHROPIC_API_KEY", "runs": 0},
+    ],
+    "machine": {"name": "fixture-host", "system": "Darwin", "arch": "arm64", "python": "3.14.4"},
+    "budget": {"policy": None, "month": {"period": "2026-11-01", "reserved_microusd": 420000, "reserved_usd": "0.420000"}, "routes": []},
+}
+PROGRESS = {"policies": [
+    {"id": "pol-1", "claim_id": CLAIM, "claim_title": "自然数加零的对称性", "state": "waiting_review",
+     "policy": {"metric": "exact-closure", "max_rounds": 0, "budget_seconds": 0, "lean": {"model_rounds": 2}},
+     "proposed_at": at(600), "approved_by": "Fixture reviewer", "approved_at": at(590), "stopped_at": None, "stop_reason": None,
+     "last_run_at": at(30), "last_status": "awaiting_evidence_review", "last_reason": None},
+]}
+THREADS = {"threads": [
+    {"claim_id": CLAIM, "claim_title": "自然数加零的对称性", "node_id": O2,
+     "node": {"id": O2, "kind": "obligation", "title": "Proof obligation 2", "proposition": "∀ n, n + 0 = n", "status": "open"},
+     "live": 2, "models": ["gpt-5-codex"], "last_at": at(2),
+     "events": [e for e in ACTIVITY["activity"] if e["node_id"] == O2]},
+]}
+DOCTOR = {"capabilities": {"offline": {"title": "Offline briefs and replay", "ready": True}},
+          "checks": [{"id": "python", "group": "Basics", "title": "Python", "status": "ok", "detail": "3.14.4", "fix": ""},
+                     {"id": "lean-toolchain", "group": "Lean", "title": "Lean 4.19.0", "status": "ok", "detail": "found", "fix": ""}]}
+INITIAL_RELEASE_STATE = {"installed_version": "1.9.0", "automatic": False, "last_checked_at": None,
+                         "status": "not_checked", "available": None}
+RELEASE_STATE = INITIAL_RELEASE_STATE.copy()
+AVAILABLE_RELEASE = {"version": "1.10.0", "url": "https://github.com/SAFuDarren/Trellin/releases/tag/v1.10.0",
+                     "dismissed": False}
+REVIEWS = []
+INITIAL_INBOX = [dict(item) for item in INBOX["items"]]
+INITIAL_GUIDANCE = [dict(item) for item in ACTIVITY["guidance"]]
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
@@ -129,7 +200,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", kind)
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Security-Policy",
-                         "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'")
+                         "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'")
         self.end_headers()
         self.wfile.write(body)
 
@@ -142,9 +213,13 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send(b'{"error": "missing"}', "application/json", 404)
             return
+        if route.path == "/api/release-updates":
+            self.release_updates(route)
+            return
         query = parse_qs(route.query)
         data = {"/api/claims": {"claims": CLAIMS, "claim_id": CLAIM}, "/api/graph": GRAPH, "/api/activity": ACTIVITY,
-                "/api/atlas": ATLAS, "/api/impact": IMPACT}.get(route.path)
+                "/api/atlas": ATLAS, "/api/impact": IMPACT, "/api/inbox": INBOX, "/api/library": LIBRARY,
+                "/api/team": TEAM, "/api/progress": PROGRESS, "/api/threads": THREADS, "/api/doctor": DOCTOR}.get(route.path)
         if data is None:
             self.send(b'{"error": "Page unavailable."}', "application/json", 404)
             return
@@ -155,12 +230,54 @@ class Handler(BaseHTTPRequestHandler):
         self.send(json.dumps(data, ensure_ascii=False).encode(), "application/json; charset=utf-8")
 
     def do_POST(self):
+        route = urlsplit(self.path)
+        if route.path == "/api/release-updates":
+            self.release_updates(route)
+            return
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length))
+        if self.path == "/__reset":  # test-only: restore the inbox between end-to-end tests
+            INBOX["items"] = [dict(item) for item in INITIAL_INBOX]
+            REVIEWS.clear()
+            ACTIVITY["guidance"][:] = [dict(item) for item in INITIAL_GUIDANCE]
+            RELEASE_STATE.update(INITIAL_RELEASE_STATE)
+            self.send(b'{"ok": true}', "application/json")
+            return
+        if self.path == "/api/review":
+            REVIEWS.append(body)
+            INBOX["items"] = [item for item in INBOX["items"] if item["item_id"] != body["evidence_id"]]
+            self.send(b'{"id": "review-1"}', "application/json")
+            return
         ACTIVITY["guidance"].append({"id": "g" + str(len(ACTIVITY["guidance"]) + 1), "text": body["text"],
                                      "audience": body.get("audience", "local"), "node_id": body["node_id"],
                                      "created_at": datetime.now(timezone.utc).isoformat()})
         self.send(b'{"ok": true}', "application/json")
+
+    def release_updates(self, route):
+        host, port = self.server.server_address
+        local_host = f"{host}:{port}"
+        origin = [f"http://{local_host}"]
+        allowed_origins = (origin,) if self.command == "POST" else (None, origin)
+        if (self.headers.get_all("Host") != [local_host] or self.headers.get_all("Origin") not in allowed_origins
+                or self.headers.get_all("X-RM-Session") != ["fixture"]):
+            self.send(b'{"error": "Open the local fixture session."}', "application/json", 403)
+            return
+        if route.query:
+            self.send(b'{"error": "This endpoint does not take parameters."}', "application/json", 400)
+            return
+        if self.command == "POST":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length))
+            action = body.get("action")
+            if action == "check" or (action == "auto_check" and RELEASE_STATE["automatic"]
+                                     and RELEASE_STATE["last_checked_at"] is None):
+                release = RELEASE_STATE["available"] or AVAILABLE_RELEASE.copy()
+                RELEASE_STATE.update(last_checked_at=int(NOW.timestamp()), status="available", available=release)
+            elif action == "automatic":
+                RELEASE_STATE["automatic"] = body["enabled"]
+            elif action == "dismiss" and RELEASE_STATE["available"] and body["version"] == AVAILABLE_RELEASE["version"]:
+                RELEASE_STATE["available"]["dismissed"] = True
+        self.send(json.dumps(RELEASE_STATE).encode(), "application/json; charset=utf-8")
 
 
 if __name__ == "__main__":

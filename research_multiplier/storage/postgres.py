@@ -1,6 +1,6 @@
 """Role-scoped connections and transactions for the production workflow."""
 
-from contextlib import ExitStack
+from contextlib import ExitStack, closing, contextmanager, suppress
 import os
 
 from research_multiplier.storage import paths
@@ -40,7 +40,10 @@ def bind_workspace(workspace):
             paths.bind_database(workspace, identifier)
             return identifier
 
-        return store.transaction("human", bind)
+        identifier = store.transaction("human", bind)
+        if user := store.local_user():
+            paths.bind_local_user(workspace, user["id"])
+        return identifier
 
 
 class Store:
@@ -126,6 +129,31 @@ class Store:
 
         return self._call(role, run)
 
+    @contextmanager
+    def listen_workspace_events(self):
+        """Listen outside any transaction on this Store's dedicated human connection."""
+        from psycopg.pq import TransactionStatus
+
+        def listen(connection):
+            if not connection.autocommit or connection.info.transaction_status != TransactionStatus.IDLE:
+                raise ValueError("Workspace events require an idle autocommit connection.")
+            connection.execute("LISTEN rm_workspace_events")
+
+        def wait(timeout):
+            def receive(connection):
+                with closing(connection.notifies(timeout=timeout, stop_after=1)) as notifications:
+                    next(notifications, None)
+
+            self._call("human", receive)
+
+        self._call("human", listen)
+        try:
+            yield wait
+        finally:
+            # The Store also closes the connection if it disconnected during the read.
+            with suppress(DatabaseOperationError):
+                self._call("human", lambda connection: connection.execute("UNLISTEN rm_workspace_events"))
+
     def _verify_role(self, role, connection):
         if role in self.verified_roles:
             return
@@ -144,6 +172,22 @@ class Store:
     def verify_runtime_roles(self, *, roles=_ROLES):
         for role in roles:
             self._call(role, lambda conn: self._verify_role(role, conn))
+
+    def local_identity_installed(self):
+        return self.query("human", """
+            SELECT to_regprocedure('rm.current_local_user()') IS NOT NULL AS installed
+        """)[0]["installed"]
+
+    def local_user(self):
+        """Resolve identity from the bound database and verify any saved local marker."""
+        if not self.local_identity_installed():
+            return None
+        rows = self.query("human", "SELECT * FROM rm.current_local_user()")
+        user = rows[0] if rows else None
+        saved = paths.local_user_id(paths.active_workspace())
+        if saved is not None and (user is None or saved != user["id"]):
+            raise ValueError("The saved research user differs from the database identity.")
+        return user
 
     def freeze(self, claim, actor_ref):
         validate("claim", "ClaimContract", claim)
