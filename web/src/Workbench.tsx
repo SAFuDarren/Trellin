@@ -359,6 +359,12 @@ export function Workbench({
           selected={selected}
           activity={activity.data}
           activityError={activityError}
+          scopeReady={
+            claimId
+              ? graph?.claim.id === claimId &&
+                (allNodes || Boolean(selected && graph.nodes.has(selected)) || !graph.nodes.size)
+              : claims.data?.claims.length === 0
+          }
           running={work.running}
           queued={work.queued}
           open={sizes.chatOpen}

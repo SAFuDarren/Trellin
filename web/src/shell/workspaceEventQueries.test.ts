@@ -28,7 +28,7 @@ describe("Workspace event read models", () => {
   it("limits clock and liveness updates to runtime views and drops covered narrow keys", () => {
     expect(
       workspaceEventQueries([{ kind: "change", area: "activity", claimId: "claim" }, { kind: "runtime" }], "session"),
-    ).toEqual([["threads"], ["team"], ["activity"], ["proof-task", "session"]]);
+    ).toEqual([["conversations", "session"], ["threads"], ["team"], ["activity"], ["proof-task", "session"]]);
   });
 
   it("refreshes conversations for recorded proof passes, job changes, and graph changes", () => {

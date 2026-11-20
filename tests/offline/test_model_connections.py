@@ -114,6 +114,7 @@ def test_native_discovery_checks_sign_in_and_registers_only_the_selected_tool(tm
     location = tmp_path / "connections.sqlite3"
     codex = tmp_path / "codex"
     codex.write_text("fixture")
+    codex.chmod(0o700)
     registry = connections.Registry(location, secrets=Secrets())
 
     def find_binary(provider, selected):
@@ -133,13 +134,19 @@ def test_native_discovery_checks_sign_in_and_registers_only_the_selected_tool(tm
 
     monkeypatch.setattr(connections, "_binary", find_binary)
     monkeypatch.setattr(cli_executor, "require_native_login", check_login)
+    monkeypatch.setattr(cli_executor, "codex_models", lambda binary: [
+        {"slug": "fixture-codex", "display_name": "Fixture Codex"},
+        {"slug": "bad model", "display_name": "Invalid"},
+        {"slug": "fixture-codex", "display_name": "Duplicate"},
+    ])
     monkeypatch.setattr(connections, "_adapter", unexpected)
-    assert registry.native() == [{"provider": "codex-cli", "status": "signed_in"}]
+    assert registry.native() == [{"provider": "codex-cli", "status": "signed_in",
+                                  "models": [{"id": "fixture-codex", "label": "Fixture Codex"}]}]
     assert registry.list() == [] and not location.exists()
     assert login == [("codex-cli", str(codex))]
 
     for invalid in ({"provider": "openai"}, {"provider": "codex-cli", "binary": "/user/path"},
-                    {"provider": "codex-cli", "model": "user-supplied"}, {"provider": "codex-cli", "api_key": "secret"}):
+                    {"provider": "codex-cli", "model": "--invalid"}, {"provider": "codex-cli", "api_key": "secret"}):
         with pytest.raises(connections.ConnectionError, match=r"^connection\.invalid$"):
             registry.add_native(invalid)
     with pytest.raises(connections.ConnectionError, match=r"^connection\.missing_cli$"):
@@ -147,7 +154,7 @@ def test_native_discovery_checks_sign_in_and_registers_only_the_selected_tool(tm
     assert len(login) == 1 and not location.exists()
 
     sign_in_allowed = False
-    assert registry.native() == [{"provider": "codex-cli", "status": "connection.authentication"}]
+    assert registry.native() == [{"provider": "codex-cli", "status": "connection.authentication", "models": []}]
     with pytest.raises(connections.ConnectionError, match=r"^connection\.authentication$"):
         registry.add_native({"provider": "codex-cli"})
     assert not location.exists()
@@ -159,7 +166,44 @@ def test_native_discovery_checks_sign_in_and_registers_only_the_selected_tool(tm
     assert set(selected) == {"id", "provider", "model", "status", "label", "fingerprint"}
     assert registry.add_native({"provider": "codex-cli"}) == selected
     assert registry.list() == [selected]
+    explicit = registry.add_native({"provider": "codex-cli", "model": "fixture-codex"})
+    assert registry.add_native({"provider": "codex-cli", "model": "fixture-codex"}) == explicit
+    assert explicit["model"] == "fixture-codex" and explicit["fingerprint"] != selected["fingerprint"]
+    assert registry.config(explicit["id"]).model == "fixture-codex"
+    assert registry.config(selected["id"]).model == "native-default"
     assert not registry._secrets.values
+
+    class Adapter:
+        def complete(self, request):
+            assert request["model_id"] == "fixture-codex"
+            return AdapterReply("fixture", "fixture-codex", model_id_reported=did_report)
+
+    monkeypatch.setattr(connections, "_adapter", lambda *args: Adapter())
+    for did_report in (True, False):
+        result = registry.test(explicit["id"])
+        assert result == {"status": "connected", "provider": "codex-cli", "model": "fixture-codex",
+                          "reported_model": "fixture-codex" if did_report else None}
+
+
+def test_codex_catalog_uses_native_metadata_without_project_material(monkeypatch):
+    monkeypatch.setenv("RM_HUMAN_DSN", "private")
+    monkeypatch.setenv("OPENAI_API_KEY", "private")
+
+    def run(command, *, cwd, env, timeout, stdin, stdout, stderr, check):
+        assert command == ["/path/to/codex", "debug", "models"]
+        assert list(Path(cwd).iterdir()) == []
+        assert not {"RM_HUMAN_DSN", "OPENAI_API_KEY"} & env.keys()
+        assert timeout == 6 and stdin == stderr == DEVNULL and not check
+        return CompletedProcess(command, 0, b'''{"models": [
+            {"slug":"test","visibility":"list","display_name":"Test"},
+            {"slug":"hidden","visibility":"hide"}]}''', b"")
+
+    monkeypatch.setattr(cli_executor.subprocess, "run", run)
+    assert cli_executor.codex_models("/path/to/codex") == [
+        {"slug": "test", "visibility": "list", "display_name": "Test"},
+    ]
+    monkeypatch.setattr(cli_executor.subprocess, "run", lambda *a, **k: CompletedProcess([], 0, b"bad", b""))
+    assert cli_executor.codex_models("/path/to/codex") == []
 
 
 @pytest.mark.parametrize("provider", ["openai", "anthropic"])
@@ -246,13 +290,14 @@ def test_native_default_leaves_model_selection_to_the_registered_cli(provider, m
             return CompletedProcess(command, 0, "fixture version", "")
         commands.append(command)
         environments.append((options["env"], options["cwd"]))
+        reported = "selected-model" if "selected-model" in command else "actual-model"
         if provider == "codex-cli":
             response = "\n".join(map(json.dumps, [
                 {"type": "item.completed", "item": {"type": "agent_message", "text": "fixture"}},
-                {"type": "turn.completed", "model": "actual-model", "usage": {}},
+                {"type": "turn.completed", "model": reported, "usage": {}},
             ]))
         else:
-            response = json.dumps({"subtype": "success", "result": "fixture", "modelUsage": {"actual-model": {}}})
+            response = json.dumps({"subtype": "success", "result": "fixture", "modelUsage": {reported: {}}})
         return CompletedProcess(command, 0, response, "")
 
     monkeypatch.setattr(cli_executor, "_isolated_codex_command", isolate)
@@ -275,6 +320,36 @@ def test_native_default_leaves_model_selection_to_the_registered_cli(provider, m
         else:
             assert "CLAUDE_CODE_TMPDIR" not in environment
     assert "CLAUDE_CODE_TMPDIR" not in environments[2][0]
+
+
+@pytest.mark.parametrize("provider,selected,reported,match", [
+    ("claude-code", "opus", "claude-opus-fixture", True),
+    ("claude-code", "opus", "claude-sonnet-fixture", False),
+    ("claude-code", "claude-opus-previous", "claude-opus-fixture", False),
+    ("codex-cli", "gpt-fixture", "gpt-substitute", False),
+    ("codex-cli", "gpt-fixture", None, True),
+])
+def test_registered_explicit_native_model_checks_reported_identity(provider, selected, reported, match, monkeypatch):
+    if provider == "codex-cli":
+        response = "\n".join(map(json.dumps, [
+            {"type": "item.completed", "item": {"type": "agent_message", "text": "fixture"}},
+            {"type": "turn.completed", "model": reported, "usage": {}},
+        ]))
+    else:
+        response = json.dumps({"subtype": "success", "result": "fixture", "modelUsage": {reported: {}}})
+    results = iter([CompletedProcess([], 0, "fixture version", ""), CompletedProcess([], 0, response, "")])
+    monkeypatch.setattr(cli_executor, "_isolated_codex_command", lambda command, _: command)
+    monkeypatch.setattr(cli_executor, "_isolated_claude_command", lambda command, *_: command)
+    monkeypatch.setattr(cli_executor.subprocess, "run", lambda *args, **kwargs: next(results))
+    with cli_executor.workbench_connection(provider):
+        if match:
+            reply = cli_executor.complete(provider, "/fixture/native", selected, [], 10)
+            assert reply["model"] == (reported or selected)
+            assert reply["model_id_reported"] is (reported is not None)
+        else:
+            with pytest.raises(ModelFailure, match="used a different model") as error:
+                cli_executor.complete(provider, "/fixture/native", selected, [], 10)
+            assert error.value.code == "model_unavailable"
 
 
 def test_registered_claude_confines_user_files_and_the_selected_workspace(tmp_path, monkeypatch):

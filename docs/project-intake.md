@@ -10,7 +10,9 @@ The suggestions quote the material they came from. Review each proposed definiti
 
 ### Connect a model
 
-Choose **Team → Runtimes → Model connections → Add connection**. Select an installed Codex or Claude Code instance detected by Trellin. Sign in through the native CLI if it asks for login, then refresh the detected list. Trellin uses the provider’s default model when adding a native connection. To connect directly to the OpenAI or Anthropic API, choose the API option and enter the model identifier and your API key. Trellin stores direct API keys in the macOS Keychain. The connection list contains only the models you added.
+Choose **Team → Runtimes → Model connections → Add connection**. Select an installed Codex or Claude Code instance detected by Trellin. Sign in through the native CLI if prompted, then check again. Choose a model from the list or keep the provider default. Codex supplies its model list when supported by the installed CLI. Claude Code offers model families whose availability depends on your account. You can also enter a model identifier supported by your account. Each chosen model is a separate connection so you can select it for intake and proof work. Use **Test connection** to check account access with a short example request.
+
+To connect directly to the OpenAI or Anthropic API, choose the API option and enter the model identifier and your API key. Trellin stores direct API keys in the macOS Keychain. The connection list contains only the models you added.
 
 **Test connection** sends one fixed request without project material. Choose **Remove connection** to prevent future requests on that connection. The project retains the prior model results and verification records. For on-device intake, start the local Ollama service with a supported text model.
 

@@ -338,6 +338,17 @@
     "fallback": "模型"
   },
   "errors": {
+    "conversation.upgrade": "更新此工作区的数据库后即可使用对话。",
+    "conversation.identity": "请使用本机研究者身份打开此工作区，再使用对话。",
+    "conversation.invalid": "请检查选择的对话、模型和消息。",
+    "conversation.stale": "消息、模型或对话已变更。请重新核对将发送的内容。",
+    "conversation.busy": "此对话仍有消息正在处理。",
+    "conversation.missing": "此对话已不可用。",
+    "conversation.confirmation": "向外部服务发送前，请核对并确认具体内容。",
+    "conversation.interrupted": "模型回复保存前工作台已停止。",
+    "conversation.failed": "模型未能完成此消息。",
+    "conversation.budget": "本项目的模型预算已用完。",
+    "conversation.unavailable": "此模型暂时无法用于此对话。",
     "intake.public_failed": "所选模型未能完成请求。请检查模型连接后重试。",
     "intake.project_budget_exhausted": "此课题的模型预算已用完。",
     "proof_task.external_unavailable": "已授权的模型连接不可用。请检查「团队 → 运行环境」中的模型连接。",
@@ -435,6 +446,9 @@
     }
   },
   "claimsPage": {
+    "openWorkbench": "在工作台打开",
+    "noStatement": "这项课题没有已记录的陈述。",
+    "noLean": "尚未记录 Lean 陈述。",
     "filter": {
       "all": "全部课题",
       "review": "有待审阅",
@@ -447,6 +461,33 @@
     "verified": "已核验 {{done}}/{{total}}",
     "running_one": "{{count}} 个模型在运行",
     "running_other": "{{count}} 个模型在运行"
+  },
+  "libraryEdit": {
+    "fixedScope": "现有 Lean 参数和前提",
+    "title": "修订定理库陈述",
+    "edit": "编辑陈述",
+    "editItem": "编辑「{{name}}」的陈述",
+    "actions": "操作",
+    "close": "关闭",
+    "discard": "放弃修改",
+    "baseVersion": "正在编辑 v{{version}} 的原始内容",
+    "review": "核对修改",
+    "before": "当前版本",
+    "after": "拟议版本",
+    "reason": "修订理由",
+    "back": "返回编辑",
+    "confirm": "确认新版本",
+    "impact": {
+      "basis": "原版本将撤回。影响涉及 {{claims}} 个命题、{{checks}} 次核验和 {{receipts}} 份核验报告。",
+      "goal": "新命题需要单独证明。原命题的 {{checks}} 次核验和 {{receipts}} 份核验报告仍归原命题。",
+      "successor": "确认后将新增一条带有原版本链接的定理库记录。原记录及其证明均可继续查阅。"
+    },
+    "invalid": "请修改自然语言陈述或 Lean 陈述，并遵守输入长度限制。",
+    "stale": "这个版本或它的依赖已发生变化。请打开当前版本重新核对。",
+    "identity": "请为工作区绑定本地研究者身份后确认修订。",
+    "missing": "当前工作区找不到这个定理库版本。",
+    "unavailable": "修订功能需要可连接且已升级的工作区数据库。",
+    "unsupported": "此来源没有可编辑的 Lean 陈述。"
   },
   "library": {
     "all": "全部",
@@ -482,6 +523,31 @@
       "formalpedia": "Formalpedia",
       "derivation": "推导所得"
     }
+  },
+  "conversations": {
+    "requestedModel": "请求使用 {{name}} · 服务未报告实际模型",
+    "localModel": "本机 · {{name}}",
+    "views": "对话视图",
+    "proofActivity": "证明活动",
+    "threads": "对话",
+    "new": "新建对话",
+    "defaultTitle": "研究对话",
+    "emptyProject": "新建对话后即可讨论研究问题。",
+    "emptyScope": "为当前选中的内容新建对话。",
+    "emptyThread": "暂无消息。",
+    "model": "对话模型",
+    "chooseModel": "选择模型",
+    "connect": "在「团队」中接入模型",
+    "message": "输入消息",
+    "send": "发送消息",
+    "working": "处理中…",
+    "you": "你",
+    "reviewTitle": "核对将外发的内容",
+    "confirmSend": "确认发送",
+    "remove": "移除对话",
+    "removeHint": "要从列表移除本对话吗？关联的证明与核验记录会保留。",
+    "confirmRemove": "确认移除",
+    "failed": "对话请求未完成。检查连接后重试。"
   },
   "threads": {
     "active": "正在进行",
@@ -632,6 +698,12 @@
     "nativeConnect": "连接 {{name}}",
     "nativeAdded": "已添加 {{name}}",
     "defaultModel": "默认模型",
+    "nativeModel": "{{name}} 模型",
+    "customModel": "输入模型标识",
+    "catalogUnavailable": "Codex 未返回模型列表。可使用默认模型或输入你的账号支持的模型标识。",
+    "aliasAvailability": "Claude Code 可用的模型系列取决于账号。使用前可测试连接。",
+    "testReported": "连接测试成功。工具回报的模型为 {{model}}。",
+    "testUnreported": "连接测试成功。工具未回报实际使用的模型。",
     "refreshNative": "重新检测",
     "addApi": "添加 API 连接",
     "apiKey": "API 密钥",

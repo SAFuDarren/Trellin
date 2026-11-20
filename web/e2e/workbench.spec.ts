@@ -3,8 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 // Parity checklist from docs/roadmap.md (P1.4) and the section pages (P1.5),
 // run against tests/fixtures/workbench_fixture.py.
 
-test.beforeEach(async ({ request }) => {
+test.beforeEach(async ({ request, page }) => {
   await request.post("/__reset", { data: {} });
+  await page.route(/\/api\/conversations(?:\?|$)/, (route) => route.fulfill({ json: { threads: [] } }));
 });
 
 async function open(page: Page, section?: string) {
@@ -50,6 +51,7 @@ test("claims, graph, live work, legend and details load without errors", async (
 test("selecting a node shows its details and conversation", async ({ page }) => {
   await open(page);
   await card(page, /^Proof obligation 2$/).click();
+  await page.getByRole("button", { name: "Proof activity" }).click();
   await expect(page.locator(".node-detail h2")).toHaveText("Proof obligation 2");
   await expect(page.locator(".node-detail")).toContainText("Blocked:");
   await expect(page.locator("#chat-target")).toHaveText("Proof obligation 2");
@@ -71,6 +73,7 @@ test("the impact view previews what withdrawing an assumption affects", async ({
 test("sending a note to Codex takes two explicit clicks", async ({ page }) => {
   await open(page);
   await card(page, /^Proof obligation 2$/).click();
+  await page.getByRole("button", { name: "Proof activity" }).click();
   await page.locator("#guidance-audience").selectOption("codex");
   await page.locator("#guidance-text").fill("Try the reduction route first.");
   const send = page.locator("#guidance-send");
@@ -221,4 +224,178 @@ test("the browser tab icons load", async ({ page, request }) => {
     expect(response.status(), icon).toBe(200);
     expect(response.headers()["content-type"]).toMatch(/^image\//);
   }
+});
+
+test("Chats starts an unlinked conversation, previews the chosen model, and restores its history", async ({ page }) => {
+  const createdAt = "2026-11-20T02:00:00Z";
+  const id = "12345678-1234-4234-8234-123456789abc";
+  const model = {
+    id: "claude-choice",
+    label: "Claude research",
+    fingerprint: "known",
+    status: "connected",
+    provider: "claude-code",
+    model: "sonnet",
+  };
+  const sent: Record<string, unknown>[] = [];
+  const previews: Record<string, unknown>[] = [];
+  const archived: Record<string, unknown>[] = [];
+  const created: Record<string, unknown>[] = [];
+  const story = {
+    id,
+    title: "Research conversation",
+    created_at: createdAt,
+    updated_at: createdAt,
+    claim_id: null,
+    statement_id: null,
+    node_id: null,
+    running: false,
+    revision: 0,
+    messages: [] as { id: string; role: string; at: string; text: string; provider?: string; model?: string }[],
+  };
+  const outgoing = JSON.stringify({ system: "Discuss the question.", user: "What structure is missing?" });
+  await page.route("**/api/claims", (route) => route.fulfill({ json: { claims: [], claim_id: null } }));
+  await page.route("**/api/project-intake/models", (route) => route.fulfill({ json: { models: [] } }));
+  await page.route("**/api/model-connections", (route) => route.fulfill({ json: { connections: [model] } }));
+  await page.route(/\/api\/conversations(?:[/?]|$)/, async (route) => {
+    switch (new URL(route.request().url()).pathname) {
+      case "/api/conversations/create":
+        created.push(route.request().postDataJSON());
+        return route.fulfill({ json: { thread: story } });
+      case "/api/conversations/preview":
+        previews.push(route.request().postDataJSON());
+        return route.fulfill({
+          json: { token: "approved-context", provider: model.provider, model: model.model, outgoing, external: true },
+        });
+      case "/api/conversations/send":
+        sent.push(route.request().postDataJSON());
+        story.revision++;
+        story.messages.push(
+          { id: "q", role: "user", at: createdAt, text: "What structure is missing?" },
+          {
+            id: "a",
+            role: "assistant",
+            provider: model.provider,
+            model: model.model,
+            at: createdAt,
+            text: "Check closure.",
+          },
+        );
+        return route.fulfill({ json: { thread: story } });
+      case "/api/conversations/archive":
+        archived.push(route.request().postDataJSON());
+        return route.fulfill({ json: { archived: true } });
+      case "/api/conversations/thread":
+        return route.fulfill({ json: { thread: story } });
+      default:
+        return route.fulfill({ json: { threads: created.length && !archived.length ? [story] : [] } });
+    }
+  });
+  await page.goto("/#session=fixture");
+  await railLink(page, "Chats").click();
+  await page.getByRole("button", { name: "New conversation" }).click();
+  const picker = page.getByRole("combobox", { name: "Conversation model" });
+  await expect(picker).toHaveValue("");
+  expect(created).toEqual([{ title: story.title }]);
+  await picker.selectOption(model.id);
+  await page.getByRole("textbox", { name: "Write a message" }).fill("What structure is missing?");
+  await page.getByRole("button", { name: "Send message" }).click();
+  const dialog = page.getByRole("dialog", { name: "Review what will be sent" });
+  await expect(dialog.locator("pre")).toHaveText(outgoing);
+  await expect(dialog).toContainText("Claude Code · sonnet");
+  expect(sent).toHaveLength(0);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("textbox", { name: "Write a message" })).toHaveValue("What structure is missing?");
+  expect(sent).toHaveLength(0);
+  await page.getByRole("button", { name: "Send message" }).click();
+  await dialog.getByRole("button", { name: "Confirm and send" }).click();
+  await expect(page.getByText("Check closure.")).toBeVisible();
+  expect(previews).toHaveLength(2);
+  expect(sent).toEqual([{ ...previews[1], token: "approved-context", confirm_external: true }]);
+  await page.reload();
+  await expect(page.getByText("Check closure.")).toBeVisible();
+  await page.getByRole("button", { name: "Remove conversation" }).click();
+  const remove = page.getByRole("dialog", { name: "Remove conversation" });
+  expect(archived).toHaveLength(0);
+  await remove.getByRole("button", { name: "Confirm removal" }).click();
+  await expect(page.getByText("Start a conversation to discuss a research question.")).toBeVisible();
+  expect(archived).toEqual([{ thread_id: id }]);
+});
+
+test("Workbench creates an anchored conversation and can choose a verified local model", async ({ page }) => {
+  const now = "2026-11-20T02:00:00Z";
+  const created: Record<string, unknown>[] = [];
+  const sent: Record<string, unknown>[] = [];
+  let thread: Record<string, unknown> | null = null;
+  await page.route("**/api/project-intake/models", (route) => route.fulfill({ json: { models: ["local-research"] } }));
+  await page.route("**/api/model-connections", (route) => route.fulfill({ json: { connections: [] } }));
+  await page.route(/\/api\/conversations(?:[/?]|$)/, async (route) => {
+    switch (new URL(route.request().url()).pathname) {
+      case "/api/conversations/create": {
+        const body = route.request().postDataJSON();
+        created.push(body);
+        thread = {
+          ...body,
+          id: "anchored-thread",
+          updated_at: now,
+          created_at: now,
+          running: false,
+          revision: 0,
+          messages: [],
+        };
+        return route.fulfill({ json: { thread } });
+      }
+      case "/api/conversations/thread":
+        return route.fulfill({ json: { thread } });
+      case "/api/conversations/preview":
+        return route.fulfill({
+          json: {
+            token: "local-reviewed",
+            provider: "ollama-native",
+            model: "local-research:local",
+            external: false,
+            outgoing: "{}",
+          },
+        });
+      case "/api/conversations/send": {
+        const body = route.request().postDataJSON();
+        sent.push(body);
+        thread = {
+          ...thread,
+          messages: [{ id: "local-answer", role: "assistant", text: "Local reply.", at: now }],
+          revision: 1,
+        };
+        return route.fulfill({ json: { thread } });
+      }
+      default:
+        return route.fulfill({ json: { threads: thread ? [thread] : [] } });
+    }
+  });
+  await open(page);
+  const node = card(page, /^Proof obligation 2$/);
+  await node.click();
+  await page.getByRole("button", { name: "New conversation" }).click();
+  await page.getByRole("combobox", { name: "Conversation model" }).selectOption("local:local-research");
+  expect(created).toEqual([
+    {
+      title: "Proof obligation 2",
+      claim_id: expect.any(String),
+      statement_id: expect.any(String),
+      node_id: await node.getAttribute("data-node"),
+    },
+  ]);
+  await page.getByRole("textbox", { name: "Write a message" }).fill("Can this obligation be reduced?");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Local reply.")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Review what will be sent" })).toHaveCount(0);
+  expect(sent).toEqual([
+    {
+      thread_id: "anchored-thread",
+      connection_id: "local:local-research",
+      text: "Can this obligation be reduced?",
+      request_id: expect.any(String),
+      token: "local-reviewed",
+      confirm_external: false,
+    },
+  ]);
 });

@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
+import { useLocalTextModels } from "../../api/localModels";
 import {
   connectionChoiceLabel,
   connectionModelLabel,
@@ -63,11 +64,7 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
   const [release, setRelease] = useState<{ input: PublicIntakeInput; preview: ReleasePreview } | null>(null);
   const connections = useModelConnections(session);
   const queries = useQueryClient();
-  const models = useQuery({
-    queryKey: ["project-intake-models", session],
-    queryFn: ({ signal }) => api<{ models: string[] }>(session, "/api/project-intake/models", { signal }),
-    retry: false,
-  });
+  const models = useLocalTextModels(session);
   const recent = useQuery({
     queryKey: ["project-intake-drafts", session],
     queryFn: ({ signal }) => api<{ drafts: IntakeDraft[] }>(session, "/api/project-intake", { signal }),

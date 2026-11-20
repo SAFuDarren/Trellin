@@ -2,6 +2,15 @@
 
 ## 1.0.23
 
+- Choose a specific Codex or Claude Code model in Team. Direct model conversations
+  work in Chats before the first claim and in the graph beside the selected node.
+- Review the exact external conversation request before sending. Conversations
+  and replies stay with the workspace and resume when it reopens.
+- Expand a Claims card in place, keep long graph labels inside their nodes, and
+  see the recorded Library state in both the table and inspector.
+- Edit an entry from the Library table or inspector and review both statements
+  before confirming a new version. Frozen claims retain their original evidence.
+
 - Add, test and remove user-selected Codex, Claude Code, OpenAI and Anthropic
   connections under Team → Runtimes. Detect installed Codex and Claude Code commands
   and reuse their existing logins. Store direct API keys in the macOS Keychain.

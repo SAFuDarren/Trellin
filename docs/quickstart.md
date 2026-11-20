@@ -95,8 +95,11 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 - [Recover a project archive](research-foundation.md#recover-and-monitor) using a PostgreSQL URL and a fresh target database. If a later step fails after import, keep the imported database and the archive, then retry with a fresh database and an unused directory.
 - [Verify a Lean proof in your own project](lean-core.md#check-a-lean-source-file-or-compiled-declaration) and see the confirmed assumptions and facts actually used.
 - Open [Proof task in Trellin](proof-workbench.md#start-a-proof-task) to review the confirmed Lean scope, authorize proof work, and monitor its result.
-- In the Mac app, add your installed Codex or Claude Code from [Team → Runtimes](project-intake.md#connect-a-model). Choose that connection for a public intake excerpt or for a released proof scope on database revision `0078`.
+- In the Mac app, add your installed Codex or Claude Code from [Team → Runtimes](project-intake.md#connect-a-model) and select its model. Choose that connection for a public intake excerpt or for a released proof scope on database revision `0078`.
 - Use [Research references](proof-workbench.md#work-with-the-models) to rename a claim's short code and reopen a saved proof node by its permanent number.
+- Expand a **Claims** card to read its statement and Lean in place. In **Library**, the table and inspector show each entry's recorded state.
+- On database revision `0079` or later, start a conversation in **Chats** before the first claim, or beside a selected node in **Workbench**. Pick an on-device model or one you added in Team. An external call needs your confirmation of the exact preview each time.
+- On revision `0080`, open **Edit** from either Library view. Compare the exact wording and Lean statement before confirming the new version. Old proof receipts follow their original claim, and affected checks of a replaced basis require recheck.
 - On database revision `0073` or later, [review evidence](proof-workbench.md#read-a-graph) under the local researcher identity from the bound workspace.
 - On database revision `0074`, new evidence approvals and returns appear automatically in an open workbench, including decisions made in the terminal.
 - On database revision `0075`, the open workbench also updates after scope confirmation, withdrawal and proof task changes, including a CLI worker's progress.

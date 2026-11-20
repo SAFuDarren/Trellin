@@ -6,6 +6,7 @@ import { isCodex, modelName, nodeTitle } from "../workbench/text";
 import type { ActivityRecord, ActivitySnapshot } from "../workbench/types";
 import { FeedEntry } from "./FeedEntry";
 import { Spin } from "./Icons";
+import { WorkbenchConversations } from "./WorkbenchConversations";
 
 type Draft = {
   text: string;
@@ -28,6 +29,7 @@ export function ChatPanel({
   selected,
   activity,
   activityError,
+  scopeReady,
   running,
   queued,
   open,
@@ -43,6 +45,7 @@ export function ChatPanel({
   selected: string | null;
   activity: ActivitySnapshot | undefined;
   activityError: string;
+  scopeReady: boolean;
   running: number;
   queued: number;
   open: boolean;
@@ -53,9 +56,18 @@ export function ChatPanel({
   onSent: () => void;
 }) {
   const { t } = useTranslation();
+  const [tab, setTab] = useState<"chat" | "proof">("chat");
   const feed = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
   const target = graph && selected ? graph.nodes.get(selected) : undefined;
+  const anchor = {
+    ...(claimId ? { claim_id: claimId } : {}),
+    ...(graph?.statementId ? { statement_id: graph.statementId } : {}),
+    ...(!allNodes && target ? { node_id: target.id } : {}),
+  };
+  const anchorKey = [session, anchor.claim_id, anchor.statement_id, anchor.node_id].join("/");
+  const conversationTitle =
+    !allNodes && target ? nodeTitle(t, target) : graph?.claim.title || t("conversations.defaultTitle");
 
   const summary = activityError
     ? activityError
@@ -85,7 +97,7 @@ export function ChatPanel({
   useLayoutEffect(() => {
     const element = feed.current;
     if (element && nearBottom.current) element.scrollTop = element.scrollHeight;
-  }, [shown.length, selected, allNodes]);
+  }, [shown.length, selected, allNodes, tab]);
 
   const relation = (id: string) => {
     const node = graph?.nodes.get(id);
@@ -134,24 +146,37 @@ export function ChatPanel({
         </button>
       </header>
       <div id="chat-body" className="chat-body" hidden={!open}>
-        <ol ref={feed} className="chat-feed" aria-label={t("chat.feed")} onScroll={onScroll}>
-          {shown.length ? (
-            shown.map(entry)
-          ) : (
-            <li className="chat-empty">
-              {!activity ? t("chat.waiting") : allNodes ? t("chat.emptyClaim") : t("chat.emptyNode")}
-            </li>
-          )}
-        </ol>
-        <Composer
-          session={session}
-          graph={graph}
-          claimId={claimId}
-          selected={selected}
-          activity={activity}
-          activityError={activityError}
-          onSent={onSent}
-        />
+        <div className="conversation-tabs" role="group" aria-label={t("conversations.views")}>
+          <button type="button" className="chip" aria-pressed={tab === "chat"} onClick={() => setTab("chat")}>
+            {t("rail.chat")}
+          </button>
+          <button type="button" className="chip" aria-pressed={tab === "proof"} onClick={() => setTab("proof")}>
+            {t("conversations.proofActivity")}
+          </button>
+        </div>
+        {tab === "chat" && scopeReady && (
+          <WorkbenchConversations key={anchorKey} session={session} anchor={anchor} title={conversationTitle} />
+        )}
+        <div className="chat-body" hidden={tab !== "proof"}>
+          <ol ref={feed} className="chat-feed" aria-label={t("chat.feed")} onScroll={onScroll}>
+            {shown.length ? (
+              shown.map(entry)
+            ) : (
+              <li className="chat-empty">
+                {!activity ? t("chat.waiting") : allNodes ? t("chat.emptyClaim") : t("chat.emptyNode")}
+              </li>
+            )}
+          </ol>
+          <Composer
+            session={session}
+            graph={graph}
+            claimId={claimId}
+            selected={selected}
+            activity={activity}
+            activityError={activityError}
+            onSent={onSent}
+          />
+        </div>
       </div>
     </section>
   );

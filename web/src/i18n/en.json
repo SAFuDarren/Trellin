@@ -338,6 +338,17 @@
     "fallback": "Model"
   },
   "errors": {
+    "conversation.upgrade": "Update this workspace’s database to use conversations.",
+    "conversation.identity": "Open this workspace with your local researcher identity to use conversations.",
+    "conversation.invalid": "Check the selected conversation, model and message.",
+    "conversation.stale": "The message, model or conversation changed. Review what will be sent again.",
+    "conversation.busy": "This conversation still has a message in progress.",
+    "conversation.missing": "This conversation is no longer available.",
+    "conversation.confirmation": "Review and confirm the exact content before sending to a connected service.",
+    "conversation.interrupted": "The workbench stopped before the model reply was recorded.",
+    "conversation.failed": "The model did not complete this message.",
+    "conversation.budget": "This project’s model budget is exhausted.",
+    "conversation.unavailable": "This model is currently unavailable for this conversation.",
     "intake.public_failed": "The selected model could not complete this request. Check the model connection and try again.",
     "intake.project_budget_exhausted": "This project’s model budget is exhausted.",
     "proof_task.external_unavailable": "This authorized model connection is unavailable. Check Model connections in Team → Runtimes.",
@@ -435,6 +446,9 @@
     }
   },
   "claimsPage": {
+    "openWorkbench": "Open in Workbench",
+    "noStatement": "There is no recorded statement for this claim.",
+    "noLean": "No Lean statement has been recorded.",
     "filter": {
       "all": "All claims",
       "review": "Waiting for review",
@@ -447,6 +461,33 @@
     "verified": "{{done}} of {{total}} verified",
     "running_one": "{{count}} model working",
     "running_other": "{{count}} models working"
+  },
+  "libraryEdit": {
+    "fixedScope": "Existing Lean parameters and prerequisites",
+    "title": "Revise Library statement",
+    "edit": "Edit statement",
+    "editItem": "Edit statement for {{name}}",
+    "actions": "Actions",
+    "close": "Close",
+    "discard": "Discard",
+    "baseVersion": "Editing exact version v{{version}}",
+    "review": "Review changes",
+    "before": "Current version",
+    "after": "Proposed version",
+    "reason": "Reason for the revision",
+    "back": "Back to edit",
+    "confirm": "Confirm new version",
+    "impact": {
+      "basis": "The previous version will be withdrawn. Affected work spans {{claims}} claims, {{checks}} checks and {{receipts}} verification reports.",
+      "goal": "The new target needs its own proof. {{checks}} checks and {{receipts}} verification reports stay with the original claim.",
+      "successor": "This creates a reviewed Library entry with a link to the original. The original and its proof records stay intact."
+    },
+    "invalid": "Supply a changed natural-language or Lean statement within the field limits.",
+    "stale": "This version or its dependencies changed. Reopen the current version and review again.",
+    "identity": "Bind this workspace to a local research profile to confirm a revision.",
+    "missing": "This Library version is unavailable in the current workspace.",
+    "unavailable": "Revision editing requires an available and upgraded workspace database.",
+    "unsupported": "This source does not contain an editable Lean statement."
   },
   "library": {
     "all": "Everything",
@@ -482,6 +523,31 @@
       "formalpedia": "Formalpedia",
       "derivation": "Derived"
     }
+  },
+  "conversations": {
+    "requestedModel": "{{name}} requested · actual model unreported",
+    "localModel": "Local · {{name}}",
+    "views": "Conversation views",
+    "proofActivity": "Proof activity",
+    "threads": "Conversations",
+    "new": "New conversation",
+    "defaultTitle": "Research conversation",
+    "emptyProject": "Start a conversation to discuss a research question.",
+    "emptyScope": "Start a conversation about this selection.",
+    "emptyThread": "No messages yet.",
+    "model": "Conversation model",
+    "chooseModel": "Choose a model",
+    "connect": "Set up a model in Team",
+    "message": "Write a message",
+    "send": "Send message",
+    "working": "Working…",
+    "you": "You",
+    "reviewTitle": "Review what will be sent",
+    "confirmSend": "Confirm and send",
+    "remove": "Remove conversation",
+    "removeHint": "Remove this conversation from the list? Any linked proof and its records will be kept.",
+    "confirmRemove": "Confirm removal",
+    "failed": "The conversation request did not complete. Check the connection and try again."
   },
   "threads": {
     "active": "Working now",
@@ -632,6 +698,12 @@
     "nativeConnect": "Connect {{name}}",
     "nativeAdded": "{{name}} added",
     "defaultModel": "Default model",
+    "nativeModel": "{{name}} model",
+    "customModel": "Enter a model identifier",
+    "catalogUnavailable": "Codex did not return its model list. Use the default or enter an identifier supported by your account.",
+    "aliasAvailability": "Claude Code model families depend on your account. Test the connection before use.",
+    "testReported": "Connection tested. The tool reported {{model}}.",
+    "testUnreported": "Connection tested. The tool did not report the model used.",
     "refreshNative": "Check again",
     "addApi": "Add an API connection",
     "apiKey": "API key",

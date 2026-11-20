@@ -7,6 +7,12 @@ export type NativeModelProvider = "codex-cli" | "claude-code";
 export type ModelProvider = NativeModelProvider | (typeof API_MODEL_PROVIDERS)[number];
 export const NATIVE_DEFAULT_MODEL = "native-default";
 
+export type DiscoveredModelProvider = {
+  provider: NativeModelProvider;
+  status: string;
+  models?: { id: string; label: string }[];
+};
+
 export type ModelConnection = {
   id: string;
   provider: ModelProvider;

@@ -19,6 +19,7 @@ export type LibraryItem = {
   id: string;
   logical_key: string;
   version: number;
+  statement_revision?: number;
   origin: string;
   admitted: boolean;
   needs_recheck: boolean;

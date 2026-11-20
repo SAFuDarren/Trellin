@@ -12,7 +12,7 @@ const MODELS = [
   {
     id: "22222222-2222-4222-8222-222222222222",
     provider: "codex-cli",
-    model: "native-default",
+    model: "gpt-fixture",
     label: "Codex",
     fingerprint: "a".repeat(64),
     status: "connected",
@@ -20,7 +20,7 @@ const MODELS = [
   {
     id: "33333333-3333-4333-8333-333333333333",
     provider: "claude-code",
-    model: "native-default",
+    model: "sonnet",
     label: "Claude Code",
     fingerprint: "b".repeat(64),
     status: "connected",
@@ -64,7 +64,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 it.each(MODELS)("passes only the selected $label connection after scope authorization", async (model) => {
   const { fetch } = openTask(true);
-  const recipient = `${model.label} · ${en.modelConnections.defaultModel}`;
+  const recipient = `${model.label} · ${model.model}`;
   await screen.findByRole("option", { name: recipient });
   const modelPicker = screen.getByRole<HTMLSelectElement>("combobox", { name: en.proofTask.modelConnection });
   expect(modelPicker.value).toBe("");
@@ -90,7 +90,7 @@ it.each(MODELS)("passes only the selected $label connection after scope authoriz
 it("requires a new approval if the chosen connection changes while the form is open", async () => {
   const { fetch, queryClient } = openTask(true);
   const model = MODELS[0]!;
-  await screen.findByRole("option", { name: `${model.label} · ${en.modelConnections.defaultModel}` });
+  await screen.findByRole("option", { name: `${model.label} · ${model.model}` });
   const picker = screen.getByRole("combobox", { name: en.proofTask.modelConnection });
   fireEvent.change(picker, { target: { value: model.id } });
   fireEvent.change(screen.getByLabelText(en.review.reason), {

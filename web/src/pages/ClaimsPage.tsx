@@ -1,13 +1,65 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { api } from "../api/client";
 import { useAtlas, useClaims, useTeam } from "../api/sections";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { Spin } from "../components/Icons";
 import { href } from "../shell/route";
 import { statusText } from "../workbench/text";
+import type { GraphSnapshot } from "../workbench/types";
 
 const COLUMNS = ["open", "awaiting_interpretation_review", "needs_recheck", "proved", "refuted"] as const;
 const DONE = new Set(["verified", "proved", "proved_goal", "approved", "route_checked", "lemma_verified"]);
 const FILTERS = ["all", "review", "blocked", "running"] as const;
+
+function ClaimPreview({
+  session,
+  claimId,
+  id,
+  onOpen,
+}: {
+  session: string;
+  claimId: string;
+  id: string;
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  const graph = useQuery({
+    queryKey: ["graph", claimId],
+    queryFn: ({ signal }) => api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId), { signal }),
+  });
+  const goal = graph.data?.nodes.find((node) => node.kind === "goal");
+  return (
+    <div className="board-preview" id={id}>
+      {graph.isPending ? (
+        <p role="status">{t("common.loading")}</p>
+      ) : graph.isError ? (
+        <p role="alert">{graph.error.message}</p>
+      ) : goal ? (
+        <>
+          {goal.statement && <p>{goal.statement}</p>}
+          {goal.formula && goal.formula !== goal.statement && goal.formula !== goal.formalization && (
+            <p className="math">{goal.formula}</p>
+          )}
+          {goal.formalization ? (
+            <>
+              <span className="field-label">{t("detail.lean")}</span>
+              <pre className="code-block">{goal.formalization}</pre>
+            </>
+          ) : (
+            <p>{t("claimsPage.noLean")}</p>
+          )}
+        </>
+      ) : (
+        <p>{t("claimsPage.noStatement")}</p>
+      )}
+      <button type="button" className="button" onClick={onOpen}>
+        {t("claimsPage.openWorkbench")}
+      </button>
+    </div>
+  );
+}
 
 export function ClaimsPage({
   session,
@@ -19,6 +71,7 @@ export function ClaimsPage({
   onOpen: (claimId: string) => void;
 }) {
   const { t } = useTranslation();
+  const [expandedClaim, setExpandedClaim] = useState<string | null>(null);
   const claims = useClaims(session);
   const atlas = useAtlas(session);
   const team = useTeam(session);
@@ -113,45 +166,57 @@ export function ClaimsPage({
                   const total = record?.nodes.length ?? 0;
                   const done = record?.nodes.filter((node) => DONE.has(node.status ?? "")).length ?? 0;
                   const live = running.get(claim.id) ?? 0;
+                  const expanded = expandedClaim === claim.id;
+                  const previewId = "claim-preview-" + claim.id;
                   return (
-                    <button
-                      type="button"
-                      className="board-card"
-                      key={claim.id}
-                      data-live={String(live > 0)}
-                      onClick={() => onOpen(claim.id)}
-                    >
-                      <span className="title">{claim.title || t("sidebar.untitled")}</span>
-                      {total > 0 && (
-                        <span className="progress" aria-hidden="true">
-                          <span className="done" style={{ width: `${Math.round((done / total) * 100)}%` }} />
+                    <article className="board-card" key={claim.id} data-live={String(live > 0)}>
+                      <button
+                        type="button"
+                        className="board-card-toggle"
+                        aria-expanded={expanded}
+                        aria-controls={expanded ? previewId : undefined}
+                        onClick={() => setExpandedClaim(expanded ? null : claim.id)}
+                      >
+                        <span className="title">{claim.title || t("sidebar.untitled")}</span>
+                        {total > 0 && (
+                          <span className="progress" aria-hidden="true">
+                            <span className="done" style={{ width: `${Math.round((done / total) * 100)}%` }} />
+                          </span>
+                        )}
+                        <span className="meta">
+                          <span>{claim.domain || t("sidebar.uncategorized")}</span>
+                          {total > 0 && <span>{"· " + t("claimsPage.verified", { done, total })}</span>}
                         </span>
+                        {(record?.awaiting_review || record?.blocked || live > 0) && (
+                          <span className="tags">
+                            {live > 0 && (
+                              <span className="tag" data-tone="live">
+                                <Spin />
+                                {t("claimsPage.running", { count: live })}
+                              </span>
+                            )}
+                            {(record?.awaiting_review ?? 0) > 0 && (
+                              <span className="tag" data-tone="review">
+                                {t("sidebar.awaitingReview", { count: record!.awaiting_review })}
+                              </span>
+                            )}
+                            {(record?.blocked ?? 0) > 0 && (
+                              <span className="tag" data-tone="bad">
+                                {t("sidebar.blocked", { count: record!.blocked })}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </button>
+                      {expanded && (
+                        <ClaimPreview
+                          session={session}
+                          claimId={claim.id}
+                          id={previewId}
+                          onOpen={() => onOpen(claim.id)}
+                        />
                       )}
-                      <span className="meta">
-                        <span>{claim.domain || t("sidebar.uncategorized")}</span>
-                        {total > 0 && <span>{"· " + t("claimsPage.verified", { done, total })}</span>}
-                      </span>
-                      {(record?.awaiting_review || record?.blocked || live > 0) && (
-                        <span className="tags">
-                          {live > 0 && (
-                            <span className="tag" data-tone="live">
-                              <Spin />
-                              {t("claimsPage.running", { count: live })}
-                            </span>
-                          )}
-                          {(record?.awaiting_review ?? 0) > 0 && (
-                            <span className="tag" data-tone="review">
-                              {t("sidebar.awaitingReview", { count: record!.awaiting_review })}
-                            </span>
-                          )}
-                          {(record?.blocked ?? 0) > 0 && (
-                            <span className="tag" data-tone="bad">
-                              {t("sidebar.blocked", { count: record!.blocked })}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </button>
+                    </article>
                   );
                 })}
               </section>

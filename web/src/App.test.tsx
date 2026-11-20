@@ -9,8 +9,8 @@ import zhCN from "./i18n/zh-CN.json";
 
 const CLAIM = "11111111-1111-4111-8111-111111111111";
 const NATIVE_CONNECTIONS = [
-  { provider: "codex-cli", id: "codex", label: "Codex", login: "codex login" },
-  { provider: "claude-code", id: "claude", label: "Claude Code", login: "claude auth login" },
+  { provider: "codex-cli", id: "codex", label: "Codex", login: "codex login", model: "gpt-fixture" },
+  { provider: "claude-code", id: "claude", label: "Claude Code", login: "claude auth login", model: "sonnet" },
 ] as const;
 const LEMMA = "lean:22222222-2222-4222-8222-222222222222";
 const WORKSPACE = "33333333-3333-4333-8333-333333333333";
@@ -1022,7 +1022,7 @@ describe("App", () => {
     const connection = {
       id: choice.id,
       provider: choice.provider,
-      model: "native-default",
+      model: choice.model,
       label: choice.label,
       status: "untested",
       fingerprint: "fingerprint",
@@ -1038,20 +1038,21 @@ describe("App", () => {
       if (input === "/api/model-connections/native") {
         scans++;
         return Response.json({
-          providers: NATIVE_CONNECTIONS.map(({ id, provider }) => ({
+          providers: NATIVE_CONNECTIONS.map(({ id, provider, model }) => ({
             provider,
             status: id === other.id && scans === 1 ? "connection.authentication" : "signed_in",
+            models: [{ id: model, label: model }],
           })),
         });
       }
       if (input === "/api/model-connections/add-native") {
-        expect(JSON.parse(String(init?.body))).toEqual({ provider: choice.provider });
+        expect(JSON.parse(String(init?.body))).toEqual({ provider: choice.provider, model: choice.model });
         existing = true;
         return Response.json(connection);
       }
       if (input === "/api/model-connections/test") {
         expect(JSON.parse(String(init?.body))).toEqual({ id: connection.id });
-        return Response.json({ status: "connected" });
+        return Response.json({ status: "connected", reported_model: `${choice.model}-reported` });
       }
       if (input === "/api/model-connections/remove") {
         expect(JSON.parse(String(init?.body))).toEqual({ id: connection.id });
@@ -1077,12 +1078,15 @@ describe("App", () => {
     expect(fetch.mock.calls.some(([path]) => path.endsWith("/add-native"))).toBe(false);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.refreshNative }));
     await waitFor(() => expect(otherConnect.hasAttribute("disabled")).toBe(false));
+    fireEvent.change(connections.getByRole("combobox", { name: `${choice.label} model` }), {
+      target: { value: choice.model },
+    });
     fireEvent.click(connect);
-    expect(await connections.findByText(/Default model/)).toBeTruthy();
+    expect(await connections.findByText(new RegExp(`${choice.model} ·`))).toBeTruthy();
     expect(connections.queryByText(other.label)).toBeNull();
     expect(fetch.mock.calls.some(([path]) => path.endsWith("/test"))).toBe(false);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.test }));
-    expect(await connections.findByText(en.modelConnections.status.connected)).toBeTruthy();
+    expect(await connections.findByText(new RegExp(`reported ${choice.model}-reported`))).toBeTruthy();
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.remove }));
     expect(fetch.mock.calls.filter(([path]) => path.endsWith("/remove"))).toHaveLength(0);
     fireEvent.click(connections.getByRole("button", { name: en.modelConnections.removeConfirm }));
@@ -1127,7 +1131,7 @@ describe("App", () => {
       id: choice.id,
       provider: choice.provider,
       label: choice.label,
-      model: "native-default",
+      model: choice.model,
       status: "connected",
       fingerprint: "fingerprint",
     };
@@ -1158,7 +1162,7 @@ describe("App", () => {
     renderApp("token");
     fireEvent.click(await screen.findByRole("button", { name: en.projectEntry.organize }));
     const dialog = within(await screen.findByRole("dialog"));
-    const recipient = `${choice.label} · ${en.modelConnections.defaultModel}`;
+    const recipient = `${choice.label} · ${choice.model}`;
     await dialog.findByRole("option", { name: recipient });
     fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.model), {
       target: { value: `connection:${choice.id}` },

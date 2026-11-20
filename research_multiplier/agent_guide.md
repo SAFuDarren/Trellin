@@ -35,6 +35,8 @@ This copy matches the Research Multiplier version that wrote it. Run
    In Trellin, a public intake preview authorizes one exact request. A public
    proof task authorizes the displayed frozen scope, selected connection and
    maximum rounds. A changed scope or connection needs renewed consent.
+   An external discussion in Chats or Workbench has its own exact preview
+   and consent for one model call. Treat suggestions in chat as research notes.
 3. **Leave the project's records to the program.** Do not edit or delete anything
    under `runs/`, `objects/`, `evaluation/`, `backups/` or `lean-project/`, the
    `.research-multiplier*` marker files, or the database. Write your own drafts
@@ -147,6 +149,8 @@ Trellin's **Proof task** panel shows the confirmed Lean proposition, basis and
 pending decisions. The researcher can authorize and stop the selected task
 there. Its default is a program-only pass. A restricted scope can use an exact
 configured on-machine model only within the allowance the researcher approves.
+For public intake or a released proof scope, the researcher can select a
+specific Codex or Claude Code model added under **Team → Runtimes**.
 
 ## Offline questions
 

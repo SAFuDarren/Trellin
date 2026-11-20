@@ -60,6 +60,17 @@ Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around
 
 ## Work with the models
 
+With database revision `0079`, use **Chats** to start a workspace discussion
+before creating a claim. In **Workbench**, select a claim or node and open
+**Conversation**. Choose an available on-device model or a connection you
+added in Team. Every external send asks separately about the recipient, your
+message, the included recent turns, and any selected node excerpt. Project
+files are outside that payload. A cancelled or stale preview sends nothing.
+The conversation and attribution are saved with the project. Removing a
+conversation hides it from the active list and preserves its history.
+
+Use **Proof activity** for guidance that a proof worker can read on a later run.
+
 On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
 
 A node whose recorded job is running shows the agent and the number of parallel jobs. The workbench also displays reasoning effort when the model attempt records it, for example `GPT-6.2 Sol xhigh`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.

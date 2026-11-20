@@ -155,13 +155,16 @@ def test_native_connections_are_discovered_and_selected_only_in_the_bound_sessio
 
     response, content = request(server, "GET", discovery)
     assert response.status == 200
-    assert json.loads(content) == {"providers": [{"provider": "claude-code", "status": "signed_in"}]}
+    assert json.loads(content) == {"providers": [{"provider": "claude-code", "status": "signed_in", "models": [
+        {"id": "sonnet", "label": "Sonnet"}, {"id": "opus", "label": "Opus"},
+        {"id": "haiku", "label": "Haiku"}, {"id": "fable", "label": "Fable"},
+    ]}]}
     assert server.connections.list() == []
 
-    response, content = request(server, "POST", connect, body=body)
+    response, content = request(server, "POST", connect, body={**body, "model": "opus"})
     assert response.status == 200
     saved = json.loads(content)
-    assert saved["provider"] == "claude-code" and saved["model"] == "native-default"
+    assert saved["provider"] == "claude-code" and saved["model"] == "opus"
     assert server.connections.list() == [saved]
     assert login == [("claude-code", str(executable))] * 2
 

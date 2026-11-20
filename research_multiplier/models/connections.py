@@ -70,13 +70,38 @@ def _text(value, maximum):
     return value.strip()
 
 
+def _model_id(value):
+    model = _text(value, 255)
+    if not _MODEL_ID.fullmatch(model):
+        raise ConnectionError("invalid")
+    return model
+
+
+def _native_model_choices(provider, binary):
+    if provider == "claude-code":
+        return [{"id": name, "label": name.title()} for name in cli_executor.CLAUDE_MODEL_ALIASES]
+    choices = {}
+    for row in cli_executor.codex_models(binary):
+        try:
+            model = _model_id(row.get("slug"))
+            if model == cli_executor.NATIVE_DEFAULT_MODEL or model in choices:
+                continue
+            label = _text(row.get("display_name") or model, 255)
+        except ConnectionError:
+            continue
+        choices[model] = {"id": model, "label": label}
+        if len(choices) >= 100:
+            break
+    return list(choices.values())
+
+
 def _input(document):
     if (not isinstance(document, dict) or not {"provider", "model"} <= document.keys()
             or document.keys() - {"provider", "model", "label", "binary", "api_key"}):
         raise ConnectionError("invalid")
     provider = _text(document["provider"], 40)
-    model = _text(document["model"], 255)
-    if provider not in SUPPORTED_PROVIDERS or not _MODEL_ID.fullmatch(model):
+    model = _model_id(document["model"])
+    if provider not in SUPPORTED_PROVIDERS:
         raise ConnectionError("invalid")
     label = _text(document["label"], 120) if "label" in document else model
     transport, command, _, _ = PROVIDERS[provider]
@@ -161,6 +186,7 @@ def _test(config):
     _validate_reply(reply)
     if reply.finish_reason not in {"stop", "end_turn", "stop_sequence"} or not reply.text.strip():
         raise ModelFailure("invalid_output", "Connection check returned no complete response.")
+    return reply.model_id if reply.model_id_reported else None
 
 
 def _settings_file():
@@ -236,16 +262,18 @@ class Registry:
                 status = provider_error_code(error, fallback="connection.unavailable")
             else:
                 status = "signed_in"
-            providers.append({"provider": provider, "status": status})
+            models = _native_model_choices(provider, binary) if status == "signed_in" else []
+            providers.append({"provider": provider, "status": status, "models": models})
         return providers
 
     def add_native(self, document):
         """Select one discovered tool using its existing native sign-in."""
-        if not isinstance(document, dict) or document.keys() != {"provider"}:
+        if not isinstance(document, dict) or "provider" not in document or document.keys() - {"provider", "model"}:
             raise ConnectionError("invalid")
         provider = _text(document["provider"], 40)
         if provider not in _NATIVE_PROVIDERS:
             raise ConnectionError("invalid")
+        model = _model_id(document.get("model", cli_executor.NATIVE_DEFAULT_MODEL))
         binary = _binary(provider, None)
         if not binary:
             raise ConnectionError("missing_cli")
@@ -254,8 +282,7 @@ class Registry:
         except ModelFailure as error:
             status = provider_error_code(error, fallback="connection.unavailable")
             raise ConnectionError(status.removeprefix("connection.")) from None
-        return self._add(provider, cli_executor.NATIVE_DEFAULT_MODEL, _NATIVE_PROVIDERS[provider], binary, None,
-                         deduplicate=True)
+        return self._add(provider, model, _NATIVE_PROVIDERS[provider], binary, None, deduplicate=True)
 
     def add(self, document):
         return self._add(*_input(document))
@@ -364,14 +391,17 @@ class Registry:
                 raise ConnectionError("missing")
             sequence = row["test_sequence"] + 1
             database.execute("UPDATE model_connections SET test_sequence = ? WHERE id = ?", (sequence, identifier))
+        result = {"provider": row["provider"], "model": row["model"]}
         try:
             with self.use(identifier) as (config, _):
-                _test(config)
+                reported_model = _test(config)
         except (ConnectionError, ModelFailure) as error:
             status = provider_error_code(error, fallback="connection.unavailable")
         else:
             status = "connected"
+            if row["provider"] in _NATIVE_PROVIDERS:
+                result["reported_model"] = reported_model
         with self._write() as database:
             database.execute("UPDATE model_connections SET status = ? WHERE id = ? AND test_sequence = ?",
                              (status, identifier, sequence))
-        return {"status": status, "provider": row["provider"], "model": row["model"]}
+        return {**result, "status": status}

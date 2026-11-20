@@ -19,6 +19,7 @@ from .model_errors import ModelFailure
 _NATIVE_ENV = {"HOME", "PATH", "USER", "LOGNAME", "TMPDIR", "SYSTEMROOT", "APPDATA", "LOCALAPPDATA",
                "USERPROFILE", "LANG", "LC_ALL", "CODEX_HOME", "CLAUDE_CONFIG_DIR"}
 NATIVE_DEFAULT_MODEL = "native-default"
+CLAUDE_MODEL_ALIASES = ("sonnet", "opus", "haiku", "fable")
 _WORKBENCH_PROVIDER = ContextVar("workbench_cli_provider", default=None)
 _MAC_SANDBOX = "/usr/bin/sandbox-exec"
 _CODEX_INSTRUCTIONS = ("AGENTS.md", "AGENTS.override.md")
@@ -132,6 +133,24 @@ def require_native_login(provider, binary):
         raise ModelFailure("authentication", "Complete sign-in with the native CLI.")
     if result.returncode != 0:
         raise ModelFailure("adapter", "Native CLI could not check its authentication status.")
+
+
+def codex_models(binary):
+    """Read the detected CLI's model catalog without creating a model turn."""
+    try:
+        with TemporaryDirectory(prefix="rm-model-catalog-") as directory:
+            result = subprocess.run(
+                [binary, "debug", "models"], cwd=directory, env=_environment(),
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                timeout=6, check=False,
+            )
+        if result.returncode == 0 and len(result.stdout) <= 4_194_304:
+            rows = json.loads(result.stdout)["models"]
+            if isinstance(rows, list):
+                return [row for row in rows if isinstance(row, dict) and row.get("visibility") == "list"]
+    except (OSError, subprocess.TimeoutExpired, KeyError, TypeError, ValueError, RecursionError):
+        pass
+    return []
 
 
 def _failed_completion(provider, signal):
@@ -254,6 +273,13 @@ def complete(provider, binary, model, messages, timeout, *, reasoning_effort=Non
     except (AttributeError, KeyError, IndexError, TypeError, StopIteration, json.JSONDecodeError, RecursionError):
         raise ModelFailure("invalid_output", f"{provider} returned an invalid completion record.") from None
     reported = isinstance(reported_model, str) and bool(reported_model.strip())
+    if workbench and model != NATIVE_DEFAULT_MODEL and reported and reported_model != model:
+        matches_claude_alias = (
+            provider == "claude-code" and model in CLAUDE_MODEL_ALIASES
+            and reported_model.startswith(f"claude-{model}-")
+        )
+        if not matches_claude_alias:
+            raise ModelFailure("model_unavailable", f"{provider} used a different model than requested.")
     return {
         "model": reported_model if reported else model, "model_id_reported": reported,
         "cli_version": version, "id": request_id,

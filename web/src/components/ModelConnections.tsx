@@ -9,15 +9,93 @@ import {
   modelConnectionsKey,
   NATIVE_DEFAULT_MODEL,
   useModelConnections,
+  type DiscoveredModelProvider,
+  type ModelConnection,
   type NativeModelProvider,
 } from "../api/modelConnections";
-
-type DiscoveredProvider = { provider: NativeModelProvider; status: string };
 
 const LOGIN_COMMANDS: Record<NativeModelProvider, string> = {
   "codex-cli": "codex login",
   "claude-code": "claude auth login",
 };
+
+const CUSTOM_MODEL = "_custom";
+
+function NativeModelChoice({
+  discovery,
+  list,
+  disabled,
+  connect,
+}: {
+  discovery: DiscoveredModelProvider;
+  list: ModelConnection[];
+  disabled: boolean;
+  connect: (provider: NativeModelProvider, model: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [choice, setChoice] = useState(NATIVE_DEFAULT_MODEL);
+  const [customModel, setCustomModel] = useState("");
+  const { provider, status, models = [] } = discovery;
+  const name = t(`team.providers.${provider}`);
+  const signedIn = status === "signed_in";
+  const model = choice === CUSTOM_MODEL ? customModel.trim() : choice;
+  const added = list.some((item) => item.provider === provider && item.model === model);
+  const message = signedIn
+    ? t("modelConnections.signedIn")
+    : status === "connection.authentication"
+      ? t("modelConnections.signIn", { command: LOGIN_COMMANDS[provider] })
+      : t(`errors.${status}`, { defaultValue: t("modelConnections.failed") });
+  return (
+    <li className="project-entry-item">
+      <strong>{name}</strong>
+      <p>{message}</p>
+      {signedIn && (
+        <>
+          <label>
+            {t("modelConnections.nativeModel", { name })}
+            <select value={choice} onChange={(event) => setChoice(event.target.value)} disabled={disabled}>
+              <option value={NATIVE_DEFAULT_MODEL}>{t("modelConnections.defaultModel")}</option>
+              {models.map(({ id, label }) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+              {choice !== NATIVE_DEFAULT_MODEL &&
+                choice !== CUSTOM_MODEL &&
+                !models.some(({ id }) => id === choice) && <option value={choice}>{choice}</option>}
+              <option value={CUSTOM_MODEL}>{t("modelConnections.customModel")}</option>
+            </select>
+          </label>
+          {choice === CUSTOM_MODEL && (
+            <label>
+              {t("modelConnections.model")}
+              <input
+                value={customModel}
+                onChange={(event) => setCustomModel(event.target.value)}
+                maxLength={255}
+                disabled={disabled}
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </label>
+          )}
+          {provider === "codex-cli" && !models.length && <p>{t("modelConnections.catalogUnavailable")}</p>}
+          {provider === "claude-code" && <p>{t("modelConnections.aliasAvailability")}</p>}
+        </>
+      )}
+      <div className="choices">
+        <button
+          type="button"
+          className="button"
+          disabled={disabled || !signedIn || !model || added}
+          onClick={() => connect(provider, model)}
+        >
+          {t(added ? "modelConnections.nativeAdded" : "modelConnections.nativeConnect", { name })}
+        </button>
+      </div>
+    </li>
+  );
+}
 
 export function ModelConnections({ session }: { session: string }) {
   const { t } = useTranslation();
@@ -31,7 +109,7 @@ export function ModelConnections({ session }: { session: string }) {
   const native = useQuery({
     queryKey: ["model-connections-native", session],
     queryFn: ({ signal }) =>
-      api<{ providers: DiscoveredProvider[] }>(session, "/api/model-connections/native", { signal }),
+      api<{ providers: DiscoveredModelProvider[] }>(session, "/api/model-connections/native", { signal }),
     enabled: adding === "native",
     retry: false,
   });
@@ -45,10 +123,19 @@ export function ModelConnections({ session }: { session: string }) {
     setStatus("");
     setPending(true);
     try {
-      const result = await api<{ status?: string }>(session, `/api/model-connections/${action}`, { data });
+      const result = await api<{ status?: string; reported_model?: string | null }>(
+        session,
+        `/api/model-connections/${action}`,
+        { data },
+      );
       if (action === "test") {
         if (result.status === "connected") {
-          setStatus(t("modelConnections.status.connected"));
+          const model = result.reported_model;
+          setStatus(
+            model
+              ? t("modelConnections.testReported", { model })
+              : t(model === null ? "modelConnections.testUnreported" : "modelConnections.status.connected"),
+          );
         } else {
           setFailure(errorMessage(result.status ?? ""));
         }
@@ -163,32 +250,17 @@ export function ModelConnections({ session }: { session: string }) {
           {!native.isFetching && !native.isError && !discovered.length && <p>{t("modelConnections.nativeEmpty")}</p>}
           {discovered.length > 0 && (
             <ul className="project-entry-items">
-              {discovered.map(({ provider, status }) => {
-                const name = t(`team.providers.${provider}`);
-                const added = list.some((item) => item.provider === provider && item.model === NATIVE_DEFAULT_MODEL);
-                const message =
-                  status === "signed_in"
-                    ? t("modelConnections.signedIn")
-                    : status === "connection.authentication"
-                      ? t("modelConnections.signIn", { command: LOGIN_COMMANDS[provider] })
-                      : errorMessage(status);
-                return (
-                  <li className="project-entry-item" key={provider}>
-                    <strong>{name}</strong>
-                    <p>{message}</p>
-                    <div className="choices">
-                      <button
-                        type="button"
-                        className="button"
-                        disabled={added || pending || native.isFetching || status !== "signed_in"}
-                        onClick={() => void change("add-native", { provider })}
-                      >
-                        {t(added ? "modelConnections.nativeAdded" : "modelConnections.nativeConnect", { name })}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
+              {discovered.map((discovery) => (
+                <NativeModelChoice
+                  key={discovery.provider}
+                  discovery={discovery}
+                  list={list}
+                  disabled={pending || native.isFetching}
+                  connect={(provider, model) =>
+                    void change("add-native", model === NATIVE_DEFAULT_MODEL ? { provider } : { provider, model })
+                  }
+                />
+              ))}
             </ul>
           )}
           <div className="choices">
