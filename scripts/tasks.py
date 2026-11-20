@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Claim, release and list roadmap tasks so parallel agents never work on the same issue.
+"""Claim, release and list issues so parallel agents never work on the same task.
 
 Every agent works through the same GitHub account, so a label alone cannot say who holds a task.
 A claim is a comment carrying a hidden marker with the agent's name and branch. After claiming,
@@ -26,6 +26,8 @@ from datetime import datetime, timezone
 
 LABEL = "status:in-progress"
 BLOCKING_LABELS = {"needs-decision"}
+PRIORITIES = {f"priority:p{number}": number for number in range(4)}
+REVIEW_LABEL = "status:in-review"
 STALE_HOURS = 48
 AGENT = re.compile(r"^[a-z0-9][a-z0-9._-]{1,40}$")
 MARKER = re.compile(r"<!--\s*rm-(claim|release)\s+([^>]*?)\s*-->")
@@ -137,33 +139,60 @@ def cmd_release(args: argparse.Namespace) -> int:
     return 0
 
 
+def board_priority(labels: set[str]) -> tuple[int, str]:
+    priorities = {label for label in labels if label.startswith("priority:")}
+    if len(priorities) == 1:
+        priority = next(iter(priorities))
+        if priority in PRIORITIES:
+            rank = PRIORITIES[priority]
+            return rank, f"P{rank}"
+    return len(PRIORITIES), "invalid" if priorities else "unset"
+
+
+def board_state(labels: set[str], claim: Claim | None) -> tuple[int, str]:
+    if labels & BLOCKING_LABELS:
+        return 4, "needs decision"
+    if REVIEW_LABEL in labels:
+        return 0, "in review"
+    if claim:
+        return 2, "in progress"
+    if LABEL in labels:
+        return 4, "labelled but unclaimed"
+    if "status:triage" in labels:
+        return 3, "triage"
+    return 1, "ready" if "status:ready" in labels else "free"
+
+
 def cmd_board(args: argparse.Namespace) -> int:
     issues = json.loads(gh("issue", "list", "--state", "open", "--limit", "200", "--json",
-                           "number,title,labels,milestone,comments"))
+                           "number,title,labels,milestone,comments,createdAt"))
     pulls = json.loads(gh("pr", "list", "--state", "open", "--limit", "100", "--json", "number,headRefName,body,title"))
     links: dict[int, list[str]] = {}
     for pull in pulls:
         for number in linked_issues(pull.get("body", "")):
             links.setdefault(number, []).append(f"#{pull['number']} ({pull['headRefName']})")
     rows = []
-    for item in sorted(issues, key=lambda entry: entry["number"]):
+    for item in issues:
         claim = holder(item["comments"])
-        labels = label_names(item)
-        if claim:
-            age = hours_since(claim.at)
-            state = f"{claim.agent} on {claim.branch}, {age:.0f}h" + (" (stale?)" if age > STALE_HOURS else "")
-        elif labels & BLOCKING_LABELS:
-            state = "needs decision"
-        elif LABEL in labels:
-            state = "labelled but unclaimed"
-        else:
-            state = "free"
         if args.mine and (not claim or claim.agent != args.mine):
             continue
-        milestone = (item.get("milestone") or {}).get("title", "")
-        rows.append((f"#{item['number']}", item["title"][:58], milestone.split(" ")[0], state, ", ".join(links.get(item["number"], []))))
-    widths = [max(len(row[column]) for row in rows + [("Issue", "Title", "Phase", "Status", "Open PRs")]) for column in range(5)]
-    for row in [("Issue", "Title", "Phase", "Status", "Open PRs")] + rows:
+        labels = label_names(item)
+        priority_rank, priority = board_priority(labels)
+        state_rank, state = board_state(labels, claim)
+        if claim:
+            age = hours_since(claim.at)
+            state += f" · {claim.agent} on {claim.branch}, {age:.0f}h"
+            if age > STALE_HOURS:
+                state += " (stale?)"
+        number = item["number"]
+        phase = (item.get("milestone") or {}).get("title", "")
+        key = (priority_rank, state_rank, item["createdAt"], number)
+        row = (f"#{number}", item["title"][:58], priority, phase, state, ", ".join(links.get(number, [])))
+        rows.append((key, row))
+    header = ("Issue", "Title", "Priority", "Phase", "Status", "Open PRs")
+    table = [header, *(row for _, row in sorted(rows))]
+    widths = [max(map(len, column)) for column in zip(*table)]
+    for row in table:
         print("  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip())
     return 0
 
@@ -199,9 +228,9 @@ def cmd_check_pr(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Claim and list roadmap tasks for parallel agents.")
+    parser = argparse.ArgumentParser(description="Claim and list issues for parallel agents.")
     commands = parser.add_subparsers(dest="command", required=True)
-    board = commands.add_parser("board", help="Show who holds which open issue.")
+    board = commands.add_parser("board", help="Show open issues in urgency and pickup order.")
     board.add_argument("--mine", metavar="AGENT", help="Only the issues this agent holds.")
     claim = commands.add_parser("claim", help="Claim an issue for an agent and branch.")
     claim.add_argument("issue", type=int)
