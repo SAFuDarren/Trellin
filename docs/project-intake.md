@@ -12,9 +12,11 @@ The suggestions quote the material they came from. Review each proposed definiti
 
 Choose **Team → Runtimes → Model connections → Add connection**. Select an installed Codex or Claude Code instance detected by Trellin. Sign in through the native CLI if prompted, then check again. Choose a model from the list or keep the provider default. Codex supplies its model list when supported by the installed CLI. Claude Code offers model families whose availability depends on your account. You can also enter a model identifier supported by your account. Each chosen model is a separate connection so you can select it for intake and proof work. Use **Test connection** to check account access with a short example request.
 
+From Workbench or Chats, choose **Manage model connections** in the conversation model menu. Add the connection, close the dialog, and choose the model. Your conversation and draft stay open.
+
 To connect directly to the OpenAI or Anthropic API, choose the API option and enter the model identifier and your API key. Trellin stores direct API keys in the macOS Keychain. The connection list contains only the models you added.
 
-**Test connection** sends one fixed request without project material. Choose **Remove connection** to prevent future requests on that connection. The project retains the prior model results and verification records. For on-device intake, start the local Ollama service with a supported text model.
+**Test connection** sends one fixed request without project material. Choose **Remove connection** to prevent future requests on that connection. A queued proof remains bound to its original connection. To run with a replacement, stop the waiting task and authorize a new task for the new connection. The project retains the prior model results and verification records. For on-device intake, start the local Ollama service with a supported text model.
 
 ## Add theorem
 

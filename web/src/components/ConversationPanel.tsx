@@ -7,6 +7,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -26,9 +27,9 @@ import {
   useModelConnections,
 } from "../api/modelConnections";
 import { useLocalTextModels } from "../api/localModels";
-import { href } from "../shell/route";
 import { timeText } from "../workbench/text";
 import { Chevron, SendArrow, Spin } from "./Icons";
+import { ModelConnections } from "./ModelConnections";
 import "../styles/conversation-composer.css";
 
 export function ConversationPanel({
@@ -73,6 +74,8 @@ export function ConversationPanel({
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [managingModels, setManagingModels] = useState(false);
+  const modelTrigger = useRef<HTMLButtonElement>(null);
   const [prepared, setPrepared] = useState<{ scope: string; preview: ConversationPreview } | null>(null);
   const request = useRef<ConversationRequest | null>(null);
   const busy = useRef(false);
@@ -270,6 +273,7 @@ export function ConversationPanel({
           </ComposerMenu>
           <ComposerMenu
             kind="model"
+            triggerRef={modelTrigger}
             label={t("conversations.model")}
             tooltip={connection?.label ?? t("conversations.chooseModel")}
             valueId={connection ? formId + "-model-label" : undefined}
@@ -312,14 +316,15 @@ export function ConversationPanel({
                 ),
             )}
             {models.isPending || local.isPending ? <p role="status">{t("common.loading")}</p> : null}
-            <a
+            <button
+              type="button"
               className="composer-menu-item composer-model-settings"
               role="menuitem"
               tabIndex={-1}
-              href={href("team", "runtimes")}
+              onClick={() => setManagingModels(true)}
             >
               {t(options.length ? "conversations.manageModels" : "conversations.connect")}
-            </a>
+            </button>
           </ComposerMenu>
           <button
             type="submit"
@@ -358,6 +363,15 @@ export function ConversationPanel({
           <p>{t("conversations.previewHint")}</p>
         )}
       </div>
+      {managingModels && (
+        <ModelConnections
+          session={session}
+          onClose={() => {
+            setManagingModels(false);
+            modelTrigger.current?.focus();
+          }}
+        />
+      )}
       {removing && (
         <Confirmation
           title={t("conversations.remove")}
@@ -380,6 +394,7 @@ function ComposerMenu({
   tooltip,
   valueId,
   trigger,
+  triggerRef,
   disabled,
   children,
 }: {
@@ -388,13 +403,15 @@ function ComposerMenu({
   tooltip?: string;
   valueId?: string;
   trigger: ReactNode;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   disabled: boolean;
   children: ReactNode;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
+  const ownTrigger = useRef<HTMLButtonElement>(null);
+  const button = triggerRef ?? ownTrigger;
   const menu = useRef<HTMLDivElement>(null);
   const opening = useRef<"last" | "selected">("selected");
   const visible = open && !disabled;
