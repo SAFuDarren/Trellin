@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.34
+
+- Update the web development tools to address reported advisories.
+
 ## 1.0.33
 
 - Propose and review a premise in Workbench, with explicit confirmation of a separate revised claim.
