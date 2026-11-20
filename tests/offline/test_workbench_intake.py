@@ -211,8 +211,10 @@ def public_intake(monkeypatch, tmp_path):
     return workbench_intake.PublicIntake(Registry()), settings, store
 
 
-def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(monkeypatch, tmp_path, public_intake):
-    service, _, store = public_intake
+@pytest.mark.parametrize("provider", ["codex-cli", "claude-code"])
+def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(monkeypatch, tmp_path, public_intake, provider):
+    service, settings, store = public_intake
+    settings["provider"] = provider
     calls = []
     proposition = "  ∀ n : Nat, n + 0 = n\n"
     candidate = {"kind": "theorem", "natural": _NOTES.strip(), "formal": {"lean": proposition}}
@@ -233,8 +235,9 @@ def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(mo
 
     def complete(config, role, system, outgoing, output_limit, deadline):
         calls.append(outgoing)
-        assert role == "intake-notes" and config.provider == "codex-cli"
+        assert role == "intake-notes" and config.provider == provider
         assert system == intake.EXTRACT_PROMPT
+        assert 'Use "items" as the only top-level key' in system
         assert outgoing == preview["outgoing"]
         assert config.timeout_seconds == 60 and output_limit == intake.MODEL_OUTPUT_TOKENS
         audit_file, = tmp_path.iterdir()
@@ -245,7 +248,7 @@ def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(mo
     store.query = draft_query
     monkeypatch.setattr(intake, "complete_structured", complete)
     preview = service.preview(store, _PUBLIC_DRAFT)
-    assert preview["provider"] == "codex-cli" and preview["model"] == "test-model"
+    assert preview["provider"] == provider and preview["model"] == "test-model"
     assert preview["outgoing"] == {"domain": _DRAFT["domain"], "objective": _DRAFT["objective"], "notes": _NOTES}
     assert preview["limits"]["timeout_seconds"] == 60
     assert preview["limits"]["output_token_limit_enforced"] is False
