@@ -81,7 +81,7 @@ A node whose recorded job is running shows the agent and the number of parallel 
 
 The conversation under the graph shows your notes, the models' recorded methods and reasons, and the Lean results for the selected node. Choose **All nodes** to see the whole claim, with a link from each entry back to its node.
 
-Select a node, write a short method or focus suggestion, choose the recipient, then send it. This attaches the note to the selected claim and exact confirmed Lean statement. For a private claim, the next otherwise eligible request from a signed private-local model policy can read up to three pending notes. The ordinary [advance worker](research-progress.md#advance-a-confirmed-lean-statement) still governs scheduling, budget, and proof verification. If no eligible call runs, the message remains pending. A recorded model attempt acknowledges the note. Existing graphs remain usable on `0069` and local-model guidance remains usable on `0070`.
+Select a node, write a short method or focus suggestion, choose the recipient, then select **Queue proof note**. This attaches the note to the selected claim and exact confirmed Lean statement. For a private claim, the next otherwise eligible request from a signed private-local model policy can read up to three pending notes. The ordinary [advance worker](research-progress.md#advance-a-confirmed-lean-statement) still governs scheduling, budget, and proof verification. If no eligible call runs, the message remains pending. A recorded model attempt acknowledges the note. Existing graphs remain usable on `0069` and local-model guidance remains usable on `0070`.
 
 Each note is local to the project and eligible on its original statement version.
 
@@ -95,8 +95,9 @@ On database revision `0081`, open **Proof activity** for a node with a
 confirmed public statement and shareable basis. Choose **Queue proof note**
 and **Allow Codex to use this note**. Start a bounded **Proof task** with a
 Codex connection from Team. The task checks its signed model, statement,
-basis and budget before using the queued note. Proof activity distinguishes
-a queued note from one included in a recorded model attempt.
+basis and budget before using the queued note. The status beside each note tells you whether it is waiting for an authorized
+proof task, blocked, tied to an older statement, or included in an attempt.
+Inclusion appears when the task records a receipt.
 
 The terminal-started workflow is also available. On earlier database
 revisions use it to deliver released guidance.

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
 import { desktopProjectUpgrade } from "../workbench/desktop";
@@ -6,7 +7,7 @@ import { activityNode, type Graph } from "../workbench/graph";
 import { isCodex, modelName, nodeTitle } from "../workbench/text";
 import type { ActivityRecord, ActivitySnapshot } from "../workbench/types";
 import { FeedEntry } from "./FeedEntry";
-import { Chevron, SendArrow, Spin } from "./Icons";
+import { Chevron, Spin } from "./Icons";
 import { WorkbenchConversations } from "./WorkbenchConversations";
 
 type Draft = {
@@ -22,6 +23,13 @@ type Draft = {
 type Entry = ActivityRecord & { kind: string };
 
 const AUDIENCES = ["local", "codex"] as const;
+
+function guidanceBlockerText(t: TFunction, activity: ActivitySnapshot, fallback: string) {
+  const reason = activity.guidance_reason || fallback;
+  return activity.guidance_blocker
+    ? t(`composer.blockers.${activity.guidance_blocker}`, { defaultValue: reason })
+    : reason;
+}
 
 export function ChatPanel({
   session,
@@ -110,9 +118,23 @@ export function ChatPanel({
     );
   };
 
+  const guidanceContext =
+    activity && !activityError
+      ? {
+          channels: Array.isArray(activity.guidance_channels) ? activity.guidance_channels : undefined,
+          blocker: guidanceBlockerText(t, activity, t("chat.guidanceUnavailable")),
+        }
+      : undefined;
   const entry = (record: Entry) => {
     const node = allNodes ? activityNode(graph, record) : null;
-    return <FeedEntry key={record.id} record={record} link={node ? relation(node) : null} />;
+    return (
+      <FeedEntry
+        key={record.id}
+        record={record}
+        link={node ? relation(node) : null}
+        guidanceContext={guidanceContext}
+      />
+    );
   };
 
   return (
@@ -231,14 +253,7 @@ function Composer({
   const canSend = !disabled && Boolean(draft?.text.trim()) && channels.includes(audience);
   const blocker = !node
     ? t("composer.chooseNode")
-    : activityError ||
-      (!activity
-        ? t("chat.loading")
-        : activity.guidance_blocker
-          ? t(`composer.blockers.${activity.guidance_blocker}`, {
-              defaultValue: activity.guidance_reason || t("composer.viewOnly"),
-            })
-          : activity.guidance_reason || t("composer.viewOnly"));
+    : activityError || (activity ? guidanceBlockerText(t, activity, t("composer.viewOnly")) : t("chat.loading"));
   const status = !available ? blocker : confirming ? t("composer.confirmHint") : draft?.message || "";
   const draftOnly = Boolean(draft && !available);
   const needsUpgrade =
@@ -353,17 +368,8 @@ function Composer({
             </select>
             <Chevron />
           </div>
-          <button
-            id="guidance-send"
-            type="submit"
-            className="send"
-            data-confirm={String(confirming)}
-            disabled={!canSend}
-            aria-label={
-              draft?.sending ? t("composer.sending") : confirming ? t("composer.confirmLabel") : t("composer.send")
-            }
-          >
-            {confirming ? t("composer.confirm") : <SendArrow />}
+          <button id="guidance-send" type="submit" className="button proof-queue-button" disabled={!canSend}>
+            {t(draft?.sending ? "composer.sending" : confirming ? "composer.confirm" : "composer.send")}
           </button>
         </div>
       )}

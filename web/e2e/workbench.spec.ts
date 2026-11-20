@@ -70,20 +70,40 @@ test("the impact view previews what withdrawing an assumption affects", async ({
   await expect(page.locator('.graph-node[data-affected="true"]')).toHaveCount(4);
 });
 
-test("releasing a proof note to Codex takes two explicit clicks", async ({ page }) => {
+test("releasing a proof note to Codex takes two explicit clicks and shows its persisted receipt", async ({ page }) => {
   await open(page);
   await card(page, /^Proof obligation 2$/).click();
   await page.getByRole("button", { name: "Proof activity" }).click();
   await page.locator("#guidance-audience").selectOption("codex");
-  await page.locator("#guidance-text").fill("Try the reduction route first.");
-  const send = page.locator("#guidance-send");
-  await send.click();
-  await expect(send).toHaveAccessibleName("Allow Codex to use this note");
+  const note = "Try the reduction route first.";
+  await page.locator("#guidance-text").fill(note);
+  const queue = page.locator("#guidance-send");
+  await expect(queue).toHaveText("Queue proof note");
+  await queue.click();
+  await expect(queue).toHaveAccessibleName("Allow Codex to use this note");
   await expect(page.locator("#guidance-status")).toContainText("later authorized Codex proof attempt");
-  await expect(page.locator(".chat-feed")).not.toContainText("Try the reduction route first.");
-  await send.click();
+  const saved = page.locator(".chat-feed > li").filter({ hasText: note });
+  await expect(saved).toHaveCount(0);
+  await queue.click();
   await expect(page.locator("#guidance-status")).toHaveText("Saved for a later authorized Codex proof attempt.");
-  await expect(page.locator(".chat-feed")).toContainText("Try the reduction route first.");
+  const status = saved.getByRole("status");
+  await expect(status).toContainText("Saved, waiting for an authorized Codex proof attempt");
+  await expect(status).toContainText("Open Proof task");
+  await expect(status).not.toContainText("Included");
+
+  await page.route(/\/api\/activity\?claim=/, async (route) => {
+    const response = await route.fetch();
+    const activity = (await response.json()) as { guidance: { text: string }[] };
+    const guidance = activity.guidance.map((record) =>
+      record.text === note ? { ...record, submitted_at: "2026-11-20T09:05:00Z" } : record,
+    );
+    await route.fulfill({ response, json: { ...activity, guidance } });
+  });
+  await page.reload();
+  await card(page, /^Proof obligation 2$/).click();
+  await page.getByRole("button", { name: "Proof activity" }).click();
+  await expect(status).toContainText("Included in a Codex proof attempt");
+  await expect(status).not.toContainText("Open Proof task");
 });
 
 test("zoom, splitters and sidebar are remembered", async ({ page }) => {
