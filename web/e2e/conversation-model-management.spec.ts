@@ -31,7 +31,9 @@ for (const surface of ["Workbench", "Chats"] as const) {
     await page.route("**/api/model-connections/native", (route) =>
       route.fulfill({
         json: {
-          providers: [{ provider: "codex-cli", status: "signed_in", models: [{ id: "gpt-fixture", label: "Fixture GPT" }] }],
+          providers: [
+            { provider: "codex-cli", status: "signed_in", models: [{ id: "gpt-fixture", label: "Fixture GPT" }] },
+          ],
         },
       }),
     );
@@ -73,7 +75,10 @@ for (const surface of ["Workbench", "Chats"] as const) {
     if (surface === "Workbench") {
       await page.getByRole("button", { name: /^Proof obligation 2/ }).click();
     } else {
-      await page.locator("nav.rail").getByRole("link", { name: /^Chats/ }).click();
+      await page
+        .locator("nav.rail")
+        .getByRole("link", { name: /^Chats/ })
+        .click();
     }
     await page.getByRole("button", { name: "New conversation" }).click();
     const panel = page.locator(".conversation-panel");
