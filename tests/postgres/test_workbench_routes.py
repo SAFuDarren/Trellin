@@ -14,6 +14,7 @@ import pytest
 
 from research_multiplier import general_lean, production
 from research_multiplier.cli import main
+from research_multiplier.models import connections
 from research_multiplier.policy import lean_budget
 from research_multiplier.storage import paths
 from research_multiplier.storage.artifacts import Artifacts
@@ -225,6 +226,41 @@ def test_connected_proof_policy_checks_model_scope_and_budget(workbench, monkeyp
             lean_budget.claim(store, "connected-fixture", 120, second["id"], retry=False)
         assert blocked.value.state == "23514"
         assert pending_lean_passes(store, 1, [policy_id], public_model_policies=True) == []
+
+
+def test_removing_a_connection_keeps_queued_proof_bound_to_its_original_model(workbench, monkeypatch, tmp_path):
+    server, *_ = workbench
+    monkeypatch.setattr(connections, "_settings_file", lambda: tmp_path / "models.sqlite")
+    executable = tmp_path / "codex"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="ascii")
+    executable.chmod(0o700)
+    registry = connections.Registry()
+    original = registry.add({"provider": "codex-cli", "model": "fixture-original", "binary": str(executable)})
+    original_identity = registry.identity(original["id"])
+    with paths.use_workspace(server.workspace, strict=True):
+        claim, _ = _approved_statement(title="Queued connection replacement fixture", sensitivity="public")
+
+    view = server.proof_task(UUID(claim))
+    document = {"claim_id": claim, "token": view["scope"]["token"], "model_rounds": 1, "reason": REASON,
+                "public_model": {key: original_identity[key] for key in ("id", "fingerprint")},
+                "confirm_external": True}
+    policy = server.write(workbench_proof_tasks.start, document)["policy_id"]
+
+    replacement = registry.add({"provider": "codex-cli", "model": "fixture-replacement", "binary": str(executable)})
+    replacement_identity = registry.identity(replacement["id"])
+    registry.remove(original["id"])
+    waiting = server.proof_task(UUID(claim))
+    assert waiting["state"] == "waiting"
+    assert waiting["blocker"] == "proof_task.external_unavailable"
+    assert waiting["policy"]["id"] == policy and waiting["policy"]["public_model"] == original_identity
+
+    new_document = {**document, "public_model": {key: replacement_identity[key] for key in ("id", "fingerprint")}}
+    with pytest.raises(workbench_proof_tasks.ProofTaskError, match=r"proof_task\.external_unavailable"):
+        server.write(workbench_proof_tasks.start, new_document)
+    server.write(workbench_proof_tasks.stop, {"claim_id": claim, "policy_id": policy, "reason": REASON})
+    new_policy = server.write(workbench_proof_tasks.start, new_document)["policy_id"]
+    assert new_policy != policy
+    assert server.proof_task(UUID(claim))["policy"]["public_model"] == replacement_identity
 
 
 def test_handoff_previews_selected_scope_and_rejects_changed_notes(workbench, capsys, tmp_path):
