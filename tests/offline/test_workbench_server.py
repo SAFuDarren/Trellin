@@ -409,3 +409,25 @@ def test_unknown_interface_files_are_not_found(server):
     assert response.status == 404
     response, _ = request(server, "GET", "/assets/../server.py", session=False)
     assert response.status in {400, 404}
+
+
+def test_local_lemma_plan_requires_trusted_write_and_bounds_request(server, monkeypatch):
+    calls = []
+
+    def verify(document):
+        calls.append(document)
+        return {"verified": 1}
+
+    monkeypatch.setattr(server, "verify_lemma_plan", verify)
+    path = "/api/lemma-plans"
+    document = {"plan": {"format_version": 1, "nodes": []}}
+    assert request(server, "POST", path, body=document, session=False)[0].status == 403
+    assert request(server, "POST", path, body=document, origin=False)[0].status == 403
+    assert request(server, "POST", path, body=document, headers={"Origin": "http://elsewhere.test"})[0].status == 403
+    assert request(server, "POST", path, body=document, headers={"Host": "elsewhere.test"})[0].status == 403
+    assert request(server, "POST", path, body={"plan": "x" * 64_000})[0].status == 400
+    assert not calls
+
+    response, content = request(server, "POST", path, body=document)
+    assert response.status == 200 and json.loads(content) == {"verified": 1}
+    assert calls == [document]

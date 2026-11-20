@@ -864,6 +864,22 @@
       "progress": "research-progress.md: automation rules and workers"
     }
   },
+  "lemmaPlan": {
+    "title": "Local lemmas",
+    "destination": "Confirmed Lean statement · version {{version}}",
+    "input": "Lemma plan (JSON)",
+    "hint": "Paste a version 1 plan with intermediate lemmas. Lean checks them locally against this confirmed statement and adds verified lemmas to the proof graph.",
+    "verify": "Verify lemma plan",
+    "checking": "Checking the lemma plan with local Lean…",
+    "verified_one": "{{count}} lemma verified. See the proof graph.",
+    "verified_other": "{{count}} lemmas verified. See the proof graph.",
+    "invalid": "Enter valid JSON for a version 1 plan containing only lemma nodes.",
+    "identity": "Verification requires the local researcher bound to this project.",
+    "stale": "The confirmed Lean scope is no longer ready. Review the current statement and its basis.",
+    "busy": "A local lemma plan is already running. Try again when it finishes.",
+    "checkFailed": "Lean could not verify the full plan. Check the plan and your local Lean setup. The graph shows any lemmas that passed.",
+    "unavailable": "Could not verify the lemma plan in this project."
+  },
   "proofTask": {
     "modelConnection": "Proof model",
     "noExternal": "Run checks and reuse existing proofs",

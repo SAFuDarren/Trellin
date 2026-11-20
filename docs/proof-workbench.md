@@ -23,6 +23,20 @@ When the scope is ready, confirm it in the panel and record your reason to start
 
 The panel shows the proof task state, selected model, reported model usage, open obligations when the worker reports them, and the verified receipt when one is issued. The existing [public Codex note flow](#send-a-public-note-to-codex) is also available. Review and adoption remain researcher decisions. **Stop** ends the selected policy and prevents new work on it. Reopen the same workspace and proof task to see the recorded checkpoint. If an authorized pass was interrupted, use **Continue** to return to the same policy.
 
+## Verify local lemmas
+
+Select a claim with a confirmed Lean statement and open **Local lemmas**. The panel shows the exact destination and statement version. Paste a version 1 [structured lemma plan](lean-core.md#derive-and-reuse-local-lemmas) containing intermediate nodes, then choose **Verify lemma plan**. Use the same local Lean runtime and project database configuration as `lean derive`. The proof graph shows each verified lemma, including any that passed before a later node failed.
+
+For example, if the frozen scope assumes `True` and has the original goal `True ∧ True`, this plan derives an intermediate lemma directly from the premise.
+
+```json
+{"format_version":1,"nodes":[
+  {"name":"Helper","proposition":"True","proof":{"intro":{"count":1,"body":{"use":0}}}}
+]}
+```
+
+Complete the frozen goal through the existing proof workflow.
+
 ## Read a graph
 
 - **Proof** shows the frozen goal, checked steps, reductions and open obligations. Choose a node to see the stored statement and its current status. Long Lean statements start folded. The fold opens the exact stored text, including any binders already in the record.

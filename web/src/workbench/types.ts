@@ -17,6 +17,7 @@ export type GraphNode = {
   formula?: string;
   proposition?: string;
   formalization?: string;
+  formalization_status?: "approved" | "pending";
   statement?: string;
   verification_status?: string;
   parameters?: { name: string; type: string }[];
@@ -33,6 +34,7 @@ export type GraphSnapshot = {
     status: string;
     domain: string | null;
     statement_id?: string | null;
+    lemma_plan_ready?: boolean;
     code?: string | null;
   };
   focus_id?: string | null;

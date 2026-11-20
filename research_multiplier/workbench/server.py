@@ -1,5 +1,6 @@
 """Serve a project-bound proof graph on the IPv4 loopback interface."""
 
+from functools import partial
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -22,7 +23,8 @@ from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
                                           workbench_activity, workbench_clarification, workbench_conversations,
                                           workbench_guidance, workbench_library,
-                                          workbench_intake, workbench_proof_tasks, workbench_review, workbench_sections,
+                                          workbench_intake, workbench_lemma_plans, workbench_proof_tasks,
+                                          workbench_review, workbench_sections,
                                           workbench_theorems, workspace_events)
 
 
@@ -65,6 +67,14 @@ _CONNECTION_WRITES = {
 }
 _INTAKE_PUBLIC = ("/api/project-intake/public-preview", "/api/project-intake/public-draft")
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
+_LEMMA_PLAN_ROUTE = "/api/lemma-plans"
+_LEMMA_PLAN_ERRORS = {
+    "lemmaPlan.invalid": HTTPStatus.BAD_REQUEST,
+    "lemmaPlan.identity": HTTPStatus.FORBIDDEN,
+    "lemmaPlan.stale": HTTPStatus.CONFLICT,
+    "lemmaPlan.busy": HTTPStatus.CONFLICT,
+    "lemmaPlan.checkFailed": HTTPStatus.UNPROCESSABLE_ENTITY,
+}
 _CONVERSATION_WRITES = {
     "/api/conversations/create": workbench_conversations.create,
     "/api/conversations/archive": workbench_conversations.archive,
@@ -185,6 +195,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self.public_intake = workbench_intake.PublicIntake(self.connections)
         self.discussions = workbench_conversations.Discussions(self.connections)
         self._proof_task_lock = threading.Lock()
+        self._lemma_plan_lock = threading.Lock()
         self.closing = threading.Event()
         self._running_policy = None
         self._failed_policy = None
@@ -210,6 +221,16 @@ class WorkbenchServer(ThreadingHTTPServer):
     def write(self, action, *values):
         with paths.use_workspace(self.workspace, strict=True), Store() as store:
             return store.transaction("human", lambda: action(store, *values))
+
+    def verify_lemma_plan(self, document):
+        if self.closing.is_set() or not self._lemma_plan_lock.acquire(blocking=False):
+            raise workbench_lemma_plans.LemmaPlanError("lemmaPlan.busy")
+        try:
+            # The verifier records its own receipts after local Lean returns.
+            with paths.use_workspace(self.workspace, strict=True), Store() as store:
+                return workbench_lemma_plans.verify(store, document)
+        finally:
+            self._lemma_plan_lock.release()
 
     def prepare_clarification(self, workspace_id, identifier, document):
         # The existing workflow locks the request and commits only after the model returns.
@@ -421,7 +442,8 @@ class _Handler(BaseHTTPRequestHandler):
                 raise _BadRequest("Use fresh=1 to repeat the check.")
             return self.server.doctor(fresh=route.query == "fresh=1")
         if route.path == "/api/graph":
-            return self.server.read(proof_graph.snapshot, *_uuid_parameters(route.query, "claim"))
+            return self.server.read(partial(proof_graph.snapshot, include_lemma_plan=True),
+                                    *_uuid_parameters(route.query, "claim"))
         if route.path == "/api/library/item":
             return self.server.read(workbench_library.item, *_uuid_parameters(route.query, "version"))
         if route.path == "/api/impact":
@@ -767,6 +789,9 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.start_proof_task(self._body()))
             elif self.path == "/api/proof-task/stop":
                 self._json(HTTPStatus.OK, self.server.write(workbench_proof_tasks.stop, self._body()))
+            elif self.path == _LEMMA_PLAN_ROUTE:
+                document = self._body(workbench_lemma_plans.MAX_REQUEST_BYTES)
+                self._json(HTTPStatus.OK, self.server.verify_lemma_plan(document))
             elif self.path == "/api/claim-code":
                 self._json(HTTPStatus.OK, self.server.write(claim_references.rename, self._body()))
             elif self.path == "/api/release-updates":
@@ -805,6 +830,8 @@ class _Handler(BaseHTTPRequestHandler):
         except workbench_proof_tasks.ProofTaskError as error:
             status = HTTPStatus.BAD_REQUEST if error.code == "proof_task.invalid" else HTTPStatus.CONFLICT
             self._error(status, error.code)
+        except workbench_lemma_plans.LemmaPlanError as error:
+            self._error(_LEMMA_PLAN_ERRORS[str(error)], str(error))
         except claim_references.ClaimCodeError as error:
             self._error(*_claim_code_error(error))
         except connections.ConnectionError as error:
@@ -825,6 +852,10 @@ class _Handler(BaseHTTPRequestHandler):
             elif self.path in _PROOF_WRITES:
                 status = HTTPStatus.SERVICE_UNAVAILABLE if error.retryable else HTTPStatus.CONFLICT
                 self._error(status, "proof_task.unavailable" if error.retryable else "proof_task.stale")
+            elif self.path == _LEMMA_PLAN_ROUTE:
+                changed = error.state in {"P0002", "23514"}
+                self._error(HTTPStatus.CONFLICT if changed else HTTPStatus.SERVICE_UNAVAILABLE,
+                            "lemmaPlan.stale" if changed else "lemmaPlan.unavailable")
             elif self.path == "/api/claim-code":
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "claim_code.save_failed")
             elif self.path in _LIBRARY_WRITES:
@@ -841,6 +872,8 @@ class _Handler(BaseHTTPRequestHandler):
             _LOG.error("Workbench write failed (%s).", type(error).__name__)
             if self.path in _PROOF_WRITES:
                 message = "proof_task.unavailable"
+            elif self.path == _LEMMA_PLAN_ROUTE:
+                message = "lemmaPlan.unavailable"
             elif self.path == "/api/claim-code":
                 message = "claim_code.save_failed"
             elif self.path in _LIBRARY_WRITES:
