@@ -9,3 +9,4 @@ Findings that need work are tracked as roadmap tasks or issues; the audit record
 | Audit | Score | Notes |
 | --- | --- | --- |
 | [2026-11](2026-11.md) · [中文](2026-11.zh-CN.md) | 57/96 (59 %) | Baseline |
+| [2026-11 regression and handover follow-up](2026-11-handoff.md) · [中文](2026-11-handoff.zh-CN.md) | — | Evidence for A-202611-13 |
