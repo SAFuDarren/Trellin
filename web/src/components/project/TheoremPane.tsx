@@ -118,6 +118,12 @@ export function TheoremPane({ session, onRecorded }: { session: string; onRecord
             {t("projectEntry.title")}
             <input name="title" maxLength={300} required />
           </label>
+          {kind === "goal" && (
+            <div className="project-entry-note">
+              <p>{t("projectEntry.theorem.destination")}</p>
+              <p>{t("projectEntry.theorem.separateProject")}</p>
+            </div>
+          )}
           {kind === "goal" && pending.data?.claim_codes && (
             <div>
               <label>

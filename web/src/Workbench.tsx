@@ -45,6 +45,7 @@ export function Workbench({
   const [referencedClaim, setReferencedClaim] = useState<string | null>(null);
   const [missingReferenceNode, setMissingReferenceNode] = useState(false);
   const [view, setView] = useState<View>("proof");
+  const [recordedGoal, setRecordedGoal] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [assumption, setAssumption] = useState<string | null>(null);
   const [allNodes, setAllNodes] = useState(false);
@@ -67,6 +68,11 @@ export function Workbench({
     if (claimId && (claimId === referencedClaim || list.some((claim) => claim.id === claimId))) return;
     setClaimId(claims.data?.claim_id ?? list[0]?.id ?? null);
   }, [claims.data, claimId, referencedClaim]);
+
+  const projectClaims = useMemo(
+    () => claims.data?.claims.filter((claim) => claim.id !== claimId) ?? [],
+    [claimId, claims.data],
+  );
 
   const snapshot = useQuery({
     queryKey: ["graph", claimId],
@@ -141,6 +147,7 @@ export function Workbench({
   );
 
   const selectClaim = (id: string) => {
+    setRecordedGoal(null);
     setClaimId(id);
     setSelected(null);
     setAssumption(null);
@@ -188,6 +195,14 @@ export function Workbench({
   const openRecorded = async (claimId?: string) => {
     await queries.invalidateQueries();
     if (claimId) selectClaim(claimId);
+  };
+  const showRecordedGoal = (id: string) => {
+    if (!claimId) return openRecorded(id);
+    // Keep the open claim reachable even if it drops off the recent claims list.
+    setReferencedClaim(claimId);
+    setRecordedGoal(id);
+    setView("proof");
+    return queries.invalidateQueries();
   };
 
   const notice = !session
@@ -271,6 +286,7 @@ export function Workbench({
               claimCode={graph?.claim.id === claimId ? graph.claim.code : null}
               claimCodesAvailable={Boolean(claims.data?.claim_codes)}
               onRecorded={openRecorded}
+              onGoalRecorded={showRecordedGoal}
               onOpenReference={openReference}
             />
             {!layout.reviewOpen && graph && (
@@ -335,6 +351,9 @@ export function Workbench({
               work={work.byNode}
               running={work.running}
               queued={work.queued}
+              projectClaims={projectClaims}
+              recordedGoal={recordedGoal}
+              onOpenClaim={selectClaim}
               atlasClaims={atlas.data?.claims ?? []}
               claimId={claimId}
               atlasOpen={sizes.atlasOpen}

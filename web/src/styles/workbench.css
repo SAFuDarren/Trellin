@@ -611,7 +611,8 @@ select {
 .graph-node-frame {
   position: absolute;
 }
-.graph-node {
+.graph-node,
+.canvas-project-claim {
   width: 100%;
   min-height: 60px;
   overflow: hidden;
@@ -625,8 +626,18 @@ select {
   color: var(--ink);
   text-align: left;
 }
-.graph-node:hover {
+.graph-node:hover,
+.canvas-project-claim:hover {
   border-color: var(--edge);
+}
+.canvas-project-claims {
+  position: absolute;
+  display: grid;
+}
+.canvas-project-heading {
+  color: var(--sub);
+  font-size: 12.5px;
+  font-weight: 600;
 }
 .graph-node-resize {
   position: absolute;

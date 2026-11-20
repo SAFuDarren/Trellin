@@ -22,6 +22,7 @@ export function ProjectActions({
   claimCode,
   claimCodesAvailable,
   onRecorded,
+  onGoalRecorded,
   onOpenReference,
 }: {
   session: string;
@@ -29,6 +30,7 @@ export function ProjectActions({
   claimCode?: string | null;
   claimCodesAvailable: boolean;
   onRecorded: (claimId?: string) => void | Promise<void>;
+  onGoalRecorded: (claimId: string) => void | Promise<void>;
   onOpenReference: (claimId: string, nodeId: string | null) => void;
 }) {
   const { t } = useTranslation();
@@ -73,8 +75,12 @@ export function ProjectActions({
                 <TheoremPane
                   session={session}
                   onRecorded={(claimId) => {
-                    if (claimId) dialog.current?.close();
-                    onRecorded(claimId);
+                    if (claimId) {
+                      dialog.current?.close();
+                      onGoalRecorded(claimId);
+                    } else {
+                      onRecorded();
+                    }
                   }}
                 />
               )}

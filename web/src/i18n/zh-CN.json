@@ -431,6 +431,8 @@
     "claim_code.conflict": "此目标已有其他短码，请从「研究引用」修改。"
   },
   "graph": {
+    "projectClaims": "项目内的其他命题",
+    "openClaim": "打开{{title}}，{{status}}",
     "label": "当前课题的依赖图",
     "queued": "{{work}} 排队中"
   },
@@ -935,6 +937,8 @@
     "lean": "Lean 命题",
     "failed": "这次操作未完成，请重试。",
     "theorem": {
+      "destination": "保存到当前项目图",
+      "separateProject": "在 Mac 应用中，可以从「文件」→「新建项目」创建独立项目。",
       "kind": "记录用途",
       "goal": "待证明的定理",
       "library": "资料库定理",

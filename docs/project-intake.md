@@ -23,6 +23,6 @@ To connect directly to the OpenAI or Anthropic API, choose the API option and en
 Choose **Add theorem**, enter the natural-language wording and the exact Lean proposition, then choose its role.
 
 - **Existing theorem** saves a library draft. You can record the source, read the saved wording and Lean statement, and confirm that exact version. Formalization confirmation records your judgment of its meaning. A checked proof has its own evidence record.
-- **Target to prove** saves a human-confirmed research target. If entering a self-contained Lean proposition, write its explicit premises as binders and use the form's confirmation. Confirmed targets appear in the claims list. Lean verification and approval of extra project basis items use the existing workflows.
+- **Target to prove** saves a human-confirmed research target. If entering a self-contained Lean proposition, write its explicit premises as binders and use the form's confirmation. Confirmed targets appear in the claims list and as independent goals on the current project's Proof canvas. The current claim stays open. Select another goal on the canvas to open its proof graph. Use **File → New Project** in the Mac app to start a separate project. Lean verification and approval of extra project basis items use the existing workflows.
 
 You can enter or review theorems while the local model is unavailable.
