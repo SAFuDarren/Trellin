@@ -261,6 +261,23 @@ select {
 .brand .icon-button {
   flex: none;
 }
+.workbench-view-trigger {
+  position: relative;
+  flex-shrink: 0;
+}
+.workbench-view-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 14px;
+  padding-inline: 2px;
+  border-radius: 4px;
+  background: var(--pick);
+  color: var(--ink);
+  font-size: 9px;
+  line-height: 12px;
+  text-align: center;
+}
 .menu {
   display: flex;
   flex-direction: column;
@@ -359,6 +376,7 @@ select {
   padding-inline: 8px;
 }
 .app[data-sidebar="collapsed"] .brand {
+  flex-direction: column;
   justify-content: center;
   padding: 0 0 8px;
 }
@@ -1523,7 +1541,10 @@ select {
   place-items: center;
   width: 36px;
   height: 36px;
+  padding: 0;
+  border: 0;
   border-radius: 8px;
+  background: transparent;
   color: var(--sub);
   text-decoration: none;
   -webkit-user-select: none;
@@ -1533,7 +1554,9 @@ select {
   background: var(--track);
   color: var(--ink);
 }
-.rail-link[aria-current="page"] {
+.rail-link[aria-current="page"],
+.rail-link[aria-expanded="true"],
+.rail-link[data-current="true"] {
   background: var(--pick);
   color: var(--ink);
 }
@@ -1613,12 +1636,19 @@ select {
   border-right: 1px solid var(--hair);
   overflow-y: auto;
 }
-.section-nav h1 {
+.section-nav-header {
   position: sticky;
   top: 0;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   padding: 14px 10px 8px;
   background: var(--side);
+}
+.section-nav-header h1 {
+  min-width: 0;
   font-size: 14px;
   font-weight: 650;
   overflow-wrap: anywhere;

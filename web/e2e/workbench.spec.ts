@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openMenu } from "./navigation";
 
 // Parity checklist from docs/roadmap.md (P1.4) and the section pages (P1.5),
 // run against tests/fixtures/workbench_fixture.py.
@@ -16,15 +17,29 @@ async function open(page: Page, section?: string) {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/#session=fixture");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("自然数加零的对称性");
-  if (section) await railLink(page, section).click();
+  if (section) await goToSection(page, section);
   return errors;
 }
 
 const card = (page: Page, name: RegExp) =>
   page.locator(".graph-node", { has: page.locator(".node-title", { hasText: name }) });
 const rail = (page: Page) => page.locator("nav.rail");
-// Rail links include their badge count in the accessible name ("Review 2 waiting for review").
 const railLink = (page: Page, name: string) => rail(page).getByRole("link", { name: new RegExp(`^${name}( |$)`) });
+
+const viewMenu = (page: Page) => openMenu(page.getByRole("button", { name: "Switch view", exact: true }));
+const utilityButton = (page: Page) => rail(page).getByRole("button", { name: "Settings and help", exact: true });
+
+async function goToSection(page: Page, section: string) {
+  if (section === "Review") {
+    const menu = await viewMenu(page);
+    await menu.getByRole("link", { name: /^Review/ }).click();
+  } else if (section === "Settings" || section === "Help") {
+    const menu = await openMenu(utilityButton(page));
+    await menu.getByRole("link", { name: section, exact: true }).click();
+  } else {
+    await railLink(page, section).click();
+  }
+}
 
 test("the interface starts in English", async ({ page }) => {
   await open(page);
@@ -174,13 +189,13 @@ test("graph controls and Help retain accessible structure", async ({ page }) => 
     Number(await resize.getAttribute("aria-valuemax")),
   );
 
-  await railLink(page, "Help").click();
+  await goToSection(page, "Help");
   const definitions = page.locator(".help dl.keys");
   await expect(definitions).toHaveCount(2);
   await expect(definitions.locator(":scope > div > dt + dd")).toHaveCount(13);
 });
 
-test("every rail section opens without errors", async ({ page }) => {
+test("every section opens through the rail or a navigation menu without errors", async ({ page }) => {
   const errors = await open(page);
   const sections: [string, string][] = [
     ["Review", "Review"],
@@ -193,24 +208,27 @@ test("every rail section opens without errors", async ({ page }) => {
     ["Settings", "Settings"],
   ];
   for (const [link, heading] of sections) {
-    await railLink(page, link).click();
+    await goToSection(page, link);
     await expect(page.locator("#section-title")).toHaveText(heading);
   }
-  await railLink(page, "Workbench").click();
+  await railLink(page, "Home").click();
   await expect(page.locator(".graph-node")).toHaveCount(7);
   expect(errors).toEqual([]);
 });
 
-test("the rail shows review and running counts, with help and settings at the bottom", async ({ page }) => {
+test("the view menu shows review counts and the rail keeps Team and utilities reachable", async ({ page }) => {
   await open(page);
   // The rail sits beside the page, not above it.
   const railBox = await rail(page).boundingBox();
   const sidebarBox = await page.locator(".sidebar").boundingBox();
   expect(railBox?.height ?? 0).toBeGreaterThan(800);
   expect(sidebarBox?.x ?? 0).toBeGreaterThanOrEqual((railBox?.x ?? 0) + (railBox?.width ?? 0) - 1);
-  await expect(rail(page).getByLabel("2 waiting for review")).toBeVisible();
+  const menu = await viewMenu(page);
+  const review = menu.getByRole("link", { name: /^Review/ });
+  await expect(review).toHaveAccessibleName(/2(?: waiting for review)?$/);
+  await expect(review.getByText("2", { exact: true })).toBeVisible();
   await expect(rail(page).getByLabel("2 running")).toBeVisible();
-  const settings = await railLink(page, "Settings").boundingBox();
+  const settings = await utilityButton(page).boundingBox();
   const bar = await rail(page).boundingBox();
   expect((bar?.y ?? 0) + (bar?.height ?? 0) - ((settings?.y ?? 0) + (settings?.height ?? 0))).toBeLessThan(24);
 });
@@ -224,7 +242,10 @@ test("approving a verified result records it and clears it from the inbox", asyn
   await page.getByLabel("Reason").fill("Scope matches; only H1 is used.");
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(page.locator(".page-notice")).toHaveText("Approved and recorded.");
-  await expect(rail(page).getByLabel("1 waiting for review")).toBeVisible();
+  const review = (await viewMenu(page)).getByRole("link", { name: /^Review/ });
+  await expect(review).toHaveAccessibleName(/1(?: waiting for review)?$/);
+  await expect(review.getByText("1", { exact: true })).toBeVisible();
+  await expect(review).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".page-head h2")).not.toHaveText("reverseZeroAdd");
 });
 
@@ -249,7 +270,7 @@ test("the language is chosen in settings and remembered", async ({ page }) => {
   await expect(page.locator("#section-title")).toHaveText("设置");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-  await railLink(page, "工作台").click();
+  await railLink(page, "主页").click();
   await expect(page.getByRole("button", { name: "证明进展" })).toBeVisible();
 });
 

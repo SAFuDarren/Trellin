@@ -6,6 +6,7 @@ import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
 import { ClarificationReview } from "../components/ClarificationReview";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
+import { WorkbenchViewMenu } from "../components/WorkbenchViewMenu";
 import { href } from "../shell/route";
 import { nodeFormula, nodeTitle, statusText, timeText } from "../workbench/text";
 import type { GraphSnapshot } from "../workbench/types";
@@ -30,9 +31,11 @@ export function ReviewPage({
   session,
   sub,
   onOpen,
+  pendingReviews,
 }: {
   session: string;
   sub: string;
+  pendingReviews: number | undefined;
   onOpen: (claimId: string, nodeId?: string) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -58,6 +61,7 @@ export function ReviewPage({
   return (
     <SectionLayout
       title={t("rail.review")}
+      headerActions={<WorkbenchViewMenu current="review" pendingReviews={pendingReviews} />}
       groups={[
         {
           name: t("review.waiting", { count: items.length }),

@@ -15,6 +15,12 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 **Organize with AI** and **Add theorem** are available before the first claim. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
 
+## Switch between the graph and Review
+
+Use **Home** in the rail to return to your project's graph. In the Workbench or Review sidebar header, **Switch view** shows the number of items awaiting review. Open **Review** there and return with **Workbench** or **Home**. Your graph keeps its selected claim and node while you switch. Use **Global map** in the Workbench sidebar to browse claims.
+
+Open **Settings and help** at the bottom of the rail to find settings or the usage guide. Press Escape to close either menu and return focus to its button.
+
 ## Start a proof task
 
 Select a claim and open **Proof task**. The panel shows the confirmed Lean proposition, its basis, and any decision that blocks work. If the Lean statement still needs preparation or review, follow [the Lean scope review](lean-core.md) before starting.
