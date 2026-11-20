@@ -2,12 +2,14 @@
 """Exercise open-goal review against an authenticated disposable database."""
 
 import json
+from uuid import uuid4
 
 import pytest
 
 from research_multiplier.storage import paths
 from research_multiplier.storage.artifacts import Artifacts
 from research_multiplier.storage.postgres import Store
+from research_multiplier.workflows import goal_suggestions, literature, research_review
 from tests.postgres.test_workbench_clarifications import _request, review_server  # noqa: F401
 
 
@@ -17,6 +19,7 @@ REASON = "The reviewed formal wording fits the question."
 TITLE = "Compare two basic consequences"
 OBJECTIVE = "Decide which consequence to investigate under the approved basis."
 SELECT = "/api/goal-review/select"
+RELATED = "/api/goal-review/related"
 
 
 def _lean(proposition):
@@ -38,13 +41,14 @@ def _basis(store):
     return list(reversed(versions))
 
 
-def _goal(store, basis, *, title=TITLE):
+def _goal(store, basis, *, title=TITLE, confirm=True):
     frame, = store.query("human", "SELECT * FROM rm.create_research_goal(%s)", store.json({
         "title": title, "domain": "lean-core", "objective": OBJECTIVE, "sensitivity": "restricted",
         "basis_version_ids": [entry["id"] for entry in basis],
     }))
-    store.query("human", "SELECT rm.confirm_research_goal(%s,%s,%s,%s)",
-                frame["id"], frame["frame_sha256"], ACTOR, REASON)
+    if confirm:
+        store.query("human", "SELECT rm.confirm_research_goal(%s,%s,%s,%s)",
+                    frame["id"], frame["frame_sha256"], ACTOR, REASON)
     return frame
 
 
@@ -90,6 +94,73 @@ def _unselected(goal):
         frame, = store.query("human", "SELECT claim_id, conjecture_id FROM rm.research_goal_status WHERE id = %s",
                              goal["id"])
         assert frame == {"claim_id": None, "conjecture_id": None}
+
+
+def test_related_work_opens_approved_goal_before_candidates_and_preserves_research_state(review_server, monkeypatch):
+    def external_call(*_args, **_kwargs):
+        pytest.fail("Local related work must not call a model or download material.")
+
+    monkeypatch.setattr(goal_suggestions, "complete_structured", external_call)
+    monkeypatch.setattr(literature, "_download", external_call)
+    with Store() as store:
+        basis = _basis(store)
+        goal = _goal(store, basis)
+        draft = _goal(store, basis, title="Unconfirmed question", confirm=False)
+        prepared = _goal(store, basis, title="Question with prepared conjecture")
+        _candidate(store, prepared, "True", [basis[1]["id"]])
+
+    document = {"goal_id": str(goal["id"]), "query": "  FIXTURE:FIRST  "}
+    expected = {"kind": "basis", "id": basis[1]["id"], "claim_id": None, "exact_key": "fixture:first",
+                "title": basis[1]["wording"], "state": "admitted"}
+    inbox = _request(review_server, "/api/inbox")
+    assert inbox["open_research_goals"] == [{"id": str(goal["id"]), "title": TITLE}]
+    assert {item["item_id"] for item in inbox["items"] if item["kind"] == "choose_conjecture"} == {str(prepared["id"])}
+    before = _request(review_server, _read(goal))
+    assert before["status"] == "ready" and before["candidates"] == []
+    _request(review_server, RELATED, document=document, session=False, status=403)
+    _request(review_server, RELATED, document={**document, "goal_id": str(uuid4())}, status=404)
+    _request(review_server, RELATED, document={**document, "goal_id": str(draft["id"])}, status=503)
+    for invalid in (
+        {**document, "goal_id": 1}, {**document, "goal_id": "invalid"},
+        {**document, "query": " "}, {**document, "query": "x" * 301},
+        {**document, "query": "\0"}, {**document, "query": "\ud800"}, {**document, "limit": 24},
+    ):
+        _request(review_server, RELATED, document=invalid, status=400)
+    assert _request(review_server, RELATED, document=document) == {"matches": [expected]}
+    assert _request(review_server, RELATED, document={**document, "query": "fixture:%"}) == {"matches": []}
+    assert _request(review_server, _read(goal)) == before
+    assert _request(review_server, "/api/inbox") == inbox
+    _unselected(goal)
+
+    with Store() as store:
+        store.query("human", "SELECT rm.retire_formal_item(%s,%s)", basis[1]["id"], "Withdraw the fixture premise.")
+    assert _request(review_server, _read(goal))["status"] == "stale"
+    assert _request(review_server, RELATED, document=document) == {"matches": []}
+    _unselected(goal)
+
+
+def test_related_work_surfaces_exact_local_source_review_status(review_server, tmp_path):
+    with Store() as store:
+        goal = _goal(store, [])
+        origin = _goal(store, [], title="Claim that owns the archived source")
+        candidate = _candidate(store, origin, "True", [])
+    claim_id = _request(review_server, SELECT, document=_decision(origin, candidate))["claim_id"]
+    source_file = tmp_path / "original.pdf"
+    source_file.write_bytes(b"%PDF-1.5\nSynthetic original\n")
+    title = "Synthetic local reference"
+    identifier = "doi:10.1234/fixture"
+    with Store() as store:
+        source = research_review.archive_source(store, claim_id, identifier, {
+            "title": title, "locator": "Theorem 1", "excerpt": "Fixture excerpt", "convention_map": {},
+        }, source_file)
+
+    document = {"goal_id": str(goal["id"]), "query": identifier}
+    expected = {"kind": "source", "id": str(source["id"]), "claim_id": claim_id, "exact_key": identifier, "title": title}
+    assert _request(review_server, RELATED, document=document) == {"matches": [{**expected, "state": "unconfirmed"}]}
+    with Store() as store:
+        research_review.confirm_source(store, source["id"], source["source_sha256"], ACTOR, REASON)
+    assert _request(review_server, RELATED, document=document) == {"matches": [{**expected, "state": "confirmed"}]}
+    _unselected(goal)
 
 
 def test_goal_review_reads_exact_basis_and_freezes_only_the_confirmed_conjecture(review_server):

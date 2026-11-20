@@ -449,3 +449,32 @@ def test_proof_draft_routes_require_session_origin_and_exact_target(server, monk
     assert request(server, "POST", route, body={**fields, "text": "draft"}, session=False)[0].status == 403
     assert request(server, "POST", route, body={**fields, "text": "draft", "audience": "codex"})[0].status == 400
     assert request(server, "POST", route + "/discard", body=fields)[0].status == 400
+
+
+def test_goal_related_search_stays_on_the_authenticated_read_path(server, monkeypatch):
+    from research_multiplier.workflows import workbench_goal_review
+
+    reads = []
+
+    def read(action, document):
+        assert action is workbench_goal_review.related
+        reads.append(document)
+        return {"matches": []}
+
+    def write(*_):
+        pytest.fail("Searching a goal's local context must use a read transaction.")
+
+    monkeypatch.setattr(server, "read", read)
+    monkeypatch.setattr(server, "write", write)
+    route = "/api/goal-review/related"
+    body = {"goal_id": "13f1a082-cd6b-436c-a601-61cef26eb943", "query": "A synthetic local search"}
+    assert request(server, "POST", route, body=body, session=False)[0].status == 403
+    assert request(server, "POST", route, body=body, origin=False)[0].status == 403
+    assert request(server, "POST", route, body=body, headers={"Origin": "https://foreign.test"})[0].status == 403
+    assert request(server, "GET", route)[0].status == 404
+    assert not reads
+    response, content = request(server, "POST", route, body=body)
+    assert response.status == 200
+    assert response.getheader("Cache-Control") == "no-store"
+    assert json.loads(content) == {"matches": []}
+    assert reads == [body]

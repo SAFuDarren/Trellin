@@ -97,6 +97,7 @@ _PREMISE_ERRORS = {
 }
 _GOAL_REVIEW_ROUTE = "/api/goal-review"
 _GOAL_SELECT_ROUTE = "/api/goal-review/select"
+_GOAL_RELATED_ROUTE = "/api/goal-review/related"
 _GOAL_REVIEW_ERRORS = {
     "goalReview.invalid": HTTPStatus.BAD_REQUEST,
     "goalReview.identity": HTTPStatus.FORBIDDEN,
@@ -864,6 +865,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.write(_PREMISE_WRITES[self.path], self._body(_MAX_PROJECT_BYTES)))
             elif self.path == _GOAL_SELECT_ROUTE:
                 self._json(HTTPStatus.OK, self.server.write(workbench_goal_review.select, self._body(12_000)))
+            elif self.path == _GOAL_RELATED_ROUTE:
+                self._json(HTTPStatus.OK, self.server.read(workbench_goal_review.related, self._body(6000)))
             elif self.path == "/api/claim-code":
                 self._json(HTTPStatus.OK, self.server.write(claim_references.rename, self._body()))
             elif self.path == "/api/release-updates":
@@ -941,7 +944,7 @@ class _Handler(BaseHTTPRequestHandler):
                         "23505": "stale", "23514": "stale"}.get(error.state, "unavailable")
                 message = f"premise.{code}"
                 self._error(_PREMISE_ERRORS[message], message)
-            elif self.path == _GOAL_SELECT_ROUTE:
+            elif self.path in {_GOAL_SELECT_ROUTE, _GOAL_RELATED_ROUTE}:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "goalReview.unavailable")
             elif self.path == "/api/claim-code":
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "claim_code.save_failed")
@@ -965,7 +968,7 @@ class _Handler(BaseHTTPRequestHandler):
                 message = "lemmaPlan.unavailable"
             elif self.path in _PREMISE_WRITES:
                 message = "premise.unavailable"
-            elif self.path == _GOAL_SELECT_ROUTE:
+            elif self.path in {_GOAL_SELECT_ROUTE, _GOAL_RELATED_ROUTE}:
                 message = "goalReview.unavailable"
             elif self.path == "/api/claim-code":
                 message = "claim_code.save_failed"

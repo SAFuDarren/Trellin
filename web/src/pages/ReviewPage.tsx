@@ -44,6 +44,7 @@ export function ReviewPage({
   const { t, i18n } = useTranslation();
   const inbox = useInbox(session);
   const clarification = inbox.data?.clarification_review;
+  const openGoals = inbox.data?.open_research_goals ?? [];
   const items: InboxItem[] = [
     ...(inbox.data?.items ?? []),
     ...(clarification?.followups ?? []).map((followup) => ({
@@ -92,6 +93,15 @@ export function ReviewPage({
             dot: item.priority <= 1 ? "bad" : "warn",
           })),
         },
+        {
+          name: t("review.openGoals"),
+          entries: openGoals.map((goal) => ({
+            key: goal.id,
+            label: goal.title,
+            href: href("review", GOAL_ROUTE + goal.id),
+            current: goal.id === goalId,
+          })),
+        },
       ]}
     >
       {notice && (
@@ -101,7 +111,7 @@ export function ReviewPage({
       )}
       {goalId !== null ? (
         GOAL_ID.test(goalId) ? (
-          <GoalReview key={goalId} session={session} goalId={goalId} onOpen={onOpen} />
+          <GoalReview key={session + "/" + goalId} session={session} goalId={goalId} onOpen={onOpen} />
         ) : (
           <>
             <PageHead title={t("review.kinds.choose_conjecture")} />
@@ -113,7 +123,9 @@ export function ReviewPage({
       ) : !selected ? (
         <>
           <PageHead title={t("rail.review")} />
-          <Empty>{inbox.isPending ? t("common.loading") : t("review.allDone")}</Empty>
+          <Empty>
+            {inbox.isPending ? t("common.loading") : t(openGoals.length ? "review.chooseOpenGoal" : "review.allDone")}
+          </Empty>
         </>
       ) : selected.kind === "clarify_formalization" && clarification ? (
         <ClarificationReview

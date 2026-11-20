@@ -6,7 +6,7 @@ import shutil
 
 from research_multiplier.policy import project_budget
 from research_multiplier.workflows import (proof_graph, research_review, workbench_activity, workbench_clarification,
-                                          workbench_guidance, workbench_review, workspace_events)
+                                          workbench_goal_review, workbench_guidance, workbench_review, workspace_events)
 
 _MAX_THREAD_CLAIMS = 30
 _MAX_THREAD_EVENTS = 40
@@ -20,8 +20,12 @@ def inbox(store):
     for item in items:
         claim = str(item["claim_id"]) if item["claim_id"] else None
         item["claim_title"] = titles.get(claim)
-    return {"items": items, **workbench_review.capability(store), **workspace_events.capability(store),
-            **workbench_clarification.capability(store)}
+    identity = workbench_review.capability(store)
+    result = {"items": items, **identity, **workspace_events.capability(store),
+              **workbench_clarification.capability(store)}
+    if identity:
+        result["open_research_goals"] = workbench_goal_review.open_goals(store)
+    return result
 
 
 _LIBRARY = """

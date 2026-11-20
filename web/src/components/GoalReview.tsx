@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "../api/client";
 import { useFallbackInterval } from "../api/liveUpdates";
+import { useLibrary } from "../api/sections";
+import { href } from "../shell/route";
+import { statusText } from "../workbench/text";
 import { Empty, PageHead } from "./SectionLayout";
 
 type Basis = {
@@ -94,6 +97,156 @@ function Formal({ value }: { value: Record<string, unknown> }) {
   );
 }
 
+type RelatedMatch = {
+  kind: "source" | "claim" | "basis" | "failure";
+  id: string;
+  claim_id: string | null;
+  exact_key: string | null;
+  title: string | null;
+  state: string;
+};
+
+type RelatedSearch =
+  | { state: "pending" }
+  | { state: "failed"; message: string }
+  | { state: "complete"; matches: RelatedMatch[] };
+
+const RELATED_QUERY_LIMIT = 300;
+
+function RelatedWork({
+  session,
+  goalId,
+  onOpen,
+}: {
+  session: string;
+  goalId: string;
+  onOpen: (claimId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const inputId = useId();
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState<RelatedSearch | null>(null);
+  const active = useRef<AbortController | null>(null);
+  const matches = result?.state === "complete" ? result.matches : [];
+  const hasBasis = matches.some((match) => match.kind === "basis");
+  const library = useLibrary(session, hasBasis);
+  const listedBasis = new Set(library.data?.items.map((item) => item.id));
+  const pending = result?.state === "pending";
+  const value = query.trim();
+
+  useEffect(() => () => active.current?.abort(), []);
+
+  async function search(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!value || query.length > RELATED_QUERY_LIMIT || active.current) return;
+    const request = new AbortController();
+    active.current = request;
+    setResult({ state: "pending" });
+    try {
+      const { matches } = await api<{ matches: RelatedMatch[] }>(session, "/api/goal-review/related", {
+        data: { goal_id: goalId, query: value },
+        signal: request.signal,
+      });
+      if (!request.signal.aborted) setResult({ state: "complete", matches });
+    } catch (error) {
+      if (!request.signal.aborted) {
+        const problem = errorKey(error);
+        const message = ["missing", "identity", "unavailable"].includes(problem)
+          ? `goalReview.errors.${problem}`
+          : "goalReview.related.failed";
+        setResult({ state: "failed", message });
+      }
+    } finally {
+      active.current = null;
+    }
+  }
+
+  return (
+    <section className="block" aria-labelledby={inputId + "-heading"}>
+      <h3 id={inputId + "-heading"}>{t("goalReview.related.title")}</h3>
+      <p id={inputId + "-help"} className="inline-note">
+        {t("goalReview.related.help")}
+      </p>
+      <form className="decision" onSubmit={(event) => void search(event)}>
+        <label className="field-label" htmlFor={inputId}>
+          {t("goalReview.related.query")}
+        </label>
+        <div className="row">
+          <input
+            id={inputId}
+            type="search"
+            value={query}
+            maxLength={RELATED_QUERY_LIMIT}
+            autoComplete="off"
+            required
+            disabled={pending}
+            aria-describedby={inputId + "-help"}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setResult(null);
+            }}
+          />
+          <button className="button" type="submit" disabled={!value || pending}>
+            {t("goalReview.related.search")}
+          </button>
+        </div>
+      </form>
+      {pending && (
+        <p role="status" className="inline-note">
+          {t("goalReview.related.searching")}
+        </p>
+      )}
+      {result?.state === "failed" && (
+        <p role="alert" className="status" data-error="true">
+          {t(result.message)}
+        </p>
+      )}
+      {result?.state === "complete" && !matches.length && (
+        <p role="status" className="inline-note">
+          {t("goalReview.related.empty")}
+        </p>
+      )}
+      {matches.length > 0 && (
+        <ol className="goal-review-list" aria-label={t("goalReview.related.results")}>
+          {matches.map((match) => (
+            <li className="stack" key={match.kind + "/" + match.id}>
+              <strong>{match.title?.trim() || match.exact_key || match.id}</strong>
+              <dl className="facts">
+                <dt>{t("goalReview.related.category")}</dt>
+                <dd>{t(`goalReview.related.kind.${match.kind}`)}</dd>
+                <dt>{t("goalReview.related.recordedStatus")}</dt>
+                <dd>{t(`goalReview.related.state.${match.state}`, { defaultValue: statusText(t, match.state) })}</dd>
+                <dt>{t("goalReview.related.identifier")}</dt>
+                <dd className="mono">{match.exact_key || match.id}</dd>
+                {match.kind === "basis" && match.exact_key && match.exact_key !== match.id && (
+                  <>
+                    <dt>{t("reference.basis_version_id")}</dt>
+                    <dd className="mono">{match.id}</dd>
+                  </>
+                )}
+              </dl>
+              {match.claim_id && (
+                <div>
+                  <button type="button" className="button" onClick={() => onOpen(match.claim_id!)}>
+                    {t(match.kind === "claim" ? "common.openInWorkbench" : "goalReview.related.openClaim")}
+                  </button>
+                </div>
+              )}
+              {match.kind === "basis" && listedBasis.has(match.id) && (
+                <div>
+                  <a className="button" href={href("library", "~" + match.id)}>
+                    {t("goalReview.related.openLibrary")}
+                  </a>
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 export function GoalReview({
   session,
   goalId,
@@ -156,7 +309,11 @@ export function GoalReview({
     <>
       <PageHead
         title={goal.title}
-        note={t(`goalReview.status.${goal.status}`)}
+        note={t(
+          goal.status === "ready" && !goal.candidates.length
+            ? "goalReview.status.open"
+            : `goalReview.status.${goal.status}`,
+        )}
         actions={
           goal.status === "selected" && goal.claim_id ? (
             <button type="button" className="button" onClick={() => onOpen(goal.claim_id!)}>
@@ -215,6 +372,7 @@ export function GoalReview({
             <p className="inline-note">{t("goalReview.basisEmpty")}</p>
           )}
         </section>
+        <RelatedWork session={session} goalId={goal.goal_id} onOpen={onOpen} />
         {goal.discussion.state !== "none" && (
           <section className="block">
             <h3>{t("goalReview.discussion")}</h3>
