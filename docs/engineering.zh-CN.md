@@ -244,8 +244,8 @@
 | 跟踪类 issue（例如公开条件，#18） | 该 issue 里的勾选清单 | 完成某项的 PR 合并后，勾掉对应条目 |
 | 架构决定和待定问题 | `docs/architecture.md` 和 `.zh-CN.md` | 某个问题有了结论时：把它从 G 节移到「已决定」那一行，新增或修改对应编号的决定，并关闭它的 `needs-decision` issue |
 | 接口契约 | `docs/interfaces.md` 和 schema | 按该文档「修改契约」一节的流程办 |
-| 用户能感知的变化 | `CHANGELOG.md` | 每个用户或插件作者能感知的变化，都在顶部的 **Unreleased** 下加一行。首次公开发布之前，改为加进 1.0.0 条目。发布 PR 负责把 Unreleased 改成版本号 |
-| 包版本号 | `pyproject.toml` | 只在发布 PR 里改，遵循[发布准备](release.md)和上面的版本规则 |
+| 用户能感知的变化 | `CHANGELOG.md` | 将用户或插件作者能感知的变化记在顶部的候选包版本下 |
+| 包版本号 | `pyproject.toml` | 按照[版本规则](#版本与兼容性)以最新的 main 确定候选版本，同时更新兼容套件的版本标记。发布时遵循[发布准备](release.md) |
 | 用户文档 | `docs/`（中英文）、两份快速入门、`research_multiplier/agent_guide.md` | 研究者能看到的命令、界面、决策、模型使用或联网行为有变化时 |
 | 审计发现 | `docs/audits/` 里的审计记录（写完后不再修改） | 由下一次审计报告每条发现的进展；实际进展记在该发现指向的 issue 或任务里 |
 

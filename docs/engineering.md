@@ -241,8 +241,8 @@ Each kind of record has one home. Update it in the same pull request that change
 | Tracking issues (for example the publication gate, #18) | The checklist in that issue | Tick an item when the PR that completes it is merged |
 | Decisions and open questions | `docs/architecture.md` and `.zh-CN.md` | When a question is answered: move it from section G to the "Decided" line, add or change the numbered decision, close its `needs-decision` issue |
 | Interface contracts | `docs/interfaces.md` and the schemas | Follow "Changing a contract" in that document |
-| User-visible changes | `CHANGELOG.md` | Every user- or plugin-author-visible change adds a line under **Unreleased** at the top. Until the first public release, add it to the 1.0.0 entry instead. The release PR renames Unreleased to the version |
-| Package version | `pyproject.toml` | Only in a release PR, following [Prepare a release](release.md) and the versioning rules above |
+| User-visible changes | `CHANGELOG.md` | Record user- or plugin-author-visible changes under the candidate package version at the top |
+| Package version | `pyproject.toml` | Choose the candidate against current main using the [versioning rules](#versioning-and-compatibility), and update the compatibility marker together. Follow [Prepare a release](release.md) when publishing |
 | User guides | `docs/` (both languages), both quickstarts, `research_multiplier/agent_guide.md` | Whenever a command, screen, decision, model use or network use that researchers see changes |
 | Audit findings | The audit record in `docs/audits/` (never edited afterwards) | The next audit reports each finding's status. Progress happens in the issue or task the finding names |
 
