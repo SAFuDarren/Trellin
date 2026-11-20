@@ -431,3 +431,21 @@ def test_local_lemma_plan_requires_trusted_write_and_bounds_request(server, monk
     response, content = request(server, "POST", path, body=document)
     assert response.status == 200 and json.loads(content) == {"verified": 1}
     assert calls == [document]
+
+
+def test_proof_draft_routes_require_session_origin_and_exact_target(server, monkeypatch):
+    def unexpected(*_):
+        pytest.fail("An invalid or cross-origin draft request must not access the project.")
+
+    monkeypatch.setattr(server, "read", unexpected)
+    monkeypatch.setattr(server, "write", unexpected)
+    claim = "13f1a082-cd6b-436c-a601-61cef26eb943"
+    route = "/api/proof-drafts"
+    target = f"{route}?claim_id={claim}&node_id=goal:{claim}"
+    fields = {"claim_id": claim, "node_id": f"goal:{claim}", "expected_revision": None}
+    assert request(server, "GET", target, session=False)[0].status == 403
+    assert request(server, "GET", target + "&node_id=wrong")[0].status == 400
+    assert request(server, "POST", route, body={**fields, "text": "draft"}, origin=False)[0].status == 403
+    assert request(server, "POST", route, body={**fields, "text": "draft"}, session=False)[0].status == 403
+    assert request(server, "POST", route, body={**fields, "text": "draft", "audience": "codex"})[0].status == 400
+    assert request(server, "POST", route + "/discard", body=fields)[0].status == 400

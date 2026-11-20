@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.37
+
+- Save and reopen private proof-note drafts for individual nodes, including while delivery is blocked.
+
 ## 1.0.36
 
 - Review the approved basis and compare and confirm saved conjectures in Workbench.

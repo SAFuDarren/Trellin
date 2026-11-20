@@ -21,7 +21,9 @@ from research_multiplier.storage.artifacts import Artifacts
 from research_multiplier.storage.lean_progress import hold_lean_pass, pending_lean_passes
 from research_multiplier.storage.postgres import DatabaseOperationError, Store, bind_workspace
 from research_multiplier.workbench.server import WorkbenchServer
-from research_multiplier.workflows import formalization, intake, research_plans, runtime, workbench_proof_tasks
+from research_multiplier.workflows import (
+    formalization, intake, research_plans, runtime, workbench_proof_drafts, workbench_proof_tasks,
+)
 from tests._native_db import disposable_project_logins
 
 
@@ -261,6 +263,78 @@ def test_removing_a_connection_keeps_queued_proof_bound_to_its_original_model(wo
     new_policy = server.write(workbench_proof_tasks.start, new_document)["policy_id"]
     assert new_policy != policy
     assert server.proof_task(UUID(claim))["policy"]["public_model"] == replacement_identity
+
+
+def test_proof_draft_reopens_and_is_consumed_only_by_exact_queue_request(workbench):
+    server, claim, statement, _ = workbench
+    node = "goal:" + claim
+    path = f"/api/proof-drafts?claim_id={claim}&node_id={node}"
+    activity = "/api/activity?claim=" + claim
+    assert _request(server, "GET", activity)["proof_draft_available"]
+    assert _request(server, "GET", path) == {"draft": None}
+
+    text = "  Check the fixture assumption first.  "
+    note = {"claim_id": claim, "node_id": node}
+    record = _request(server, "POST", "/api/proof-drafts",
+                      body={**note, "expected_revision": None, "text": text})["draft"]
+    assert record["text"] == text
+    with WorkbenchServer(server.workspace, port=0) as reopened:
+        saved = reopened.read(workbench_proof_drafts.read, UUID(claim), node)["draft"]
+        assert saved["revision"] == UUID(record["revision"])
+        assert saved["text"] == text
+    assert not _request(server, "GET", activity)["guidance"]
+
+    queue = {**note, "statement_id": statement, "request_id": str(uuid4()),
+             "text": text, "draft_revision": record["revision"]}
+    _request(server, "POST", "/api/guidance", body={**queue, "statement_id": str(uuid4())}, status=409)
+    assert _request(server, "GET", path) == {"draft": record}
+    receipt = _request(server, "POST", "/api/guidance", body=queue)
+    assert receipt["draft_consumed"] and receipt["text"] == text.strip()
+    assert _request(server, "GET", path) == {"draft": None}
+
+    updated = _request(server, "POST", "/api/proof-drafts",
+                       body={**note, "expected_revision": None, "text": text})["draft"]
+    repeated = _request(server, "POST", "/api/guidance", body=queue)
+    assert repeated["id"] == receipt["id"] and repeated["draft_consumed"] is False
+    assert _request(server, "GET", path) == {"draft": updated}
+    response = _request(server, "POST", "/api/proof-drafts/discard",
+                        body={**note, "expected_revision": record["revision"]}, status=409)
+    assert response["error"] == "proof_draft_conflict"
+    assert _request(server, "POST", "/api/proof-drafts/discard",
+                    body={**note, "expected_revision": updated["revision"]}) == {"draft": None}
+
+
+def test_proof_draft_can_be_saved_before_lean_statement_confirmation(workbench):
+    server, *_ = workbench
+    target = _document({
+        "title": "Unconfirmed proof draft fixture", "domain": "lean-core", "sensitivity": "public",
+        "statement": "Every natural number equals itself.",
+        "formal": {"lean": {"proposition": "∀ n : Nat, n = n"}},
+    })
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        preview = intake.preview_target(store, target)
+        frozen = intake.freeze_target(store, target, preview["target_sha256"], ACTOR, REASON)
+        draft = intake.draft(store, b'{"items": []}', target_id=frozen["id"])
+        intake.confirm(store, draft["id"], draft["intake_sha256"], {}, ACTOR, REASON)
+        claim = str(intake.target(store, frozen["id"])["claim_id"])
+
+    path = "/api/activity?claim=" + claim
+    assert _request(server, "GET", path)["guidance_blocker"] == "scope"
+    node = "goal:" + claim
+    body = {"claim_id": claim, "node_id": node, "expected_revision": None, "text": "Check reflexivity."}
+    _request(server, "POST", "/api/proof-drafts", body={**body, "node_id": "other-node"}, status=404)
+    record = _request(server, "POST", "/api/proof-drafts", body=body)
+    assert record["draft"]["text"] == body["text"]
+    assert _request(server, "GET", f"/api/proof-drafts?claim_id={claim}&node_id={node}") == record
+    assert _request(server, "GET", path)["guidance"] == []
+
+
+@pytest.mark.parametrize("workbench", ["0081"], indirect=True)
+def test_old_workbench_detects_unavailable_draft_storage(workbench):
+    server, claim, _, _ = workbench
+    assert not _request(server, "GET", "/api/activity?claim=" + claim)["proof_draft_available"]
+    reply = _request(server, "GET", f"/api/proof-drafts?claim_id={claim}&node_id=goal:{claim}", status=503)
+    assert reply == {"error": "proof_draft_unavailable"}
 
 
 def test_handoff_previews_selected_scope_and_rejects_changed_notes(workbench, capsys, tmp_path):

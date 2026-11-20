@@ -1,20 +1,28 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { api } from "../api/client";
+import { api, ApiError } from "../api/client";
 import { desktopProjectUpgrade } from "../workbench/desktop";
 import { activityNode, type Graph } from "../workbench/graph";
 import { isCodex, modelName, nodeTitle } from "../workbench/text";
-import type { ActivityRecord, ActivitySnapshot } from "../workbench/types";
+import type { ActivityRecord, ActivitySnapshot, ProofDraft } from "../workbench/types";
 import { FeedEntry } from "./FeedEntry";
 import { Chevron, Spin } from "./Icons";
 import { WorkbenchConversations } from "./WorkbenchConversations";
 
+type DraftOperation = "loading" | "saving" | "discarding";
+type DraftError = "loadFailed" | "saveFailed" | "discardFailed" | "conflict";
+
 type Draft = {
+  saved?: ProofDraft | null;
+  draftOperation?: DraftOperation;
+  draftError?: DraftError;
+  discarded?: boolean;
   text: string;
   audience?: string;
-  confirmRelease?: boolean;
+  releaseStatement?: string;
   requestId?: string;
+  requestStatement?: string;
   requestText?: string;
   sending?: boolean;
   message?: string;
@@ -23,6 +31,12 @@ type Draft = {
 type Entry = ActivityRecord & { kind: string };
 
 const AUDIENCES = ["local", "codex"] as const;
+const DRAFT_PATH = "/api/proof-drafts";
+type DraftResponse = { draft: ProofDraft | null };
+
+function isDraftConflict(error: unknown) {
+  return error instanceof ApiError && error.status === 409;
+}
 
 function guidanceBlockerText(t: TFunction, activity: ActivitySnapshot, fallback: string) {
   const reason = activity.guidance_reason || fallback;
@@ -36,6 +50,7 @@ export function ChatPanel({
   graph,
   claimId,
   selected,
+  proofSelected,
   activity,
   activityError,
   scopeReady,
@@ -52,6 +67,7 @@ export function ChatPanel({
   graph: Graph | null;
   claimId: string | null;
   selected: string | null;
+  proofSelected: string | null;
   activity: ActivitySnapshot | undefined;
   activityError: string;
   scopeReady: boolean;
@@ -68,15 +84,17 @@ export function ChatPanel({
   const [tab, setTab] = useState<"chat" | "proof">("chat");
   const feed = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
-  const target = graph && selected ? graph.nodes.get(selected) : undefined;
+  const chatTarget = graph && selected ? graph.nodes.get(selected) : undefined;
+  const proofTarget = graph && proofSelected ? graph.nodes.get(proofSelected) : undefined;
+  const target = tab === "proof" ? proofTarget : chatTarget;
   const anchor = {
     ...(claimId ? { claim_id: claimId } : {}),
     ...(graph?.statementId ? { statement_id: graph.statementId } : {}),
-    ...(!allNodes && target ? { node_id: target.id } : {}),
+    ...(!allNodes && chatTarget ? { node_id: chatTarget.id } : {}),
   };
   const anchorKey = [session, anchor.claim_id, anchor.statement_id, anchor.node_id].join("/");
   const conversationTitle =
-    !allNodes && target ? nodeTitle(t, target) : graph?.claim.title || t("conversations.defaultTitle");
+    !allNodes && chatTarget ? nodeTitle(t, chatTarget) : graph?.claim.title || t("conversations.defaultTitle");
 
   const summary = activityError
     ? activityError
@@ -96,7 +114,7 @@ export function ChatPanel({
   const time = (entry: Entry) => Date.parse(entry.at || entry.created_at || "") || 0;
   const live = (entry: Entry) => (entry.state === "running" ? 1 : 0);
   const shown = [...rows, ...guidance]
-    .filter((record) => allNodes || activityNode(graph, record) === selected)
+    .filter((record) => allNodes || (proofSelected && activityNode(graph, record) === proofSelected))
     .sort((a, b) => live(a) - live(b) || time(a) - time(b));
 
   const onScroll = () => {
@@ -106,7 +124,7 @@ export function ChatPanel({
   useLayoutEffect(() => {
     const element = feed.current;
     if (element && nearBottom.current) element.scrollTop = element.scrollHeight;
-  }, [shown.length, selected, allNodes, tab]);
+  }, [shown.length, proofSelected, allNodes, tab]);
 
   const relation = (id: string) => {
     const node = graph?.nodes.get(id);
@@ -194,7 +212,9 @@ export function ChatPanel({
             session={session}
             graph={graph}
             claimId={claimId}
-            selected={selected}
+            selected={proofSelected}
+            active={open && tab === "proof"}
+            allNodes={allNodes}
             activity={activity}
             activityError={activityError}
             onSent={onSent}
@@ -210,6 +230,8 @@ function Composer({
   graph,
   claimId,
   selected,
+  active,
+  allNodes,
   activity,
   activityError,
   onSent,
@@ -218,6 +240,8 @@ function Composer({
   graph: Graph | null;
   claimId: string | null;
   selected: string | null;
+  active: boolean;
+  allNodes: boolean;
   activity: ActivitySnapshot | undefined;
   activityError: string;
   onSent: () => void;
@@ -225,51 +249,151 @@ function Composer({
   const { t } = useTranslation();
   const drafts = useRef(new Map<string, Draft>());
   const [, rerender] = useState(0);
-  const refresh = () => rerender((value) => value + 1);
-  const node = graph && selected ? graph.nodes.get(selected) : undefined;
+  const refresh = useCallback(() => rerender((value) => value + 1), []);
+  const candidate = claimId && graph?.claim.id === claimId && selected ? graph.nodes.get(selected) : undefined;
+  const node = candidate?.kind === "proposed_premise" ? undefined : candidate;
+  const nodeId = node?.id;
   const statement = graph?.statementId ?? null;
-  const key = claimId && node ? JSON.stringify([session, claimId, statement, node.id]) : null;
+  const key = claimId && nodeId ? JSON.stringify([session, claimId, nodeId]) : null;
   const draft: Draft | null = key ? (drafts.current.get(key) ?? drafts.current.set(key, { text: "" }).get(key)!) : null;
 
-  const declared = Array.isArray(activity?.guidance_channels);
+  const currentActivity = activity?.claim_id === claimId ? activity : undefined;
+  const declared = Array.isArray(currentActivity?.guidance_channels);
   const channels: string[] = declared
-    ? AUDIENCES.filter((channel) => activity!.guidance_channels!.includes(channel))
-    : activity?.guidance_available
+    ? AUDIENCES.filter((channel) => currentActivity!.guidance_channels!.includes(channel))
+    : currentActivity?.guidance_available
       ? ["local"]
       : [];
   const available = Boolean(statement && node && channels.length && !activityError);
+  const draftAvailable = currentActivity?.proof_draft_available === true;
   useEffect(() => {
     if (draft?.audience && declared && !channels.includes(draft.audience)) {
       draft.audience = undefined;
-      draft.confirmRelease = false;
+      draft.releaseStatement = undefined;
       draft.requestId = undefined;
+      refresh();
+    } else if (draft?.releaseStatement && (!available || draft.releaseStatement !== statement)) {
+      draft.releaseStatement = undefined;
       refresh();
     }
   });
   const audience = draft?.audience ?? (channels.includes("local") ? "local" : (channels[0] ?? ""));
   const towardsCodex = audience === "codex";
-  const disabled = !available || Boolean(draft?.sending);
-  const confirming = Boolean(towardsCodex && draft?.confirmRelease && !draft?.sending);
-  const canSend = !disabled && Boolean(draft?.text.trim()) && channels.includes(audience);
+  const busy = Boolean(draft?.sending || draft?.draftOperation);
+  const confirming = Boolean(towardsCodex && draft?.releaseStatement && draft.releaseStatement === statement && !busy);
+  const canSend = available && !busy && Boolean(draft?.text.trim()) && channels.includes(audience);
   const blocker = !node
     ? t("composer.chooseNode")
-    : activityError || (activity ? guidanceBlockerText(t, activity, t("composer.viewOnly")) : t("chat.loading"));
+    : activityError ||
+      (currentActivity ? guidanceBlockerText(t, currentActivity, t("composer.viewOnly")) : t("chat.loading"));
   const status = !available ? blocker : confirming ? t("composer.confirmHint") : draft?.message || "";
   const draftOnly = Boolean(draft && !available);
   const needsUpgrade =
-    activity?.guidance_blocker === "connected_schema" || activity?.guidance_blocker === "codex_schema";
-  const upgrade = draftOnly && needsUpgrade && !activityError ? desktopProjectUpgrade() : undefined;
+    currentActivity?.proof_draft_available === false ||
+    currentActivity?.guidance_blocker === "connected_schema" ||
+    currentActivity?.guidance_blocker === "codex_schema";
+  const upgrade = draft && needsUpgrade && !activityError ? desktopProjectUpgrade() : undefined;
+  const matchesSaved = Boolean(draft?.saved && draft.text === draft.saved.text);
+  const canWriteDraft = draftAvailable && draft?.saved !== undefined && !busy && draft.draftError !== "conflict";
+  let draftStatus = "";
+  if (draft?.draftOperation) {
+    draftStatus = t(`composer.draft.${draft.draftOperation}`);
+  } else if (draft?.draftError) {
+    draftStatus = t(`composer.draft.${draft.draftError}`);
+  } else if (draft?.saved) {
+    draftStatus = t(matchesSaved ? "composer.draft.saved" : "composer.draft.edited");
+  } else if (draft?.discarded) {
+    draftStatus = t(draft.text.trim() ? "composer.draft.discardedEdits" : "composer.draft.discarded");
+  } else if (draftAvailable && draft?.text.trim()) {
+    draftStatus = t("composer.draft.unsaved");
+  } else if (draft && !draftAvailable && (currentActivity || activityError) && (draftOnly || draft.text.trim())) {
+    draftStatus = t("composer.draftOnly");
+  }
+  const canReloadDraft = draft?.draftError === "loadFailed" || draft?.draftError === "conflict";
+
+  const loadDraft = useCallback(
+    async (replaceText: boolean, signal?: AbortSignal) => {
+      if (!draft || !claimId || !nodeId) return;
+      draft.draftOperation = "loading";
+      draft.draftError = undefined;
+      refresh();
+      try {
+        const params = new URLSearchParams({ claim_id: claimId, node_id: nodeId });
+        const { draft: saved } = await api<DraftResponse>(session, DRAFT_PATH + "?" + params, { signal });
+        if (signal?.aborted) return;
+        if (replaceText || draft.text === (draft.saved?.text ?? "")) {
+          draft.text = saved?.text ?? "";
+          draft.releaseStatement = undefined;
+          draft.requestId = undefined;
+        }
+        draft.saved = saved;
+      } catch {
+        if (!signal?.aborted) draft.draftError = "loadFailed";
+      } finally {
+        if (!signal?.aborted) {
+          draft.draftOperation = undefined;
+          refresh();
+        }
+      }
+    },
+    [claimId, draft, nodeId, refresh, session],
+  );
+
+  const needsDraftLoad = active && draftAvailable && draft?.saved === undefined && !draft?.draftError;
+  useEffect(() => {
+    if (!needsDraftLoad || !draft || draft.draftOperation) return;
+    const request = new AbortController();
+    void loadDraft(false, request.signal);
+    return () => {
+      request.abort();
+      if (draft.draftOperation === "loading") draft.draftOperation = undefined;
+    };
+  }, [draft, loadDraft, needsDraftLoad]);
+
+  const writeDraft = async (operation: "saving" | "discarding") => {
+    if (!draft || !claimId || !nodeId || !canWriteDraft || draft.draftOperation || draft.sending) return;
+    const discard = operation === "discarding";
+    if (discard ? !draft.saved : !draft.text.trim() || matchesSaved) return;
+    draft.draftOperation = operation;
+    draft.draftError = undefined;
+    draft.discarded = undefined;
+    refresh();
+    try {
+      const { draft: saved } = await api<DraftResponse>(session, discard ? DRAFT_PATH + "/discard" : DRAFT_PATH, {
+        data: {
+          claim_id: claimId,
+          node_id: nodeId,
+          expected_revision: draft.saved?.revision ?? null,
+          ...(!discard ? { text: draft.text } : {}),
+        },
+      });
+      if (discard && matchesSaved) {
+        draft.text = "";
+        draft.releaseStatement = undefined;
+        draft.requestId = undefined;
+      }
+      draft.saved = saved;
+      draft.discarded = discard;
+    } catch (error) {
+      draft.draftError = isDraftConflict(error) ? "conflict" : discard ? "discardFailed" : "saveFailed";
+    } finally {
+      draft.draftOperation = undefined;
+      refresh();
+    }
+  };
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!draft || !node || !claimId || !statement || !canSend) return;
-    if (towardsCodex && !draft.confirmRelease) {
-      // Sending to an external service takes a second, explicit click.
-      draft.confirmRelease = true;
+    if (!draft || !nodeId || !claimId || !statement || !canSend || draft.draftOperation || draft.sending) return;
+    if (towardsCodex && !confirming) {
+      draft.releaseStatement = statement;
       refresh();
       return;
     }
-    const text = draft.text.trim();
+    const text = draft.text;
+    const draftRevision = matchesSaved ? draft.saved?.revision : undefined;
+    if (draft.requestStatement !== statement || draft.requestText !== text) draft.requestId = undefined;
+    draft.requestStatement = statement;
     draft.requestText = text;
     draft.requestId ||= crypto.randomUUID();
     draft.sending = true;
@@ -277,28 +401,35 @@ function Composer({
     draft.error = false;
     refresh();
     try {
-      await api(session, "/api/guidance", {
+      const reply = await api<{ draft_consumed?: boolean }>(session, "/api/guidance", {
         data: {
           claim_id: claimId,
           statement_id: statement,
-          node_id: node.id,
-          text,
+          node_id: nodeId,
+          text: draftRevision ? text : text.trim(),
           request_id: draft.requestId,
           ...(declared ? { audience } : {}),
           ...(towardsCodex ? { confirm_release: true } : {}),
+          ...(draftRevision ? { draft_revision: draftRevision } : {}),
         },
       });
-      draft.text = "";
+      if (draftRevision) {
+        // When another window changed the draft, reload it instead of showing a stale saved receipt.
+        draft.saved = reply.draft_consumed ? null : undefined;
+        draft.draftError = undefined;
+      }
+      draft.text = draft.saved?.text ?? "";
+      draft.discarded = undefined;
       draft.requestId = undefined;
       draft.audience = undefined;
-      draft.confirmRelease = false;
+      draft.releaseStatement = undefined;
       draft.message = t(towardsCodex ? "composer.sentCodex" : "composer.sentLocal");
       onSent();
     } catch (error) {
       draft.message =
         error instanceof Error ? t(`errors.${error.message}`, { defaultValue: error.message }) : String(error);
       draft.error = true;
-      draft.confirmRelease = false;
+      draft.releaseStatement = undefined;
     } finally {
       draft.sending = false;
       refresh();
@@ -318,6 +449,11 @@ function Composer({
     [code, t(`audience.${channel}`), agentFor(channel)].filter(Boolean).join(" · ");
   return (
     <form id="guidance-form" className="composer" onSubmit={send}>
+      {allNodes && node && (
+        <p id="guidance-target" className="composer-status">
+          {t("composer.draft.target", { node: [code, nodeTitle(t, node)].filter(Boolean).join(" · ") })}
+        </p>
+      )}
       <label htmlFor="guidance-text" className="sr-only">
         {t("composer.label")}
       </label>
@@ -327,14 +463,18 @@ function Composer({
         maxLength={1500}
         required
         placeholder={t(draftOnly ? "composer.draftPlaceholder" : "composer.placeholder")}
-        aria-describedby={draftOnly ? "guidance-status guidance-draft" : "guidance-status"}
-        disabled={!draft || Boolean(draft.sending)}
+        aria-describedby={[allNodes && node && "guidance-target", "guidance-status", draftStatus && "guidance-draft"]
+          .filter(Boolean)
+          .join(" ")}
+        disabled={!draft || busy}
         value={draft?.text ?? ""}
         onChange={(event) => {
           if (!draft) return;
-          if (draft.text.trim() !== event.target.value.trim()) draft.confirmRelease = false;
+          if (draft.text !== event.target.value) draft.releaseStatement = undefined;
           draft.text = event.target.value;
-          if (draft.text.trim() !== draft.requestText) draft.requestId = undefined;
+          draft.discarded = undefined;
+          if (draft.text !== draft.requestText) draft.requestId = undefined;
+          if (draft.draftError === "saveFailed" || draft.draftError === "discardFailed") draft.draftError = undefined;
           draft.message = "";
           draft.error = false;
           refresh();
@@ -348,12 +488,12 @@ function Composer({
             </label>
             <select
               id="guidance-audience"
-              disabled={disabled}
+              disabled={busy}
               value={audience}
               onChange={(event) => {
                 if (!draft) return;
                 draft.audience = event.target.value;
-                draft.confirmRelease = false;
+                draft.releaseStatement = undefined;
                 draft.requestId = undefined;
                 draft.message = "";
                 draft.error = false;
@@ -389,11 +529,46 @@ function Composer({
           </button>
         </div>
       )}
-      {draftOnly && (
-        <p id="guidance-draft" className="composer-status">
-          {t("composer.draftOnly")}
-        </p>
+      {draft && draftAvailable && (
+        <div className="composer-row proof-draft-actions">
+          <button
+            type="button"
+            className="button"
+            disabled={!canWriteDraft || !draft.text.trim() || matchesSaved}
+            onClick={() => void writeDraft("saving")}
+          >
+            {t("composer.draft.save")}
+          </button>
+          {draft.saved && (
+            <button
+              type="button"
+              className="button"
+              disabled={!canWriteDraft}
+              onClick={() => void writeDraft("discarding")}
+            >
+              {t("composer.draft.discard")}
+            </button>
+          )}
+          {canReloadDraft && (
+            <button
+              type="button"
+              className="button"
+              disabled={busy}
+              onClick={() => void loadDraft(draft.draftError === "conflict")}
+            >
+              {t(draft.draftError === "conflict" ? "composer.draft.reload" : "composer.draft.retry")}
+            </button>
+          )}
+        </div>
       )}
+      <p
+        id="guidance-draft"
+        className={draftStatus ? "composer-status" : "sr-only"}
+        role="status"
+        data-error={String(Boolean(draft?.draftError))}
+      >
+        {draftStatus}
+      </p>
     </form>
   );
 }

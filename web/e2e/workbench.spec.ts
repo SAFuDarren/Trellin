@@ -121,6 +121,66 @@ test("releasing a proof note to Codex takes two explicit clicks and shows its pe
   await expect(status).not.toContainText("Open Proof task");
 });
 
+test("a blocked proof node keeps a private draft across reopen", async ({ page }) => {
+  const drafts = new Map<string, { text: string; revision: string; updated_at: string }>();
+  await page.route(/\/api\/activity\?claim=/, async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: {
+        ...(await response.json()),
+        guidance_channels: [],
+        guidance_blocker: "scope",
+        proof_draft_available: true,
+      },
+    });
+  });
+  await page.route(/\/api\/proof-drafts(?:[/?]|$)/, async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === "GET") {
+      await route.fulfill({ json: { draft: drafts.get(url.searchParams.get("node_id") ?? "") ?? null } });
+      return;
+    }
+    const body = request.postDataJSON() as { node_id: string; expected_revision: string | null; text: string };
+    expect(body.expected_revision).toBe(drafts.get(body.node_id)?.revision ?? null);
+    if (url.pathname.endsWith("/discard")) {
+      drafts.delete(body.node_id);
+    } else {
+      drafts.set(body.node_id, { text: body.text, revision: crypto.randomUUID(), updated_at: "2026-11-20T09:05:00Z" });
+    }
+    await route.fulfill({ json: { draft: drafts.get(body.node_id) ?? null } });
+  });
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/guidance") sent.push(request.method());
+  });
+
+  const select = async () => {
+    await card(page, /^Proof obligation 2$/).click();
+    await page.getByRole("button", { name: "Proof activity" }).click();
+  };
+  await open(page);
+  await select();
+  const note = "Check the statement before trying this lemma.";
+  const input = page.getByRole("textbox", { name: "Proof opinion" });
+  await expect(page.locator("#guidance-status")).toContainText("Review and confirm the Lean statement");
+  await expect(page.getByRole("button", { name: "Queue proof note" })).toHaveCount(0);
+  await input.fill(note);
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.locator("#guidance-draft")).toHaveText("Saved in this project · Not queued");
+  await expect(page.locator(".chat-feed")).not.toContainText(note);
+
+  await page.reload();
+  await select();
+  await expect(input).toHaveValue(note);
+  await page.getByRole("button", { name: "Discard saved draft" }).click();
+  await expect(input).toHaveValue("");
+  await expect(page.locator("#guidance-draft")).toHaveText("Saved draft discarded");
+  expect(drafts.size).toBe(0);
+  expect(sent).toEqual([]);
+});
+
 test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   await open(page);
   const level = page.locator(".zoom-level");

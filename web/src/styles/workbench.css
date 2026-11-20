@@ -1272,6 +1272,12 @@ select {
   padding-block: 5px;
   white-space: normal;
 }
+.proof-draft-actions .button {
+  height: auto;
+  min-height: 28px;
+  padding-block: 4px;
+  white-space: normal;
+}
 .composer-status {
   font-size: 12px;
   color: var(--sub);

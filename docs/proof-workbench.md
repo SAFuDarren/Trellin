@@ -97,9 +97,13 @@ are outside that payload.
 The conversation and attribution are saved with the project. Removing a
 conversation hides it from the active list and preserves its history.
 
-Use **Proof activity** to leave an opinion on the selected proof node. When the
-workbench explains a blocker, you can keep typing a draft in that panel. Leaving
-the workbench or quitting Trellin clears unsent drafts.
+Open **Proof activity**, select a proof node and use **Save draft** to keep a
+private note in the project. Saving works while proof guidance is blocked,
+including before the Lean statement is confirmed. Reopen the same node to
+continue editing the saved draft or discard it. To make a draft available to an
+eligible proof task, use **Queue proof note** once the panel shows an available
+recipient and complete any requested confirmation. Saving a draft requires
+database revision `0082` or later.
 
 On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
 
@@ -115,9 +119,9 @@ Each note is local to the project and eligible on its original statement version
 
 If the Mac workbench shows a database upgrade is required, select **Back up and
 upgrade** in **Proof activity**. Confirm the project in the native dialog. The
-app reopens the same project after verifying its backup and updating to `0081`.
+app reopens the same project after verifying its backup and applying the bundled database upgrade.
 
-On database revision `0081`, open **Proof activity** for a node with a
+On database revision `0081` or later, open **Proof activity** for a node with a
 confirmed public statement and shareable basis. Choose **Queue proof note**
 and **Allow Codex to use this note**. Start a bounded **Proof task** with a
 Codex connection from Team. The task checks its signed model, statement,

@@ -104,6 +104,11 @@ export type GuidanceNote = {
   audience?: string;
   current_scope?: boolean;
 };
+export type ProofDraft = {
+  revision: string;
+  text: string;
+  updated_at: string;
+};
 export type ActivitySnapshot = {
   claim_id: string;
   activity: ActivityRecord[];
@@ -112,6 +117,7 @@ export type ActivitySnapshot = {
   guidance_available?: boolean;
   guidance_reason?: string;
   guidance_blocker?: string | null;
+  proof_draft_available?: boolean;
 };
 
 export type AtlasClaim = {
