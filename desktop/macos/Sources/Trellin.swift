@@ -6,25 +6,24 @@ func localized(_ key: String) -> String {
     Bundle.main.localizedString(forKey: key, value: nil, table: nil)
 }
 
-private struct LastWorkspace: Codable {
-    let path: String
-    var position: WorkbenchPosition?
-}
-
 @main
-final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, NSWindowDelegate {
+final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate,
+                     WKScriptMessageHandler, WKScriptMessageHandlerWithReply, NSWindowDelegate {
     private static let windowSurface = NSColor(name: nil) { appearance in
         let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         return NSColor(white: dark ? 0.10 : 0.91, alpha: 1)
     }
     private let defaults = UserDefaults.standard
     private let lastKey = "lastWorkspaceV1"
+    private let positionsKey = "workspacePositionsV1"
     private let bridge = "trellinPosition"
     private let upgradeBridge = "trellinUpgradeProject"
+    private let projectsBridge = "trellinProjects"
     private let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1260, height: 820),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable],
                                   backing: .buffered, defer: false)
     private var last: LastWorkspace?
+    private var positions: [String: WorkbenchPosition] = [:]
     private var requested: URL?
     private var requestedLaunch: WorkbenchLaunch = .library
     private var child: WorkbenchProcess?
@@ -33,6 +32,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     private var starting = false
     private var movingStorage = false
     private var upgradingProject = false
+    private var resolvingProject = false
 
     private var storageBusy: Bool { movingStorage || upgradingProject }
     private lazy var storageSettings = StorageSettings(window: window) { [weak self] plan in
@@ -40,7 +40,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     private var canPresent: Bool {
-        !starting && !storageBusy && !storageSettings.busy && window.attachedSheet == nil
+        !starting && !resolvingProject && !storageBusy && !storageSettings.busy && window.attachedSheet == nil
     }
 
     private var runtime: URL? {
@@ -71,6 +71,10 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         window.setFrameAutosaveName("TrellinWorkbench")
         if let data = defaults.data(forKey: lastKey) {
             last = try? JSONDecoder().decode(LastWorkspace.self, from: data)
+        }
+        if let data = defaults.data(forKey: positionsKey),
+           let saved = try? JSONDecoder().decode([String: WorkbenchPosition].self, from: data) {
+            positions = saved
         }
         if let saved = localDirectoryURL(last?.path) { open(.restore(saved)) }
         else { open(.library) }
@@ -322,13 +326,12 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
             try process.start(runtime: runtime, launch: launch, onReady: { [weak self, weak process] result in
                 guard let self, let process, self.child === process else { return }
                 self.starting = false
-                if let result, let url = result.sessionURL, let opened = result.workspaceURL {
-                    if launch.isRestore, let priorPath = launch.location?.path, self.last?.path == priorPath,
-                       priorPath != opened.path {
-                        self.last = LastWorkspace(path: opened.path, position: self.last?.position)
-                    }
+                if let result, result.matches(launch), let url = result.sessionURL, let opened = result.workspaceURL {
                     self.requested = opened
-                    self.requestedLaunch = .restore(opened)
+                    self.requestedLaunch = launch.projectId.map { .registered($0, opened) } ?? .restore(opened)
+                    self.last = LastWorkspace.opened(opened, projectId: result.project_id, previous: self.last,
+                                                     restoredFrom: launch.isRestore ? launch.location : nil,
+                                                     positions: self.positions)
                     self.showWorkbench(url: url, workspace: opened, name: result.name,
                                        leanMissing: result.warnings?.contains("lean") == true)
                 } else {
@@ -355,13 +358,13 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     private func showWorkbench(url: URL, workspace: URL, name: String?, leanMissing: Bool) {
-        if last?.path != workspace.path { last = LastWorkspace(path: workspace.path, position: nil) }
         saveLast()
         serverURL = url
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(self, name: bridge)
         configuration.userContentController.add(self, name: upgradeBridge)
+        configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: projectsBridge)
         if let position = last?.position {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: position.script, injectionTime: .atDocumentStart, forMainFrameOnly: true
@@ -380,7 +383,13 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     private func saveLast() {
-        guard let last, let data = try? JSONEncoder().encode(last) else { return }
+        guard let last else { return }
+        let encoder = JSONEncoder()
+        if let id = last.projectId, let position = last.position {
+            positions[id.uuidString.lowercased()] = position
+            if let data = try? encoder.encode(positions) { defaults.set(data, forKey: positionsKey) }
+        }
+        guard let data = try? encoder.encode(last) else { return }
         defaults.set(data, forKey: lastKey)
     }
 
@@ -392,6 +401,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         serverURL = nil
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: bridge)
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: upgradeBridge)
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: projectsBridge, contentWorld: .page)
         webView?.stopLoading()
         webView = nil
     }
@@ -466,5 +476,47 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
               last?.position != position else { return }
         last?.position = position
         saveLast()
+    }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage,
+                               replyHandler: @escaping (Any?, String?) -> Void) {
+        let unavailable = "projects-unavailable"
+        guard message.name == projectsBridge, let web = message.webView, web === webView, trusted(message.frameInfo),
+              let worker = child, let runtime, let request = DesktopProjectsRequest(message: message.body) else {
+            replyHandler(nil, unavailable)
+            return
+        }
+        switch request {
+        case .list:
+            StorageProcess.run(.information, runtime: runtime) { [weak self, weak web, weak worker] reply in
+                guard let self, let web, let worker, self.webView === web, self.child === worker,
+                      reply?.isReady == true, let projects = reply?.projects else {
+                    replyHandler(nil, unavailable)
+                    return
+                }
+                var result: [String: Any] = ["projects": projects.map(\.sidebarEntry)]
+                if let id = self.last?.projectId { result["activeId"] = id.uuidString.lowercased() }
+                replyHandler(result, nil)
+            }
+        case let .open(id):
+            guard canPresent else { replyHandler(nil, unavailable); return }
+            if last?.projectId == id { replyHandler(true, nil); return }
+            resolvingProject = true
+            StorageProcess.run(.resolve(id), runtime: runtime) { [weak self, weak web, weak worker] reply in
+                self?.resolvingProject = false
+                guard let self, let web, let worker, self.webView === web, self.child === worker,
+                      self.canPresent, let workspace = reply?.workspaceURL else {
+                    replyHandler(nil, unavailable)
+                    return
+                }
+                replyHandler(true, nil)
+                self.open(.registered(id, workspace))
+            }
+        case .newProject, .folder:
+            guard canPresent else { replyHandler(nil, unavailable); return }
+            if request == .newProject { newProject() }
+            else { chooseWorkspace() }
+            replyHandler(true, nil)
+        }
     }
 }

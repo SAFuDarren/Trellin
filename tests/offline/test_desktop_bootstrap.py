@@ -198,6 +198,7 @@ def test_local_session_uses_selected_workspace_and_drains_on_parent_disconnect(m
 
 def test_run_resolves_a_moved_managed_project_before_starting_server(monkeypatch, tmp_path):
     old, confirmed = tmp_path / "previous", tmp_path / "active"
+    project_id = str(uuid4())
     calls = []
 
     class Library:
@@ -210,7 +211,7 @@ def test_run_resolves_a_moved_managed_project_before_starting_server(monkeypatch
         def describe(self, path):
             assert path == confirmed
             calls.append(("describe", path))
-            return {"name": "Original project"}
+            return {"id": project_id, "name": "Original project"}
 
     class Server:
         workspace = confirmed
@@ -222,7 +223,8 @@ def test_run_resolves_a_moved_managed_project_before_starting_server(monkeypatch
         def shutdown(self):
             pass
 
-    def open_project(path, _resources):
+    def open_project(path, _resources, *, expected_project):
+        assert expected_project is None
         calls.append(("open", Path(path)))
         return Server()
 
@@ -235,8 +237,26 @@ def test_run_resolves_a_moved_managed_project_before_starting_server(monkeypatch
     assert calls == [("open", confirmed), ("describe", confirmed), ("serve", confirmed)]
     assert json.loads(output.getvalue()) == {
         "version": 1, "status": "ready", "workspace": str(confirmed), "name": "Original project",
-        "url": "test", "warnings": [],
+        "project_id": project_id, "url": "test", "warnings": [],
     }
+
+
+def test_registered_launch_rejects_a_different_identity_before_loading_credentials(
+    monkeypatch, tmp_path, bound_workspace,
+):
+    project_id = uuid4()
+
+    class Library:
+        anchor = tmp_path
+
+        def resolve_project(self, identifier):
+            assert identifier == str(project_id)
+            return bound_workspace
+
+    monkeypatch.setattr(desktop, "_configure_database", _unexpected_start)
+    output = StringIO()
+    assert desktop.run(None, BytesIO(), output, library=Library(), project_id=project_id) == 2
+    assert json.loads(output.getvalue()) == {"version": 1, "status": "error", "code": "storage-project"}
 
 
 def test_storage_preview_translates_the_exact_confirmation_token(tmp_path):

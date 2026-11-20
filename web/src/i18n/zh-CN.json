@@ -6,6 +6,17 @@
   "session": {
     "missing": "请用 `research-multiplier workbench` 打印的链接打开工作台。"
   },
+  "projects": {
+    "title": "项目",
+    "new": "新建项目",
+    "openFolder": "打开项目文件夹",
+    "empty": "还没有已登记的项目。",
+    "unavailable": "不可用",
+    "opening": "正在打开项目…",
+    "listFailed": "无法读取已登记的项目。",
+    "actionFailed": "无法打开项目，请重试。",
+    "retry": "重新加载项目"
+  },
   "sidebar": {
     "label": "课题",
     "collapse": "收起侧栏",

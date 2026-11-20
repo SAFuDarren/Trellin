@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.42
+
+- Open registered local projects from the Mac Workbench sidebar and restore each project's selected graph node when switching back.
+
 ## 1.0.41
 
 - Send chats and queue eligible proof notes with Enter or one click, keep Shift+Enter for new lines, and see sending, waiting and recorded delivery status.

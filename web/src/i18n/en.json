@@ -6,6 +6,17 @@
   "session": {
     "missing": "Open the workbench with the link printed by `research-multiplier workbench`."
   },
+  "projects": {
+    "title": "Projects",
+    "new": "New project",
+    "openFolder": "Open project folder",
+    "empty": "No registered projects yet.",
+    "unavailable": "Unavailable",
+    "opening": "Opening project…",
+    "listFailed": "Could not load registered projects.",
+    "actionFailed": "Could not open the project. Try again.",
+    "retry": "Reload projects"
+  },
   "sidebar": {
     "label": "Claims",
     "collapse": "Collapse sidebar",

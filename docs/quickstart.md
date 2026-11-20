@@ -95,6 +95,7 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 - [Recover a project archive](research-foundation.md#recover-and-monitor) using a PostgreSQL URL and a fresh target database. If a later step fails after import, keep the imported database and the archive, then retry with a fresh database and an unused directory.
 - [Verify a Lean proof in your own project](lean-core.md#check-a-lean-source-file-or-compiled-declaration) and see the confirmed assumptions and facts actually used.
 - Use **Home** to open the graph and **Switch view** in the sidebar header to open Review. The bottom rail menu opens Settings and Help. [Workbench navigation](proof-workbench.md#switch-between-the-graph-and-review)
+- In the Mac app, choose a registered project from **Projects** in the Workbench sidebar. The sidebar also opens the New Project and Open Folder dialogs. Each project restores its own selected graph node if the node is still available.
 - In **Review**, open **Open research goals** to inspect an approved goal before preparing a candidate. Search local sources and claims from **Related work**. [Local goal search](research-goals.md#find-related-work-in-the-project)
 - In **Review**, open **Conjectures to compare** to compare already prepared Lean candidates and the approved basis before confirming a claim. [Conjecture review](research-goals.md#reopen-a-prepared-conjecture-in-workbench)
 - Open [Proof task in Trellin](proof-workbench.md#start-a-proof-task) to review the confirmed Lean scope, authorize proof work, and monitor its result.

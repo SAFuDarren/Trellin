@@ -123,7 +123,8 @@ def test_selection_creates_once_and_opens_the_resolved_workspace(monkeypatch, tm
     server = SimpleNamespace(workspace=destination, launch_url="local", shutdown=lambda: None,
                              serve_forever=lambda **_: None)
 
-    def open_bound(workspace, _):
+    def open_bound(workspace, _, *, expected_project):
+        assert expected_project is None
         assert Path(workspace) == destination
         assert paths.database_id(workspace) == database_id
         assert credentials.read(paths.workspace_id(workspace)) == values

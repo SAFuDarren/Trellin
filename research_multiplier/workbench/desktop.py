@@ -7,9 +7,10 @@ from pathlib import Path
 import shutil
 import sys
 from threading import Thread
+from uuid import UUID
 
 from research_multiplier.storage import credentials, paths
-from research_multiplier.storage.managed_workspaces import workspace_registration
+from research_multiplier.storage.managed_workspaces import uuid_text, workspace_registration
 from research_multiplier.storage.postgres import DatabaseOperationError
 
 from research_multiplier.workflows import release_updates
@@ -58,8 +59,10 @@ def _selected_workspace(workspace_path):
         yield workspace
 
 
-def _open(workspace_path, resources):
+def _open(workspace_path, resources, *, expected_project=None):
     with _selected_workspace(workspace_path) as workspace:
+        if expected_project is not None and paths.workspace_id(workspace) != expected_project:
+            raise _StartError("storage-project")
         _configure_database(workspace)
     server = resources.enter_context(WorkbenchServer(workspace))
     # Stop accepting requests when the launcher leaves, then drain handlers
@@ -109,9 +112,11 @@ def _stop_on_disconnect(server, lifetime):
         server.shutdown()
 
 
-def run(workspace_path, lifetime, output, *, select=False, library=None, new_name=None):
+def run(workspace_path, lifetime, output, *, select=False, library=None, new_name=None, project_id=None):
     try:
-        if library is not None and new_name is not None:
+        if library is not None and project_id is not None:
+            workspace_path = library.resolve_project(str(project_id))
+        elif library is not None and new_name is not None:
             workspace_path = library.create(new_name)
         elif library is not None and workspace_path is None:
             workspace_path = library.open_default()
@@ -132,7 +137,7 @@ def run(workspace_path, lifetime, output, *, select=False, library=None, new_nam
         return 2
     with ExitStack() as resources:
         try:
-            server = _open(str(workspace_path), resources)
+            server = _open(str(workspace_path), resources, expected_project=project_id)
             selection = {"workspace": str(server.workspace)} if select or library is not None else {}
             if library is not None:
                 if workspace_registration(server.workspace) is not None:
@@ -147,6 +152,7 @@ def run(workspace_path, lifetime, output, *, select=False, library=None, new_nam
                         project = None
                 if project is not None:
                     selection["name"] = project["name"]
+                    selection["project_id"] = project["id"]
                 # Keep a recorded update preference from an earlier install.
                 # Fresh native profiles store this setting in the app home.
                 legacy = credentials.directory().parent / "release-updates.sqlite3"
@@ -177,6 +183,8 @@ def run(workspace_path, lifetime, output, *, select=False, library=None, new_nam
 def _storage(library, args, output):
     if args == ["--storage-info"]:
         data = library.status()
+    elif len(args) == 2 and args[0] == "--storage-resolve":
+        data = {"workspace": str(library.resolve_project(args[1], verify_database=True))}
     elif len(args) == 2 and args[0] == "--storage-preview":
         plan = library.preview(args[1])
         data = {
@@ -202,6 +210,8 @@ def main():
             return _storage(Library(), args, sys.stdout)
         if args == ["--library"]:
             return run(None, sys.stdin.buffer, sys.stdout, library=Library())
+        if len(args) == 2 and args[0] == "--registered-project":
+            return run(None, sys.stdin.buffer, sys.stdout, library=Library(), project_id=UUID(uuid_text(args[1])))
         if len(args) == 2 and args[0] == "--new-managed":
             return run(None, sys.stdin.buffer, sys.stdout, library=Library(), new_name=args[1])
         if len(args) == 2 and args[0] == "--select":

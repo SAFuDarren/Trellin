@@ -21,6 +21,22 @@ struct WorkbenchPosition: Codable, Equatable {
     }
 }
 
+struct LastWorkspace: Codable {
+    let path: String
+    let projectId: UUID?
+    var position: WorkbenchPosition?
+
+    static func opened(_ workspace: URL, projectId: UUID?, previous: LastWorkspace?,
+                       restoredFrom: URL?, positions: [String: WorkbenchPosition]) -> LastWorkspace {
+        let matchesProject = projectId != nil && previous?.projectId == projectId
+        let matchesLegacy = previous?.projectId == nil &&
+            (previous?.path == workspace.path || (restoredFrom != nil && previous?.path == restoredFrom?.path))
+        let remembered = projectId.flatMap { positions[$0.uuidString.lowercased()] }
+        let position = remembered ?? (matchesProject || matchesLegacy ? previous?.position : nil)
+        return LastWorkspace(path: workspace.path, projectId: projectId, position: position)
+    }
+}
+
 struct WorkbenchReadiness: Decodable {
     let version: Int
     let status: String
@@ -29,9 +45,14 @@ struct WorkbenchReadiness: Decodable {
     let code: String?
     let workspace: String?
     let name: String?
+    let project_id: UUID?
 
     var workspaceURL: URL? {
         localDirectoryURL(workspace)
+    }
+
+    func matches(_ launch: WorkbenchLaunch) -> Bool {
+        launch.projectId == nil || project_id == launch.projectId
     }
 
     var failure: WorkbenchStartFailure {
@@ -72,6 +93,7 @@ func localDirectoryURL(_ path: String?) -> URL? {
 
 enum WorkbenchLaunch {
     case restore(URL)
+    case registered(UUID, URL)
     case select(URL)
     case library
     case newManaged(String)
@@ -81,6 +103,7 @@ enum WorkbenchLaunch {
     var arguments: [String] {
         switch self {
         case let .restore(workspace): return Self.prefix + [workspace.path]
+        case let .registered(id, _): return Self.prefix + ["--registered-project", id.uuidString.lowercased()]
         case let .select(folder): return Self.prefix + ["--select", folder.path]
         case .library: return Self.prefix + ["--library"]
         case let .newManaged(name): return Self.prefix + ["--new-managed", name]
@@ -89,7 +112,7 @@ enum WorkbenchLaunch {
 
     var location: URL? {
         switch self {
-        case let .restore(url), let .select(url):
+        case let .restore(url), let .registered(_, url), let .select(url):
             return url.standardizedFileURL.resolvingSymlinksInPath()
         case .library, .newManaged:
             return nil
@@ -97,8 +120,15 @@ enum WorkbenchLaunch {
     }
 
     var isRestore: Bool {
-        if case .restore = self { return true }
-        return false
+        switch self {
+        case .restore, .registered: return true
+        case .select, .library, .newManaged: return false
+        }
+    }
+
+    var projectId: UUID? {
+        if case let .registered(id, _) = self { return id }
+        return nil
     }
 }
 

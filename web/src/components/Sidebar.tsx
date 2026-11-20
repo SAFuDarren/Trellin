@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
 import type { AtlasClaim } from "../workbench/types";
 import { statusText } from "../workbench/text";
+import { SidebarProjects } from "./SidebarProjects";
 import { WorkbenchViewMenu } from "./WorkbenchViewMenu";
 
 export function Sidebar({
@@ -95,6 +96,7 @@ export function Sidebar({
           </svg>
         </button>
       </div>
+      <SidebarProjects open={open} onExpand={onToggle} />
       <div className="menu">
         {open ? (
           <label className="menu-item search">

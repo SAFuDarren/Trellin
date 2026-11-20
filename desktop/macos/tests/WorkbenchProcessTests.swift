@@ -8,12 +8,14 @@ struct WorkbenchProcessTests {
         try startFailures()
         try launchDestination()
         try storageProtocol()
+        try projectSidebarProtocol()
         try storageDestinationAliases()
         try storageReplyBounds()
         try position()
+        try projectPositions()
         environment()
         releaseNotesLinks()
-        print("10 Trellin native boundary checks passed.")
+        print("12 Trellin native boundary checks passed.")
     }
 
     private static func startFailures() throws {
@@ -78,6 +80,66 @@ struct WorkbenchProcessTests {
             let invalid = try reply(values)
             precondition(invalid.plan == nil)
         }
+    }
+
+    private static func projectSidebarProtocol() throws {
+        let id = UUID(uuidString: "89ba7968-41d4-4b75-b00d-21e8ec00f7be")!
+        let token = id.uuidString.lowercased()
+        precondition(DesktopProjectsRequest(message: ["action": "list"]) == .list)
+        precondition(DesktopProjectsRequest(message: ["action": "open", "id": token]) == .open(id))
+        precondition(DesktopProjectsRequest(message: ["action": "new"]) == .newProject)
+        precondition(DesktopProjectsRequest(message: ["action": "folder"]) == .folder)
+        precondition(DesktopProjectsRequest(message: ["action": "open", "id": "/Studies/Project"]) == nil)
+        precondition(DesktopProjectsRequest(message: ["action": "open", "id": token, "path": "/Studies/Project"]) == nil)
+        precondition(DesktopProjectsRequest(message: ["action": "new", "id": token]) == nil)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("trellin-project-\(UUID())")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let unavailable = folder.appendingPathComponent("unavailable")
+        let entries = [folder, unavailable].map { ["id": token, "name": "量子图 Proofs", "path": $0.path] }
+        let data = try JSONSerialization.data(withJSONObject: ["version": 1, "status": "ready", "projects": entries])
+        let projects = try JSONDecoder().decode(StorageReply.self, from: data).projects!
+        precondition(projects[0].sidebarEntry["available"] as? Bool == true)
+        precondition(projects[1].sidebarEntry["available"] as? Bool == false)
+        precondition(Set(projects[0].sidebarEntry.keys) == ["id", "name", "available"])
+
+        let resolved = try JSONSerialization.data(withJSONObject: ["version": 1, "status": "ready", "workspace": folder.path])
+        let reply = try JSONDecoder().decode(StorageReply.self, from: resolved)
+        let canonical = folder.standardizedFileURL.resolvingSymlinksInPath()
+        precondition(reply.workspaceURL?.path == canonical.path)
+        precondition(StorageCommand.resolve(id).arguments.suffix(2) == ["--storage-resolve", token])
+        let launch = WorkbenchLaunch.registered(id, canonical)
+        precondition(launch.arguments.suffix(2) == ["--registered-project", token])
+        precondition(launch.isRestore && launch.location?.path == canonical.path)
+        let matching = try JSONSerialization.data(withJSONObject: ["version": 1, "status": "ready", "project_id": token])
+        let matchingReady = try JSONDecoder().decode(WorkbenchReadiness.self, from: matching)
+        let missingReady = try JSONDecoder().decode(WorkbenchReadiness.self, from: resolved)
+        precondition(matchingReady.matches(launch) && !missingReady.matches(launch))
+        precondition(!matchingReady.matches(.registered(UUID(), canonical)))
+    }
+
+    private static func projectPositions() throws {
+        let initial = URL(fileURLWithPath: "/Studies/Old")
+        let moved = URL(fileURLWithPath: "/Archive/Moved")
+        let other = URL(fileURLWithPath: "/Studies/Other")
+        let firstId = UUID()
+        let otherId = UUID()
+        let claim = "11111111-1111-4111-8111-111111111111"
+        let node = "goal:" + claim
+        let prior = try JSONSerialization.data(withJSONObject: [
+            "path": initial.path, "position": ["claimId": claim, "nodeId": node],
+        ])
+        let legacy = try JSONDecoder().decode(LastWorkspace.self, from: prior)
+        precondition(legacy.projectId == nil)
+        let restored = LastWorkspace.opened(moved, projectId: firstId, previous: legacy, restoredFrom: initial, positions: [:])
+        precondition(restored.position?.nodeId == node)
+        let positions = [firstId.uuidString.lowercased(): restored.position!]
+        let switched = LastWorkspace.opened(other, projectId: otherId, previous: restored, restoredFrom: other, positions: positions)
+        precondition(switched.position == nil)
+        let returned = LastWorkspace.opened(moved, projectId: firstId, previous: switched, restoredFrom: moved, positions: positions)
+        precondition(returned.position == restored.position)
+        let replaced = LastWorkspace.opened(moved, projectId: otherId, previous: returned, restoredFrom: moved, positions: positions)
+        precondition(replaced.position == nil)
     }
 
     private static func storageDestinationAliases() throws {
