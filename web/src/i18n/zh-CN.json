@@ -166,6 +166,7 @@
       "review_evidence": "待审阅的核验结果",
       "counterexample": "待审阅的反例",
       "resolve_clarification": "待回答的问题",
+      "choose_conjecture": "待比较的猜想",
       "clarify_formalization": "待澄清的含义",
       "decide_condition": "待决定的条件",
       "checker_hold": "待审阅的核验器变更",
@@ -185,6 +186,54 @@
     "context": "上下文",
     "status": "状态",
     "cliNote": "这类事项目前在命令行里处理："
+  },
+  "goalReview": {
+    "objective": "研究目标",
+    "sensitivity": {
+      "public": "公开研究",
+      "restricted": "受限研究"
+    },
+    "status": {
+      "ready": "待你决定",
+      "stale": "起始依据已变化",
+      "blocked": "待解决范围问题",
+      "selected": "猜想已确认"
+    },
+    "statusHelp": {
+      "stale": "选择猜想前，请核对已撤回或发生变化的起始依据。",
+      "blocked": "选择猜想前，请先解决这个研究范围内待处理的问题。",
+      "selected": "选中的猜想及其已确认的起始依据已记录为课题。"
+    },
+    "basis": "已确认的起始依据",
+    "basisEmpty": "这个研究范围没有起始依据。",
+    "basisStale": "已撤回或已过期",
+    "version": "版本 {{version}}",
+    "recordedVersion": "精确版本标识与摘要",
+    "digest": "摘要",
+    "discussion": "已归档的讨论",
+    "discussionHelp": "这些是供比较的想法。请从下方已形式化的猜想中选择。",
+    "discussionBasis": "此想法引用的依据",
+    "discussionUnavailable": "无法读取这次讨论的归档。",
+    "candidates": "已形式化的猜想",
+    "selectedCandidate": "已选定的猜想",
+    "needsLean": "缺少精确的 Lean 陈述",
+    "candidatesEmpty": "这个研究范围内还没有已形式化的猜想。",
+    "provenance": {
+      "human": "研究者录入",
+      "ai": "由模型辅助生成",
+      "program": "由程序生成"
+    },
+    "confirmHelp": "选定一条确切的猜想，说明它为何符合研究目标。确认时会冻结选中的猜想和上方列出的完整起始依据。",
+    "confirm": "确认选中的猜想",
+    "confirming": "正在确认猜想…",
+    "errors": {
+      "invalid": "请核对并选择一条确切的猜想，再填写理由。",
+      "missing": "当前工作区中找不到这个研究范围。",
+      "stale": "研究范围或选定结果已变化，请核对更新后的状态。",
+      "identity": "请重新打开已绑定的工作区以确认研究者身份。",
+      "unavailable": "当前工作区无法审阅猜想。",
+      "failed": "无法完成操作，请核对当前状态后重试。"
+    }
   },
   "clarifications": {
     "original": "原始陈述",

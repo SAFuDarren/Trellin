@@ -161,3 +161,29 @@
     padding-inline: 12px;
   }
 }
+
+.goal-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding-inline-start: 18px;
+}
+
+.goal-review-list > li {
+  padding: 10px 12px;
+  border-block-start: 1px solid var(--hair);
+}
+
+.goal-review-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.goal-review .decision .goal-review-option input {
+  flex: none;
+  width: auto;
+  height: auto;
+  margin: 0;
+}
