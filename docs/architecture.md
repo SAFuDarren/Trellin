@@ -182,7 +182,7 @@ The project is developed as an open community project in a public repository. Th
 
 ### E8 Versioning starts at 1.0.0 (settled)
 
-The first public release is 1.0.0, built from the current code under the Apache License 2.0; the earlier private 1.0.0 draft is never published. Semantic versioning continues from it; a breaking change raises the major version. The HTTP API, plugin protocol and event payloads carry their own versions, and new interfaces may be marked experimental. See [engineering](engineering.md#versioning-and-compatibility).
+The first public release is 1.0.0, built from the current code under the Apache License 2.0; the earlier private 1.0.0 draft is never published. Semantic versioning continues from it. Each PR merged into main normally advances the patch version. A maintainer-approved feature milestone advances the minor version and resets the patch. An approved major milestone that opens the next generation, or a breaking package change, advances the major version and resets the minor and patch. Choose the package version against the latest main. Tags and release publication are separate actions. The HTTP API, plugin protocol and event payloads carry their own versions, and new interfaces may be marked experimental. See [engineering](engineering.md#versioning-and-compatibility).
 
 ### E9 License and contributions (settled)
 
