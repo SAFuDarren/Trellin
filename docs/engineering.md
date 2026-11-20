@@ -136,7 +136,11 @@ All tasks, bugs and milestones are tracked in **GitHub Issues** and a **GitHub P
 
 ## Versioning and compatibility
 
-Version 1.0.0 is the first public release, and semantic versioning continues forward from it. Breaking changes to the package's public behavior raise the major version. Each public interface also carries its own version:
+Version 1.0.0 is the first public release. By default, each PR merged into main takes the next patch version, for example `1.0.22` → `1.0.23`. A maintainer-approved feature milestone takes the next minor version and resets the patch. An approved major milestone that opens the next generation, or a breaking change to the package's public behavior, takes the next major version and resets the minor and patch. Package version increments, tag creation, and release publication are separate actions.
+
+Use the static `[project].version` in [pyproject.toml](../pyproject.toml) as the package version source. Update [the compatibility suite's version marker](../tests/compat_validation/PACKAGE_VERSION) to the same candidate version. Preserve its [original provenance](../tests/compat_validation/PROVENANCE.md) and archived baseline. The required release regressions verify the marker against the installed wheel.
+
+Each public interface also carries its own version.
 
 | Interface | Version marker | Rule |
 | --- | --- | --- |
@@ -205,7 +209,7 @@ Several people and coding agents may work on the repository at once. The rules b
 | Architecture decisions, interface contracts, schemas | Changed only in their own PR, approved by the maintainer | CODEOWNERS; branch protection once the repository is public |
 
 **Integration**
-- Rebase on `origin/main` before review and before merging, and rerun the checks.
+- Fetch the latest main and rebase on `origin/main` before review and before merging. Run `python scripts/check_package_version.py` on the committed candidate after rebasing and rerun the required checks. For a maintainer-approved increment, pass `--bump minor` or `--bump major`. If main advanced, choose the version from the new base and update both version files before checking again.
 - Keep each PR to one task.
 - Squash-merge with a Conventional Commit title.
 - Issues found outside the task become new issues, not extra changes in the branch.
