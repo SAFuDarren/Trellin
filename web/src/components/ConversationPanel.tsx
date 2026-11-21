@@ -1,14 +1,4 @@
-import {
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-  type ReactNode,
-  type RefObject,
-} from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 import {
   conversationErrorText,
@@ -30,9 +20,11 @@ import { useLocalTextModels } from "../api/localModels";
 import { useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { useComposerKeyboard } from "../hooks/useComposerKeyboard";
 import { useConversationEditor } from "../shell/ConversationEditors";
-import { timeText } from "../workbench/text";
+import { harnessName, timeText } from "../workbench/text";
 import { Chevron, SendArrow, Spin } from "./Icons";
+import { Menu, Picker } from "./FloatingControls";
 import { ModelConnections } from "./ModelConnections";
+import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import "../styles/conversation-composer.css";
 
 export function ConversationPanel({
@@ -46,7 +38,7 @@ export function ConversationPanel({
   session: string;
   thread: ConversationSummary;
   onRemove: () => void;
-  header?: (removeControl: ReactNode) => ReactNode;
+  header?: (actions: { remove: () => void; removeDisabled: boolean; triggerRef: Ref<HTMLButtonElement> }) => ReactNode;
   employee?: Pick<TeamAgent, "id" | "name" | "connection_id" | "revision">;
   focusComposer?: boolean;
 }) {
@@ -138,9 +130,7 @@ export function ConversationPanel({
   useLayoutEffect(() => {
     if (removing || !restoreArchiveFocus.current) return;
     restoreArchiveFocus.current = false;
-    const trigger = archiveTrigger.current;
-    const collapsedMenu = trigger?.closest("details:not([open])");
-    (collapsedMenu?.querySelector("summary") ?? trigger)?.focus();
+    archiveTrigger.current?.focus({ preventScroll: true });
   }, [removing]);
 
   useEffect(() => {
@@ -255,7 +245,7 @@ export function ConversationPanel({
   );
   return (
     <section className="conversation-panel" aria-label={thread.title}>
-      {header?.(remove)}
+      {header?.({ remove: () => setRemoving(true), removeDisabled: disabled, triggerRef: archiveTrigger })}
       {detail.isPending ? (
         <p role="status">{t("common.loading")}</p>
       ) : detail.isError ? (
@@ -315,29 +305,28 @@ export function ConversationPanel({
           onChange={(event) => changeDraft({ text: event.target.value })}
         />
         <div className="composer-row">
-          <ComposerMenu
-            kind="context"
+          <Menu
             label={t("conversations.contextMenu")}
             trigger={<ContextIcon />}
+            triggerClassName="composer-menu-trigger composer-context-trigger"
+            placement="top-start"
             disabled={removing}
-          >
-            <p className="composer-context-title" aria-hidden="true">
-              {t("conversations.contextMenu")}
-            </p>
-            <p className="composer-context-summary">{context.join(" · ") || t("conversations.messageOnly")}</p>
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className="composer-menu-item"
-              onClick={() => {
-                setShowDetails(!showDetails);
-                if (!showDetails && !details) void prepare(false);
-              }}
-            >
-              {t(showDetails ? "conversations.hideRequestDetails" : "conversations.requestDetails")}
-            </button>
-          </ComposerMenu>
+            intro={<p className="composer-context-summary">{context.join(" · ") || t("conversations.messageOnly")}</p>}
+            groups={[
+              {
+                options: [
+                  {
+                    id: "request-details",
+                    label: t(showDetails ? "conversations.hideRequestDetails" : "conversations.requestDetails"),
+                    onSelect: () => {
+                      setShowDetails(!showDetails);
+                      if (!showDetails && !details) void prepare(false);
+                    },
+                  },
+                ],
+              },
+            ]}
+          />
           {employeeScoped ? (
             connection && (
               <span className="composer-fixed-recipient" title={connection.label}>
@@ -345,58 +334,49 @@ export function ConversationPanel({
               </span>
             )
           ) : (
-            <ComposerMenu
-              kind="model"
-              triggerRef={modelTrigger}
+            <Picker
               label={t("conversations.model")}
-              tooltip={connection?.label ?? t("conversations.chooseModel")}
-              valueId={connection ? formId + "-model-label" : undefined}
+              triggerRef={modelTrigger}
+              triggerClassName="composer-menu-trigger composer-model-trigger"
+              placement="top-end"
+              value={connection?.id}
               trigger={
                 <>
-                  <span id={formId + "-model-label"} className="composer-model-label">
-                    {connection?.label ?? t("conversations.chooseModel")}
-                  </span>
+                  <span className="composer-model-label">{connection?.label ?? t("conversations.chooseModel")}</span>
                   <Chevron />
                 </>
               }
               disabled={disabled}
-            >
-              {[
+              groups={[
                 { label: t("conversations.onDevice"), matches: options.filter((model) => model.local) },
                 { label: t("conversations.connectedModels"), matches: options.filter((model) => !model.local) },
-              ].map(
-                ({ label, matches }) =>
-                  matches.length > 0 && (
-                    <div className="composer-model-group" key={label} role="group" aria-label={label}>
-                      <p aria-hidden="true">{label}</p>
-                      {matches.map((model) => (
-                        <button
-                          key={model.id}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={connection?.id === model.id}
-                          tabIndex={-1}
-                          className="composer-menu-item"
-                          onClick={() => changeDraft({ selectedModel: model.id })}
-                        >
-                          <span>{model.description ? recipient(model.provider, model.model) : model.label}</span>
-                          {model.description && <small>{model.description}</small>}
-                        </button>
-                      ))}
-                    </div>
-                  ),
+              ].map(({ label, matches }) => ({
+                label,
+                options: matches.map((model) => ({
+                  id: model.id,
+                  label: model.description ? recipient(model.provider, model.model) : model.label,
+                  detail: model.description ?? undefined,
+                  icon: <TeamAgentAvatar avatar="initials" name={harnessName(model.provider)} />,
+                })),
+              }))}
+              searchLabel={t("conversations.searchModels")}
+              emptyLabel={t(models.isPending || local.isPending ? "common.loading" : "picker.noMatches")}
+              onSelect={(selectedModel) => {
+                if (selectedModel !== editor.selectedModel) changeDraft({ selectedModel });
+              }}
+              footer={(dismiss) => (
+                <button
+                  type="button"
+                  className="composer-model-settings"
+                  onClick={() => {
+                    dismiss();
+                    setManagingModels(true);
+                  }}
+                >
+                  {t(options.length ? "conversations.manageModels" : "conversations.connect")}
+                </button>
               )}
-              {models.isPending || local.isPending ? <p role="status">{t("common.loading")}</p> : null}
-              <button
-                type="button"
-                className="composer-menu-item composer-model-settings"
-                role="menuitem"
-                tabIndex={-1}
-                onClick={() => setManagingModels(true)}
-              >
-                {t(options.length ? "conversations.manageModels" : "conversations.connect")}
-              </button>
-            </ComposerMenu>
+            />
           )}
           <button
             type="submit"
@@ -497,139 +477,6 @@ function ReplyElapsed({ start, locale }: { start: string; locale: string }) {
         unitDisplay: "short",
       }).format(elapsed)}
     </span>
-  );
-}
-
-function ComposerMenu({
-  kind,
-  label,
-  tooltip,
-  valueId,
-  trigger,
-  triggerRef,
-  disabled,
-  children,
-}: {
-  kind: "context" | "model";
-  label: string;
-  tooltip?: string;
-  valueId?: string;
-  trigger: ReactNode;
-  triggerRef?: RefObject<HTMLButtonElement | null>;
-  disabled: boolean;
-  children: ReactNode;
-}) {
-  const id = useId();
-  const [open, setOpen] = useState(false);
-  const container = useRef<HTMLDivElement>(null);
-  const ownTrigger = useRef<HTMLButtonElement>(null);
-  const button = triggerRef ?? ownTrigger;
-  const menu = useRef<HTMLDivElement>(null);
-  const opening = useRef<"last" | "selected">("selected");
-  const visible = open && !disabled;
-
-  useLayoutEffect(() => {
-    if (!visible) return;
-    const items = menu.current?.querySelectorAll<HTMLElement>(".composer-menu-item");
-    const selected = menu.current?.querySelector<HTMLElement>('[aria-checked="true"]');
-    const initial = opening.current === "last" ? items?.[items.length - 1] : (selected ?? items?.[0]);
-    initial?.focus();
-    opening.current = "selected";
-  }, [visible]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (disabled) {
-      setOpen(false);
-      return;
-    }
-    function outside(event: PointerEvent) {
-      if (event.target instanceof Node && !container.current?.contains(event.target)) setOpen(false);
-    }
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
-  }, [open, disabled]);
-
-  function dismiss() {
-    setOpen(false);
-    button.current?.focus();
-  }
-
-  function move(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      dismiss();
-      return;
-    }
-    const items = Array.from(menu.current?.querySelectorAll<HTMLElement>(".composer-menu-item") ?? []);
-    const index = items.findIndex((item) => item === document.activeElement);
-    const next =
-      event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? items.length - 1
-          : event.key === "ArrowDown"
-            ? (index + 1) % items.length
-            : event.key === "ArrowUp"
-              ? (index - 1 + items.length) % items.length
-              : -1;
-    if (!items[next]) return;
-    event.preventDefault();
-    items[next].focus();
-  }
-
-  return (
-    <div
-      className="composer-menu"
-      data-kind={kind}
-      ref={container}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-    >
-      <button
-        type="button"
-        ref={button}
-        className="composer-menu-trigger"
-        aria-label={label}
-        aria-describedby={valueId}
-        title={tooltip ?? label}
-        aria-haspopup="menu"
-        aria-expanded={visible}
-        aria-controls={id}
-        disabled={disabled}
-        onClick={() => setOpen(!visible)}
-        onKeyDown={(event) => {
-          if (["ArrowDown", "ArrowUp"].includes(event.key)) {
-            event.preventDefault();
-            opening.current = event.key === "ArrowUp" ? "last" : "selected";
-            if (visible) {
-              const items = menu.current?.querySelectorAll<HTMLElement>(".composer-menu-item");
-              items?.[event.key === "ArrowUp" ? items.length - 1 : 0]?.focus();
-            } else {
-              setOpen(true);
-            }
-          }
-        }}
-      >
-        {trigger}
-      </button>
-      <div
-        id={id}
-        ref={menu}
-        hidden={!visible}
-        role="menu"
-        aria-label={label}
-        className="composer-popover"
-        onKeyDown={move}
-        onClick={(event) => {
-          if (event.target instanceof Element && event.target.closest(".composer-menu-item")) dismiss();
-        }}
-      >
-        {children}
-      </div>
-    </div>
   );
 }
 

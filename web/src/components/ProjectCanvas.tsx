@@ -16,7 +16,8 @@ import { nodeStatus, nodeTitle, nodeTone } from "../workbench/text";
 import type { AtlasClaim } from "../workbench/types";
 import type { AtlasBox } from "../workbench/useLayout";
 import { AtlasMap, atlasOpening, atlasPlacement } from "./AtlasMap";
-import { Mark } from "./Icons";
+import { Menu, Picker } from "./FloatingControls";
+import { Chevron, Mark } from "./Icons";
 import "../styles/project-canvas.css";
 
 type Camera = Point & { k: number };
@@ -106,11 +107,10 @@ export function ProjectCanvas({
   layoutUnavailable,
   saving,
 }: Props) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const stage = useRef<HTMLDivElement>(null);
-  const searchMenu = useRef<HTMLDetailsElement>(null);
-  const linksMenu = useRef<HTMLDetailsElement>(null);
   const nodes = useRef(new Map<string, HTMLButtonElement>());
+  const removingLastLink = useRef(false);
   const movedCamera = useRef(false);
   const gesture = useRef<Gesture | null>(null);
   const draggedCard = useRef<string | null>(null);
@@ -122,7 +122,6 @@ export function ProjectCanvas({
   const [panning, setPanning] = useState(false);
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [linkNotice, setLinkNotice] = useState("");
-  const [query, setQuery] = useState("");
   const [atlasOpeningBox, setAtlasOpeningBox] = useState<AtlasBox | null>(null);
 
   const cards = useMemo(() => {
@@ -148,10 +147,14 @@ export function ProjectCanvas({
   const visibleLinks = layout.links.filter((link) => byId.has(link.source) && byId.has(link.target));
   const activeSource = linkSource ? byId.get(linkSource) : undefined;
   const editingDisabled = Boolean(layoutUnavailable || saving);
-  const normalizedQuery = query.trim().toLocaleLowerCase(i18n.language);
-  const matches = cards.filter((card) => card.title.toLocaleLowerCase(i18n.language).includes(normalizedQuery));
   const center = { x: size.width / 2, y: size.height / 2 };
   const mapBox = atlasPlacement(atlasBox ?? atlasOpeningBox, size.width, size.height, true);
+
+  useLayoutEffect(() => {
+    if (visibleLinks.length || !removingLastLink.current) return;
+    removingLastLink.current = false;
+    if (document.activeElement === document.body) stage.current?.focus({ preventScroll: true });
+  }, [visibleLinks.length]);
 
   useEffect(() => {
     const target = stage.current;
@@ -279,7 +282,6 @@ export function ProjectCanvas({
       x: center.x - (card.point.x + WIDTH / 2) * current.k,
       y: center.y - (card.point.y + HEIGHT / 2) * current.k,
     }));
-    if (searchMenu.current) searchMenu.current.open = false;
     nodes.current.get(id)?.focus({ preventScroll: true });
   }
 
@@ -354,17 +356,11 @@ export function ProjectCanvas({
   }
 
   function onCanvasKey(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.defaultPrevented) return;
     if (event.key === "Escape") {
       if (activeSource) {
         setLinkSource(null);
         event.preventDefault();
-      } else {
-        const menu = searchMenu.current?.open ? searchMenu.current : linksMenu.current;
-        if (menu?.open) {
-          menu.open = false;
-          menu.querySelector("summary")?.focus();
-          event.preventDefault();
-        }
       }
       return;
     }
@@ -413,58 +409,52 @@ export function ProjectCanvas({
         >
           {t(activeSource ? "projectCanvas.cancelLink" : "projectCanvas.linkClaim")}
         </button>
-        <details className="project-canvas-menu" ref={searchMenu}>
-          <summary role="button" onClick={() => linksMenu.current?.removeAttribute("open")}>
-            {t("projectCanvas.findClaim")}
-          </summary>
-          <div className="project-canvas-popover">
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
-              aria-label={t("projectCanvas.searchClaims")}
-              placeholder={t("projectCanvas.searchClaims")}
-            />
-            {matches.length ? (
-              <ul>
-                {matches.map((card) => (
-                  <li key={card.id}>
-                    <button type="button" className="project-canvas-menu-item" onClick={() => reveal(card.id)}>
-                      {card.title}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>{t("projectCanvas.noMatches")}</p>
-            )}
-          </div>
-        </details>
+        <Picker
+          label={t("projectCanvas.findClaim")}
+          searchLabel={t("projectCanvas.searchClaims")}
+          emptyLabel={t("projectCanvas.noMatches")}
+          trigger={
+            <>
+              {t("projectCanvas.findClaim")}
+              <Chevron />
+            </>
+          }
+          triggerClassName="project-canvas-menu-trigger"
+          className="project-canvas-popover"
+          groups={[{ options: cards.map(({ id, title }) => ({ id, label: title })) }]}
+          value={selected ?? undefined}
+          focusOnSelect={false}
+          onSelect={reveal}
+        />
         {visibleLinks.length > 0 && (
-          <details className="project-canvas-menu" ref={linksMenu}>
-            <summary role="button" onClick={() => searchMenu.current?.removeAttribute("open")}>
-              {t("projectCanvas.researchLinks")}
-            </summary>
-            <ul className="project-canvas-popover project-canvas-link-list">
-              {visibleLinks.map(({ source, target }) => {
-                const params = { source: byId.get(source)!.title, target: byId.get(target)!.title };
-                return (
-                  <li key={`${source}:${target}`}>
-                    <span>{t("projectCanvas.linkDescription", params)}</span>
-                    <button
-                      type="button"
-                      className="button"
-                      disabled={editingDisabled}
-                      aria-label={t("projectCanvas.removeLink", params)}
-                      onClick={() => onLayout({ action: "unlink", source, target })}
-                    >
-                      {t("projectCanvas.remove")}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </details>
+          <Menu
+            label={t("projectCanvas.researchLinks")}
+            trigger={
+              <>
+                {t("projectCanvas.researchLinks")}
+                <Chevron />
+              </>
+            }
+            triggerClassName="project-canvas-menu-trigger"
+            className="project-canvas-popover"
+            groups={[
+              {
+                options: visibleLinks.map(({ source, target }) => ({
+                  id: `${source}:${target}`,
+                  label: t("projectCanvas.removeLink", {
+                    source: byId.get(source)!.title,
+                    target: byId.get(target)!.title,
+                  }),
+                  disabled: editingDisabled,
+                  destructive: true,
+                  onSelect: () => {
+                    removingLastLink.current = visibleLinks.length === 1;
+                    onLayout({ action: "unlink", source, target });
+                  },
+                })),
+              },
+            ]}
+          />
         )}
         <button type="button" className="button" aria-pressed={atlasOpen} onClick={onToggleAtlas}>
           {t("sidebar.atlas")}

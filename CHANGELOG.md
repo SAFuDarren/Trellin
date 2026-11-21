@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.56
+
+- Search for claims, Agents, conversation tasks and models from the active page. Workbench menus open beside their controls and support arrow keys, typeahead, Escape and focus return.
+
 ## 1.0.55
 
 - Workbench controls and project cards show consistent hover, press and selection states. The claim inspector and Global map use the shared entrance timing, and floating controls share one shadow.

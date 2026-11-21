@@ -65,10 +65,11 @@ afterEach(() => vi.unstubAllGlobals());
 it.each(MODELS)("passes only the selected $label connection after scope authorization", async (model) => {
   const { fetch } = openTask(true);
   const recipient = `${model.label} · ${model.model}`;
-  await screen.findByRole("option", { name: recipient });
-  const modelPicker = screen.getByRole<HTMLSelectElement>("combobox", { name: en.proofTask.modelConnection });
-  expect(modelPicker.value).toBe("");
-  fireEvent.change(modelPicker, { target: { value: model.id } });
+  const modelPicker = await screen.findByRole("button", { name: en.proofTask.modelConnection });
+  expect(modelPicker.textContent).toBe(en.proofTask.noExternal);
+  fireEvent.click(modelPicker);
+  fireEvent.click(await screen.findByRole("option", { name: recipient }));
+  expect(fetch).not.toHaveBeenCalledWith("/api/proof-task/start", expect.anything());
   fireEvent.change(screen.getByRole("combobox", { name: en.proofTask.externalRounds }), { target: { value: "2" } });
   fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "Approve the shown public scope." } });
   const start = screen.getByRole<HTMLButtonElement>("button", { name: en.proofTask.start });
@@ -90,9 +91,9 @@ it.each(MODELS)("passes only the selected $label connection after scope authoriz
 it("requires a new approval if the chosen connection changes while the form is open", async () => {
   const { fetch, queryClient } = openTask(true);
   const model = MODELS[0]!;
-  await screen.findByRole("option", { name: `${model.label} · ${model.model}` });
-  const picker = screen.getByRole("combobox", { name: en.proofTask.modelConnection });
-  fireEvent.change(picker, { target: { value: model.id } });
+  const picker = await screen.findByRole("button", { name: en.proofTask.modelConnection });
+  fireEvent.click(picker);
+  fireEvent.click(await screen.findByRole("option", { name: `${model.label} · ${model.model}` }));
   fireEvent.change(screen.getByLabelText(en.review.reason), {
     target: { value: "Authorize only the reviewed recipient." },
   });
@@ -115,6 +116,6 @@ it("requires a new approval if the chosen connection changes while the form is o
 it("does not load or display external models for a private or legacy proof scope", async () => {
   const { fetch } = openTask(false);
   expect(await screen.findByText(en.proofTask.programOnly)).toBeTruthy();
-  expect(screen.queryByRole("combobox", { name: en.proofTask.modelConnection })).toBeNull();
+  expect(screen.queryByRole("button", { name: en.proofTask.modelConnection })).toBeNull();
   expect(fetch).not.toHaveBeenCalledWith("/api/model-connections", expect.anything());
 });

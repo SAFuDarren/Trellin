@@ -155,67 +155,45 @@
   min-height: 80px;
 }
 
-.agent-dock-picker {
-  position: relative;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.agent-dock-picker > summary {
-  display: flex;
+.agent-dock-picker-trigger {
+  display: inline-flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   min-height: 30px;
-  max-width: 260px;
+  max-width: min(260px, 100%);
   padding: 4px 8px;
+  border: 0;
   border-radius: var(--radius-control);
-  cursor: pointer;
-  list-style: none;
+  background: transparent;
+  color: var(--ink);
   font-weight: var(--type-medium);
 }
-
-.agent-dock-picker > summary::-webkit-details-marker {
-  display: none;
-}
-
-.agent-dock-picker > summary > span:last-of-type {
+.agent-dock-picker-trigger > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.agent-dock-picker > summary > .chevron {
-  transform: rotate(90deg);
-}
-
-.agent-dock-picker > summary[aria-disabled="true"] {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.agent-dock-picker[open] > summary,
-.agent-dock-picker > summary:hover {
+.agent-dock-picker-trigger:is(:hover, [aria-expanded="true"]) {
   background: var(--track);
 }
-
-.agent-dock-options {
-  position: absolute;
-  z-index: 1;
-  top: calc(100% + 4px);
-  left: 0;
-  width: min(330px, calc(100vw - 52px));
-  max-height: min(252px, 40vh);
-  padding: 4px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  border: 1px solid var(--node-line);
-  border-radius: var(--radius-card);
-  background: var(--main);
-  box-shadow: var(--elevation-float);
+.agent-dock-picker-trigger > .chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  transform: rotate(90deg);
 }
-
-.agent-dock-options > input,
+.agent-dock-picker-trigger:disabled {
+  opacity: 0.55;
+}
+.agent-dock-picker-trigger .team-agent-avatar,
+.agent-dock-picker-panel .team-agent-avatar {
+  width: 20px;
+  height: 20px;
+}
+.agent-dock-picker-panel {
+  width: min(330px, calc(100vw - 16px));
+}
 .agent-dock-draft input {
   width: 100%;
   min-height: 32px;
@@ -225,14 +203,6 @@
   background: var(--side);
   color: var(--ink);
 }
-
-.agent-dock-options p {
-  margin: 0;
-  padding: 6px 8px;
-  color: var(--sub);
-}
-
-.agent-dock-options ul,
 .agent-dock-activity ul {
   display: grid;
   gap: 3px;
@@ -240,8 +210,6 @@
   padding: 4px 0;
   list-style: none;
 }
-
-.agent-dock-options button,
 .agent-dock-activity li > :is(a, button) {
   display: flex;
   flex-wrap: wrap;
@@ -257,23 +225,13 @@
   text-align: left;
   overflow-wrap: anywhere;
 }
-
-.agent-dock-options button:hover,
-.agent-dock-options button[aria-current="true"],
 .agent-dock-activity li > :is(a, button):hover {
   background: var(--track);
 }
-
-.agent-dock-options button > small,
 .agent-dock-activity li small {
   flex-basis: 100%;
   color: var(--sub);
   font-size: var(--type-meta-size);
-}
-
-.agent-dock-picker .team-agent-avatar {
-  width: 20px;
-  height: 20px;
 }
 
 .agent-dock-draft,

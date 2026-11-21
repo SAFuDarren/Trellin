@@ -9,6 +9,7 @@ import {
   dispatchableConnection,
   useModelConnections,
 } from "../../api/modelConnections";
+import { Picker } from "../FloatingControls";
 import { href } from "../../shell/route";
 import { ReviewFields } from "./ReviewFields";
 import { reviewIdentity } from "./review";
@@ -58,6 +59,7 @@ function formalText(value: Candidate["formal"]): string {
 export function IntakePane({ session, onRecorded }: { session: string; onRecorded: () => void }) {
   const { t } = useTranslation();
   const [notes, setNotes] = useState("");
+  const [modelChoice, setModelChoice] = useState<string | null>(null);
   const [active, setActive] = useState<IntakeDraft | null>(null);
   const [fileError, setFileError] = useState("");
   const [message, setMessage] = useState("");
@@ -163,6 +165,9 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
   const modelNames = models.data?.models ?? [];
   const available = (connections.data?.connections ?? []).filter(dispatchableConnection);
   const canChoose = modelNames.length > 0 || available.length > 0;
+  const selectedModel = modelChoice ?? modelNames[0] ?? "";
+  const selectedConnection = available.find((connection) => selectedModel === `connection:${connection.id}`);
+  const selectionValid = Boolean(selectedConnection || modelNames.includes(selectedModel));
   const working = draft.isPending || preview.isPending;
   const tooLarge = new TextEncoder().encode(notes).length > MAX_NOTES_BYTES;
   const failure = active ? confirm.error : (draft.error ?? preview.error);
@@ -247,26 +252,40 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
                 disabled={working || Boolean(release)}
               />
             </label>
-            <label>
-              {t("projectEntry.intake.model")}
-              <select name="model" required disabled={!canChoose || working || Boolean(release)}>
-                {!modelNames.length && (
-                  <option value="">
-                    {t(canChoose ? "modelConnections.chooseConnection" : "projectEntry.intake.noModels")}
-                  </option>
-                )}
-                {modelNames.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
-                {available.map((connection) => (
-                  <option key={connection.id} value={`connection:${connection.id}`}>
-                    {connectionChoiceLabel(t, connection)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="project-entry-field">
+              <label htmlFor="intake-model-picker">{t("projectEntry.intake.model")}</label>
+              <input name="model" type="hidden" value={selectionValid ? selectedModel : ""} />
+              <Picker
+                label={t("projectEntry.intake.model")}
+                triggerId="intake-model-picker"
+                triggerClassName="project-entry-picker"
+                trigger={
+                  selectedConnection
+                    ? connectionChoiceLabel(t, selectedConnection)
+                    : selectionValid
+                      ? selectedModel
+                      : t(canChoose ? "modelConnections.chooseConnection" : "projectEntry.intake.noModels")
+                }
+                value={selectionValid ? selectedModel : ""}
+                disabled={!canChoose || working || Boolean(release)}
+                groups={[
+                  {
+                    label: t("conversations.onDevice"),
+                    options: modelNames.map((model) => ({ id: model, label: model })),
+                  },
+                  {
+                    label: t("conversations.connectedModels"),
+                    options: available.map((connection) => ({
+                      id: `connection:${connection.id}`,
+                      label: connectionChoiceLabel(t, connection),
+                    })),
+                  },
+                ]}
+                searchLabel={t("conversations.searchModels")}
+                emptyLabel={t("picker.noMatches")}
+                onSelect={setModelChoice}
+              />
+            </div>
           </div>
           {connections.isError && (
             <p className="project-entry-status" role="alert">

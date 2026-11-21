@@ -95,7 +95,8 @@
     "noActivity": "No active work or results to review.",
     "threadPicker": "Choose a conversation",
     "activityUnavailable": "Some activity could not be loaded.",
-    "contextNone": "Message and conversation history"
+    "contextNone": "Message and conversation history",
+    "searchThreads": "Search conversations"
   },
   "projectCanvas": {
     "askAgent": "Ask an Agent",
@@ -518,7 +519,8 @@
     "queueFailed": "Could not confirm queueing. Your note is still here. {{reason}}",
     "sentCodex": "Queued for a later authorized Codex proof attempt.",
     "sentLocal": "Queued for a later authorized local proof attempt.",
-    "sentDelivered": "Delivery was recorded for this proof note."
+    "sentDelivered": "Delivery was recorded for this proof note.",
+    "searchRecipients": "Search recipients"
   },
   "model": {
     "fallback": "Model"
@@ -766,7 +768,9 @@
       "identity": "Set up this project's local user and reopen it before assigning tasks.",
       "upgrade": "Upgrade this project from the Trellin launcher to assign agent tasks.",
       "confirmation": "Preview the task again and confirm the destination and approved inputs."
-    }
+    },
+    "searchAgents": "Search Agents",
+    "searchDeliveries": "Search deliveries"
   },
   "libraryEdit": {
     "fixedScope": "Existing Lean parameters and prerequisites",
@@ -878,7 +882,8 @@
     "includesRecent": "May include recent turns",
     "requestDetails": "Request details",
     "previewRequest": "Load request details",
-    "previewHint": "Choose a model and enter a message to view the request."
+    "previewHint": "Choose a model and enter a message to view the request.",
+    "searchModels": "Search models"
   },
   "employeeChats": {
     "employees": "Employees",
@@ -902,7 +907,8 @@
     "failed_one": "{{count}} failed",
     "failed_other": "{{count}} failed",
     "statusWithFailures": "{{status}} · {{failed}}",
-    "history": "Conversation history"
+    "history": "Conversation history",
+    "searchTasks": "Search tasks"
   },
   "threads": {
     "active": "Working now",
@@ -1409,5 +1415,8 @@
       "pending": "Intake notes to review",
       "back": "Back to notes"
     }
+  },
+  "picker": {
+    "noMatches": "No matches"
   }
 }

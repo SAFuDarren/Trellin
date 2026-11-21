@@ -105,10 +105,18 @@ test("Chats shows recorded recipients and statuses, keeps the input visible, and
   expect(await feed.evaluate((node) => node.scrollTop)).toBe(0);
   await expect(composer).toBeInViewport();
   await main.getByLabel("Conversation actions").click();
-  await expect(main.getByRole("button", { name: "Remove conversation" })).toBeVisible();
-  await expect(main.getByRole("button", { name: "Open in workbench" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Remove conversation" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Open in workbench" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(main.getByRole("button", { name: "Remove conversation" })).toBeHidden();
+  await expect(page.getByRole("menuitem", { name: "Remove conversation" })).toBeHidden();
+  const actions = main.getByRole("button", { name: "Conversation actions" });
+  await actions.click();
+  await page.getByRole("menuitem", { name: "Remove conversation" }).click();
+  const confirmation = page.getByRole("dialog", { name: "Remove conversation" });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole("button", { name: "Cancel" }).click();
+  await expect(confirmation).toBeHidden();
+  await expect(actions).toBeFocused();
 
   await page.setViewportSize({ width: 640, height: 720 });
   await secondRow.click();

@@ -111,8 +111,8 @@ test("Agent chat keeps map context explicit and preserves the selected Agent and
   await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toBeVisible();
   expect(created).toHaveLength(0);
   await dock.getByLabel("Choose an Agent", { exact: true }).click();
-  await dock.getByRole("searchbox", { name: "Search Agents" }).fill("lean");
-  await dock.getByRole("button", { name: "Lean Reviewer" }).click();
+  await page.getByRole("combobox", { name: "Search Agents" }).fill("lean");
+  await page.getByRole("option", { name: "Lean Reviewer" }).click();
   await dock.getByRole("button", { name: "Open conversation", exact: true }).click();
   const input = dock.getByRole("textbox", { name: "Message Lean Reviewer" });
   await input.fill("Check the fixture obligation.");
@@ -135,7 +135,7 @@ test("Agent chat keeps map context explicit and preserves the selected Agent and
   expect(previews).toHaveLength(0);
 
   await dock.getByRole("button", { name: "Message context" }).click();
-  await dock.getByRole("menuitem", { name: "Request details" }).click();
+  await page.getByRole("menuitem", { name: "Request details" }).click();
   await expect(dock.locator(".conversation-request pre")).toHaveText('{"scope":"selected proof node only"}');
   expect(sends).toHaveLength(0);
   try {

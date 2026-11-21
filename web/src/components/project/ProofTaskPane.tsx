@@ -10,6 +10,7 @@ import {
   useModelConnections,
   type ModelConnection,
 } from "../../api/modelConnections";
+import { Picker } from "../FloatingControls";
 import { href } from "../../shell/route";
 
 type PublicModel = Pick<ModelConnection, "id" | "provider" | "model"> & { fingerprint: string };
@@ -96,7 +97,8 @@ function StartTaskForm({
   const [rounds, setRounds] = useState(policy?.model_rounds ?? 0);
   const [approvedScope, setApprovedScope] = useState<string | null>(null);
   const [connectionId, setConnectionId] = useState("");
-  const selected = policy?.public_model ?? connections.find(({ id }) => id === connectionId);
+  const chosenConnection = connections.find(({ id }) => id === connectionId);
+  const selected = policy?.public_model ?? chosenConnection;
   const model = selected && `${t(`team.providers.${selected.provider}`)} · ${connectionModelLabel(t, selected)}`;
   const blockedSelection = Boolean((requiresExternal || connectionId) && !selected);
   const authorization = JSON.stringify([token, rounds, selected?.id, selected?.fingerprint]);
@@ -118,27 +120,41 @@ function StartTaskForm({
   return (
     <form className="project-entry-form" onSubmit={start}>
       {externalModelAllowed && !policy && (
-        <label>
-          {t("proofTask.modelConnection")}
-          <select
+        <div className="project-entry-field">
+          <label htmlFor="proof-task-model-picker">{t("proofTask.modelConnection")}</label>
+          <Picker
+            label={t("proofTask.modelConnection")}
+            triggerId="proof-task-model-picker"
+            triggerClassName="project-entry-picker"
+            trigger={
+              chosenConnection
+                ? connectionChoiceLabel(t, chosenConnection)
+                : t(requiresExternal ? "proofTask.modelConnection" : "proofTask.noExternal")
+            }
             value={connectionId}
             disabled={pending}
-            onChange={(event) => {
-              const id = event.target.value;
+            searchLabel={t("conversations.searchModels")}
+            emptyLabel={t("picker.noMatches")}
+            groups={[
+              {
+                options: [
+                  { id: "", label: t(requiresExternal ? "proofTask.modelConnection" : "proofTask.noExternal") },
+                  ...connections.map((connection) => ({
+                    id: connection.id,
+                    label: connectionChoiceLabel(t, connection),
+                  })),
+                ],
+              },
+            ]}
+            onSelect={(id) => {
+              if (id === connectionId) return;
               setConnectionId(id);
               setRounds(id ? 1 : 0);
               setApprovedScope(null);
             }}
-          >
-            <option value="">{t(requiresExternal ? "proofTask.modelConnection" : "proofTask.noExternal")}</option>
-            {connections.map((connection) => (
-              <option key={connection.id} value={connection.id}>
-                {connectionChoiceLabel(t, connection)}
-              </option>
-            ))}
-          </select>
+          />
           {!connections.length && <a href={href("team", "runtimes")}>{t("proofTask.connectModel")}</a>}
-        </label>
+        </div>
       )}
       {(localModelAllowed || selected) && !policy && (
         <label>

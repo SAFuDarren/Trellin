@@ -123,19 +123,21 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
 
     const search = page.getByRole("button", { name: "Find claim", exact: true });
     await search.click();
-    const searchResults = page.locator(".project-canvas-popover").filter({ has: page.getByRole("searchbox") });
+    await expectToken(search, "background-color", "--state-selected");
+    const searchResults = page.locator(".project-canvas-popover").filter({ has: page.getByRole("combobox") });
     await expectEnter(searchResults, "rm-float-in", floatDuration);
     await expectToken(searchResults, "box-shadow", "--elevation-float");
-    await expect(searchResults.getByRole("searchbox")).toHaveCSS("border-radius", "6px");
-    await expect(searchResults.getByRole("button").first()).toHaveCSS("border-radius", "6px");
-    await search.click();
+    await expect(searchResults.getByRole("combobox")).toHaveCSS("border-radius", "6px");
+    await expect(searchResults.getByRole("option").first()).toHaveCSS("border-radius", "6px");
+    await page.keyboard.press("Escape");
 
-    const researchActions = page.locator("summary").filter({ hasText: /^Research actions$/ });
+    const researchActions = page.getByRole("button", { name: "Research actions", exact: true });
     await researchActions.click();
     const actions = page.locator(".workbench-actions-items");
     await expectEnter(actions, "rm-float-in", floatDuration);
     await expectToken(actions, "box-shadow", "--elevation-float");
-    await researchActions.press("Escape");
+    await page.keyboard.press("Escape");
+    await expect(researchActions).toBeFocused();
 
     await page.getByRole("button", { name: "Add theorem", exact: true }).click();
     const dialog = page.getByRole("dialog");

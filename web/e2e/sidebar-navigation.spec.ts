@@ -44,13 +44,13 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   const utilities = rail.getByRole("button", { name: "Settings and help", exact: true });
   await expect(utilities).toBeInViewport();
   const utilityMenu = await openMenu(utilities);
-  await expect(utilityMenu.getByRole("link", { name: "Help", exact: true })).toBeInViewport({ ratio: 1 });
-  await expect(utilityMenu.getByRole("link", { name: "Settings", exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(utilityMenu.getByRole("menuitem", { name: "Help", exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(utilityMenu.getByRole("menuitem", { name: "Settings", exact: true })).toBeInViewport({ ratio: 1 });
   await page.keyboard.press("Escape");
   await expect(utilities).toBeFocused();
   await expect(workbenchSidebar.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
   await page.getByRole("button", { name: "Find claim", exact: true }).click();
-  await expect(page.getByRole("searchbox", { name: "Search claims on map" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Search claims on map" })).toBeVisible();
   await expect(workbenchSidebar.getByRole("searchbox")).toHaveCount(0);
   await rail.getByRole("link", { name: "Library", exact: true }).click();
   const navigation = page.locator(".section-nav");
@@ -102,9 +102,8 @@ test("the view switcher and Home restore the selected claim and proof node", asy
   await expect(switchView).toHaveAttribute("aria-expanded", "true");
   let menu = await controlledMenu(switchView);
   await expect(menu).toBeInViewport({ ratio: 1 });
-  const workbench = menu.getByRole("link", { name: "Workbench", exact: true });
+  const workbench = menu.getByRole("menuitem", { name: "Workbench", exact: true });
   await expect(workbench).toHaveAttribute("aria-current", "page");
-  await page.keyboard.press("Tab");
   await expect(workbench).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
@@ -118,15 +117,15 @@ test("the view switcher and Home restore the selected claim and proof node", asy
 
   for (const returnVia of ["switcher", "home"]) {
     menu = await openMenu(switchView);
-    await menu.getByRole("link", { name: /^Review/ }).click();
+    await menu.getByRole("menuitem", { name: /^Review/ }).click();
     await expect(page).toHaveURL(/#review$/);
     await expect(home).not.toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Review");
     await expect(page.locator("#node-detail")).toHaveCount(0);
     if (returnVia === "switcher") {
       const reviewMenu = await openMenu(switchView);
-      await expect(reviewMenu.getByRole("link", { name: /^Review/ })).toHaveAttribute("aria-current", "page");
-      await reviewMenu.getByRole("link", { name: "Workbench", exact: true }).click();
+      await expect(reviewMenu.getByRole("menuitem", { name: /^Review/ })).toHaveAttribute("aria-current", "page");
+      await reviewMenu.getByRole("menuitem", { name: "Workbench", exact: true }).click();
     } else {
       await home.click();
     }
@@ -148,8 +147,7 @@ test("utilities and direct review links work in a narrow Chinese window", async 
   await page.keyboard.press("Enter");
   await expect(utilities).toHaveAttribute("aria-expanded", "true");
   let menu = await controlledMenu(utilities);
-  const settings = menu.getByRole("link", { name: "Settings", exact: true });
-  await page.keyboard.press("Tab");
+  const settings = menu.getByRole("menuitem", { name: "Settings", exact: true });
   await expect(settings).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/#settings$/);
@@ -157,14 +155,14 @@ test("utilities and direct review links work in a narrow Chinese window", async 
 
   const chineseUtilities = rail.getByRole("button", { name: "设置与帮助", exact: true });
   menu = await openMenu(chineseUtilities);
-  await expect(menu.getByRole("link", { name: "设置", exact: true })).toHaveAttribute("aria-current", "page");
-  const help = menu.getByRole("link", { name: "帮助", exact: true });
+  await expect(menu.getByRole("menuitem", { name: "设置", exact: true })).toHaveAttribute("aria-current", "page");
+  const help = menu.getByRole("menuitem", { name: "帮助", exact: true });
   await expect(help).toBeInViewport({ ratio: 1 });
   await help.click();
   await expect(page).toHaveURL(/#help$/);
   await expect(page.locator("#section-title")).toHaveText("帮助");
   menu = await openMenu(chineseUtilities);
-  await expect(menu.getByRole("link", { name: "帮助", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(menu.getByRole("menuitem", { name: "帮助", exact: true })).toHaveAttribute("aria-current", "page");
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   await expect(chineseUtilities).toBeFocused();
@@ -175,7 +173,7 @@ test("utilities and direct review links work in a narrow Chinese window", async 
   await expect(page.locator(".page-head h2")).toHaveText("reverseZeroAdd");
   const chineseSwitcher = page.getByRole("button", { name: "切换视图", exact: true });
   menu = await openMenu(chineseSwitcher);
-  const review = menu.getByRole("link", { name: /^审阅/ });
+  const review = menu.getByRole("menuitem", { name: /^审阅/ });
   await expect(review).toHaveAttribute("aria-current", "page");
   await expect(review.getByText("2", { exact: true })).toBeVisible();
 

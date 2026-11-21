@@ -7,8 +7,10 @@ import { desktopProjectUpgrade } from "../workbench/desktop";
 import { activityNode, type Graph } from "../workbench/graph";
 import { isCodex, modelName, nodeTitle } from "../workbench/text";
 import type { ActivityRecord, ActivitySnapshot, ProofDraft } from "../workbench/types";
+import { Picker } from "./FloatingControls";
 import { FeedEntry } from "./FeedEntry";
 import { Spin } from "./Icons";
+import { TeamAgentAvatar } from "./TeamAgentAvatar";
 
 type DraftOperation = "loading" | "saving" | "discarding";
 type DraftError = "loadFailed" | "saveFailed" | "discardFailed" | "conflict";
@@ -451,28 +453,34 @@ function Composer({
       {available && (
         <div className="composer-row">
           <div className="proof-recipient">
-            <label htmlFor="guidance-audience" className="sr-only">
-              {t("composer.audience")}
-            </label>
-            <select
-              id="guidance-audience"
+            <Picker
+              label={t("composer.audience")}
+              triggerId="guidance-audience"
+              triggerClassName="proof-recipient-picker"
+              trigger={recipient(audience)}
+              placement="top-start"
               disabled={busy}
               value={audience}
-              onChange={(event) => {
-                if (!draft) return;
-                draft.audience = event.target.value;
+              groups={[
+                {
+                  options: channels.map((channel) => ({
+                    id: channel,
+                    label: recipient(channel),
+                    icon: <TeamAgentAvatar avatar="initials" name={agentFor(channel) || t(`audience.${channel}`)} />,
+                  })),
+                },
+              ]}
+              searchLabel={t("composer.searchRecipients")}
+              emptyLabel={t("picker.noMatches")}
+              onSelect={(channel) => {
+                if (!draft || channel === audience) return;
+                draft.audience = channel;
                 draft.requestId = undefined;
                 draft.message = "";
                 draft.error = false;
                 refresh();
               }}
-            >
-              {channels.map((channel) => (
-                <option key={channel} value={channel}>
-                  {recipient(channel)}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <button
             id="guidance-send"

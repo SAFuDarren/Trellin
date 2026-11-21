@@ -88,8 +88,8 @@ function renderApp(
 }
 
 async function openResearchAction(name: string) {
-  fireEvent.click(await screen.findByText(en.canvasShell.researchActions, { selector: "summary" }));
-  fireEvent.click(await screen.findByRole("button", { name }));
+  fireEvent.click(await screen.findByRole("button", { name: en.canvasShell.researchActions }));
+  fireEvent.click(await screen.findByRole("menuitem", { name }));
 }
 
 function keys(value: object, prefix = ""): string[] {
@@ -1450,7 +1450,7 @@ describe("App", () => {
     renderApp("token");
     await openResearchAction(en.projectEntry.organize);
     const dialog = within(await screen.findByRole("dialog"));
-    expect(await dialog.findByRole("option", { name: "local-text" })).toBeTruthy();
+    expect(await dialog.findByText("local-text", { selector: "button" })).toBeTruthy();
     fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: wording } });
     fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.analyze }));
     expect(await dialog.findByText(wording)).toBeTruthy();
@@ -1619,10 +1619,8 @@ describe("App", () => {
     await openResearchAction(en.projectEntry.organize);
     const dialog = within(await screen.findByRole("dialog"));
     const recipient = `${choice.label} · ${choice.model}`;
-    await dialog.findByRole("option", { name: recipient });
-    fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.model), {
-      target: { value: `connection:${choice.id}` },
-    });
+    fireEvent.click(await dialog.findByRole("button", { name: en.projectEntry.intake.model }));
+    fireEvent.click(await dialog.findByRole("option", { name: recipient }));
     fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: content } });
     fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.analyze }));
     const preview = within(await dialog.findByRole("region", { name: en.modelConnections.publicPreview }));

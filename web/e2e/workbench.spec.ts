@@ -40,10 +40,10 @@ async function confirmImeCandidate(input: Locator) {
 async function goToSection(page: Page, section: string) {
   if (section === "Review") {
     const menu = await viewMenu(page);
-    await menu.getByRole("link", { name: /^Review/ }).click();
+    await menu.getByRole("menuitem", { name: /^Review/ }).click();
   } else if (section === "Settings" || section === "Help") {
     const menu = await openMenu(utilityButton(page));
-    await menu.getByRole("link", { name: section, exact: true }).click();
+    await menu.getByRole("menuitem", { name: section, exact: true }).click();
   } else {
     await railLink(page, section).click();
   }
@@ -82,7 +82,7 @@ test("selecting a node shows its details and conversation", async ({ page }) => 
     "Proof obligation 2",
   );
   await expect(page.locator(".chat-feed .live")).toHaveCount(2);
-  await expect(page.locator("#guidance-audience option").first()).toHaveText(/^[A-Z0-9]+-\d\d · Local$/);
+  await expect(page.locator("#guidance-audience")).toHaveText(/^[A-Z0-9]+-\d\d · Local$/);
   await page.getByRole("button", { name: "All nodes" }).click();
   await expect(page.getByRole("region", { name: "Proof activity" }).getByRole("heading")).toHaveText("Whole claim");
 });
@@ -119,7 +119,8 @@ test("queues a Codex proof note with one action, retaining a failed note and sho
     .locator("summary")
     .filter({ hasText: /^Proof activity$/ })
     .click();
-  await page.locator("#guidance-audience").selectOption("codex");
+  await page.locator("#guidance-audience").click();
+  await page.getByRole("option", { name: /Codex/ }).click();
   const firstLine = "先检查陈述。";
   const secondLine = "Try the reduction route first.";
   const note = firstLine + "\n" + secondLine;
@@ -359,7 +360,7 @@ test("the view menu shows review counts and the rail keeps Team and utilities re
   expect(railBox?.height ?? 0).toBeGreaterThan(800);
   expect(sidebarBox?.x ?? 0).toBeGreaterThanOrEqual((railBox?.x ?? 0) + (railBox?.width ?? 0) - 1);
   const menu = await viewMenu(page);
-  const review = menu.getByRole("link", { name: /^Review/ });
+  const review = menu.getByRole("menuitem", { name: /^Review/ });
   await expect(review).toHaveAccessibleName(/2(?: waiting for review)?$/);
   await expect(review.getByText("2", { exact: true })).toBeVisible();
   await expect(rail(page).getByLabel("2 running")).toBeVisible();
@@ -377,7 +378,7 @@ test("approving a verified result records it and clears it from the inbox", asyn
   await page.getByLabel("Reason").fill("Scope matches; only H1 is used.");
   await page.getByRole("button", { name: "Approve" }).click();
   await expect(page.locator(".page-notice")).toHaveText("Approved and recorded.");
-  const review = (await viewMenu(page)).getByRole("link", { name: /^Review/ });
+  const review = (await viewMenu(page)).getByRole("menuitem", { name: /^Review/ });
   await expect(review).toHaveAccessibleName(/1(?: waiting for review)?$/);
   await expect(review.getByText("1", { exact: true })).toBeVisible();
   await expect(review).toHaveAttribute("aria-current", "page");
@@ -535,20 +536,22 @@ for (const inspect of [false, true]) {
     expect(created).toEqual([{ title: story.title }]);
     if (inspect) await page.setViewportSize({ width: 820, height: 720 });
     await picker.press("ArrowDown");
-    const pickerMenu = page.getByRole("menu", { name: "Conversation model" });
-    const localChoice = pickerMenu.getByRole("group", { name: "On this device" }).getByRole("menuitemradio");
-    const remoteChoice = pickerMenu.getByRole("group", { name: "Connected services" }).getByRole("menuitemradio");
-    await expect(localChoice).toBeFocused();
+    const pickerMenu = page.getByRole("listbox", { name: "Search models" });
+    const localChoice = pickerMenu.getByRole("group", { name: "On this device" }).getByRole("option");
+    const remoteChoice = pickerMenu.getByRole("group", { name: "Connected services" }).getByRole("option");
+    const modelSearch = page.getByRole("combobox", { name: "Search models" });
+    await expect(modelSearch).toBeFocused();
+    await expect(modelSearch).toHaveAttribute("aria-activedescendant", (await localChoice.getAttribute("id"))!);
     await expect(remoteChoice).toHaveText(/Claude Code · sonnet/);
     await expect(pickerMenu.getByText("unavailable-model")).toHaveCount(0);
     await page.keyboard.press("ArrowDown");
-    await expect(remoteChoice).toBeFocused();
+    await expect(modelSearch).toHaveAttribute("aria-activedescendant", (await remoteChoice.getAttribute("id"))!);
     await page.keyboard.press("Enter");
     await expect(pickerMenu).toBeHidden();
     await expect(picker).toBeFocused();
     await expect(picker).toHaveText(/sonnet/);
     await picker.press("Enter");
-    await expect(remoteChoice).toHaveAttribute("aria-checked", "true");
+    await expect(remoteChoice).toHaveAttribute("aria-selected", "true");
     await page.keyboard.press("Escape");
     await expect(pickerMenu).toBeHidden();
     await expect(picker).toBeFocused();
@@ -566,7 +569,7 @@ for (const inspect of [false, true]) {
       const context = page.getByRole("button", { name: "Message context" });
       await context.press("Enter");
       const contextMenu = page.getByRole("menu", { name: "Message context" });
-      await expect(contextMenu.getByText("This message only")).toBeVisible();
+      await expect(page.locator(".floating-popover").getByText("This message only")).toBeVisible();
       const detailsItem = contextMenu.getByRole("menuitem", { name: "Request details" });
       await expect(detailsItem).toBeFocused();
       await page.keyboard.press("Enter");
@@ -607,7 +610,7 @@ for (const inspect of [false, true]) {
     await page.reload();
     await expect(page.getByText("Check closure.")).toBeVisible();
     await page.getByLabel("Conversation actions").click();
-    await page.getByRole("button", { name: "Remove conversation" }).click();
+    await page.getByRole("menuitem", { name: "Remove conversation" }).click();
     const remove = page.getByRole("dialog", { name: "Remove conversation" });
     await expect(remove.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
     expect(archived).toHaveLength(0);
@@ -676,15 +679,15 @@ test("Workbench retries one anchored local conversation message by Enter without
   await node.click();
   await page.getByRole("button", { name: "Ask an Agent" }).click();
   await page.getByLabel("Choose an Agent", { exact: true }).click();
-  await page.getByRole("button", { name: "Choose a model", exact: true }).click();
+  await page.getByRole("option", { name: "Choose a model", exact: true }).click();
   await page.getByRole("button", { name: "Open conversation" }).click();
   const picker = page.getByRole("button", { name: "Conversation model" });
-  const pickerMenu = page.getByRole("menu", { name: "Conversation model" });
+  const pickerMenu = page.getByRole("listbox", { name: "Search models" });
   await picker.click();
   await page.getByRole("textbox", { name: "Write a message" }).click();
   await expect(pickerMenu).toBeHidden();
   await picker.click();
-  await pickerMenu.getByRole("menuitemradio", { name: "Local · local-research" }).click();
+  await pickerMenu.getByRole("option", { name: "Local · local-research" }).click();
   expect(created).toEqual([
     {
       title: "Proof obligation 2",

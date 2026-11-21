@@ -95,7 +95,8 @@
     "noActivity": "暂无运行中的工作或待审阅结果。",
     "threadPicker": "选择对话",
     "activityUnavailable": "部分活动无法加载。",
-    "contextNone": "消息和这条对话的历史"
+    "contextNone": "消息和这条对话的历史",
+    "searchThreads": "搜索对话"
   },
   "projectCanvas": {
     "askAgent": "询问 Agent",
@@ -518,7 +519,8 @@
     "queueFailed": "无法确认已排队。意见仍在输入框中。{{reason}}",
     "sentCodex": "已排队，等待后续获授权的 Codex 证明尝试。",
     "sentLocal": "已排队，等待后续获授权的本机证明尝试。",
-    "sentDelivered": "这条证明意见已有送达回执。"
+    "sentDelivered": "这条证明意见已有送达回执。",
+    "searchRecipients": "搜索接收方"
   },
   "model": {
     "fallback": "模型"
@@ -766,7 +768,9 @@
       "identity": "请设置项目的本地用户并重新打开项目，再派工。",
       "upgrade": "请通过 Trellin 启动器升级当前项目，再使用 Agent 派工功能。",
       "confirmation": "请重新预览任务，确认接收方和已批准的材料。"
-    }
+    },
+    "searchAgents": "搜索 Agent",
+    "searchDeliveries": "搜索交付成果"
   },
   "libraryEdit": {
     "fixedScope": "现有 Lean 参数和前提",
@@ -878,7 +882,8 @@
     "includesRecent": "可能包含最近的对话",
     "requestDetails": "请求详情",
     "previewRequest": "查看请求详情",
-    "previewHint": "选择模型并输入消息后，可查看请求详情。"
+    "previewHint": "选择模型并输入消息后，可查看请求详情。",
+    "searchModels": "搜索模型"
   },
   "employeeChats": {
     "employees": "员工",
@@ -902,7 +907,8 @@
     "failed_one": "{{count}} 项失败",
     "failed_other": "{{count}} 项失败",
     "statusWithFailures": "{{status}} · {{failed}}",
-    "history": "会话历史"
+    "history": "会话历史",
+    "searchTasks": "搜索任务"
   },
   "threads": {
     "active": "正在进行",
@@ -1409,5 +1415,8 @@
       "pending": "待审的整理结果",
       "back": "返回笔记"
     }
+  },
+  "picker": {
+    "noMatches": "没有匹配项"
   }
 }
