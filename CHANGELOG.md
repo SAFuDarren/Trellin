@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.85
+
+- The graph and inspector report the same withdrawal-impact total across claims and mark the selected premise as the preview target.
+
 ## 1.0.84
 
 - The proof graph’s References view highlights recorded proof uses and allowed premises, shows planned steps as quieter dashed lines, and explains the line styles in English and Chinese. The legend follows the current view.
