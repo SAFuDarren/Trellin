@@ -216,6 +216,21 @@ Several people and coding agents may work on the repository at once. The rules b
 - Squash-merge with a Conventional Commit title.
 - Issues found outside the task become new issues, not extra changes in the branch.
 
+### Branch lifecycle and weekly inventory
+
+Run `python scripts/tasks.py branches` from a repository checkout. The command reads live `origin` branch heads, local branches, worktrees, GitHub PRs, and held claims. Add `--json` to keep a dated snapshot. The maintainer reviews the inventory weekly and uses the issue to return stale branches and due preservation reviews to their owners.
+
+| State | Evidence | Who acts |
+| --- | --- | --- |
+| Active | An open PR, an open PR using the branch as its base, or a held claim with recent progress. A new claim has 48 hours to make progress. Recent unclaimed tips and tips without a verifiable commit date are held for review. | The task owner continues the work or hands it off. |
+| Ready to retire | The current tip exactly matches the final head of a merged or explicitly closed PR. No open PR depends on the branch, and the branch has no valid claim. | The owner follows the [retirement procedure](#retire-a-branch-and-worktree) on the day the task ends. The maintainer decides on unmerged work. |
+| Stale | No active PR or valid claim and no commit in the last seven days, or a claim older than 48 hours with no recent commit after it was made. | The owner records what to preserve or proposes retirement. The maintainer handles unowned entries. |
+| Preserved | The repository default branch or an entry in [the preservation register](preserved-branches.json). A detached or unborn checkout is held for manual review. | The named owner reviews the recorded reason on its review date. The maintainer follows up on entries due in the weekly review. |
+
+For a registered branch, record `branch`, `reason`, `owner`, and `review_on` in YYYY-MM-DD format. Register only confirmed decisions. For a squash merge, use the recorded PR head and merge commit rather than the ancestry of the old branch tip.
+
+The report flags dirty or unavailable worktree status, ignored files, locked or prunable worktrees, and local commits that are unreachable from the live branch heads of every configured remote. It reports unknown reachability when remote heads or local history are incomplete. The inventory reads state without fetching, pruning or removing refs. Use the separate retirement checks before taking any action.
+
 ### Retire a branch and worktree
 
 The owner handles local checkout cleanup or arranges an explicit handoff in the issue. Record the branch, reviewed commit and remaining work there. Keep the claim while you own review follow-up. Release it on handoff or when you relinquish follow-up. GitHub settings remain a maintainer decision.
