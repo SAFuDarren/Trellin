@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.83
+
+- Narrow proof and map windows use a details drawer and a separate zoom footer. The selected proof node and nearby map cards stay in view when the inspector opens or the window changes size.
+
 ## 1.0.82
 
 - Open a verified result directly from its inspector, review queue or bottom-bar review count. Activity and review lists show the result and its claim, and Command/Control+Enter records the chosen decision with its reason. (#215)
