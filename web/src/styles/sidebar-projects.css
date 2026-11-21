@@ -77,6 +77,16 @@
 .sidebar-projects [role="alert"] {
   color: var(--crit);
 }
+.project-sidebar .sidebar-projects {
+  flex: 1 1 auto;
+  border-block-end: 0;
+}
+.project-sidebar .sidebar-projects-list {
+  max-height: none;
+}
+.project-sidebar .brand {
+  justify-content: flex-end;
+}
 .sidebar-projects-status > .button {
   margin-block-start: 4px;
 }

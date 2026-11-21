@@ -17,7 +17,7 @@ async function stubLibrary(page: Page, reply: (request: Request) => unknown) {
   });
 }
 
-test("the sidebar opens registered desktop projects and keeps the claims navigation available", async ({ page }) => {
+test("the sidebar lists and opens registered desktop projects", async ({ page }) => {
   const first = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "First Research", available: true };
   const second = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Second Research", available: true };
   const missing = { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "Offline Research", available: false };
@@ -63,11 +63,9 @@ test("the sidebar opens registered desktop projects and keeps the claims navigat
     await sidebar.evaluate((element) => element.clientWidth),
   );
 
-  const search = sidebar.getByRole("searchbox", { name: "Search claims" });
-  await search.fill("单射");
-  await expect(sidebar.getByRole("button", { name: /^单射映射的复合/ })).toBeVisible();
-  await expect(sidebar.getByRole("button", { name: /^自然数加零/ })).toHaveCount(0);
-  await expect(projects.getByRole("button", { name: second.name })).toBeVisible();
+  await expect(sidebar.getByRole("searchbox")).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: "Global map" })).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: /^单射映射的复合/ })).toHaveCount(0);
 
   try {
     await secondRow.press("Enter");
@@ -99,8 +97,8 @@ test("the sidebar opens registered desktop projects and keeps the claims navigat
     ]);
   await sidebar.getByRole("button", { name: "Collapse sidebar" }).click();
   await expect(projects).toHaveCount(0);
-  await sidebar.getByRole("button", { name: "Search claims" }).click();
-  await expect(search).toBeFocused();
+  await openProjects.press("Enter");
+  await expect(heading).toBeFocused();
 });
 
 test("an empty desktop library retains the project actions and can recover from a list error", async ({ page }) => {
@@ -119,10 +117,14 @@ test("an empty desktop library retains the project actions and can recover from 
   await expect(projects.getByRole("button", { name: "Open project folder" })).toBeEnabled();
 });
 
-test("a workbench without the native bridge keeps its normal claims sidebar", async ({ page }) => {
+test("a workbench without the native bridge can find claims on the project map", async ({ page }) => {
   await page.goto("/#session=fixture");
   const sidebar = page.locator("#sidebar");
-  await expect(sidebar.getByRole("searchbox", { name: "Search claims" })).toBeVisible();
-  await expect(sidebar.getByRole("region", { name: "Projects" })).toHaveCount(0);
+  await expect(sidebar.getByRole("searchbox")).toHaveCount(0);
+  await expect(sidebar.getByRole("region", { name: "Projects" }).getByText("Current project")).toBeVisible();
   await expect(sidebar.getByRole("button", { name: "New project" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Find claim", exact: true }).click();
+  const search = page.getByRole("searchbox", { name: "Search claims on map" });
+  await search.fill("单射");
+  await expect(page.getByRole("button", { name: "单射映射的复合", exact: true })).toHaveCount(2);
 });

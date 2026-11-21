@@ -344,15 +344,29 @@ def _snapshot(row):
     }
 
 
+_VISIBLE_CLAIMS = """
+    SELECT claim.id::text AS id, claim.title, effective.status, claim.domain
+    FROM rm.claims claim JOIN rm.claim_foundation_status effective ON effective.id = claim.id
+    WHERE claim.contract_sha256 IS NOT NULL AND claim.kind = 'researcher_claim'
+      AND effective.status NOT IN ('superseded', 'archived')
+"""
+_CLAIM_ORDER = " ORDER BY claim.created_at DESC, claim.id"
+
+
 def claims(store):
     """List the most recent frozen workspace claims."""
-    return store.query("human", """
-        SELECT claim.id::text AS id, claim.title, effective.status, claim.domain
-        FROM rm.claims claim JOIN rm.claim_foundation_status effective ON effective.id = claim.id
-        WHERE claim.contract_sha256 IS NOT NULL AND claim.kind = 'researcher_claim'
-          AND effective.status NOT IN ('superseded', 'archived')
-        ORDER BY claim.created_at DESC, claim.id LIMIT 100
-    """)
+    return store.query("human", _VISIBLE_CLAIMS + _CLAIM_ORDER + " LIMIT 100")
+
+
+def canvas_claim_index(store):
+    """Read the workspace's visible project graph, including older claims."""
+    return {"claims": store.query("human", _VISIBLE_CLAIMS + _CLAIM_ORDER)}
+
+
+def visible_claim_ids(store, identifiers):
+    """Check only the requested claim IDs against the project graph scope."""
+    rows = store.query("human", _VISIBLE_CLAIMS + " AND claim.id = ANY(%s::uuid[])", list(identifiers))
+    return {row["id"] for row in rows}
 
 
 def claim_index(store):

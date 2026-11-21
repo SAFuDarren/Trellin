@@ -24,7 +24,7 @@ from research_multiplier.workflows import (claim_references, doctor, proof_graph
                                           workbench_conversations, workbench_goal_review,
                                           workbench_guidance, workbench_library,
                                           workbench_intake, workbench_lemma_plans, workbench_premises,
-                                          workbench_proof_drafts, workbench_proof_tasks,
+                                          workbench_project_canvas, workbench_proof_drafts, workbench_proof_tasks,
                                           workbench_review, workbench_sections,
                                           workbench_theorems, workspace_events)
 
@@ -74,6 +74,13 @@ _TEAM_AGENTS_ERRORS = {
     "team_agents.conflict": HTTPStatus.CONFLICT,
     "team_agents.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
     "team_agents.limit": HTTPStatus.CONFLICT,
+}
+_PROJECT_CANVAS_ROUTE = "/api/project-canvas"
+_PROJECT_CANVAS_CLAIMS = _PROJECT_CANVAS_ROUTE + "/claims"
+_PROJECT_CANVAS_ERRORS = {
+    "project_canvas.invalid": HTTPStatus.BAD_REQUEST,
+    "project_canvas.missing": HTTPStatus.CONFLICT,
+    "project_canvas.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
 }
 _INTAKE_PUBLIC = ("/api/project-intake/public-preview", "/api/project-intake/public-draft")
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
@@ -232,6 +239,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self._intake_lock = threading.Lock()
         self.connections = connections.Registry()
         self.team_agents = workbench_agents.AgentProfiles(workspace)
+        self.project_canvas = workbench_project_canvas.ProjectCanvas(workspace)
         self.public_intake = workbench_intake.PublicIntake(self.connections)
         self.discussions = workbench_conversations.Discussions(self.connections, self.team_agents)
         self._proof_task_lock = threading.Lock()
@@ -461,6 +469,14 @@ class _Handler(BaseHTTPRequestHandler):
             if route.query:
                 raise _BadRequest("team_agents.invalid")
             return {"agents": self.server.team_agents.list()}
+        if route.path == _PROJECT_CANVAS_ROUTE:
+            if route.query:
+                raise _BadRequest("project_canvas.invalid")
+            return self.server.project_canvas.snapshot()
+        if route.path == _PROJECT_CANVAS_CLAIMS:
+            if route.query:
+                raise _BadRequest("project_canvas.invalid")
+            return self.server.read(proof_graph.canvas_claim_index)
         if route.path == "/api/project-intake/models":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -551,6 +567,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.SERVICE_UNAVAILABLE, error.code)
         except workbench_agents.AgentProfileError as error:
             self._error(_TEAM_AGENTS_ERRORS[str(error)], str(error))
+        except workbench_project_canvas.ProjectCanvasError as error:
+            self._error(_PROJECT_CANVAS_ERRORS[str(error)], str(error))
         except workbench_conversations.ConversationError as error:
             self._conversation_error(error.code)
         except workbench_goal_review.GoalReviewError as error:
@@ -564,6 +582,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "proof_draft_unavailable")
             elif self.path.startswith(_GOAL_REVIEW_ROUTE):
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "goalReview.unavailable")
+            elif self.path == _PROJECT_CANVAS_CLAIMS:
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "project_canvas.unavailable")
             elif error.state in _SCHEMA_SQLSTATES:
                 self._error(HTTPStatus.CONFLICT, "This project database needs the workbench schema. See the workbench guide.")
             else:
@@ -904,6 +924,10 @@ class _Handler(BaseHTTPRequestHandler):
             elif self.path == _TEAM_AGENTS_SAVE:
                 document = self._body(workbench_agents.MAX_REQUEST_BYTES)
                 self._json(HTTPStatus.OK, {"agent": self.server.team_agents.save(document, self.server.connections)})
+            elif self.path == _PROJECT_CANVAS_ROUTE:
+                document = self._body(workbench_project_canvas.MAX_REQUEST_BYTES)
+                self._json(HTTPStatus.OK, self.server.read(workbench_project_canvas.apply,
+                                                          self.server.project_canvas, document))
             elif self.path == "/api/project-intake/public-preview":
                 self._json(HTTPStatus.OK, self.server.read(self.server.public_intake.preview, self._body(_MAX_PROJECT_BYTES)))
             elif self.path == "/api/project-intake/public-draft":
@@ -940,6 +964,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.CONFLICT, error.code)
         except workbench_agents.AgentProfileError as error:
             self._error(_TEAM_AGENTS_ERRORS[str(error)], str(error))
+        except workbench_project_canvas.ProjectCanvasError as error:
+            self._error(_PROJECT_CANVAS_ERRORS[str(error)], str(error))
         except workbench_conversations.ConversationError as error:
             self._conversation_error(error.code)
         except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:
@@ -971,6 +997,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(_PREMISE_ERRORS[message], message)
             elif self.path in {_GOAL_SELECT_ROUTE, _GOAL_RELATED_ROUTE}:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "goalReview.unavailable")
+            elif self.path == _PROJECT_CANVAS_ROUTE:
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "project_canvas.unavailable")
             elif self.path == "/api/claim-code":
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "claim_code.save_failed")
             elif self.path in _LIBRARY_WRITES:
@@ -995,6 +1023,8 @@ class _Handler(BaseHTTPRequestHandler):
                 message = "premise.unavailable"
             elif self.path in {_GOAL_SELECT_ROUTE, _GOAL_RELATED_ROUTE}:
                 message = "goalReview.unavailable"
+            elif self.path == _PROJECT_CANVAS_ROUTE:
+                message = "project_canvas.unavailable"
             elif self.path == "/api/claim-code":
                 message = "claim_code.save_failed"
             elif self.path in _LIBRARY_WRITES:

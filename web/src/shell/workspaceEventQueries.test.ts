@@ -16,6 +16,7 @@ describe("Workspace event read models", () => {
       ["goal-review", "session"],
       ["library"],
       ["claims"],
+      ["project-canvas-claims", "session"],
       ["atlas"],
       ["inbox", "session"],
       ["graph", "claim"],

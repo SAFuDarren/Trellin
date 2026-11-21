@@ -4,11 +4,14 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { api, type ClaimsResponse } from "./api/client";
 import { useFallbackInterval } from "./api/liveUpdates";
+import { useProjectCanvas } from "./api/projectCanvas";
 import { ChatPanel } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
+import { ProjectCanvas } from "./components/ProjectCanvas";
 import { ProjectActions } from "./components/project/ProjectActions";
 import { queueEntries, ReviewPanel } from "./components/ReviewPanel";
 import { Sidebar } from "./components/Sidebar";
+import { useDesktopProjectList } from "./components/SidebarProjects";
 import { Splitter } from "./components/Splitter";
 import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type View } from "./workbench/graph";
@@ -25,7 +28,12 @@ function errorText(t: TFunction, error: unknown): string {
 }
 
 export type Focus = { claimId: string; nodeId?: string; nonce: number };
-export type WorkbenchPosition = DesktopPosition & { view: View; assumption: string | null; referenced: boolean };
+export type WorkbenchPosition = DesktopPosition & {
+  view: View | "project";
+  mapClaimId?: string;
+  assumption: string | null;
+  referenced: boolean;
+};
 
 export function Workbench({
   session,
@@ -51,12 +59,14 @@ export function Workbench({
     restore: focus ? undefined : returnTo,
   }));
   const [claimId, setClaimId] = useState<string | null>(initial.position?.claimId ?? null);
+  const pendingLaunch = useRef(!initial.position);
   const pendingNode = useRef(initial.position?.nodeId);
   const [referencedClaim, setReferencedClaim] = useState<string | null>(
     initial.restore?.referenced ? initial.restore.claimId : null,
   );
   const [missingReferenceNode, setMissingReferenceNode] = useState(false);
-  const [view, setView] = useState<View>(initial.restore?.view ?? "proof");
+  const [view, setView] = useState<View | "project">(focus ? "proof" : (initial.restore?.view ?? "project"));
+  const [mapClaimId, setMapClaimId] = useState(initial.restore?.mapClaimId ?? initial.position?.claimId ?? null);
   const [recordedGoal, setRecordedGoal] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [assumption, setAssumption] = useState<string | null>(initial.restore?.assumption ?? null);
@@ -64,6 +74,12 @@ export function Workbench({
   const [premiseDialog, setPremiseDialog] = useState<{ id?: string } | null>(null);
   const [premiseChatAnchor, setPremiseChatAnchor] = useState<string | null>(null);
   const [live, setLive] = useState<{ side?: number; right?: number; chat?: number }>({});
+  const inMap = view === "project";
+  const canvas = useProjectCanvas(session, inMap);
+  const projects = useDesktopProjectList();
+  const projectName =
+    projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name ||
+    t("projects.current");
 
   const claims = useQuery({
     queryKey: ["claims"],
@@ -72,6 +88,7 @@ export function Workbench({
   const atlas = useQuery({
     queryKey: ["atlas"],
     queryFn: ({ signal }) => api<Atlas>(session, "/api/atlas", { signal }),
+    enabled: !inMap && sizes.atlasOpen,
     retry: false,
   });
 
@@ -79,19 +96,29 @@ export function Workbench({
   useEffect(() => {
     const list = claims.data?.claims;
     if (!list) return;
+    if (pendingLaunch.current) {
+      pendingLaunch.current = false;
+      // The CLI may name an exact claim when starting this workbench.
+      const requested = claims.data?.claim_id;
+      if (requested) {
+        setClaimId(requested);
+        setMapClaimId(requested);
+        setReferencedClaim(requested);
+        setView("proof");
+        return;
+      }
+    }
     if (claimId && (claimId === referencedClaim || list.some((claim) => claim.id === claimId))) return;
-    setClaimId(claims.data?.claim_id ?? list[0]?.id ?? null);
+    setClaimId(list[0]?.id ?? null);
   }, [claims.data, claimId, referencedClaim]);
 
-  const projectClaims = useMemo(
-    () => claims.data?.claims.filter((claim) => claim.id !== claimId) ?? [],
-    [claimId, claims.data],
-  );
+  const mapClaims = canvas.claims ?? claims.data?.claims ?? [];
+  const mapSelection = mapClaims.some(({ id }) => id === mapClaimId) ? mapClaimId : (mapClaims[0]?.id ?? null);
 
   const snapshot = useQuery({
     queryKey: ["graph", claimId],
     enabled: Boolean(
-      claimId && (claimId === referencedClaim || claims.data?.claims.some((claim) => claim.id === claimId)),
+      !inMap && claimId && (claimId === referencedClaim || claims.data?.claims.some((claim) => claim.id === claimId)),
     ),
     queryFn: ({ signal }) =>
       api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId!), { signal }),
@@ -101,10 +128,12 @@ export function Workbench({
   // Another page asked to open a claim (and maybe a node).
   useEffect(() => {
     if (!focus) return;
+    pendingLaunch.current = false;
     setClaimId(focus.claimId);
+    setMapClaimId(focus.claimId);
     setView("proof");
     pendingNode.current = focus.nodeId;
-    setReferencedClaim(null);
+    setReferencedClaim(focus.claimId);
     setPremiseChatAnchor(null);
     setMissingReferenceNode(false);
     onFocusHandled(null);
@@ -128,12 +157,30 @@ export function Workbench({
   }, [graph, claimId, referencedClaim]);
 
   useEffect(() => {
-    if (claimId && selected && graph?.claim.id === claimId && graph.nodes.has(selected)) {
+    if (view === "project") {
+      if (mapSelection) {
+        const id = claimId ?? mapSelection;
+        onPositionChange({
+          claimId: id,
+          nodeId: selected ?? pendingNode.current ?? `goal:${id}`,
+          view,
+          mapClaimId: mapSelection,
+          assumption,
+          referenced: id === referencedClaim,
+        });
+      }
+    } else if (claimId && selected && graph?.claim.id === claimId && graph.nodes.has(selected)) {
       const position = { claimId, nodeId: selected };
-      onPositionChange({ ...position, view, assumption, referenced: claimId === referencedClaim });
+      onPositionChange({
+        ...position,
+        view,
+        mapClaimId: mapSelection ?? undefined,
+        assumption,
+        referenced: claimId === referencedClaim,
+      });
       saveDesktopPosition(position);
     }
-  }, [claimId, graph, selected, view, assumption, referencedClaim, onPositionChange]);
+  }, [claimId, graph, selected, view, mapSelection, assumption, referencedClaim, onPositionChange]);
 
   const basis = assumption ? graph?.nodes.get(assumption)?.reference?.basis_version_id : undefined;
   const impact = useQuery({
@@ -147,7 +194,7 @@ export function Workbench({
 
   const activity = useQuery({
     queryKey: ["activity", claimId],
-    enabled: Boolean(graph),
+    enabled: !inMap && Boolean(graph),
     refetchInterval: useFallbackInterval(ACTIVITY_MS),
     queryFn: async ({ signal }) => {
       const reply = await api<ActivitySnapshot>(session, "/api/activity?claim=" + encodeURIComponent(claimId!), {
@@ -165,12 +212,14 @@ export function Workbench({
 
   const selectClaim = (id: string) => {
     setRecordedGoal(null);
+    setMapClaimId(id);
+    setView("proof");
+    if (inMap && id === claimId) return;
     setClaimId(id);
     setSelected(null);
     setPremiseChatAnchor(null);
     setAssumption(null);
-    setView("proof");
-    setReferencedClaim(null);
+    setReferencedClaim(claims.data?.claims.some((claim) => claim.id === id) ? null : id);
     setMissingReferenceNode(false);
     pendingNode.current = undefined;
   };
@@ -184,6 +233,7 @@ export function Workbench({
     if (node.kind === "hypothesis" && node.reference?.basis_version_id) setAssumption(id);
   };
   const openReference = (id: string, nodeId: string | null) => {
+    setMapClaimId(id);
     setView("proof");
     if (graph?.claim.id === id && claimId === id) {
       if (nodeId && graph.nodes.has(nodeId)) {
@@ -214,18 +264,21 @@ export function Workbench({
   };
   const openRecorded = async (claimId?: string) => {
     await queries.invalidateQueries();
-    if (claimId) selectClaim(claimId);
+    if (claimId) {
+      if (inMap) setMapClaimId(claimId);
+      else selectClaim(claimId);
+    }
   };
   const openPremises = (id?: string) => {
     setReferencedClaim(claimId);
     setPremiseDialog({ id });
   };
   const showRecordedGoal = (id: string) => {
-    if (!claimId) return openRecorded(id);
-    // Keep the open claim reachable even if it drops off the recent claims list.
-    setReferencedClaim(claimId);
-    setRecordedGoal(id);
-    setView("proof");
+    setMapClaimId(id);
+    if (!inMap) {
+      setReferencedClaim(claimId);
+      setRecordedGoal(id);
+    }
     return queries.invalidateQueries();
   };
 
@@ -235,22 +288,26 @@ export function Workbench({
       ? errorText(t, claims.error)
       : claims.isPending
         ? t("notice.loadingProject")
-        : claims.data.claims.length === 0 && !referencedClaim
-          ? t("notice.noClaims")
-          : snapshot.isError
-            ? errorText(t, snapshot.error)
-            : !graph
-              ? t("notice.loadingClaim")
-              : graph.order.length === 0
-                ? t("notice.noNodes")
-                : "";
-  const noticeIsError = claims.isError || snapshot.isError;
+        : inMap
+          ? canvas.loadingClaims
+            ? t("notice.loadingProject")
+            : ""
+          : claims.data.claims.length === 0 && !referencedClaim
+            ? t("notice.noClaims")
+            : snapshot.isError
+              ? errorText(t, snapshot.error)
+              : !graph
+                ? t("notice.loadingClaim")
+                : graph.order.length === 0
+                  ? t("notice.noNodes")
+                  : "";
+  const noticeIsError = claims.isError || (!inMap && snapshot.isError);
   const workspaceState = claims.isError
     ? t("sidebar.readFailed")
     : claims.data
-      ? t("sidebar.connected", { count: claims.data.claims.length })
+      ? t("sidebar.connected", { count: mapClaims.length })
       : t("sidebar.connecting");
-  const reviewCount = view === "impact" ? 0 : queueEntries(t, graph, view, assumption, impact.data).length;
+  const reviewCount = inMap || view === "impact" ? 0 : queueEntries(t, graph, view, assumption, impact.data).length;
   const goal = graph?.claim.id === claimId && claimId ? graph.nodes.get(`goal:${claimId}`) : undefined;
   // A premise under review can keep the previous conversation, but is not a proof-note target.
   const reviewingPremise = Boolean(selected && graph?.nodes.get(selected)?.kind === "proposed_premise");
@@ -264,7 +321,7 @@ export function Workbench({
   const meta = graph
     ? [graph.claim.code, statusText(t, graph.claim.status), graph.claim.domain].filter(Boolean).join(" · ")
     : "";
-  const showGraph = Boolean(graph && graph.order.length);
+  const showGraph = !inMap && Boolean(graph && graph.order.length);
 
   const side = live.side ?? clamped.side;
   const right = live.right ?? clamped.right;
@@ -299,21 +356,15 @@ export function Workbench({
       className="app"
       id="workbench"
       data-sidebar={layout.sidebarOpen ? "open" : "collapsed"}
-      data-review={layout.reviewOpen ? "open" : "collapsed"}
+      data-review={!inMap && layout.reviewOpen ? "open" : "collapsed"}
       data-view={view}
       style={{ "--side-w": `${side}px`, "--right-w": `${right}px`, "--chat-h": `${chat}px` } as React.CSSProperties}
     >
       <Sidebar
         pendingReviews={pendingReviews}
-        claims={claims.data?.claims ?? []}
-        atlasClaims={atlas.data?.claims ?? []}
-        claimId={claimId}
         open={layout.sidebarOpen}
-        atlasOpen={sizes.atlasOpen}
         workspaceState={workspaceState}
-        onSelect={selectClaim}
         onToggle={() => layout.update({ sidebarOpen: !layout.sidebarOpen })}
-        onToggleAtlas={() => layout.update({ atlasOpen: !sizes.atlasOpen })}
         onRefresh={refresh}
         refreshing={claims.isFetching}
       />
@@ -327,19 +378,27 @@ export function Workbench({
       <main className="main">
         <header className="toolbar">
           <div className="claim-heading">
-            <h1>{claimTitle}</h1>
-            {meta && <span className="claim-meta">{meta}</span>}
+            {!inMap && (
+              <button type="button" className="workbench-map-return" onClick={() => setView("project")}>
+                {t("canvasShell.map")}
+              </button>
+            )}
+            <h1 title={inMap ? projectName : claimTitle}>{inMap ? projectName : claimTitle}</h1>
+            {inMap && <span className="claim-meta">{t("canvasShell.map")}</span>}
+            {!inMap && meta && <span className="claim-meta">{meta}</span>}
           </div>
           <div className="project-toolbar-actions">
             <ProjectActions
               session={session}
-              claimId={graph?.claim.id === claimId ? claimId : null}
-              claimCode={graph?.claim.id === claimId ? graph.claim.code : null}
+              claimId={!inMap && graph?.claim.id === claimId ? claimId : null}
+              claimCode={!inMap && graph?.claim.id === claimId ? graph.claim.code : null}
               claimCodesAvailable={Boolean(claims.data?.claim_codes)}
-              lemmaPlanScope={lemmaPlanScope}
+              lemmaPlanScope={inMap ? null : lemmaPlanScope}
               claimTitle={claimTitle}
-              premiseReview={graph?.claim.id === claimId ? graph.claim.premise_review : undefined}
+              premiseReview={!inMap && graph?.claim.id === claimId ? graph.claim.premise_review : undefined}
               premiseDialog={premiseDialog}
+              overview={inMap ? undefined : sizes.atlasOpen}
+              onToggleOverview={() => layout.update({ atlasOpen: !sizes.atlasOpen })}
               onOpenPremises={openPremises}
               onClosePremises={() => setPremiseDialog(null)}
               onPremiseRecorded={openRecorded}
@@ -347,7 +406,7 @@ export function Workbench({
               onGoalRecorded={showRecordedGoal}
               onOpenReference={openReference}
             />
-            {!layout.reviewOpen && graph && (
+            {!inMap && !layout.reviewOpen && graph && (
               <button
                 type="button"
                 className="chip"
@@ -393,7 +452,41 @@ export function Workbench({
             {notice}
           </p>
         )}
-        {missingReferenceNode && (
+        {!inMap && recordedGoal && (
+          <div className="workbench-map-status" role="status">
+            {t("canvasShell.goalAdded")}
+            <button type="button" className="conversation-text-action" onClick={() => setView("project")}>
+              {t("canvasShell.viewOnMap")}
+            </button>
+          </div>
+        )}
+        {inMap && claims.data && !canvas.loadingClaims && (
+          <>
+            {(canvas.loadError || canvas.saveError || canvas.indexError) && (
+              <div className="workbench-map-status" role="alert">
+                {canvas.indexError
+                  ? t("canvasShell.claimsUnavailable")
+                  : errorText(t, canvas.loadError || canvas.saveError)}
+                <button type="button" className="conversation-text-action" onClick={canvas.reload}>
+                  {t("canvasShell.reload")}
+                </button>
+              </div>
+            )}
+            <section className="graph-area project-map-area">
+              <ProjectCanvas
+                claims={mapClaims}
+                selected={mapSelection}
+                onSelect={setMapClaimId}
+                onOpenClaim={selectClaim}
+                layout={canvas.layout}
+                onLayout={canvas.apply}
+                layoutUnavailable={canvas.loading || Boolean(canvas.loadError)}
+                saving={canvas.saving}
+              />
+            </section>
+          </>
+        )}
+        {!inMap && missingReferenceNode && (
           <p className="notice" role="status">
             {t("claimCodes.nodeAbsent")}
           </p>
@@ -402,16 +495,13 @@ export function Workbench({
           <section className="graph-area" aria-label={t("graph.label")}>
             <GraphView
               graph={graph}
-              view={view}
+              view={inMap ? "proof" : view}
               selected={selected}
               assumption={assumption}
               impact={impact.data}
               work={work.byNode}
               running={work.running}
               queued={work.queued}
-              projectClaims={projectClaims}
-              recordedGoal={recordedGoal}
-              onOpenClaim={selectClaim}
               atlasClaims={atlas.data?.claims ?? []}
               claimId={claimId}
               atlasOpen={sizes.atlasOpen}
@@ -424,59 +514,67 @@ export function Workbench({
             />
           </section>
         )}
-        <Splitter
-          name="chat"
-          value={chat}
-          label={t("splitter.chat")}
-          hidden={!sizes.chatOpen}
-          onResize={(value) => resize("chat", value)}
-          onCommit={(value) => commit("chat", value)}
-        />
-        <ChatPanel
-          session={session}
-          graph={graph}
-          claimId={claimId}
-          selected={chatSelected}
-          proofSelected={reviewingPremise ? null : selected}
-          activity={activity.data}
-          activityError={activityError}
-          scopeReady={
-            claimId
-              ? graph?.claim.id === claimId &&
-                (allNodes || Boolean(chatSelected && graph.nodes.has(chatSelected)) || !graph.nodes.size)
-              : claims.data?.claims.length === 0
-          }
-          running={work.running}
-          queued={work.queued}
-          open={sizes.chatOpen}
-          allNodes={allNodes}
-          onToggle={() => layout.update({ chatOpen: !sizes.chatOpen })}
-          onAllNodes={() => setAllNodes(!allNodes)}
-          onSelect={selectNode}
-          onSent={() => void queries.invalidateQueries({ queryKey: ["activity", claimId] })}
-        />
+        {!inMap && (
+          <Splitter
+            name="chat"
+            value={chat}
+            label={t("splitter.chat")}
+            hidden={!sizes.chatOpen}
+            onResize={(value) => resize("chat", value)}
+            onCommit={(value) => commit("chat", value)}
+          />
+        )}
+        {!inMap && (
+          <ChatPanel
+            session={session}
+            graph={graph}
+            claimId={claimId}
+            selected={chatSelected}
+            proofSelected={reviewingPremise ? null : selected}
+            activity={activity.data}
+            activityError={activityError}
+            scopeReady={
+              claimId
+                ? graph?.claim.id === claimId &&
+                  (allNodes || Boolean(chatSelected && graph.nodes.has(chatSelected)) || !graph.nodes.size)
+                : claims.data?.claims.length === 0
+            }
+            running={work.running}
+            queued={work.queued}
+            open={sizes.chatOpen}
+            allNodes={allNodes}
+            onToggle={() => layout.update({ chatOpen: !sizes.chatOpen })}
+            onAllNodes={() => setAllNodes(!allNodes)}
+            onSelect={selectNode}
+            onSent={() => void queries.invalidateQueries({ queryKey: ["activity", claimId] })}
+          />
+        )}
       </main>
-      <Splitter
-        name="right"
-        value={right}
-        label={t("splitter.right")}
-        onResize={(value) => resize("right", value)}
-        onCommit={(value) => commit("right", value)}
-      />
-      <ReviewPanel
-        graph={graph}
-        claims={claims.data?.claims ?? []}
-        claimId={claimId}
-        view={view}
-        selected={selected}
-        assumption={assumption}
-        impact={impact.data}
-        impactLoading={impact.isFetching}
-        impactError={impact.isError ? errorText(t, impact.error) : ""}
-        onSelect={selectNode}
-        onReviewPremise={openPremises}
-        onClose={() => layout.update({ reviewOpen: false })}
-      />
+      {!inMap && (
+        <Splitter
+          name="right"
+          value={right}
+          label={t("splitter.right")}
+          onResize={(value) => resize("right", value)}
+          onCommit={(value) => commit("right", value)}
+        />
+      )}
+      {!inMap && (
+        <ReviewPanel
+          graph={graph}
+          claims={claims.data?.claims ?? []}
+          claimId={claimId}
+          view={view}
+          selected={selected}
+          assumption={assumption}
+          impact={impact.data}
+          impactLoading={impact.isFetching}
+          impactError={impact.isError ? errorText(t, impact.error) : ""}
+          onSelect={selectNode}
+          onReviewPremise={openPremises}
+          onClose={() => layout.update({ reviewOpen: false })}
+        />
+      )}
     </div>
   );
 }

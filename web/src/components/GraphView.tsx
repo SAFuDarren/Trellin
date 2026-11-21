@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Claim } from "../api/client";
 import {
   CARD,
   clampCardSize,
@@ -21,11 +20,6 @@ import { kindText, nodeStatus, nodeSub, nodeTitle, nodeTone, summarize, type Ton
 import type { AtlasClaim, ImpactPreview } from "../workbench/types";
 import type { AtlasBox, CardSizes } from "../workbench/useLayout";
 import { Clock, Mark, Spin } from "./Icons";
-
-const PROJECT_CLAIM_HEIGHT = 64;
-const PROJECT_CLAIM_GAP = 8;
-const PROJECT_CLAIM_HEADING = 24;
-const NO_PROJECT_CLAIMS: Claim[] = [];
 
 type Camera = { x: number; y: number; k: number };
 type ResizePreview = { id: string; anchor: Point; size: CardSize };
@@ -57,9 +51,6 @@ type Props = {
   work: Map<string, NodeWork>;
   running: number;
   queued: number;
-  projectClaims: Claim[];
-  recordedGoal: string | null;
-  onOpenClaim: (claimId: string) => void;
   atlasClaims: AtlasClaim[];
   claimId: string;
   atlasOpen: boolean;
@@ -82,7 +73,6 @@ export function GraphView(props: Props) {
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const moved = useRef(false);
-  const revealedGoal = useRef<string | null>(null);
   const [panning, setPanning] = useState(false);
 
   const affected = useMemo(() => (view === "impact" ? impactItems(graph, impact) : new Map()), [graph, view, impact]);
@@ -107,12 +97,7 @@ export function GraphView(props: Props) {
     () => layoutGraph(graph, resizing ? new Map(sizes).set(resizing.id, resizing.size) : sizes),
     [graph, sizes, resizing],
   );
-  const projectClaims = view === "proof" ? props.projectClaims : NO_PROJECT_CLAIMS;
-  // The canvas can show other goals. Its proof positions, paths and scope stay claim-specific.
-  const canvasWidth = layout.width + (projectClaims.length ? CARD.width + CARD.pad / 2 : 0);
-  const projectHeight =
-    CARD.pad * 2 + PROJECT_CLAIM_HEADING + projectClaims.length * (PROJECT_CLAIM_HEIGHT + PROJECT_CLAIM_GAP);
-  const canvasHeight = projectClaims.length ? Math.max(layout.height, projectHeight) : layout.height;
+  const { width: canvasWidth, height: canvasHeight } = layout;
   const positioned = resizing ? anchoredCamera(camera, layout, resizing.id, resizing.anchor) : camera;
 
   // Card heights decide where edges meet them; measure after every render that may change a card.
@@ -143,45 +128,27 @@ export function GraphView(props: Props) {
   const box = atlasPlacement(props.atlasBox, stageSize.width, stageSize.height);
   const atlasVisible = props.atlasOpen && props.atlasClaims.length > 0;
 
-  const fit = useCallback(
-    (includeProject = false) => {
-      const { width, height } = stageSize;
-      if (!width || !height) return;
-      const fitWidth = includeProject ? canvasWidth : layout.width;
-      const fitHeight = includeProject ? canvasHeight : layout.height;
-      // Leave the overview map uncovered when there is room beside it; otherwise the graph may pass under it.
-      const mapRight = !atlasVisible || box.y > height / 2 ? 0 : box.x + box.w + 12;
-      const inset = mapRight && mapRight < width * 0.4 ? mapRight : 0;
-      const k = Math.max(0.3, Math.min(1.25, (width - inset - 32) / fitWidth, (height - 56) / fitHeight));
-      setCamera({
-        k,
-        x: inset + (width - inset - fitWidth * k) / 2,
-        y: Math.max(8, (height - fitHeight * k) / 2),
-      });
-    },
-    [stageSize, canvasWidth, canvasHeight, layout.width, layout.height, atlasVisible, box.x, box.y, box.w],
-  );
+  const fit = useCallback(() => {
+    const { width, height } = stageSize;
+    if (!width || !height) return;
+    // Leave the overview map uncovered when there is room beside it; otherwise the graph may pass under it.
+    const mapRight = !atlasVisible || box.y > height / 2 ? 0 : box.x + box.w + 12;
+    const inset = mapRight && mapRight < width * 0.4 ? mapRight : 0;
+    const k = Math.max(0.3, Math.min(1.25, (width - inset - 32) / canvasWidth, (height - 56) / canvasHeight));
+    setCamera({
+      k,
+      x: inset + (width - inset - canvasWidth * k) / 2,
+      y: Math.max(8, (height - canvasHeight * k) / 2),
+    });
+  }, [stageSize, canvasWidth, canvasHeight, atlasVisible, box.x, box.y, box.w]);
 
   // A new claim gets a fresh view; otherwise the camera stays where the researcher left it.
   useEffect(() => {
     moved.current = false;
   }, [graph.claim.id]);
   useEffect(() => {
-    if (!moved.current) fit(true);
+    if (!moved.current) fit();
   }, [fit]);
-  useEffect(() => {
-    if (!props.recordedGoal) {
-      revealedGoal.current = null;
-    } else if (
-      props.recordedGoal !== revealedGoal.current &&
-      stageSize.width &&
-      stageSize.height &&
-      projectClaims.some((claim) => claim.id === props.recordedGoal)
-    ) {
-      revealedGoal.current = props.recordedGoal;
-      fit(true);
-    }
-  }, [fit, projectClaims, props.recordedGoal, stageSize]);
 
   const zoomAt = (factor: number, cx = stageSize.width / 2, cy = stageSize.height / 2) => {
     moved.current = true;
@@ -464,45 +431,6 @@ export function GraphView(props: Props) {
               );
             })}
           </div>
-          {projectClaims.length > 0 && (
-            <section
-              className="canvas-project-claims"
-              aria-label={t("graph.projectClaims")}
-              style={{ left: layout.width - CARD.pad / 2, top: CARD.pad, width: CARD.width, gap: PROJECT_CLAIM_GAP }}
-            >
-              <h2 className="canvas-project-heading" style={{ height: PROJECT_CLAIM_HEADING }}>
-                {t("graph.projectClaims")}
-              </h2>
-              {projectClaims.map((claim) => {
-                const node = {
-                  id: `goal:${claim.id}`,
-                  kind: "goal",
-                  title: claim.title ?? undefined,
-                  status: claim.status,
-                };
-                const title = nodeTitle(t, node, { full: true });
-                const status = nodeStatus(t, node);
-                return (
-                  <button
-                    key={claim.id}
-                    className="canvas-project-claim"
-                    data-node={node.id}
-                    title={title}
-                    aria-label={t("graph.openClaim", { title, status })}
-                    type="button"
-                    style={{ height: PROJECT_CLAIM_HEIGHT }}
-                    onClick={() => props.onOpenClaim(claim.id)}
-                  >
-                    <span className="node-head">
-                      <Mark tone={nodeTone(node, false)} />
-                      <span className="node-title">{title}</span>
-                    </span>
-                    <span className="node-caption">{status}</span>
-                  </button>
-                );
-              })}
-            </section>
-          )}
         </div>
         <div className="segmented" role="group" aria-label={t("views.label")}>
           {(["proof", "references", "impact"] as const).map((key) => (

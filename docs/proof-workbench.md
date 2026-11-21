@@ -13,17 +13,19 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 ## Start a research project
 
-**Organize with AI** and **Add theorem** are available before the first claim. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
+**Research actions → Organize with AI** and **Add theorem** are available before the first claim. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
 
 ## Switch between the graph and Review
 
-Use **Home** in the rail to return to your project's graph. In the Workbench or Review sidebar header, **Switch view** shows the number of items awaiting review. Open **Review** there and return with **Workbench** or **Home**. Your graph keeps its selected claim and node while you switch. Use **Global map** in the Workbench sidebar to browse claims.
+Use **Home** in the rail to return to Workbench. In the Workbench or Review sidebar header, **Switch view** shows the number of items awaiting review. Open **Review** there and return with **Workbench** or **Home**. Your graph keeps its selected claim and node while you switch.
+
+Use the left sidebar to open a project. Its **Project map** shows the project's claims on one canvas. Click a card to select it or choose **Find claim** to bring it into view. Choose **Open proof** to read the selected proof. Use **Project map** in the proof header to return. Drag cards or focus a card and use the arrow keys to move it. To record a research relationship, select a claim, choose **Link selected claim**, and select the other claim. Escape cancels the link. **Research links** lists saved links and lets you remove them. Positions and research links are saved per project in this device's settings. The proof view shows recorded proof dependencies.
 
 Open **Settings and help** at the bottom of the rail to find settings or the usage guide. Press Escape to close either menu and return focus to its button.
 
 ## Start a proof task
 
-Select a claim and open **Proof task**. The panel shows the confirmed Lean proposition, its basis, and any decision that blocks work. If the Lean statement still needs preparation or review, follow [the Lean scope review](lean-core.md) before starting.
+Select a claim, choose **Open proof**, and open **Proof task**. The panel shows the confirmed Lean proposition, its basis, and any decision that blocks work. If the Lean statement still needs preparation or review, follow [the Lean scope review](lean-core.md) before starting.
 
 When the scope is ready, confirm it in the panel and record your reason to start. The worker runs deterministic checks and proof reuse first. The default allows zero model rounds. For restricted research, the panel can authorize a bounded number of rounds with the exact configured private Lean model once that route is available. For a public goal with a released scope, [add a connection](project-intake.md#connect-a-model) in **Team → Runtimes**. Select it in **Proof task**, set the maximum model rounds, and check the theorem and released basis before allowing the send. The authorization covers that connection, scope and cap. A changed scope or connection needs a new authorization.
 
@@ -31,7 +33,7 @@ The panel shows the proof task state, selected model, reported model usage, open
 
 ## Verify local lemmas
 
-Select a claim with a confirmed Lean statement and open **Local lemmas**. The panel shows the exact destination and statement version. Paste a version 1 [structured lemma plan](lean-core.md#derive-and-reuse-local-lemmas) containing intermediate nodes, then choose **Verify lemma plan**. Use the same local Lean runtime and project database configuration as `lean derive`. The proof graph shows each verified lemma, including any that passed before a later node failed.
+Open a proof with a confirmed Lean statement and choose **Research actions → Local lemmas**. The panel shows the exact destination and statement version. Paste a version 1 [structured lemma plan](lean-core.md#derive-and-reuse-local-lemmas) containing intermediate nodes, then choose **Verify lemma plan**. Use the same local Lean runtime and project database configuration as `lean derive`. The proof graph shows each verified lemma, including any that passed before a later node failed.
 
 For example, if the frozen scope assumes `True` and has the original goal `True ∧ True`, this plan derives an intermediate lemma directly from the premise.
 
@@ -45,7 +47,7 @@ Complete the frozen goal through the existing proof workflow.
 
 ## Propose a premise
 
-Open **Premises** on the selected Lean claim. Enter the proposed wording, its exact Lean proposition, the question to decide, and the expected impact. The pending item appears beside the current proof without adding a dependency. The interpretation review pauses new proof work on that scope. Reopen the project to continue the same review.
+Choose **Research actions → Premises** in the selected Lean proof. Enter the proposed wording, its exact Lean proposition, the question to decide, and the expected impact. The pending item appears beside the current proof without adding a dependency. The interpretation review pauses new proof work on that scope. Reopen the project to continue the same review.
 
 Review the target, approved starting basis, and proposed premise before recording your reason. Reject the proposal to keep the current basis. Confirm the revised claim to approve the exact premise and freeze a separate claim with the same conclusion. The original claim retains its statement and proof history. Open the revised claim from the decision and use the ordinary [Lean statement review](lean-core.md) before proving it. Other pending interpretation questions must be resolved before confirming a revision. See [the condition workflow](research-goals.md#handle-a-questioned-condition).
 
@@ -80,9 +82,9 @@ returns. Older databases keep the earlier refresh behavior. Agent text and
 clarification answers remain in the workspace and are fetched through the
 existing authorized views.
 
-The workbench has four areas. The left column lists the project's claims by domain, with a search field. The centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **If withdrawn**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser; **Settings** can reset them. The interface is in English by default; choose **简体中文** in **Settings** to switch to Chinese, and the choice is remembered too. The map can be dragged by its title and resized from its corner.
+The left column lists registered projects. When a proof is open, the centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **If withdrawn**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser; **Settings** can reset them. The interface is in English by default; choose **简体中文** in **Settings** to switch to Chinese, and the choice is remembered too. The proof overview can be dragged by its title and resized from its corner.
 
-Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. Drag the corner of a node to adjust its width and height. With that handle focused, the arrow keys resize the node. The small **Global position** map in the corner shows the recorded nodes of recent claims, with a dashed circle at the current claim.
+Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. Drag the corner of a node to adjust its width and height. With that handle focused, the arrow keys resize the node. **Research actions → Show proof overview** toggles a small map in the corner. It shows the recorded nodes of recent claims, with a dashed circle at the current claim.
 
 ## Work with the models
 
@@ -113,7 +115,7 @@ eligible proof task, use **Queue proof note** once the panel shows an available
 recipient and explains how the note may be used. Saving a draft requires
 database revision `0082` or later.
 
-On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
+On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research actions → Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
 
 A node whose recorded job is running shows the agent and the number of parallel jobs. The workbench also displays reasoning effort when the model attempt records it, for example `GPT-6.2 Sol xhigh`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
 

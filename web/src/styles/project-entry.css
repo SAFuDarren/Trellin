@@ -7,6 +7,58 @@
   gap: 6px 10px;
 }
 
+.workbench-actions-menu {
+  position: relative;
+}
+
+.workbench-actions-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+}
+
+.workbench-actions-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.workbench-actions-menu > summary::after {
+  width: 5px;
+  height: 5px;
+  border-inline-end: 1px solid currentColor;
+  border-block-end: 1px solid currentColor;
+  transform: translateY(-1px) rotate(45deg);
+  content: "";
+}
+
+.workbench-actions-items {
+  position: absolute;
+  z-index: 6;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-end: 0;
+  display: grid;
+  min-width: min(190px, 70vw);
+  padding: 4px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: var(--side);
+}
+
+.workbench-actions-items button {
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  text-align: start;
+  font-size: var(--type-control-size);
+}
+
+.workbench-actions-items button:is(:hover, :focus-visible, [aria-pressed="true"]) {
+  background: var(--pick);
+}
+
 .project-entry {
   width: min(680px, calc(100vw - 26px));
   max-height: calc(100dvh - 32px);

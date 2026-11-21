@@ -8,6 +8,7 @@
   },
   "projects": {
     "title": "Projects",
+    "current": "Current project",
     "new": "New project",
     "openFolder": "Open project folder",
     "empty": "No registered projects yet.",
@@ -71,6 +72,30 @@
     "frozenScope": "Frozen scope to reconfirm",
     "effect": "Impact",
     "none": "Nothing relies on this version right now."
+  },
+  "projectCanvas": {
+    "label": "Project map",
+    "openProof": "Open proof",
+    "linkClaim": "Link selected claim",
+    "cancelLink": "Cancel link",
+    "findClaim": "Find claim",
+    "searchClaims": "Search claims on map",
+    "noMatches": "No matching claims.",
+    "researchLinks": "Research links",
+    "chooseLinkTarget": "Select another claim to link to {{title}}.",
+    "linkAlreadyExists": "These claims are already linked.",
+    "linkDescription": "{{source}} ↔ {{target}}",
+    "removeLink": "Remove link between {{source}} and {{target}}",
+    "remove": "Remove"
+  },
+  "canvasShell": {
+    "map": "Project map",
+    "researchActions": "Research actions",
+    "proofOverview": "Show proof overview",
+    "reload": "Reload map",
+    "claimsUnavailable": "Could not load all claims. The map is showing recent claims.",
+    "goalAdded": "Theorem added.",
+    "viewOnMap": "View on project map"
   },
   "stage": {
     "resizeNode": "Resize node {{title}}",
@@ -469,6 +494,9 @@
     "fallback": "Model"
   },
   "errors": {
+    "project_canvas.invalid": "This map change is invalid. Try again.",
+    "project_canvas.missing": "A claim is no longer available in this project. Reload the map.",
+    "project_canvas.unavailable": "Could not read or save the project map. Reload to try again.",
     "conversation.upgrade": "Update this workspace’s database to use conversations.",
     "conversation.identity": "Open this workspace with your local researcher identity to use conversations.",
     "conversation.invalid": "Check the selected conversation, model and message.",

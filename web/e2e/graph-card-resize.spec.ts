@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from "@playwright/test";
 import type { GraphSnapshot } from "../src/workbench/types";
+import { openProof } from "./project-map";
 
 const TITLE = "Symmetry of equality on the natural numbers with explanatory text that needs several visible lines";
 const LAYOUT_KEY = "research-multiplier-workbench-layout";
@@ -21,6 +22,7 @@ test("resize a graph card independently at different zooms and remember per view
     await route.fulfill({ response, json: { ...graph, nodes: [goal], edges: [], focus_id: goal.id } });
   });
   await page.goto("/#session=fixture");
+  await openProof(page);
   const card = page.locator('.graph-node[data-kind="goal"]');
   const handle = page.getByRole("button", { name: `Resize node ${TITLE}`, exact: true });
   const zoom = page.locator(".zoom-level");
@@ -76,6 +78,7 @@ test("resize a graph card independently at different zooms and remember per view
   await page.getByRole("button", { name: "Proof", exact: true }).click();
   await expect.poll(async () => (await dimensions(card)).cssWidth).toBe(tall.cssWidth + 36);
   await page.reload();
+  await openProof(page);
   await expect.poll(async () => (await dimensions(card)).cssHeight).toBe(tall.cssHeight - 12);
   await expect.poll(async () => (await dimensions(card)).cssWidth).toBe(tall.cssWidth + 36);
 });
