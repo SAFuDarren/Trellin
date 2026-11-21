@@ -4,7 +4,7 @@ import i18n from "../i18n";
 import en from "../i18n/en.json";
 import { buildGraph } from "../workbench/graph";
 import type { GuidanceNote } from "../workbench/types";
-import { ChatPanel } from "./ChatPanel";
+import { ProofActivity } from "./ChatPanel";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -33,12 +33,11 @@ const panel = (
   draftAvailable?: boolean,
   proofSelected: string | null = selected,
 ) => (
-  <ChatPanel
+  <ProofActivity
     session="test"
     graph={graph}
     claimId={claim}
-    selected={selected}
-    proofSelected={proofSelected}
+    selected={proofSelected}
     activity={{
       claim_id: claim,
       activity: [],
@@ -48,12 +47,10 @@ const panel = (
       proof_draft_available: draftAvailable,
     }}
     activityError=""
-    scopeReady={false}
     running={0}
     queued={0}
-    open
+    active
     allNodes={false}
-    onToggle={vi.fn()}
     onAllNodes={vi.fn()}
     onSelect={vi.fn()}
     onSent={vi.fn()}
@@ -61,14 +58,12 @@ const panel = (
 );
 
 const opinion = () => screen.getByRole<HTMLTextAreaElement>("textbox", { name: en.composer.label });
-const openProof = () => fireEvent.click(screen.getByRole("button", { name: en.conversations.proofActivity }));
 const button = (name: string) => screen.getByRole<HTMLButtonElement>("button", { name });
 
 it("keeps a blocked proof opinion on its exact node until a later explicit release", async () => {
   const fetch = vi.fn<typeof window.fetch>(async () => Response.json({}));
   vi.stubGlobal("fetch", fetch);
   const { rerender } = render(panel(node));
-  openProof();
   const note = "First check the original premise.";
   expect(screen.getByText(en.composer.blockers.public_basis)).toBeTruthy();
   expect(screen.getByText(en.composer.draftOnly)).toBeTruthy();
@@ -173,7 +168,6 @@ it("restores a saved opinion for the exact proof node and consumes it only with 
   vi.stubGlobal("fetch", fetch);
 
   const first = render(panel(node, false, "scope", [], true));
-  openProof();
   await waitFor(() => expect(opinion().disabled).toBe(false));
   fireEvent.change(opinion(), { target: { value: note } });
   fireEvent.click(button(en.composer.draft.save));
@@ -194,7 +188,6 @@ it("restores a saved opinion for the exact proof node and consumes it only with 
   first.unmount();
 
   render(panel(node, true, "scope", [], true));
-  openProof();
   await screen.findByText(en.composer.draft.saved);
   expect(opinion().value).toBe(note);
   expect(fetch.mock.calls.some(([url]) => url === "/api/guidance")).toBe(false);
@@ -233,7 +226,6 @@ it("preserves edits after a draft save error and requires an explicit reload aft
   });
   vi.stubGlobal("fetch", fetch);
   render(panel(node, false, "public_basis", [], true));
-  openProof();
   await screen.findByText(en.composer.draft.saved);
   fireEvent.change(opinion(), { target: { value: "Local unsaved edits" } });
   fireEvent.click(button(en.composer.draft.save));
@@ -258,7 +250,6 @@ it("does not expose the conversation's fallback scope as an editable proof node"
   const fetch = vi.fn<typeof window.fetch>();
   vi.stubGlobal("fetch", fetch);
   render(panel(node, true, "scope", [], true, null));
-  openProof();
   expect(screen.getByText(en.composer.chooseNode)).toBeTruthy();
   expect(opinion().disabled).toBe(true);
   expect(screen.queryByRole("button", { name: en.composer.draft.save })).toBeNull();
@@ -279,7 +270,6 @@ it("shows the newly saved version when an explicit queue leaves a concurrent dra
   });
   vi.stubGlobal("fetch", fetch);
   render(panel(node, true, "scope", [], true));
-  openProof();
   await screen.findByText(en.composer.draft.saved);
   fireEvent.click(button(en.composer.send));
   await screen.findByText(en.composer.sentCodex);
@@ -302,7 +292,6 @@ it("submits once while queueing and retries a failed receipt with the same note 
   vi.stubGlobal("fetch", fetch);
 
   render(panel(node, true));
-  openProof();
   fireEvent.change(opinion(), { target: { value: note } });
   fireEvent.click(button(en.composer.send));
   fireEvent.submit(opinion().form!);

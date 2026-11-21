@@ -42,7 +42,7 @@ for (const variant of [
     chats: "Chats",
     activity: "Proof activity",
     zoom: "Zoom in",
-    openProof: /^Open proof$/,
+    openProof: /^Proof details$/,
     received: "Included in a local proof attempt",
     replied: "Replied",
     title: "Natural-number addition in a workspace with a deliberately long claim and conversation title",
@@ -54,7 +54,7 @@ for (const variant of [
     chats: "对话",
     activity: "证明活动",
     zoom: "放大",
-    openProof: /^打开证明$/,
+    openProof: /^证明详情$/,
     received: "已纳入本机证明尝试",
     replied: "已回复",
     title: "自然数加法的证明研究与工作台长标题换行测试用于检查对话和证明活动在紧凑窗口中的布局",
@@ -132,7 +132,7 @@ for (const variant of [
     if (await expand.isVisible()) await expand.click();
     const goalCard = page.locator(`.graph-node[data-node="${goalId}"]`);
     await goalCard.press("Enter");
-    await expect(page.locator(".claim-heading h1")).toHaveText(variant.title);
+    await expect(page.locator("#node-detail h2")).toHaveText(variant.title);
     await expectTextRole([page.locator(".claim-heading h1"), sidebar.locator(".sidebar-projects h2")], "heading");
     await expectTextRole([page.locator(".claim-meta")], "metadata");
 
@@ -155,36 +155,36 @@ for (const variant of [
     await expectWrapped(lean);
     await expectWrapped(inspector.locator("h2"));
 
-    const plot = page.locator(".plot");
+    const plot = page.locator(".inspector-graph .plot");
     const canvasScale = () => plot.evaluate((node) => new DOMMatrixReadOnly(getComputedStyle(node).transform).a);
     const beforeZoom = await canvasScale();
-    await page.getByRole("button", { name: variant.zoom, exact: true }).click();
+    await page.locator(".inspector-graph").getByRole("button", { name: variant.zoom, exact: true }).click();
     await expect.poll(canvasScale).toBeGreaterThan(beforeZoom);
     await expectTextRole([page.locator(".claim-heading h1")], "heading");
 
-    const inlineChat = page.locator(".chat .conversation-panel");
-    await expectTextRole([inlineChat.locator("textarea"), inlineChat.locator(".message")], "body");
     await page.locator(`.graph-node[data-node="${obligationId}"]`).press("Enter");
     const proof = page.locator(".chat");
-    const proofTab = proof.getByRole("button", { name: variant.activity });
+    const proofTab = page.locator("#review summary").filter({ hasText: variant.activity });
     await proofTab.click();
     const note = proof.locator(".guidance-note-status");
     await expect(note).toContainText(variant.received);
     await expectTextRole([proof.locator(".chat-head h2")], "heading");
     await expectTextRole([proof.locator("textarea"), proof.locator(".bubble")], "body");
-    await expectTextRole([proofTab, proof.locator("#guidance-send")], "control");
+    await expectTextRole([proof.locator("#guidance-send")], "control");
     await expectTextRole([note], "metadata");
+    await proof.locator("#guidance-send").scrollIntoViewIfNeeded();
     await expect(proof.locator("#guidance-send")).toBeInViewport();
 
     if (variant.width < 900) {
       await page.setViewportSize({ width: 640, height: 720 });
       const collapse = sidebar.getByRole("button", { name: "收起侧栏" });
       if (await collapse.isVisible()) await collapse.click();
-      const tabs = page.locator(".stage .segmented");
+      const tabs = page.locator(".inspector-lenses");
+      await tabs.scrollIntoViewIfNeeded();
       await expect
         .poll(() =>
           tabs.evaluate((element) => {
-            const stage = element.closest(".stage")!.getBoundingClientRect();
+            const stage = element.closest("#review")!.getBoundingClientRect();
             return [...element.querySelectorAll("button")].every((button) => {
               const { left, right, top, bottom } = button.getBoundingClientRect();
               return left >= stage.left && right <= stage.right && top >= stage.top && bottom <= stage.bottom;

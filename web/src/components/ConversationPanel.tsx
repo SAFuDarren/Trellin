@@ -29,6 +29,7 @@ import {
 import { useLocalTextModels } from "../api/localModels";
 import { useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { useComposerKeyboard } from "../hooks/useComposerKeyboard";
+import { useConversationEditor } from "../shell/ConversationEditors";
 import { timeText } from "../workbench/text";
 import { Chevron, SendArrow, Spin } from "./Icons";
 import { ModelConnections } from "./ModelConnections";
@@ -40,14 +41,14 @@ export function ConversationPanel({
   onRemove,
   header,
   employee,
-  draft,
+  focusComposer = false,
 }: {
   session: string;
   thread: ConversationSummary;
   onRemove: () => void;
   header?: (removeControl: ReactNode) => ReactNode;
   employee?: Pick<TeamAgent, "id" | "name" | "connection_id" | "revision">;
-  draft?: { text: string; onChange: (text: string) => void; onSent?: (submittedText: string) => void };
+  focusComposer?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const detail = useConversation(session, thread.id);
@@ -79,22 +80,19 @@ export function ConversationPanel({
       return { ...connection, label, description, local: false };
     }),
   ];
-  const [selected, setSelected] = useState("");
-  const [localText, setLocalText] = useState("");
-  const text = draft?.text ?? localText;
-  const setText = draft?.onChange ?? setLocalText;
-  const [pending, setPending] = useState<"preview" | "send" | "archive" | null>(null);
-  const [error, setError] = useState("");
+  const { editor, update, reserve, release, keepsRequest } = useConversationEditor(session, thread.id);
+  const { text, selectedModel, pending, error } = editor;
   const [removing, setRemoving] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [managingModels, setManagingModels] = useState(false);
   const modelTrigger = useRef<HTMLButtonElement>(null);
+  const archiveTrigger = useRef<HTMLButtonElement>(null);
+  const restoreArchiveFocus = useRef(false);
   const [prepared, setPrepared] = useState<{ scope: string; preview: ConversationPreview } | null>(null);
-  const request = useRef<ConversationRequest | null>(null);
-  const busy = useRef(false);
   const currentScope = useRef<string | null>(null);
   const composerKeyboard = useComposerKeyboard();
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const initialFocus = useRef(focusComposer);
   const formId = useId();
   const feed = useRef<HTMLOListElement>(null);
   const nearEnd = useRef(true);
@@ -103,7 +101,7 @@ export function ConversationPanel({
   const sending = pending === "send";
   const latestError = detail.data?.thread.latest_error;
   const latestMessage = messages[messages.length - 1];
-  const connection = options.find((option) => option.id === (employeeScoped ? agent?.connection_id : selected));
+  const connection = options.find((option) => option.id === (employeeScoped ? agent?.connection_id : selectedModel));
   const startedAt = running && latestMessage?.role === "user" ? latestMessage.at : undefined;
   const messageLabel = agent ? t("employeeChats.messageEmployee", { name: agent.name }) : t("conversations.message");
   const waiting = agent ? t("conversations.awaitingEmployee", { name: agent.name }) : t("conversations.awaitingReply");
@@ -137,62 +135,80 @@ export function ConversationPanel({
     if (feed.current && nearEnd.current) feed.current.scrollTop = feed.current.scrollHeight;
   }, [latestMessage?.id, running, sending]);
 
+  useLayoutEffect(() => {
+    if (removing || !restoreArchiveFocus.current) return;
+    restoreArchiveFocus.current = false;
+    const trigger = archiveTrigger.current;
+    const collapsedMenu = trigger?.closest("details:not([open])");
+    (collapsedMenu?.querySelector("summary") ?? trigger)?.focus();
+  }, [removing]);
+
+  useEffect(() => {
+    if (initialFocus.current && detail.data && !disabled) {
+      initialFocus.current = false;
+      textarea.current?.focus();
+    }
+  }, [detail.data, disabled]);
+
   function errorText(code: string) {
     return t(`errors.${code}`, { defaultValue: t("conversations.failed") });
   }
 
-  function changeDraft() {
-    request.current = null;
+  function changeDraft(change: { text?: string; selectedModel?: string }) {
+    update((state) => ({ ...state, ...change, request: null, error: "" }));
     setPrepared(null);
-    setError("");
   }
 
   async function prepare(send: boolean) {
-    if (!canPrepare || !connection || busy.current) return;
+    if (!canPrepare || !connection) return;
     if (send && prepared && !details) {
       setPrepared(null);
-      setError(t("errors.conversation.stale"));
+      update((state) => ({ ...state, error: t("errors.conversation.stale") }));
       return;
     }
+    if (!reserve()) return;
     const textToSend = text.trim();
-    const previous = request.current;
-    const body =
+    const previous = editor.request;
+    const body: ConversationRequest =
       previous?.text === textToSend && previous.connection_id === connection.id
         ? previous
-        : { thread_id: thread.id, connection_id: connection.id, text: textToSend, request_id: crypto.randomUUID() };
-    request.current = body;
-    busy.current = true;
+        : {
+            thread_id: thread.id,
+            connection_id: connection.id,
+            text: textToSend,
+            request_id: crypto.randomUUID(),
+          };
     if (send) nearEnd.current = true;
-    setError("");
-    setPending(send ? "send" : "preview");
+    update((state) => ({ ...state, request: body, error: "", pending: send ? "send" : "preview" }));
     try {
       const preview = details ?? (await actions.preview(body));
-      if (currentScope.current === null) return;
+      // Once Send was requested, switching panels can retire this editor while the workspace still owns the request.
+      // The server checks the signed recipient, thread revision and outgoing context again before recording the turn.
+      if (currentScope.current === null && !(send && keepsRequest())) return;
       if (
-        currentScope.current !== scope ||
+        (currentScope.current !== null && currentScope.current !== scope) ||
         preview.external !== !connection.local ||
         preview.provider !== connection.provider ||
         preview.model !== connection.model
       ) {
         setPrepared(null);
-        setError(t("errors.conversation.stale"));
+        update((state) => ({ ...state, error: t("errors.conversation.stale") }));
         return;
       }
       if (send) {
         await actions.send(body, preview.token, preview.external);
-        if (draft?.onSent) draft.onSent(textToSend);
-        else setText("");
-        changeDraft();
+        update((state) => ({ ...state, text: state.text.trim() === textToSend ? "" : state.text, request: null }));
+        setPrepared(null);
         setShowDetails(false);
       } else {
         setPrepared({ scope, preview });
       }
     } catch (cause) {
       setPrepared(null);
-      setError(conversationErrorText(t, cause));
+      update((state) => ({ ...state, error: conversationErrorText(t, cause) }));
     } finally {
-      busy.current = false;
-      setPending(null);
+      release();
+      update((state) => ({ ...state, pending: null }));
     }
   }
 
@@ -202,19 +218,18 @@ export function ConversationPanel({
   }
 
   async function archive() {
-    if (running || busy.current) return;
-    busy.current = true;
-    setPending("archive");
-    setError("");
+    if (running || !reserve()) return;
+    update((state) => ({ ...state, pending: "archive", error: "" }));
     try {
       await actions.archive(thread.id);
-      onRemove();
+      update((state) => ({ ...state, text: "", request: null }));
+      if (currentScope.current !== null) onRemove();
     } catch (cause) {
-      setError(conversationErrorText(t, cause));
+      update((state) => ({ ...state, error: conversationErrorText(t, cause) }));
     } finally {
-      busy.current = false;
+      release();
       setRemoving(false);
-      setPending(null);
+      update((state) => ({ ...state, pending: null }));
     }
   }
 
@@ -228,7 +243,13 @@ export function ConversationPanel({
     return t("model.fallback");
   }
   const remove = (
-    <button type="button" className="conversation-text-action" disabled={disabled} onClick={() => setRemoving(true)}>
+    <button
+      ref={archiveTrigger}
+      type="button"
+      className="conversation-text-action"
+      disabled={disabled}
+      onClick={() => setRemoving(true)}
+    >
       {t("conversations.remove")}
     </button>
   );
@@ -291,10 +312,7 @@ export function ConversationPanel({
           maxLength={1500}
           disabled={disabled || !detail.data}
           placeholder={messageLabel}
-          onChange={(event) => {
-            setText(event.target.value);
-            changeDraft();
-          }}
+          onChange={(event) => changeDraft({ text: event.target.value })}
         />
         <div className="composer-row">
           <ComposerMenu
@@ -359,10 +377,7 @@ export function ConversationPanel({
                           aria-checked={connection?.id === model.id}
                           tabIndex={-1}
                           className="composer-menu-item"
-                          onClick={() => {
-                            setSelected(model.id);
-                            changeDraft();
-                          }}
+                          onClick={() => changeDraft({ selectedModel: model.id })}
                         >
                           <span>{model.description ? recipient(model.provider, model.model) : model.label}</span>
                           {model.description && <small>{model.description}</small>}
@@ -410,8 +425,7 @@ export function ConversationPanel({
             type="button"
             className="conversation-text-action chat-reuse-draft"
             onClick={() => {
-              changeDraft();
-              setText(latestMessage.text);
+              changeDraft({ text: latestMessage.text });
               textarea.current?.focus();
             }}
           >
@@ -453,7 +467,10 @@ export function ConversationPanel({
           confirmLabel={t("conversations.confirmRemove")}
           pending={Boolean(pending)}
           blocked={running}
-          onCancel={() => setRemoving(false)}
+          onCancel={() => {
+            restoreArchiveFocus.current = true;
+            setRemoving(false);
+          }}
           onConfirm={() => void archive()}
         >
           <p>{t("conversations.removeHint")}</p>
@@ -648,6 +665,10 @@ function Confirmation({
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
   }, []);
+  function dismiss() {
+    ref.current?.close();
+    onCancel();
+  }
   return (
     <dialog
       ref={ref}
@@ -655,13 +676,13 @@ function Confirmation({
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
-        if (!pending) onCancel();
+        if (!pending) dismiss();
       }}
     >
       <h3 id={titleId}>{title}</h3>
       {children}
       <div className="choices">
-        <button type="button" className="button" disabled={pending} onClick={onCancel}>
+        <button type="button" className="button" disabled={pending} onClick={dismiss}>
           {t("common.cancel")}
         </button>
         <button type="button" className="button primary" disabled={blocked || pending} onClick={onConfirm}>

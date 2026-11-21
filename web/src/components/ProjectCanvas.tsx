@@ -75,7 +75,6 @@ type Props = {
   claims: Claim[];
   selected: string | null;
   onSelect: (id: string) => void;
-  onOpenClaim: (id: string) => void;
   detailsOpen: boolean;
   onToggleDetails: () => void;
   atlasClaims: AtlasClaim[] | undefined;
@@ -94,7 +93,6 @@ export function ProjectCanvas({
   claims,
   selected,
   onSelect,
-  onOpenClaim,
   detailsOpen,
   onToggleDetails,
   atlasClaims,
@@ -362,14 +360,11 @@ export function ProjectCanvas({
   return (
     <div className="project-canvas" onKeyDown={onCanvasKey}>
       <div className="project-canvas-tools">
-        <button type="button" className="button" disabled={!selected} onClick={() => selected && onOpenClaim(selected)}>
-          {t("projectCanvas.openProof")}
-        </button>
         <button
           id="map-details-toggle"
           type="button"
           className="button"
-          disabled={!selected}
+          disabled={!selected && !detailsOpen}
           aria-expanded={detailsOpen}
           aria-controls="review"
           onClick={() => {

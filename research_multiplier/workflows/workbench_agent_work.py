@@ -173,7 +173,8 @@ def _present(task, *, detail=False):
     attempt = task["attempt"] or {}
     error = attempt.get("error")
     result = {
-        "id": task["id"], "mode": spec["mode"], "title": spec["title"], "agent_name": spec["agent_name"],
+        "id": task["id"], "mode": spec["mode"], "title": spec["title"],
+        "agent_id": spec.get("agent_id"), "agent_name": spec["agent_name"],
         "status": task["state"], "created_at": task["created_at"], "updated_at": task["updated_at"],
         "delivery_sha256": attempt.get("result_sha256"), "predecessor_id": spec.get("predecessor_id"),
         "error": {"lease_expired": "agentWork.interrupted", "stale_predecessor": "agentWork.predecessorUnavailable"}.get(

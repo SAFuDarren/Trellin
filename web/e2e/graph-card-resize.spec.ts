@@ -25,18 +25,21 @@ test("resize a graph card independently at different zooms and remember per view
   await openProof(page);
   const card = page.locator('.graph-node[data-kind="goal"]');
   const handle = page.getByRole("button", { name: `Resize node ${TITLE}`, exact: true });
-  const zoom = page.locator(".zoom-level");
+  const proof = page.locator(".inspector-graph");
+  const scale = () =>
+    proof.locator(".plot").evaluate((plot) => new DOMMatrixReadOnly(getComputedStyle(plot).transform).a);
   await expect(card).toHaveAttribute("title", TITLE);
   await expect(handle).toHaveAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight ArrowUp ArrowDown");
-  await page.getByRole("button", { name: "Fit to window", exact: true }).click();
-  await expect(zoom).toHaveText("125%");
+  await proof.getByRole("button", { name: "Fit to window", exact: true }).click();
+  await handle.scrollIntoViewIfNeeded();
+  const firstScale = await scale();
   const start = await dimensions(card);
   const originalTitle = await card.locator(".node-title").evaluate((el) => el.clientHeight);
   const first = (await handle.boundingBox())!;
   await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
   await page.mouse.down();
   await page.mouse.move(first.x + first.width / 2 + 70, first.y + first.height / 2, { steps: 5 });
-  await expect.poll(async () => (await dimensions(card)).cssWidth).toBe(start.cssWidth + 56);
+  await expect.poll(async () => (await dimensions(card)).cssWidth).toBe(start.cssWidth + Math.round(70 / firstScale));
   const wide = await dimensions(card);
   expect(wide.cssHeight).toBe(start.cssHeight);
   expect(wide.x).toBeCloseTo(start.x, 0);
@@ -45,15 +48,17 @@ test("resize a graph card independently at different zooms and remember per view
   await page.mouse.up();
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), LAYOUT_KEY)).not.toBeNull();
 
-  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
-  await expect(zoom).toHaveText("104%");
+  await proof.getByRole("button", { name: "Zoom out", exact: true }).click();
+  const secondScale = await scale();
   const beforeHeight = await dimensions(card);
   const second = (await handle.boundingBox())!;
   await page.mouse.move(second.x + second.width / 2, second.y + second.height / 2);
   await page.mouse.down();
   await page.mouse.move(second.x + second.width / 2, second.y + second.height / 2 + 80, { steps: 6 });
   await page.mouse.up();
-  await expect.poll(async () => (await dimensions(card)).cssHeight).toBe(beforeHeight.cssHeight + 77);
+  await expect
+    .poll(async () => (await dimensions(card)).cssHeight)
+    .toBe(beforeHeight.cssHeight + Math.round(80 / secondScale));
   const tall = await dimensions(card);
   expect(tall.cssWidth).toBe(wide.cssWidth);
   expect(tall.x).toBeCloseTo(beforeHeight.x, 0);

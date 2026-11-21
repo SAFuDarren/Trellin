@@ -41,7 +41,8 @@ test("a claim expands and collapses in place with its recorded statement", async
 
   await card.click();
   await page.getByRole("button", { name: "Open in Workbench", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(CLAIM_TITLE);
+  await expect(page.locator("#node-detail").getByRole("heading", { name: CLAIM_TITLE })).toBeVisible();
+  await expect(page.getByRole("application", { name: "Project map", exact: true })).toBeVisible();
 });
 
 test("long titles stay inside their proof node when zooming", async ({ page }) => {
@@ -51,8 +52,8 @@ test("long titles stay inside their proof node when zooming", async ({ page }) =
   const label = card.locator(".node-title");
   await expect(card).toHaveAttribute("title", LONG_TITLE);
   await expect(label).toHaveText(LONG_TITLE);
-  await page.getByRole("button", { name: "Fit to window", exact: true }).click();
-  await expect(page.locator(".zoom-level")).toHaveText("125%");
+  await page.locator("#review").getByRole("button", { name: "Fit to window", exact: true }).click();
+  await expect(card).toBeInViewport();
   const width = await label.evaluate((title) => {
     const node = title.closest(".graph-node")!;
     return {

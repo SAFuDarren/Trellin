@@ -46,7 +46,6 @@
   --type-semibold: 600;
   --side-w: 240px;
   --right-w: 340px;
-  --chat-h: 320px;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -550,18 +549,6 @@ select {
   white-space: nowrap;
   font-weight: var(--type-regular);
 }
-.workbench-map-return {
-  padding: 0 10px 0 0;
-  border: 0;
-  border-inline-end: 1px solid var(--hair);
-  background: transparent;
-  color: var(--sub);
-  font-size: var(--type-control-size);
-}
-.workbench-map-return:hover,
-.workbench-map-return:focus-visible {
-  color: var(--ink);
-}
 .workbench-map-status {
   display: flex;
   flex-wrap: wrap;
@@ -581,25 +568,6 @@ select {
   border: 1px solid var(--hair);
   border-radius: 9px;
   background: var(--track);
-}
-.stage .segmented {
-  position: absolute;
-  top: 8px;
-  right: 14px;
-  z-index: 2;
-  cursor: default;
-  max-width: calc(100% - 28px);
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-.stage .segmented button {
-  height: auto;
-  min-height: 26px;
-  min-width: 0;
-  max-width: 100%;
-  padding: 3px clamp(5px, 1vw, 14px);
-  line-height: 1.15;
-  overflow-wrap: anywhere;
 }
 .segmented button {
   height: 26px;
@@ -693,7 +661,7 @@ select {
 .graph-edge[data-emphasis="strong"] {
   stroke-width: 1.8;
 }
-.app[data-view="impact"] .graph-edge[data-emphasis="strong"] {
+[data-proof-view="impact"] .graph-edge[data-emphasis="strong"] {
   stroke: var(--crit);
   stroke-width: 2;
 }
@@ -1130,17 +1098,13 @@ select {
   background: var(--hair);
 }
 
-/* Conversation */
+/* Proof activity */
 .chat {
-  flex: 0 0 var(--chat-h);
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px 18px 14px;
-}
-.chat[data-collapsed="true"] {
-  flex-basis: auto;
 }
 .chat-head {
   display: flex;
@@ -1163,14 +1127,6 @@ select {
 .chat-code {
   font: var(--type-medium) var(--type-meta-size) / 1 var(--mono);
   color: var(--sub);
-}
-#chat-target {
-  font-size: var(--type-meta-size);
-  font-weight: var(--type-regular);
-  color: var(--sub);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .chat-state {
   margin-left: auto;
@@ -1199,17 +1155,6 @@ select {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--on-ink);
-}
-.conversation-tabs .chip[aria-pressed="true"] {
-  background: var(--pick);
-  border-color: var(--pick);
-  color: var(--ink);
-}
-#toggle-chat svg {
-  transition: transform 0.15s;
-}
-.chat[data-collapsed="true"] #toggle-chat svg {
-  transform: rotate(180deg);
 }
 .chat-body {
   flex: 1;
@@ -1512,6 +1457,53 @@ select {
   gap: 14px;
   padding: 16px;
 }
+.inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.inspector-disclosure {
+  border-top: 1px solid var(--hair);
+}
+.inspector-disclosure > summary {
+  padding: 11px 16px;
+  cursor: pointer;
+  font-weight: var(--type-semibold);
+}
+.inspector-disclosure > summary:hover {
+  background: var(--track);
+}
+.inspector-lenses {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 12px 8px;
+}
+.inspector-lenses button {
+  height: auto;
+  min-height: 30px;
+  padding: 4px 5px;
+  overflow-wrap: anywhere;
+}
+.inspector-graph {
+  min-height: 260px;
+  margin: 0 12px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.inspector-proof-empty {
+  padding: 4px 16px 12px;
+  color: var(--sub);
+}
+.inspector-activity .chat {
+  padding-inline: 16px;
+}
+.inspector-activity .chat-head {
+  flex-wrap: wrap;
+}
+.inspector-activity .chat-feed {
+  max-height: 14rem;
+}
 .detail-head {
   display: flex;
   flex-wrap: wrap;
@@ -1610,7 +1602,6 @@ select {
 
 @media (pointer: coarse) {
   .segmented button,
-  .stage .segmented button,
   .claim,
   .queue-item,
   .zoom button,
@@ -2610,17 +2601,6 @@ select {
   background: var(--main);
 }
 
-.conversation-tabs,
-.conversation-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-.conversation-tools select {
-  min-width: 0;
-  max-width: 100%;
-}
 .conversation-panel {
   display: flex;
   flex: 1;

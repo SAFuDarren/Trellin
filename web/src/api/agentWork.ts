@@ -17,6 +17,7 @@ export type AgentWorkStatus =
 export type AgentWorkSummary = {
   id: string;
   title: string;
+  agent_id?: string | null;
   agent_name: string;
   mode: AgentWorkMode;
   status: AgentWorkStatus;

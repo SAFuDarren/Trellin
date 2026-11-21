@@ -108,6 +108,10 @@ def test_workbench_pins_code_handoff_and_requires_a_human_decision(workbench, mo
     assert len(requests) == 2
     assert requests[1]["user"]["inputs"]["predecessor"]["delivery"] == first["delivery"]
     assert second["agent_name"] == "Reviewer"
+    assert second["agent_id"] == employees[1]["id"]
+    assert {
+        task["id"]: task["agent_id"] for task in _request(server, "GET", _ROUTE)["tasks"]
+    } == {first["id"]: employees[0]["id"], second["id"]: employees[1]["id"]}
     assert _get(server, first["id"])["status"] == "delivered"
     decision = {
         "task_id": second["id"], "action_id": str(uuid4()), "delivery_sha256": second["delivery_sha256"],

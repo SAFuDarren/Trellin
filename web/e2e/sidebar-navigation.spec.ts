@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { controlledMenu, openMenu } from "./navigation";
-import { openProof } from "./project-map";
+import { mapClaim, openProof } from "./project-map";
 
 test("the icon rail keeps names and badges and shows labels by pointer and keyboard", async ({ page }) => {
   await page.goto("/#session=fixture");
@@ -60,19 +60,17 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   await expect(page.locator(".section-main")).toBeInViewport();
 });
 
-test("dark navigation and conversation tabs use flat gray selection", async ({ page }) => {
+test("proof activity opens with the keyboard and dark navigation uses flat gray selection", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/#session=fixture");
   await openProof(page);
 
-  const proofActivity = page.getByRole("button", { name: "Proof activity" });
+  const proofActivity = page.locator("#review summary").filter({ hasText: /^Proof activity$/ });
   await proofActivity.focus();
   await proofActivity.press("Enter");
   await expect(proofActivity).toHaveCSS("outline-style", "solid");
   await expect(proofActivity).toHaveCSS("outline-width", "2px");
-  await expect(proofActivity).toHaveAttribute("aria-pressed", "true");
-  await expect(proofActivity).toHaveCSS("background-color", "rgb(52, 52, 52)");
-  await expect(proofActivity).toHaveCSS("color", "rgb(241, 241, 241)");
+  await expect(page.locator(".inspector-activity")).toHaveAttribute("open", "");
 
   const rail = page.locator("nav.rail");
   const claims = rail.getByRole("link", { name: "Claims", exact: true });
@@ -94,7 +92,7 @@ test("the view switcher and Home restore the selected claim and proof node", asy
   const switchView = page.getByRole("button", { name: "Switch view", exact: true });
   const title = page.getByRole("heading", { level: 1 });
   await openProof(page, "单射映射的复合");
-  await expect(title).toHaveText("Other claim");
+  await expect(mapClaim(page, "单射映射的复合")).toHaveAttribute("aria-pressed", "true");
   const chosen = page.getByRole("button", { name: /^Proof obligation 2\b/ });
   await chosen.click();
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
@@ -133,7 +131,7 @@ test("the view switcher and Home restore the selected claim and proof node", asy
       await home.click();
     }
     await expect(page).toHaveURL(/#workbench$/);
-    await expect(title).toHaveText("Other claim");
+    await expect(mapClaim(page, "单射映射的复合")).toHaveAttribute("aria-pressed", "true");
     await expect(chosen).toHaveAttribute("aria-pressed", "true");
     await expect(home).toHaveAttribute("aria-current", "page");
   }

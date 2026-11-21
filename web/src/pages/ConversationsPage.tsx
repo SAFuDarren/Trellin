@@ -44,7 +44,6 @@ export function ConversationsPage({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<{ route: string; message: string; named: boolean }>();
   const [employeeQuery, setEmployeeQuery] = useState("");
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const lastTask = useRef(new Map<string, string>());
   const taskSelect = useRef<HTMLSelectElement>(null);
   const refocusTaskSelect = useRef(false);
@@ -67,7 +66,6 @@ export function ConversationsPage({
   const current = selected ?? (!sub && !profiles.isPending && employees.length === 0 ? conversations[0] : undefined);
   const currentId = current?.id;
   const currentEmployeeId = employee?.id;
-  const draftKey = session + "/" + currentId;
   const showHistory = historyView || showProof || Boolean(selected && !employee);
   const proofRows = proof.data?.threads ?? [];
   const selectedProof = showProof ? proofRows.find((thread) => proofKey(thread) === sub) : undefined;
@@ -128,24 +126,6 @@ export function ConversationsPage({
     } finally {
       setCreating(false);
     }
-  }
-
-  function updateDraft(text: string) {
-    setDrafts((previous) => {
-      const next = { ...previous };
-      if (text) next[draftKey] = text;
-      else delete next[draftKey];
-      return next;
-    });
-  }
-
-  function clearSentDraft(text: string) {
-    setDrafts((previous) => {
-      if (previous[draftKey]?.trim() !== text) return previous;
-      const next = { ...previous };
-      delete next[draftKey];
-      return next;
-    });
   }
 
   function row(thread: ConversationSummary) {
@@ -354,11 +334,7 @@ export function ConversationsPage({
             session={session}
             thread={current}
             employee={employee}
-            draft={
-              employee ? { text: drafts[draftKey] ?? "", onChange: updateDraft, onSent: clearSentDraft } : undefined
-            }
             onRemove={() => {
-              updateDraft("");
               window.location.hash = employee
                 ? href("chat", tasks.find((task) => task.id !== current.id)?.id ?? EMPLOYEE_ROUTE + employee.id)
                 : href("chat", employees.length ? HISTORY_ROUTE : "");
