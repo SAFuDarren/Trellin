@@ -22,13 +22,8 @@
 
 .team-tools select {
   min-width: 8rem;
-  max-width: 100%;
-  min-height: 34px;
-  padding: 4px 8px;
-  border: 1px solid var(--hair);
-  border-radius: 7px;
-  background: var(--canvas);
-  color: var(--ink);
+  height: var(--field-h);
+  background-color: var(--canvas);
 }
 
 .team-table {

@@ -11,7 +11,6 @@ import {
 } from "../api/modelConnections";
 import { AGENT_AVATARS, useSaveTeamAgent, useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { href } from "../shell/route";
-import { Chevron } from "./Icons";
 import { ModelConnections } from "./ModelConnections";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import "../styles/team-agent-profiles.css";
@@ -352,24 +351,21 @@ function TeamAgentWizard({
                 </label>
                 <div className="team-agent-field">
                   <label htmlFor={`${title}-avatar`}>{t("teamAgents.avatar")}</label>
-                  <div className="team-agent-select">
-                    <select
-                      id={`${title}-avatar`}
-                      value={draft.avatar}
-                      onChange={(event) => {
-                        const avatar = AGENT_AVATARS.find((option) => option === event.target.value);
-                        if (avatar) update({ avatar });
-                      }}
-                      disabled={busy}
-                    >
-                      {AGENT_AVATARS.map((avatar) => (
-                        <option key={avatar} value={avatar}>
-                          {t(`teamAgents.avatars.${avatar}`)}
-                        </option>
-                      ))}
-                    </select>
-                    <Chevron />
-                  </div>
+                  <select
+                    id={`${title}-avatar`}
+                    value={draft.avatar}
+                    onChange={(event) => {
+                      const avatar = AGENT_AVATARS.find((option) => option === event.target.value);
+                      if (avatar) update({ avatar });
+                    }}
+                    disabled={busy}
+                  >
+                    {AGENT_AVATARS.map((avatar) => (
+                      <option key={avatar} value={avatar}>
+                        {t(`teamAgents.avatars.${avatar}`)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <label>

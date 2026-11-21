@@ -8,7 +8,7 @@ import { activityNode, type Graph } from "../workbench/graph";
 import { isCodex, modelName, nodeTitle } from "../workbench/text";
 import type { ActivityRecord, ActivitySnapshot, ProofDraft } from "../workbench/types";
 import { FeedEntry } from "./FeedEntry";
-import { Chevron, Spin } from "./Icons";
+import { Spin } from "./Icons";
 
 type DraftOperation = "loading" | "saving" | "discarding";
 type DraftError = "loadFailed" | "saveFailed" | "discardFailed" | "conflict";
@@ -473,7 +473,6 @@ function Composer({
                 </option>
               ))}
             </select>
-            <Chevron />
           </div>
           <button
             id="guidance-send"
