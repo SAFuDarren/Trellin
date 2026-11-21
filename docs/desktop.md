@@ -26,7 +26,7 @@ In Library, hover over a row or focus it with the keyboard to reveal its **Edit 
 
 The project map, claim inspector and Claims page show the claim’s recorded review, decision and verification state. Select a claim to load its current proof task. The count covers obligations recorded in reduction routes for the current Lean statement. An obligation counts as verified while its checked proof remains current. If two routes record the same proposition, each occurrence counts in its route.
 
-Add installed models from [Team → Runtimes](project-intake.md#connect-a-model). For a managed installation with tools outside the standard locations, the Trellin launch environment can supply colon-separated absolute directories through `RM_DESKTOP_TOOL_PATH`.
+Team opens on **Agents**. Add installed models from [Team → Runtimes](project-intake.md#connect-a-model), where **Environment check** has its own section. For a managed installation with tools outside the standard locations, the Trellin launch environment can supply colon-separated absolute directories through `RM_DESKTOP_TOOL_PATH`.
 
 If **Proof activity** needs a newer database, choose **Back up and upgrade**. Confirm the project path in the Mac dialog. Trellin verifies a local archive containing the project files and PostgreSQL snapshot before it upgrades the selected database, then reopens the project. Keep the archive for recovery. The dialog requires this project’s saved database owner login.
 

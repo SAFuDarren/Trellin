@@ -64,8 +64,20 @@
 }
 
 .team-heading h3 {
-  font-size: 14px;
-  font-weight: 640;
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-semibold);
+}
+
+.team-environment {
+  display: grid;
+  gap: 8px;
+  padding-block-start: 14px;
+  border-block-start: 1px solid var(--hair);
+}
+
+.team-check-summary {
+  margin: 0;
+  color: var(--sub);
 }
 
 .team-model-actions {

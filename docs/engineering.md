@@ -70,6 +70,7 @@ Rules by language:
   - Server data is fetched and cached with TanStack Query; local interface state stays in components.
   - Accessibility target: WCAG 2.1 AA.
   - Use the interaction tokens in [`foundation.css`](../web/src/styles/foundation.css). Give each independently visible action area at most one filled `.button.primary`. Use outlined `.button` controls for secondary actions and quiet text or icon controls for tertiary actions. When a confirmation step opens within an area, it takes the primary emphasis.
+  - Keep page, section, and card headings at 22, 16, and 14 px using the workbench type tokens. Reserve the Navy accent for selection, focus, primary actions, and running states. Use the theme-specific accent and foreground tokens together, and give tinted selection a solid accent indicator.
 - **Lean**
   - A Lean or Mathlib upgrade is its own pull request. It records the new versions and runs the `lean` lane and the release regressions. It follows the existing upgrade path (`lean-reset-after-upgrade`, regression replay), and evidence from the old version is preserved, not rewritten.
 - **Plugins**

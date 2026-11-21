@@ -5,7 +5,7 @@
 
 .team-agent-profiles > header h3,
 .team-agent-history-heading h3 {
-  font-size: var(--type-section-size);
+  font-size: var(--type-section-title-size);
   font-weight: var(--type-semibold);
 }
 

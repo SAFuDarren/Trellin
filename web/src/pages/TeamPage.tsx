@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { api } from "../api/client";
@@ -112,7 +112,7 @@ export function TeamPage({
 }) {
   const { t } = useTranslation();
   const team = useTeam(session);
-  const page: Page = (PAGES as readonly string[]).includes(sub) ? (sub as Page) : "runtimes";
+  const page: Page = (PAGES as readonly string[]).includes(sub) ? (sub as Page) : "agents";
   const data = team.data;
   const running = data?.jobs.filter((job) => job.state === "running").length ?? 0;
   const entry = (key: Page, count?: number) => ({
@@ -180,6 +180,7 @@ export function TeamPage({
 
 function Runtimes({ session, data }: { session: string; data: Team }) {
   const { t } = useTranslation();
+  const checkHeading = useId();
   const [fresh, setFresh] = useState(0);
   const doctor = useQuery({
     queryKey: ["doctor", fresh],
@@ -213,56 +214,56 @@ function Runtimes({ session, data }: { session: string; data: Team }) {
         </table>
       </div>
       <ModelConnections session={session} />
-      <div className="callout">
-        <div className="body">
-          <strong>{t("team.check.title")}</strong>
-          <span>
-            {doctor.isFetching
-              ? t("team.check.running")
-              : doctor.data
-                ? failing.length
-                  ? t("team.check.problems", { count: failing.length })
-                  : t("team.check.allGood", {
-                      count: doctor.data.checks.filter((check) => check.status === "ok").length,
-                    })
-                : doctor.isError
-                  ? doctor.error.message
-                  : t("team.check.hint")}
-          </span>
-        </div>
-        <button
-          type="button"
-          className="button"
-          disabled={doctor.isFetching}
-          onClick={() => setFresh((value) => value + 1)}
-        >
-          {doctor.data ? t("team.check.again") : t("team.check.run")}
-        </button>
-      </div>
-      {doctor.data && (
-        <ul className="checks">
-          {doctor.data.checks.map((check) => (
-            <li key={check.id}>
-              <span
-                className="status-dot"
-                data-tone={
-                  check.status === "ok"
-                    ? "ok"
-                    : check.status === "fail"
-                      ? "bad"
-                      : check.status === "warn"
-                        ? "warn"
-                        : "none"
-                }
-              />
-              <span>{check.title}</span>
-              <span className="detail">
-                {check.status === "ok" || !check.fix ? check.detail : `${check.detail} — ${check.fix}`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <section className="team-environment" aria-labelledby={checkHeading}>
+        <header className="team-heading">
+          <h3 id={checkHeading}>{t("team.check.title")}</h3>
+          <button
+            type="button"
+            className="button"
+            disabled={doctor.isFetching}
+            onClick={() => setFresh((value) => value + 1)}
+          >
+            {doctor.data ? t("team.check.again") : t("team.check.run")}
+          </button>
+        </header>
+        <p className="team-check-summary" role="status">
+          {doctor.isFetching
+            ? t("team.check.running")
+            : doctor.data
+              ? failing.length
+                ? t("team.check.problems", { count: failing.length })
+                : t("team.check.allGood", {
+                    count: doctor.data.checks.filter((check) => check.status === "ok").length,
+                  })
+              : doctor.isError
+                ? doctor.error.message
+                : t("team.check.hint")}
+        </p>
+        {doctor.data && (
+          <ul className="checks">
+            {doctor.data.checks.map((check) => (
+              <li key={check.id}>
+                <span
+                  className="status-dot"
+                  data-tone={
+                    check.status === "ok"
+                      ? "ok"
+                      : check.status === "fail"
+                        ? "bad"
+                        : check.status === "warn"
+                          ? "warn"
+                          : "none"
+                  }
+                />
+                <span>{check.title}</span>
+                <span className="detail">
+                  {check.status === "ok" || !check.fix ? check.detail : `${check.detail} — ${check.fix}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
