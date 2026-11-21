@@ -157,6 +157,69 @@ describe("atlas", () => {
     expect(shape.here).not.toBeNull();
     expect(shape.keys.map((key) => key.claimId)).toEqual(["a", "b"]);
   });
+
+  it.each([1, 12])("keeps %i root-only claims distinguishable", (count) => {
+    const claims = Array.from({ length: count }, (_, index) => ({
+      id: `c${index}`,
+      title: `C${index}`,
+      domain: null,
+      status: "open",
+      nodes: [{ id: `g${index}`, kind: "goal" }],
+      edges: [] as [string, string][],
+    }));
+    const roots = atlasShape(claims, "c0").groups.map((group) => group.dots[0]!);
+    expect(roots).toHaveLength(count);
+    for (const [x, y] of roots) expect(Math.hypot(x - 100, y - 75)).toBeGreaterThanOrEqual(30);
+    for (const [index, [x, y, r]] of roots.entries()) {
+      for (const [ox, oy, or] of roots.slice(index + 1))
+        expect(Math.hypot(x - ox, y - oy)).toBeGreaterThan(3 * (r + or));
+    }
+  });
+
+  it("spreads root-only claims apart instead of drawing a small ring (#154)", () => {
+    const claims = Array.from({ length: 3 }, (_, index) => ({
+      id: `c${index}`,
+      title: `C${index}`,
+      domain: null,
+      status: "open",
+      nodes: [{ id: `g${index}`, kind: "goal" }],
+      edges: [] as [string, string][],
+    }));
+    const shape = atlasShape(claims, "c1");
+    const roots = shape.groups.map((group) => group.dots[0]!);
+    const centre = { x: 100, y: 75 };
+    for (const [x, y] of roots) expect(Math.hypot(x - centre.x, y - centre.y)).toBeGreaterThanOrEqual(30);
+    for (const [index, [x, y]] of roots.entries()) {
+      for (const [ox, oy] of roots.slice(index + 1)) expect(Math.hypot(x - ox, y - oy)).toBeGreaterThan(40);
+    }
+    // The dashed marker surrounds the selected claim's own dot.
+    const [sx, sy] = roots[1]!;
+    expect(Math.hypot(shape.here!.x - sx, shape.here!.y - sy)).toBeLessThan(0.01);
+  });
+
+  it("keeps the established radii once a claim has recorded steps", () => {
+    const shape = atlasShape(
+      [
+        {
+          id: "a",
+          title: "A",
+          domain: null,
+          status: "open",
+          nodes: [
+            { id: "g", kind: "goal" },
+            { id: "x", kind: "local_lemma" },
+          ],
+          edges: [["x", "g"]],
+        },
+        { id: "b", title: "B", domain: null, status: "open", nodes: [{ id: "g2", kind: "goal" }], edges: [] },
+      ],
+      "a",
+    );
+    const radius = ([x, y]: number[]) => Math.hypot(x! - 100, y! - 75);
+    const [root, step] = shape.groups[0]!.dots;
+    expect(radius(root!)).toBeCloseTo(10);
+    expect(radius(step!)).toBeCloseTo(28);
+  });
 });
 
 describe("codes and agent names", () => {

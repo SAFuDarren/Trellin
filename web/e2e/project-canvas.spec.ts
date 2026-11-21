@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { GraphSnapshot } from "../src/workbench/types";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
 
@@ -136,6 +136,63 @@ test("the global map is available from the project canvas", async ({ page }) => 
   await expect(overview).toBeHidden();
   await expect(mapClaim(page, SECOND_TITLE)).toHaveAttribute("aria-pressed", "true");
 });
+
+async function openOverview(page: Page, viewport: { width: number; height: number }) {
+  await page.setViewportSize(viewport);
+  await page.goto("/#session=fixture");
+  const canvas = page.locator(".project-canvas");
+  await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toBeVisible();
+  await canvas.getByRole("button", { name: "Global map", exact: true }).click();
+  const overview = canvas.locator(".atlas");
+  await expect(overview).toBeVisible();
+  const box = (await overview.boundingBox())!;
+  const cards = await canvas.locator(".project-canvas-plot [data-claim-id]").evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        label: element.textContent ?? "",
+        selected: element.getAttribute("aria-pressed") === "true",
+        x: rect.x,
+        y: rect.y,
+        w: rect.width,
+        h: rect.height,
+      };
+    }),
+  );
+  expect(cards.length).toBeGreaterThan(0);
+  const covered = cards.filter(
+    (card) =>
+      card.x < box.x + box.width && box.x < card.x + card.w && card.y < box.y + box.height && box.y < card.y + card.h,
+  );
+  return { box, cards, covered };
+}
+
+for (const viewport of [
+  { width: 1280, height: 800 },
+  { width: 1024, height: 768 },
+]) {
+  test(`the global map opens beside the claim cards at ${viewport.width}×${viewport.height} (#154)`, async ({
+    page,
+  }) => {
+    const { covered } = await openOverview(page, viewport);
+    expect(covered.map((card) => card.label)).toEqual([]);
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 640 },
+  { width: 640, height: 460 },
+]) {
+  test(`with no free corner at ${viewport.width}×${viewport.height} the global map leaves the selected claim visible (#154)`, async ({
+    page,
+  }) => {
+    const { box, cards, covered } = await openOverview(page, viewport);
+    expect(cards.some((card) => card.selected)).toBe(true);
+    expect(covered.filter((card) => card.selected)).toEqual([]);
+    expect(covered.length).toBeLessThanOrEqual(1);
+    if (viewport.width < 800) expect(box.width).toBeLessThan(160);
+  });
+}
 
 test("opening the inspector keeps the rightmost card visible in a compact window", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });

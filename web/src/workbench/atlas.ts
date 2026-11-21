@@ -66,6 +66,10 @@ export type AtlasShape = {
 };
 
 export const ATLAS_COLOURS = 5;
+// Radii in the 200 × 150 view box, measured from its centre.
+const ATLAS_INNER = 10;
+const ATLAS_OUTER = 68;
+const ATLAS_ROOT_ONLY = 40;
 
 export function atlasShape(claims: AtlasClaim[], currentId: string | null): AtlasShape {
   const trees = claims
@@ -74,8 +78,12 @@ export function atlasShape(claims: AtlasClaim[], currentId: string | null): Atla
   const total = trees.reduce((sum, entry) => sum + Math.max(entry.tree.leaves.get(entry.tree.root!) ?? 1, 1), 0);
   const gap = trees.length > 1 ? 6 : 0;
   const center = { x: 100, y: 75 };
-  const deepest = Math.max(1, ...trees.map(({ tree }) => tree.depth));
-  const step = Math.min(18, 58 / deepest);
+  // Claims start on an inner ring and their proof steps fan outwards to OUTER.
+  // Without any recorded steps, the claims alone use a wider ring so that they
+  // stay apart instead of collapsing into a small circle around the centre.
+  const deepest = Math.max(0, ...trees.map(({ tree }) => tree.depth));
+  const inner = deepest ? ATLAS_INNER : ATLAS_ROOT_ONLY;
+  const step = deepest ? Math.min(18, (ATLAS_OUTER - inner) / deepest) : 0;
   const point = (radius: number, angle: number) => ({
     x: center.x + radius * Math.cos((angle * Math.PI) / 180),
     y: center.y + radius * Math.sin((angle * Math.PI) / 180),
@@ -91,9 +99,9 @@ export function atlasShape(claims: AtlasClaim[], currentId: string | null): Atla
     const current = claim.id === currentId;
     const group: AtlasShape["groups"][number] = { claimId: claim.id, index, current, lines: [], dots: [] };
     const place = (id: string, from: number, to: number, level: number, parent: { x: number; y: number }) => {
-      const at = point(10 + level * step, (from + to) / 2);
+      const at = point(inner + level * step, (from + to) / 2);
       group.lines.push([parent.x, parent.y, at.x, at.y]);
-      group.dots.push([at.x, at.y, level ? 1.3 : 1.8]);
+      group.dots.push([at.x, at.y, level ? 1.3 : deepest ? 1.8 : 3]);
       nodeCount += 1;
       if (current && level === 1 && !here) here = at;
       let cursor = from;
@@ -104,7 +112,7 @@ export function atlasShape(claims: AtlasClaim[], currentId: string | null): Atla
       }
     };
     place(root, angle, angle + span, 0, center);
-    if (current && !here) here = point(10, angle + span / 2);
+    if (current && !here) here = point(inner, angle + span / 2);
     angle += span + gap;
     groups.push(group);
   }

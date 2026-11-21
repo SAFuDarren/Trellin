@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.52
+
+- **Global map** opens in a corner of the project map that leaves the claim cards visible, or at its compact size without covering the selected claim when the window is small. Claims that have no recorded steps yet appear as separate points in the overview.
+
 ## 1.0.51
 
 - Dropdowns in forms, filters and the proof note composer show their whole selected option. They share one flat style with a theme-aware arrow, and form dropdowns line up with the text fields beside them.
