@@ -101,13 +101,18 @@ Choose **Assign review** on a delivery to send that version to another agent. Dr
 ## Work with the models
 
 With database revision `0079` or later, use **Chats** to start a workspace
-discussion before creating a claim. Select an employee saved in **Team** and
-name a new task. The header lets you switch that employee's tasks, shows how
-many are waiting for a reply or need attention, and keeps existing
-conversations available from **Other conversations**. Drafts stay with their task while
-you switch in the open Chats page. A waiting turn shows its elapsed time from
-acceptance. The employee and task link are stored with this project's settings
-on this device.
+discussion before creating a claim. Select an agent saved in **Team** and
+name a new task. The header shows the agent and current task. Click the task
+title to switch among that agent's tasks and see which ones are waiting for a
+reply or have failed. Use the arrow keys to move through the list, Enter to
+select a task and Escape to close it. Drafts stay with their task while you
+switch in Chats. A waiting turn shows its elapsed time from acceptance. The
+agent and task link are stored with this project's settings on this device.
+
+Use the **Conversation history** clock beside the Chats heading to find
+earlier unassigned conversations and proof activity. Saved conversation and
+proof activity links open the same records. An earlier conversation attached
+to a proof node still shows its link to the node.
 
 Open **Agent chat** from the bottom of any page and choose a saved Agent or model. In **Workbench**, use **Ask an Agent** from the selected claim or proof node's inspector to attach that context. Choose a recipient and open the conversation. Collapse the panel to return to it later, or choose **Open full conversation** to continue in Chats. **Agent activity** shows queued and running work and results to review or retry. The composer identifies the destination and included context,
 including recent turns and, when selected, a node excerpt.

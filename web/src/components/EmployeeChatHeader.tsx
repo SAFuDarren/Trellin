@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import type { ConversationSummary } from "../api/conversations";
 import type { TeamAgent } from "../api/teamAgents";
@@ -26,6 +26,149 @@ export function EmployeeStatus({ tasks, announce }: { tasks: ConversationSummary
   );
 }
 
+function TaskSwitcher({
+  tasks,
+  current,
+  onSwitch,
+  trigger,
+}: {
+  tasks: ConversationSummary[];
+  current?: ConversationSummary;
+  onSwitch: (threadId: string) => void;
+  trigger: RefObject<HTMLButtonElement | null>;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const menuId = useId();
+  const root = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const startAtEnd = useRef(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const list = menu.current;
+    const initial = startAtEnd.current
+      ? list?.querySelector<HTMLButtonElement>("button:last-child")
+      : (list?.querySelector<HTMLButtonElement>('button[aria-checked="true"]') ?? list?.querySelector("button"));
+    initial?.focus();
+    function dismiss(event: PointerEvent) {
+      if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, [open]);
+
+  function close() {
+    setOpen(false);
+    trigger.current?.focus();
+  }
+
+  return (
+    <div
+      className="employee-chat-switcher"
+      ref={root}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        className="employee-chat-task-trigger"
+        aria-label={
+          current ? t("employeeChats.switchTaskTitle", { title: current.title }) : t("employeeChats.switchTask")
+        }
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        title={current?.title}
+        ref={trigger}
+        onClick={() => {
+          startAtEnd.current = false;
+          setOpen(!open);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          startAtEnd.current = event.key === "ArrowUp";
+          setOpen(true);
+        }}
+      >
+        <span>{current?.title ?? t("employeeChats.switchTask")}</span>
+        <Chevron />
+      </button>
+      {open && (
+        <div
+          className="employee-chat-task-menu"
+          id={menuId}
+          ref={menu}
+          role="menu"
+          aria-label={t("employeeChats.switchTask")}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              close();
+              return;
+            }
+            const items = Array.from(event.currentTarget.querySelectorAll("button"));
+            const index = items.indexOf(document.activeElement as HTMLButtonElement);
+            const last = items.length - 1;
+            let next: number;
+            switch (event.key) {
+              case "ArrowDown":
+                next = index === last ? 0 : index + 1;
+                break;
+              case "ArrowUp":
+                next = index <= 0 ? last : index - 1;
+                break;
+              case "Home":
+                next = 0;
+                break;
+              case "End":
+                next = last;
+                break;
+              default:
+                return;
+            }
+            event.preventDefault();
+            items[next]?.focus();
+          }}
+        >
+          {tasks.map((task) => {
+            const state = taskState(task);
+            return (
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={task.id === current?.id}
+                tabIndex={-1}
+                key={task.id}
+                onClick={() => {
+                  close();
+                  if (task.id !== current?.id) onSwitch(task.id);
+                }}
+              >
+                <span className="employee-chat-task-label" title={task.title}>
+                  {task.title}
+                </span>
+                {state && (
+                  <span className="chat-list-status" data-state={state}>
+                    {t(state === "running" ? "conversations.working" : "conversations.lastSendFailed")}
+                  </span>
+                )}
+                {task.id === current?.id && (
+                  <svg className="employee-chat-task-check" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="m3.5 8 3 3 6-6.5" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function EmployeeChatHeader({
   employee,
   tasks,
@@ -37,7 +180,7 @@ export function EmployeeChatHeader({
   onShowCreate,
   onCreate,
   onSwitch,
-  selectRef,
+  switcherRef,
 }: {
   employee: TeamAgent;
   tasks: ConversationSummary[];
@@ -49,7 +192,7 @@ export function EmployeeChatHeader({
   onShowCreate: () => void;
   onCreate: (title: string) => Promise<boolean>;
   onSwitch: (threadId: string) => void;
-  selectRef: Ref<HTMLSelectElement>;
+  switcherRef: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useTranslation();
   const [title, setTitle] = useState("");
@@ -65,33 +208,7 @@ export function EmployeeChatHeader({
           {tasks.length > 0 && (
             <>
               <Chevron />
-              <select
-                className="employee-chat-task-select"
-                aria-label={t("employeeChats.switchTask")}
-                title={current?.title}
-                value={current?.id ?? ""}
-                ref={selectRef}
-                onChange={(event) => onSwitch(event.currentTarget.value)}
-              >
-                {!current && (
-                  <option value="" disabled>
-                    {t("employeeChats.switchTask")}
-                  </option>
-                )}
-                {tasks.map((task) => {
-                  const state = taskState(task);
-                  return (
-                    <option value={task.id} key={task.id}>
-                      {state
-                        ? t("employeeChats.taskWithStatus", {
-                            title: task.title,
-                            status: t(state === "running" ? "conversations.working" : "conversations.lastSendFailed"),
-                          })
-                        : task.title}
-                    </option>
-                  );
-                })}
-              </select>
+              <TaskSwitcher tasks={tasks} current={current} onSwitch={onSwitch} trigger={switcherRef} />
             </>
           )}
         </div>

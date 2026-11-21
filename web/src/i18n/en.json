@@ -886,6 +886,7 @@
     "noMatches": "No matching employees.",
     "chooseEmployee": "Choose an employee to open their tasks.",
     "switchTask": "Switch task",
+    "switchTaskTitle": "Switch task: {{title}}",
     "chooseTask": "Choose a task to open its conversation.",
     "noTasks": "Create a task to start a conversation with this employee.",
     "newTask": "New task",
@@ -901,9 +902,7 @@
     "failed_one": "{{count}} failed",
     "failed_other": "{{count}} failed",
     "statusWithFailures": "{{status}} · {{failed}}",
-    "taskWithStatus": "{{title}} · {{status}}",
-    "history": "Other conversations",
-    "chooseHistory": "Choose an earlier conversation or proof activity from the sidebar."
+    "history": "Conversation history"
   },
   "threads": {
     "active": "Working now",
@@ -1188,7 +1187,7 @@
       "review": "Results and questions waiting for your decision.",
       "claims": "Every claim at a glance, grouped by status.",
       "library": "Definitions, assumptions and theorems you can build on.",
-      "chat": "Conversations with models, across all claims.",
+      "chat": "Chat with saved agents, switch tasks, or open conversation history.",
       "team": "Models, runtimes, usage and the job queue.",
       "progress": "Rules that keep work going while you are away."
     },
