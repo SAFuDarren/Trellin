@@ -40,7 +40,10 @@ test("picker search stays in place and Escape returns focus without choosing", a
   await page.keyboard.press("Escape");
   await expect(search).toBeHidden();
   await expect(find).toBeFocused();
-  await expect(page.getByRole("button", { name: "单射映射的复合" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "单射映射的复合", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
 });
 
 test("a picker inside a native dialog keeps focus and Escape scoped to the picker", async ({ page }) => {

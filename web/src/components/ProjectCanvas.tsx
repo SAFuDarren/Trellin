@@ -39,6 +39,8 @@ type Camera = Point & { k: number };
 type Gesture = { pointer: number; start: Point; origin: Point; moved: boolean; id?: string };
 type Preview = { id: string; point: Point };
 type KeyboardMove = Preview & { origin: Point };
+type ResearchLink = ProjectCanvasLayout["links"][number];
+type LinkGesture = { pointer: number; handle: HTMLButtonElement; source: string; client: Point };
 
 const WIDTH = 192;
 const HEIGHT = 80;
@@ -65,14 +67,36 @@ function connect(a: Point, b: Point) {
     const middle = (ax + bx) / 2;
     const ay = a.y + HEIGHT / 2;
     const by = b.y + HEIGHT / 2;
-    return `M ${ax} ${ay} C ${middle} ${ay}, ${middle} ${by}, ${bx} ${by}`;
+    return {
+      path: `M ${ax} ${ay} C ${middle} ${ay}, ${middle} ${by}, ${bx} ${by}`,
+      midpoint: { x: middle, y: (ay + by) / 2 },
+    };
   }
   const ax = a.x + WIDTH / 2;
   const bx = b.x + WIDTH / 2;
   const ay = a.y + (a.y < b.y ? HEIGHT : 0);
   const by = b.y + (a.y < b.y ? 0 : HEIGHT);
   const middle = (ay + by) / 2;
-  return `M ${ax} ${ay} C ${ax} ${middle}, ${bx} ${middle}, ${bx} ${by}`;
+  return {
+    path: `M ${ax} ${ay} C ${ax} ${middle}, ${bx} ${middle}, ${bx} ${by}`,
+    midpoint: { x: (ax + bx) / 2, y: middle },
+  };
+}
+
+function linkPreview(a: Point, b: Point) {
+  const middle = a.y + Math.max(20, (b.y - a.y) / 2);
+  return `M ${a.x} ${a.y} C ${a.x} ${middle}, ${b.x} ${middle}, ${b.x} ${b.y}`;
+}
+
+function sameLink(a: ResearchLink | null, b: ResearchLink) {
+  return a?.source === b.source && a.target === b.target;
+}
+
+function edgeScroll(value: number, extent: number) {
+  const edge = 40;
+  if (value < edge) return (edge - value) / edge;
+  if (value > extent - edge) return (extent - edge - value) / edge;
+  return 0;
 }
 
 function zoomCamera(camera: Camera, factor: number, center: Point) {
@@ -184,6 +208,7 @@ export function ProjectCanvas({
   const movedCamera = useRef(false);
   const gesture = useRef<Gesture | null>(null);
   const draggedCard = useRef<string | null>(null);
+  const linkGesture = useRef<LinkGesture | null>(null);
   const proofClick = useRef<string | null>(null);
   const pendingDetails = useRef<{ id: string; timer: number } | null>(null);
   const inspected = useRef<{ id: string; width: number; height: number } | null>(null);
@@ -197,6 +222,9 @@ export function ProjectCanvas({
   const [contextTarget, setContextTarget] = useState<{ id: string; anchor: ContextMenuAnchor } | null>(null);
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [linkNotice, setLinkNotice] = useState("");
+  const [linkClient, setLinkClient] = useState<Point | null>(null);
+  const [linkTarget, setLinkTarget] = useState<string | null>(null);
+  const [selectedLink, setSelectedLink] = useState<ResearchLink | null>(null);
   const [atlasOpeningBox, setAtlasOpeningBox] = useState<AtlasBox | null>(null);
 
   const cards = useMemo(() => {
@@ -220,6 +248,8 @@ export function ProjectCanvas({
   const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const visibleLinks = layout.links.filter((link) => byId.has(link.source) && byId.has(link.target));
   const activeSource = linkSource ? byId.get(linkSource) : undefined;
+  const activeLink = visibleLinks.find((link) => sameLink(selectedLink, link));
+  const drawingLink = linkClient !== null;
   const contextCard = contextTarget && byId.get(contextTarget.id);
   const editingDisabled = Boolean(layoutUnavailable || saving);
   const movingCard = keyboardMove && byId.get(keyboardMove.id);
@@ -435,6 +465,100 @@ export function ProjectCanvas({
     );
   }
 
+  function cardUnderPointer(point: Point) {
+    const card = document.elementFromPoint(point.x, point.y)?.closest<HTMLButtonElement>(".project-canvas-node");
+    return card && stage.current?.contains(card) ? (card.dataset.claimId ?? null) : null;
+  }
+
+  useLayoutEffect(() => {
+    if (linkClient) setLinkTarget(cardUnderPointer(linkClient));
+  }, [linkClient, camera]);
+
+  useEffect(() => {
+    if (!drawingLink) return;
+    let frame: number;
+    let previous = performance.now();
+    const pan = (now: number) => {
+      const current = linkGesture.current;
+      const rect = stage.current?.getBoundingClientRect();
+      if (!current || !rect) return;
+      const x = current.client.x - rect.left;
+      const y = current.client.y - rect.top;
+      const width = Math.min(rect.width, size.visibleWidth);
+      const time = Math.min(32, now - previous);
+      previous = now;
+      if (x >= 0 && x <= width && y >= 0 && y <= rect.height) {
+        const dx = edgeScroll(x, width) * time * 0.5;
+        const dy = edgeScroll(y, rect.height) * time * 0.5;
+        if (dx || dy) setCamera((view) => ({ ...view, x: view.x + dx, y: view.y + dy }));
+      }
+      frame = requestAnimationFrame(pan);
+    };
+    frame = requestAnimationFrame(pan);
+    return () => cancelAnimationFrame(frame);
+  }, [drawingLink, size.visibleWidth]);
+
+  function beginLink(id: string) {
+    cancelPendingDetails();
+    setKeyboardMove(null);
+    proofClick.current = null;
+    setSelectedLink(null);
+    setLinkNotice("");
+    setLinkSource(id);
+  }
+
+  function endLink() {
+    const current = linkGesture.current;
+    linkGesture.current = null;
+    setLinkClient(null);
+    setLinkTarget(null);
+    setLinkSource(null);
+    if (current?.handle.hasPointerCapture(current.pointer)) current.handle.releasePointerCapture(current.pointer);
+  }
+
+  function alreadyLinked(source: string, target: string) {
+    return visibleLinks.some(
+      (link) => sameLink({ source, target }, link) || sameLink({ source: target, target: source }, link),
+    );
+  }
+
+  function createLink(source: string, target: string) {
+    endLink();
+    if (editingDisabled || !byId.has(source) || !byId.has(target)) return false;
+    if (source === target) {
+      setLinkNotice(t("projectCanvas.linkToAnother"));
+      return false;
+    }
+    if (alreadyLinked(source, target)) {
+      setLinkNotice(t("projectCanvas.linkAlreadyExists"));
+      return false;
+    }
+    setLinkNotice("");
+    onLayout({ action: "link", source, target });
+    return true;
+  }
+
+  function removeLink(link: ResearchLink) {
+    if (editingDisabled) return;
+    setSelectedLink(null);
+    removingLastLink.current = visibleLinks.length === 1;
+    onLayout({ action: "unlink", ...link });
+  }
+
+  function startLinkDrag(event: PointerEvent<HTMLButtonElement>, source: string) {
+    if (event.button !== 0 || event.ctrlKey || editingDisabled || gesture.current || linkGesture.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const handle = event.currentTarget;
+    const client = { x: event.clientX, y: event.clientY };
+    handle.setPointerCapture(event.pointerId);
+    linkGesture.current = { pointer: event.pointerId, handle, source, client };
+    beginLink(source);
+    setLinkClient(client);
+    movedCamera.current = true;
+    stage.current?.focus({ preventScroll: true });
+  }
+
   function linkAction(id: string | null): FloatingOption {
     const disabled = !activeSource && (!id || cards.length < 2 || editingDisabled);
     return graphAction(
@@ -443,9 +567,8 @@ export function ProjectCanvas({
       disabled
         ? undefined
         : () => {
-            cancelPendingDetails();
-            setLinkSource(activeSource ? null : id);
-            setLinkNotice("");
+            if (activeSource) endLink();
+            else if (id) beginLink(id);
           },
       disabled ? t("graphActions.linkUnavailable") : undefined,
     );
@@ -453,16 +576,10 @@ export function ProjectCanvas({
 
   function choose(id: string, openDetails = true) {
     if (activeSource) {
-      if (activeSource.id === id || editingDisabled) return;
-      const source = activeSource.id;
-      const linked = visibleLinks.some(
-        (link) => (link.source === source && link.target === id) || (link.target === source && link.source === id),
-      );
-      setLinkSource(null);
-      setLinkNotice(linked ? t("projectCanvas.linkAlreadyExists") : "");
-      if (!linked) onLayout({ action: "link", source, target: id });
+      if (!createLink(activeSource.id, id)) return;
     } else {
       setLinkNotice("");
+      setSelectedLink(null);
     }
     movedCamera.current = true;
     onSelect(id, openDetails);
@@ -520,7 +637,7 @@ export function ProjectCanvas({
   }
 
   function startGesture(event: PointerEvent<HTMLElement>, id?: string) {
-    if (event.button !== 0 || event.ctrlKey || gesture.current || moving) return;
+    if (event.button !== 0 || event.ctrlKey || gesture.current || linkGesture.current || moving) return;
     if (pendingDetails.current?.id !== id) cancelPendingDetails();
     draggedCard.current = null;
     const origin = id ? byId.get(id)?.point : camera;
@@ -544,6 +661,12 @@ export function ProjectCanvas({
   }
 
   function moveGesture(event: PointerEvent<HTMLDivElement>) {
+    const linking = linkGesture.current;
+    if (linking?.pointer === event.pointerId) {
+      linking.client = { x: event.clientX, y: event.clientY };
+      setLinkClient(linking.client);
+      return;
+    }
     const current = gesture.current;
     if (!current || current.pointer !== event.pointerId) return;
     const dx = event.clientX - current.start.x;
@@ -564,6 +687,13 @@ export function ProjectCanvas({
   }
 
   function finishGesture(event: PointerEvent<HTMLDivElement>, save: boolean) {
+    const linking = linkGesture.current;
+    if (linking?.pointer === event.pointerId) {
+      const target = save && cardUnderPointer({ x: event.clientX, y: event.clientY });
+      if (target) createLink(linking.source, target);
+      else endLink();
+      return;
+    }
     const current = gesture.current;
     if (!current || current.pointer !== event.pointerId) return;
     gesture.current = null;
@@ -612,17 +742,63 @@ export function ProjectCanvas({
   }
 
   function onCanvasKey(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.defaultPrevented) return;
+    if (
+      event.defaultPrevented ||
+      !(event.target instanceof Element) ||
+      !event.currentTarget.contains(event.target) ||
+      event.nativeEvent.isComposing ||
+      event.target.closest("input, select, textarea, [contenteditable]")
+    )
+      return;
     if (event.key === "Escape") {
       if (cancelPendingDetails()) {
         proofClick.current = null;
         event.preventDefault();
       }
       if (activeSource) {
-        setLinkSource(null);
+        endLink();
+        event.preventDefault();
+      } else if (activeLink) {
+        setSelectedLink(null);
+        stage.current?.focus({ preventScroll: true });
         event.preventDefault();
       }
       return;
+    }
+    if (
+      activeLink &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      (event.key === "Delete" || event.key === "Backspace")
+    ) {
+      event.preventDefault();
+      removeLink(activeLink);
+      stage.current?.focus({ preventScroll: true });
+      return;
+    }
+    if (activeSource && !drawingLink && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const delta = directions[event.key];
+      if (delta || event.key === "Tab") {
+        const targets = cards.filter((card) => card.id !== activeSource.id);
+        if (!targets.length) return;
+        event.preventDefault();
+        const currentId = (document.activeElement as HTMLElement | null)?.dataset.claimId;
+        const next = delta ? delta[0] + delta[1] : event.shiftKey ? -1 : 1;
+        const index = targets.findIndex((card) => card.id === currentId);
+        const card =
+          targets[index < 0 ? (next < 0 ? targets.length - 1 : 0) : (index + next + targets.length) % targets.length];
+        if (!card) return;
+        const point = position(card.id);
+        movedCamera.current = true;
+        setCamera((view) => ({
+          ...view,
+          x: visibleOffset(view.x, point.x * view.k, WIDTH * view.k, size.visibleWidth),
+          y: visibleOffset(view.y, point.y * view.k, HEIGHT * view.k, size.height),
+        }));
+        nodes.current.get(card.id)?.focus({ preventScroll: true });
+        return;
+      }
     }
     if (
       !event.repeat &&
@@ -630,10 +806,7 @@ export function ProjectCanvas({
       !event.ctrlKey &&
       !event.metaKey &&
       !event.shiftKey &&
-      !event.nativeEvent.isComposing &&
-      event.target instanceof HTMLElement &&
-      event.currentTarget.contains(event.target) &&
-      !event.target.closest("input, select, textarea, [contenteditable]")
+      event.target instanceof HTMLElement
     ) {
       const key = event.key.toUpperCase();
       if (key === SHORTCUTS.details && canToggleDetails) {
@@ -664,6 +837,13 @@ export function ProjectCanvas({
   }
 
   const toolbarLink = linkAction(selected);
+  const midpoint = activeLink && connect(position(activeLink.source), position(activeLink.target)).midpoint;
+  const canvasBounds = linkClient && stage.current?.getBoundingClientRect();
+  const linkEnd = linkClient &&
+    canvasBounds && {
+      x: (linkClient.x - canvasBounds.left - camera.x) / camera.k,
+      y: (linkClient.y - canvasBounds.top - camera.y) / camera.k,
+    };
 
   return (
     <div className="project-canvas" onKeyDown={onCanvasKey}>
@@ -717,10 +897,7 @@ export function ProjectCanvas({
                   }),
                   disabled: editingDisabled,
                   destructive: true,
-                  onSelect: () => {
-                    removingLastLink.current = visibleLinks.length === 1;
-                    onLayout({ action: "unlink", source, target });
-                  },
+                  onSelect: () => removeLink({ source, target }),
                 })),
               },
             ]}
@@ -763,7 +940,10 @@ export function ProjectCanvas({
         data-panning={panning ? "true" : undefined}
         data-linking={activeSource ? "true" : undefined}
         onPointerDown={(event) => {
-          if (!(event.target as Element).closest("button, .atlas")) startGesture(event);
+          if (!(event.target as Element).closest("button, .atlas, .project-canvas-link, .project-canvas-link-detail")) {
+            setSelectedLink(null);
+            startGesture(event);
+          }
         }}
         onPointerMove={moveGesture}
         onPointerUp={(event) => finishGesture(event, true)}
@@ -781,12 +961,55 @@ export function ProjectCanvas({
         )}
         <div
           className="plot project-canvas-plot"
-          style={{ transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.k})` }}
+          style={
+            {
+              transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.k})`,
+              "--map-inverse-scale": 1 / camera.k,
+            } as React.CSSProperties
+          }
         >
-          <svg className="project-canvas-paths" aria-hidden="true" width="1" height="1">
-            {visibleLinks.map(({ source, target }) => (
-              <path data-research-link="" key={`${source}:${target}`} d={connect(position(source), position(target))} />
-            ))}
+          <svg className="project-canvas-paths" width="1" height="1" aria-label={t("projectCanvas.researchLinks")}>
+            {visibleLinks.map((link) => {
+              const { source, target } = link;
+              const path = connect(position(source), position(target)).path;
+              const select = () => {
+                if (activeSource) return;
+                cancelPendingDetails();
+                setSelectedLink(link);
+              };
+              return (
+                <g
+                  className="project-canvas-link"
+                  key={`${source}:${target}`}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={t("projectCanvas.selectLink", {
+                    source: byId.get(source)!.title,
+                    target: byId.get(target)!.title,
+                  })}
+                  aria-pressed={sameLink(selectedLink, link)}
+                  onClick={(event) => {
+                    event.currentTarget.focus({ preventScroll: true });
+                    select();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.preventDefault();
+                    select();
+                  }}
+                >
+                  <path data-research-link="" d={path} aria-hidden="true" />
+                  <path className="project-canvas-link-hit" d={path} aria-hidden="true" />
+                </g>
+              );
+            })}
+            {activeSource && linkEnd && (
+              <path
+                className="project-canvas-link-preview"
+                d={linkPreview({ x: activeSource.point.x + WIDTH / 2, y: activeSource.point.y + HEIGHT }, linkEnd)}
+                aria-hidden="true"
+              />
+            )}
           </svg>
           {cards.map((card) => {
             const at = position(card.id);
@@ -797,71 +1020,137 @@ export function ProjectCanvas({
               : "";
             const progress = claimProgressText(t, claimProgress?.get(card.id), card.status);
             return (
-              <button
-                {...menu}
-                key={card.id}
-                ref={(element) => {
-                  if (element) nodes.current.set(card.id, element);
-                  else nodes.current.delete(card.id);
-                }}
-                type="button"
-                className="project-canvas-node"
-                data-claim-id={card.id}
-                data-link-source={activeSource?.id === card.id ? "true" : undefined}
-                data-moving={keyboardMoving || preview?.id === card.id ? "true" : undefined}
-                aria-pressed={selected === card.id}
-                aria-label={card.title}
-                aria-description={[
-                  progress.label,
-                  progress.count ?? progress.emptyCountLabel,
-                  progress.emptyCountHint,
-                  card.domain,
-                  keyboardMoving && moveHint,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                aria-keyshortcuts={menu["aria-keyshortcuts"] + (onOpenProof ? " Enter" : "") + movingShortcuts}
-                title={card.title}
-                style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
-                onClick={(event) => {
-                  if (!keyboardMoving) clickCard(event, card.id);
-                }}
-                onPointerDown={(event) => startGesture(event, card.id)}
-                onBlur={() => {
-                  if (keyboardMoving) setKeyboardMove(null);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === SHORTCUTS.enter && event.repeat) {
-                    event.preventDefault();
-                    return;
+              <div className="project-canvas-card" key={card.id}>
+                <button
+                  {...menu}
+                  ref={(element) => {
+                    if (element) nodes.current.set(card.id, element);
+                    else nodes.current.delete(card.id);
+                  }}
+                  type="button"
+                  className="project-canvas-node"
+                  data-claim-id={card.id}
+                  data-link-source={activeSource?.id === card.id ? "true" : undefined}
+                  data-link-target={
+                    activeSource &&
+                    linkTarget === card.id &&
+                    activeSource.id !== card.id &&
+                    !alreadyLinked(activeSource.id, card.id)
+                      ? "true"
+                      : undefined
                   }
-                  if (keyboardMoving) {
-                    moveByKey(event, moving);
-                    return;
+                  data-moving={keyboardMoving || preview?.id === card.id ? "true" : undefined}
+                  aria-pressed={selected === card.id}
+                  aria-label={card.title}
+                  aria-description={[
+                    progress.label,
+                    progress.count ?? progress.emptyCountLabel,
+                    progress.emptyCountHint,
+                    card.domain,
+                    keyboardMoving && moveHint,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  aria-keyshortcuts={
+                    menu["aria-keyshortcuts"] +
+                    (onOpenProof ? " Enter" : "") +
+                    movingShortcuts +
+                    (!editingDisabled && cards.length > 1 ? ` ${SHORTCUTS.linkClaim}` : "")
                   }
-                  menu.onKeyDown(event);
-                  if (
-                    !event.defaultPrevented &&
-                    event.key === SHORTCUTS.enter &&
-                    !activeSource &&
-                    onOpenProof &&
-                    !event.ctrlKey &&
-                    !event.metaKey &&
-                    !event.altKey &&
-                    !event.shiftKey
-                  ) {
-                    event.preventDefault();
-                    cancelPendingDetails();
-                    onOpenProof(card.id);
-                  }
-                }}
-              >
-                <span className="project-canvas-title">{card.title}</span>
-                <ClaimProgressSummary {...progress} detail={card.domain} />
-              </button>
+                  title={card.title}
+                  style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
+                  onClick={(event) => {
+                    if (!keyboardMoving) clickCard(event, card.id);
+                  }}
+                  onPointerDown={(event) => startGesture(event, card.id)}
+                  onBlur={() => {
+                    if (keyboardMoving) setKeyboardMove(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === SHORTCUTS.enter && event.repeat) {
+                      event.preventDefault();
+                      return;
+                    }
+                    if (keyboardMoving) {
+                      moveByKey(event, moving);
+                      return;
+                    }
+                    menu.onKeyDown(event);
+                    if (
+                      !event.defaultPrevented &&
+                      !editingDisabled &&
+                      !activeSource &&
+                      cards.length > 1 &&
+                      event.key.toUpperCase() === SHORTCUTS.linkClaim &&
+                      !event.repeat &&
+                      !event.altKey &&
+                      !event.ctrlKey &&
+                      !event.metaKey &&
+                      !event.shiftKey
+                    ) {
+                      event.preventDefault();
+                      beginLink(card.id);
+                    }
+                    if (
+                      !event.defaultPrevented &&
+                      event.key === SHORTCUTS.enter &&
+                      !activeSource &&
+                      onOpenProof &&
+                      !event.ctrlKey &&
+                      !event.metaKey &&
+                      !event.altKey &&
+                      !event.shiftKey
+                    ) {
+                      event.preventDefault();
+                      cancelPendingDetails();
+                      onOpenProof(card.id);
+                    }
+                  }}
+                >
+                  <span className="project-canvas-title">{card.title}</span>
+                  <ClaimProgressSummary {...progress} detail={card.domain} />
+                </button>
+                {!editingDisabled && !moving && cards.length > 1 && (!activeSource || activeSource.id === card.id) && (
+                  <button
+                    type="button"
+                    className="project-canvas-link-handle"
+                    tabIndex={-1}
+                    style={{ left: at.x + WIDTH / 2, top: at.y + HEIGHT }}
+                    aria-label={t("projectCanvas.linkFrom", { title: card.title })}
+                    onPointerDown={(event) => startLinkDrag(event, card.id)}
+                  />
+                )}
+              </div>
             );
           })}
         </div>
+        {activeLink && midpoint && (
+          <div
+            className="project-canvas-link-detail"
+            style={{
+              left: Math.max(100, Math.min(size.visibleWidth - 100, camera.x + midpoint.x * camera.k)),
+              top: Math.max(38, Math.min(size.height - 12, camera.y + midpoint.y * camera.k)),
+            }}
+          >
+            <span>
+              {t("projectCanvas.linkDescription", {
+                source: byId.get(activeLink.source)!.title,
+                target: byId.get(activeLink.target)!.title,
+              })}
+            </span>
+            <button
+              type="button"
+              className="button"
+              disabled={editingDisabled}
+              onClick={() => {
+                removeLink(activeLink);
+                stage.current?.focus({ preventScroll: true });
+              }}
+            >
+              {t("projectCanvas.remove")}
+            </button>
+          </div>
+        )}
         {!cards.length && <p className="project-canvas-empty">{t("notice.noClaims")}</p>}
         {atlasOpen &&
           (atlasClaims?.length ? (

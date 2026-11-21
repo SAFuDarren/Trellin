@@ -91,6 +91,7 @@ export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () =>
             { id: "fit", label: t("stage.fit"), keys: [SHORTCUTS.fit] },
             { id: "details", label: t("canvasShell.details"), keys: [SHORTCUTS.details] },
             { id: "atlas", label: t("sidebar.atlas"), keys: [SHORTCUTS.atlas] },
+            { id: "link", label: t("projectCanvas.linkClaim"), keys: [SHORTCUTS.linkClaim] },
             { id: "proof", label: t("shortcuts.openSelected"), keys: [SHORTCUTS.enter] },
             { id: "move", label: t("shortcuts.previewMove"), keys: SHORTCUTS.arrows },
             { id: "save", label: t("shortcuts.saveMove"), keys: [SHORTCUTS.enter] },

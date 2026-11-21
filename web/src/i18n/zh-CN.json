@@ -198,6 +198,9 @@
     "researchLinks": "研究关联",
     "chooseLinkTarget": "选择另一个课题，与「{{title}}」建立关联。",
     "linkAlreadyExists": "这两个课题已有研究关联。",
+    "linkToAnother": "请选择另一个课题建立关联。",
+    "linkFrom": "连接「{{title}}」",
+    "selectLink": "「{{source}}」与「{{target}}」的研究关联",
     "linkDescription": "{{source}} ↔ {{target}}",
     "removeLink": "移除「{{source}}」与「{{target}}」的关联",
     "remove": "移除"

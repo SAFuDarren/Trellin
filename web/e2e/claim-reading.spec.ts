@@ -29,7 +29,7 @@ async function open(page: Page, singleGoal = false) {
 test("a claim expands and collapses in place with its recorded statement", async ({ page }) => {
   await open(page);
   await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
-  const card = page.getByRole("button", { name: new RegExp(CLAIM_TITLE) });
+  const card = page.locator(".board").getByRole("button", { name: new RegExp(CLAIM_TITLE) });
   await expect(card).toHaveAttribute("aria-expanded", "false");
   await card.click();
   await expect(card).toHaveAttribute("aria-expanded", "true");

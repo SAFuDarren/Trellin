@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.75
+
+- Draw research links from claim handles, select links directly for removal, and use the same actions from the keyboard (#196).
+
 ## 1.0.74
 
 - Press **?** to see keyboard shortcuts. Choose **Move card** from a project card’s context menu to preview its new position with the arrows. Enter saves the position and Escape cancels.

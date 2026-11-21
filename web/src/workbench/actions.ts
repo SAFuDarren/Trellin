@@ -1,3 +1,4 @@
+import { SHORTCUTS } from "../shortcuts";
 import type { TFunction } from "i18next";
 import { createElement } from "react";
 import { WorkbenchIcon } from "../components/Icons";
@@ -22,7 +23,7 @@ const ACTIONS = {
   "copy-reference": { label: "graphActions.copyReference", icon: "copy", shortcut: "Alt+C" },
   "copy-lean": { label: "graphActions.copyLean", icon: "code", shortcut: "Alt+L" },
   "show-library": { label: "graphActions.showLibrary", icon: "library" },
-  "link-claim": { label: "projectCanvas.linkClaim", icon: "link" },
+  "link-claim": { label: "projectCanvas.linkClaim", icon: "link", shortcut: SHORTCUTS.linkClaim },
   "cancel-link": { label: "projectCanvas.cancelLink", icon: "cancel" },
   "move-card": { label: "projectCanvas.moveCard", icon: "move" },
 } satisfies Record<string, ActionDefinition>;

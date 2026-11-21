@@ -198,6 +198,9 @@
     "researchLinks": "Research links",
     "chooseLinkTarget": "Select another claim to link to {{title}}.",
     "linkAlreadyExists": "These claims are already linked.",
+    "linkToAnother": "Choose a different claim to create a link.",
+    "linkFrom": "Connect {{title}}",
+    "selectLink": "Research link between {{source}} and {{target}}",
     "linkDescription": "{{source}} ↔ {{target}}",
     "removeLink": "Remove link between {{source}} and {{target}}",
     "remove": "Remove"
