@@ -431,6 +431,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderApp("token");
+    await screen.findByRole("region", { name: en.graph.label });
     await openResearchAction(en.lemmaPlan.title);
     const dialog = within(screen.getByRole("dialog", { name: en.lemmaPlan.title }));
     expect(dialog.getByText(goal.formalization!)).toBeTruthy();
@@ -533,6 +534,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     const { container } = renderApp("token");
+    await screen.findByRole("region", { name: en.graph.label });
     await openResearchAction(en.premise.title);
     const dialog = within(screen.getByRole("dialog", { name: en.premise.title }));
     fireEvent.click(dialog.getByRole("button", { name: en.premise.propose }));
@@ -1228,7 +1230,6 @@ describe("App", () => {
       vi.fn(async (input: string) => new Response(JSON.stringify(responses[input.split("?")[0]!] ?? {}))),
     );
     renderApp("token");
-    expect(await screen.findByRole("application", { name: en.projectCanvas.label })).toBeTruthy();
     const lemma = await screen.findByRole("button", { name: /^A helper lemma/ });
     expect(lemma.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: /^Original claim/ }));
@@ -1256,6 +1257,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderApp("token");
+    await screen.findByRole("region", { name: en.graph.label });
     await openResearchAction(en.claimCodes.title);
     const modal = within(await screen.findByRole("dialog", { name: en.claimCodes.title }));
     fireEvent.change(modal.getByLabelText(en.claimCodes.claim), { target: { value: "new" } });

@@ -118,8 +118,8 @@ export function Shell({ session }: { session: string }) {
       }
     }
   }, [session, workspace, head, comprehensive, live, sessionConnection, queries]);
-  const open = (claimId: string, nodeId?: string) => {
-    setFocus({ claimId, nodeId, nonce: Date.now() });
+  const open = (claimId: string, nodeId?: string, proof?: boolean) => {
+    setFocus({ claimId, nodeId, proof, nonce: Date.now() });
     go("workbench");
   };
   const runProjectAction = (request: ProjectActionRequest) => {
@@ -145,7 +145,12 @@ export function Shell({ session }: { session: string }) {
       ...(claimMetadata.data?.claim_codes
         ? [graphAction(t, "research-references", () => runProjectAction({ id: "research-references" }))]
         : []),
-      ...(claimId ? [graphAction(t, "proof-task", () => runProjectAction({ id: "proof-task", claimId }))] : []),
+      ...(claimId
+        ? [
+            graphAction(t, "open-proof", () => open(claimId, undefined, true)),
+            graphAction(t, "proof-task", () => runProjectAction({ id: "proof-task", claimId })),
+          ]
+        : []),
       {
         id: "start-chat",
         label: t("palette.startChat"),

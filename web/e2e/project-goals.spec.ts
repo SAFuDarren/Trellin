@@ -65,7 +65,7 @@ test("adding a project goal keeps the current proof open and draws no dependency
   await expect(edges).toHaveCount(7);
   const oldPaths = await edges.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")));
   await originalNode.click();
-  await page.locator("#review").getByRole("button", { name: "Zoom in", exact: true }).click();
+  await page.locator(".main-proof-graph").getByRole("button", { name: "Zoom in", exact: true }).click();
 
   await page.getByRole("button", { name: "Add theorem" }).click();
   const dialog = page.getByRole("dialog");
@@ -81,7 +81,8 @@ test("adding a project goal keeps the current proof open and draws no dependency
   const newClaim = mapClaim(page, NEW_GOAL.title);
   await expect(dialog).toBeHidden();
   await expect(heading).toHaveText("Proof obligation 2");
-  await expect(newClaim).toBeVisible();
+  await expect(page.locator(`[data-claim-id="${NEW_GOAL.id}"]`)).toHaveCount(1);
+  await expect(newClaim).toBeHidden();
   await expect(originalNode).toHaveAttribute("aria-pressed", "true");
   await expect(originalGoal).toBeVisible();
   await expect(edges).toHaveCount(7);

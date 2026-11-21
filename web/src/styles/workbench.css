@@ -223,6 +223,9 @@ select:disabled {
   min-height: 520px;
   overflow: hidden;
 }
+.shell:has(#workbench[data-view="proof"]) {
+  min-height: 0;
+}
 .app {
   flex: 1 1 auto;
   min-width: 0;
@@ -1498,27 +1501,48 @@ select:disabled {
 .inspector-disclosure > summary:hover {
   background: var(--track);
 }
-.inspector-lenses {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0 12px 8px;
+.workbench-surfaces {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
 }
-.inspector-lenses button {
-  height: auto;
-  min-height: 30px;
-  padding: 4px 5px;
-  overflow-wrap: anywhere;
+.workbench-surfaces[data-proof-open="true"] .project-map-area {
+  visibility: hidden;
 }
-.inspector-graph {
-  min-height: 260px;
-  margin: 0 12px 12px;
-  border: 1px solid var(--hair);
-  border-radius: var(--radius-card);
-  overflow: hidden;
+.proof-surface {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
 }
-.inspector-proof-empty {
-  padding: 4px 16px 12px;
+.proof-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--hair);
+}
+.proof-lenses button {
+  padding-inline: clamp(5px, 2cqw, 14px);
+}
+.main-proof-graph {
+  min-height: 0;
+}
+.main-proof-empty {
+  padding: 8px 16px;
   color: var(--sub);
+}
+.proof-return {
+  align-self: center;
+  white-space: nowrap;
+}
+.proof-return span {
+  padding-inline-end: 3px;
 }
 .inspector-activity .chat {
   padding-inline: 16px;

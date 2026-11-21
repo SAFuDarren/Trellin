@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { AgentWorkSummary } from "../src/api/agentWork";
 import type { Conversation, ConversationAnchor, ConversationRequest } from "../src/api/conversations";
 import type { TeamAgent } from "../src/api/teamAgents";
-import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
+import { openProof } from "./project-map";
 
 test("Agent chat keeps map context explicit and preserves the selected Agent and draft across pages", async ({
   page,
@@ -101,14 +101,14 @@ test("Agent chat keeps map context explicit and preserves the selected Agent and
 
   await page.goto("/#session=fixture");
   await openProof(page);
-  const map = page.getByRole("application", { name: "Project map", exact: true });
+  const proof = page.locator(".main-proof-graph");
   const node = page.getByRole("button", { name: /^Proof obligation 2/ });
   await node.click();
   await page.getByRole("button", { name: "Ask an Agent", exact: true }).click();
   const dock = page.getByRole("region", { name: "Agent chat", exact: true });
   await expect(dock.getByText("Context · Proof obligation 2")).toBeVisible();
-  await expect(map).toBeVisible();
-  await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toBeVisible();
+  await expect(proof).toBeVisible();
+  await expect(node).toHaveAttribute("aria-pressed", "true");
   expect(created).toHaveLength(0);
   await dock.getByLabel("Choose an Agent", { exact: true }).click();
   await page.getByRole("combobox", { name: "Search Agents" }).fill("lean");
@@ -142,7 +142,7 @@ test("Agent chat keeps map context explicit and preserves the selected Agent and
     await input.press("Enter");
     await expect.poll(() => sends.length).toBe(1);
     await page.locator("nav.rail").getByRole("link", { name: "Home", exact: true }).click();
-    await expect(map).toBeVisible();
+    await expect(proof).toBeVisible();
     await expect(dock.getByText("Sending…", { exact: true })).toBeVisible();
   } finally {
     accept();

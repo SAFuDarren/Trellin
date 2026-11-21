@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.60
+
+- Open a claim’s proof in the main canvas from its details, context menu, or the command palette. Return to the same project map and camera with Escape. On Mac, a library with one project starts with the project sidebar folded.
+
 ## 1.0.59
 
 - Project map cards, the claim inspector, and Claims show the verified and total recorded obligations for the current statement, alongside the current review, decision or verification state.

@@ -93,18 +93,17 @@ test("project claims open the existing inspector without leaving or moving the c
   await expect(detailsToggle).toBeFocused();
   await expect(detailsToggle).toHaveAttribute("aria-expanded", "false");
   await expect(second).toHaveAttribute("aria-pressed", "true");
-  await second.press("Enter");
+  await second.click();
   await expect(detail.getByText(SECOND_LEAN, { exact: true })).toBeVisible();
   expect(await camera()).toEqual(panned);
   await expect(page.locator(".graph-edges")).toHaveCount(0);
 
-  await inspector
-    .locator("summary")
-    .filter({ hasText: /^Proof details$/ })
-    .click();
-  await expect(stage).toBeVisible();
+  await inspector.getByRole("button", { name: "Open proof", exact: true }).click();
+  await expect(stage).toBeHidden();
   await expect(detail.getByRole("heading", { name: SECOND_TITLE, exact: true })).toBeVisible();
-  await expect(inspector.locator(".graph-edge")).toHaveCount(7);
+  await expect(page.locator(".main-proof-graph .graph-edge")).toHaveCount(7);
+  await expect(inspector.locator(".graph-edge")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await expect(canvas.locator(".project-canvas-node")).toHaveCount(5);
   await expect(canvas.getByRole("button", { name: "Open proof", exact: true })).toHaveCount(0);
   expect(await camera()).toEqual(panned);
@@ -217,7 +216,9 @@ test("opening the inspector keeps the rightmost card visible in a compact window
   await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
 });
 
-test("an explicitly named launch claim opens proof while keeping the project map visible", async ({ page }) => {
+test("an explicitly named launch claim opens the main proof canvas and returns to the selected project card", async ({
+  page,
+}) => {
   await page.route("**/api/claims", async (route) => {
     const response = await route.fetch();
     const project = await response.json();
@@ -226,7 +227,8 @@ test("an explicitly named launch claim opens proof while keeping the project map
   await page.goto("/#session=fixture");
   await expect(page.locator("#node-detail").getByRole("heading", { name: FIXTURE_CLAIM_TITLE })).toBeVisible();
   await expect(page.locator(".graph-edge")).toHaveCount(7);
-  await expect(page.locator(".project-canvas")).toBeVisible();
+  await expect(page.locator(".project-canvas")).toBeHidden();
+  await page.locator(".proof-return").click();
   await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -304,11 +306,9 @@ test("moving nodes and linking claims are deliberate and remain after reopen", a
   await expect(canvas.locator(".atlas")).toBeVisible();
   await toggle.click();
   await expect(paths).toHaveCount(1);
-  await page
-    .locator("#review summary")
-    .filter({ hasText: /^Proof details$/ })
-    .click();
+  await page.locator("#review").getByRole("button", { name: "Open proof", exact: true }).click();
   await expect(page.locator(".graph-edge")).toHaveCount(7);
+  await page.locator(".proof-return").click();
   await expect(canvas).toBeVisible();
   await expect(paths).toHaveCount(1);
 

@@ -1,16 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { desktopProjectLibrary, type DesktopProjectAction, type DesktopProjectLibrary } from "../workbench/desktop";
+import { Popover } from "./FloatingControls";
+import { Chevron } from "./Icons";
 import "../styles/sidebar-projects.css";
 
-type SidebarProjectsProps = { open: boolean; onExpand: () => void };
+type SidebarProjectsProps = { open: boolean; onExpand?: () => void };
 
 export function useDesktopProjectList(library = desktopProjectLibrary()) {
   return useQuery({
     queryKey: ["desktop-projects"],
-    queryFn: library?.list,
-    enabled: Boolean(library),
+    queryFn: library?.list ?? skipToken,
     retry: false,
   });
 }
@@ -33,6 +34,36 @@ export function SidebarProjects(props: SidebarProjectsProps) {
   );
 }
 
+export function ProjectHeading({ name }: { name: string }) {
+  const { t } = useTranslation();
+  const id = useId();
+  const label = t("projects.switch", { name });
+  const library = desktopProjectLibrary();
+  return (
+    <h1 title={name}>
+      {library ? (
+        <Popover
+          label={label}
+          panelId={id}
+          popup="dialog"
+          triggerClassName="project-switcher-trigger"
+          className="project-switcher-panel"
+          trigger={
+            <>
+              <span>{name}</span>
+              <Chevron />
+            </>
+          }
+        >
+          {() => <RegisteredProjects open library={library} />}
+        </Popover>
+      ) : (
+        name
+      )}
+    </h1>
+  );
+}
+
 function Folder() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -43,6 +74,7 @@ function Folder() {
 
 function RegisteredProjects({ library, open, onExpand }: SidebarProjectsProps & { library: DesktopProjectLibrary }) {
   const { t } = useTranslation();
+  const titleId = useId();
   const [opening, setOpening] = useState(false);
   const [actionError, setActionError] = useState(false);
   const busy = useRef(false);
@@ -82,7 +114,7 @@ function RegisteredProjects({ library, open, onExpand }: SidebarProjectsProps & 
         title={t("projects.title")}
         onClick={() => {
           focusHeading.current = true;
-          onExpand();
+          onExpand?.();
         }}
       >
         <Folder />
@@ -91,9 +123,9 @@ function RegisteredProjects({ library, open, onExpand }: SidebarProjectsProps & 
   }
 
   return (
-    <section className="sidebar-projects" aria-labelledby="sidebar-projects-title">
+    <section className="sidebar-projects" aria-labelledby={titleId}>
       <header>
-        <h2 id="sidebar-projects-title" ref={heading} tabIndex={-1}>
+        <h2 id={titleId} ref={heading} tabIndex={-1}>
           {t("projects.title")}
         </h2>
         <button

@@ -25,6 +25,7 @@
   },
   "projects": {
     "title": "Projects",
+    "switch": "Switch project, {{name}}",
     "current": "Current project",
     "new": "New project",
     "openFolder": "Open project folder",

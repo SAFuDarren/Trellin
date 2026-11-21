@@ -84,9 +84,11 @@ function visibleOffset(offset: number, start: number, extent: number, available:
 
 type Props = {
   claims: Claim[];
+  active?: boolean;
   claimProgress?: ReadonlyMap<string, ClaimProgress>;
   selected: string | null;
   onSelect: (id: string) => void;
+  onOpenProof?: (id: string) => void;
   onContextClaim: (id: string | null) => void;
   claimActions: (id: string, link: FloatingOption) => FloatingGroup[];
   detailsOpen: boolean;
@@ -105,9 +107,11 @@ type Props = {
 
 export function ProjectCanvas({
   claims,
+  active = true,
   claimProgress,
   selected,
   onSelect,
+  onOpenProof,
   onContextClaim,
   claimActions,
   detailsOpen,
@@ -130,8 +134,9 @@ export function ProjectCanvas({
   const movedCamera = useRef(false);
   const gesture = useRef<Gesture | null>(null);
   const draggedCard = useRef<string | null>(null);
-  const inspected = useRef<string | null>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
+  const inspected = useRef<{ id: string; width: number; height: number } | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0, visibleWidth: 0 });
+  const { width: viewportWidth, height: viewportHeight } = size;
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
   const unfittedCamera = useRef(camera);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -184,35 +189,52 @@ export function ProjectCanvas({
 
   useEffect(() => {
     const target = stage.current;
-    if (!target) return;
-    const observer = new ResizeObserver(() => setSize({ width: target.clientWidth, height: target.clientHeight }));
+    if (!active || !target) return;
+    const inspector = detailsOpen ? document.getElementById("review") : null;
+    const observer = new ResizeObserver(() => {
+      const { left, width, height } = target.getBoundingClientRect();
+      const visibleWidth = inspector ? Math.min(width, inspector.getBoundingClientRect().left - left) : width;
+      setSize((current) =>
+        current.width === width && current.height === height && current.visibleWidth === visibleWidth
+          ? current
+          : { width, height, visibleWidth },
+      );
+    });
     observer.observe(target);
+    if (inspector) observer.observe(inspector);
     return () => observer.disconnect();
-  }, []);
+  }, [active, detailsOpen]);
 
   const fit = useCallback(
     (all: boolean) => {
       const first = cards[0]?.point;
-      if (!first || !size.width || !size.height) return;
+      if (!first || !viewportWidth || !viewportHeight) return;
       const left = Math.min(...cards.map(({ point }) => point.x));
       const top = Math.min(...cards.map(({ point }) => point.y));
       const width = Math.max(...cards.map(({ point }) => point.x)) - left + WIDTH;
       const height = Math.max(...cards.map(({ point }) => point.y)) - top + HEIGHT;
-      const k = Math.min(1.15, Math.max(8, size.width - 40) / width, Math.max(8, size.height - 72) / height);
+      const k = Math.min(1.15, Math.max(8, viewportWidth - 40) / width, Math.max(8, viewportHeight - 72) / height);
       if (!all && k < 0.6) {
         // Open at a readable scale on extensive maps; Fit to window can zoom out to the whole layout.
         const scale = 0.6;
-        setCamera({ x: size.width / 2 - (first.x + WIDTH / 2) * scale, y: 28 - first.y * scale, k: scale });
+        setCamera({ x: viewportWidth / 2 - (first.x + WIDTH / 2) * scale, y: 28 - first.y * scale, k: scale });
       } else {
-        setCamera({ x: (size.width - width * k) / 2 - left * k, y: (size.height - height * k) / 2 - top * k - 10, k });
+        setCamera({
+          x: (viewportWidth - width * k) / 2 - left * k,
+          y: (viewportHeight - height * k) / 2 - top * k - 10,
+          k,
+        });
       }
     },
-    [cards, size],
+    [cards, viewportWidth, viewportHeight],
   );
 
+  const lastAutomaticFit = useRef<typeof fit | null>(null);
   useEffect(() => {
-    if (!movedCamera.current) fit(false);
-  }, [fit]);
+    if (!active || movedCamera.current || lastAutomaticFit.current === fit) return;
+    lastAutomaticFit.current = fit;
+    fit(false);
+  }, [active, fit]);
 
   useLayoutEffect(() => {
     // Choose the overview's opening corner once per opening, after the map has
@@ -239,21 +261,43 @@ export function ProjectCanvas({
     );
   }, [atlasBox, atlasOpen, atlasOpeningBox, camera, cards, selected, size.height, size.width]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    if (!active) return;
     const id = detailsOpen ? selected : null;
-    if (inspected.current === id) return;
-    inspected.current = id;
-    if (contextTarget?.id === id) return;
-    const target = stage.current;
-    const point = id ? byId.get(id)?.point : undefined;
-    if (!target || !point) return;
-    const { clientWidth, clientHeight } = target;
+    if (!id) {
+      inspected.current = null;
+      return;
+    }
+    const point = byId.get(id)?.point;
+    const { visibleWidth: width, height } = size;
+    if (!point || width <= 0 || height <= 0) return;
+    const previous = inspected.current;
+    if (previous?.id === id && previous.width === width && previous.height === height) return;
+    inspected.current = { id, width, height };
+    if (previous?.id !== id && contextTarget?.id === id) return;
+    const neighbours = cards
+      .filter((card) => card.id !== id)
+      .map((card) => card.point)
+      .sort((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y));
     setCamera((current) => {
-      const x = visibleOffset(current.x, point.x * current.k, WIDTH * current.k, clientWidth);
-      const y = visibleOffset(current.y, point.y * current.k, HEIGHT * current.k, clientHeight);
+      let left = point.x;
+      let right = point.x + WIDTH;
+      let top = point.y;
+      let bottom = point.y + HEIGHT;
+      for (const other of neighbours.slice(0, 2)) {
+        const nextLeft = Math.min(left, other.x);
+        const nextRight = Math.max(right, other.x + WIDTH);
+        const nextTop = Math.min(top, other.y);
+        const nextBottom = Math.max(bottom, other.y + HEIGHT);
+        if ((nextRight - nextLeft) * current.k > width - 16 || (nextBottom - nextTop) * current.k > height - 16)
+          continue;
+        [left, right, top, bottom] = [nextLeft, nextRight, nextTop, nextBottom];
+      }
+      const x = visibleOffset(current.x, left * current.k, (right - left) * current.k, width);
+      const y = visibleOffset(current.y, top * current.k, (bottom - top) * current.k, height);
       return x === current.x && y === current.y ? current : { ...current, x, y };
     });
-  }, [byId, contextTarget, detailsOpen, selected]);
+  }, [active, byId, cards, detailsOpen, selected, size, contextTarget?.id]);
 
   useEffect(() => {
     const target = stage.current;
@@ -570,6 +614,20 @@ export function ProjectCanvas({
                 onPointerDown={(event) => startGesture(event, card.id)}
                 onKeyDown={(event) => {
                   menu.onKeyDown(event);
+                  if (
+                    !event.defaultPrevented &&
+                    event.key === "Enter" &&
+                    selected === card.id &&
+                    !activeSource &&
+                    onOpenProof &&
+                    !event.ctrlKey &&
+                    !event.metaKey &&
+                    !event.altKey &&
+                    !event.shiftKey
+                  ) {
+                    event.preventDefault();
+                    onOpenProof(card.id);
+                  }
                   if (!event.defaultPrevented) moveByKey(event, card.id, at);
                 }}
               >
