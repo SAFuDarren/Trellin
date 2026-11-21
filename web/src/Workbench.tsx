@@ -5,7 +5,13 @@ import type { TFunction } from "i18next";
 import { api } from "./api/client";
 import type { ConversationAnchor } from "./api/conversations";
 import { useFallbackInterval } from "./api/liveUpdates";
-import { useProjectCanvas } from "./api/projectCanvas";
+import {
+  sameResearchLink,
+  useProjectCanvas,
+  type ProjectCanvasOperation,
+  type ResearchLink,
+} from "./api/projectCanvas";
+import { ActionFeedback } from "./components/ActionFeedback";
 import { useAtlas, useClaimGraph, useClaims, useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
 import type { ConversationStarterScope } from "./components/ConversationRecipients";
@@ -118,6 +124,7 @@ export function Workbench({
   const [projectAction, setProjectAction] = useState<ProjectAction | null>(null);
   const [contextClaim, setContextClaim] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<{ id: number; copied: boolean }>();
+  const [linkFeedback, setLinkFeedback] = useState<{ session: string; removed: ResearchLink | null }>();
   const copySequence = useRef(0);
   const [live, setLive] = useState<{ side?: number; right?: number }>({});
   const canvas = useProjectCanvas(session, true);
@@ -266,6 +273,42 @@ export function Workbench({
     const timer = window.setTimeout(() => setCopyNotice(undefined), 4200);
     return () => window.clearTimeout(timer);
   }, [copyNotice]);
+  useEffect(() => {
+    if (!linkFeedback || canvas.saving) return;
+    const timer = window.setTimeout(() => setLinkFeedback(undefined), linkFeedback.removed ? 6500 : 4200);
+    return () => window.clearTimeout(timer);
+  }, [linkFeedback, canvas.saving]);
+
+  const removedLink = linkFeedback?.session === session ? linkFeedback.removed : null;
+  const canRestoreLink =
+    removedLink &&
+    !canvas.saving &&
+    !canvas.loading &&
+    !canvas.loadError &&
+    [removedLink.source, removedLink.target].every((id) => canvas.claims?.some((claim) => claim.id === id)) &&
+    !canvas.layout.links.some((link) => sameResearchLink(link, removedLink));
+
+  const applyCanvas = (operation: ProjectCanvasOperation) => {
+    if (operation.action === "move") return canvas.apply(operation);
+    canvas.apply(operation, (layout) => {
+      const exists = layout.links.some((link) => sameResearchLink(link, operation));
+      if (operation.action === "unlink" && !exists) setLinkFeedback({ session, removed: operation });
+      if (operation.action === "link" && exists) {
+        setLinkFeedback((current) =>
+          current?.session === session && sameResearchLink(current.removed, operation) ? undefined : current,
+        );
+      }
+    });
+  };
+
+  const restoreLink = () => {
+    if (!removedLink || !canRestoreLink) return;
+    canvas.apply({ ...removedLink, action: "link" }, (layout) => {
+      if (layout.links.some((link) => sameResearchLink(link, removedLink))) {
+        setLinkFeedback({ session, removed: null });
+      }
+    });
+  };
 
   const inspectClaim = (id: string, openDetails = true) => {
     if (claimId !== id) {
@@ -634,7 +677,7 @@ export function Workbench({
                   onToggleAtlas={() => setMapAtlasOpen((open) => !open)}
                   onAtlasBox={(box, persist) => layout.update({ atlas: box }, persist)}
                   layout={canvas.layout}
-                  onLayout={canvas.apply}
+                  onLayout={applyCanvas}
                   layoutUnavailable={canvas.loading || Boolean(canvas.loadError)}
                   saving={canvas.saving}
                 />
@@ -743,14 +786,26 @@ export function Workbench({
           </>
         )}
         <div className="workbench-action-feedback" aria-live="polite">
-          {copyNotice && (
-            <div className="workbench-action-toast" key={copyNotice.id}>
-              <span>{t(copyNotice.copied ? "graphActions.copied" : "graphActions.copyFailed")}</span>
-              <button type="button" className="conversation-text-action" onClick={() => setCopyNotice(undefined)}>
-                {t("graphActions.dismiss")}
-              </button>
-            </div>
-          )}
+          <div className="workbench-action-feedback-stack">
+            {copyNotice && (
+              <ActionFeedback
+                key={copyNotice.id}
+                message={t(copyNotice.copied ? "graphActions.copied" : "graphActions.copyFailed")}
+                onDismiss={() => setCopyNotice(undefined)}
+              />
+            )}
+            {linkFeedback?.session === session && (
+              <ActionFeedback
+                message={t(removedLink ? "projectCanvas.linkRemoved" : "projectCanvas.linkRestored")}
+                action={
+                  removedLink
+                    ? { label: t("projectCanvas.undo"), disabled: !canRestoreLink, run: restoreLink }
+                    : undefined
+                }
+                onDismiss={() => setLinkFeedback(undefined)}
+              />
+            )}
+          </div>
         </div>
         <div className="workbench-agent-chat-slot" ref={onChatCanvas} />
       </main>

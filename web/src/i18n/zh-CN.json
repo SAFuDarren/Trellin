@@ -204,6 +204,9 @@
     "linkFrom": "连接「{{title}}」",
     "selectLink": "「{{source}}」与「{{target}}」的研究关联",
     "linkDescription": "{{source}} ↔ {{target}}",
+    "linkRemoved": "已移除研究关联。",
+    "linkRestored": "已恢复研究关联。",
+    "undo": "撤销",
     "removeLink": "移除「{{source}}」与「{{target}}」的关联",
     "remove": "移除"
   },

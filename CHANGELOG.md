@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.86
+
+- Dragging a research link previews its saved route over the target card. Select a link to see both claim names without covering cards. Use Undo after removing a link to restore it.
+
 ## 1.0.85
 
 - The graph and inspector report the same withdrawal-impact total across claims and mark the selected premise as the preview target.

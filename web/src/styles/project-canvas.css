@@ -246,6 +246,17 @@
   stroke-width: 2.5px;
 }
 
+.project-canvas-link:focus {
+  outline: none;
+}
+.project-canvas-link[aria-pressed="true"] [data-research-link] {
+  stroke-width: 3px;
+  stroke-dasharray: none;
+}
+.project-canvas-link:focus-visible [data-research-link] {
+  stroke-width: 4px;
+}
+
 .project-canvas-node[data-link-target="true"] {
   border: 2px solid var(--accent);
 }
@@ -284,22 +295,41 @@
 }
 
 .project-canvas-link-detail {
-  position: absolute;
-  z-index: 2;
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: min(200px, calc(100% - 12px));
+  flex: none;
+  width: min(336px, calc(100% - 24px));
+  height: 38px;
+  margin: 6px 12px;
   padding: 4px 5px 4px 9px;
   border: 1px solid var(--hair);
   border-radius: var(--radius-control);
   background: var(--main);
-  box-shadow: var(--elevation-float);
-  transform: translate(-50%, calc(-100% - 7px));
   font-size: var(--type-meta-size);
 }
 
-.project-canvas-link-detail span {
+.project-canvas-link-detail[data-in-canvas="true"] {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  box-shadow: var(--elevation-float);
+}
+
+.project-canvas-link-detail .button {
+  flex: none;
+}
+
+.project-canvas-link-names {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.project-canvas-link-names span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
