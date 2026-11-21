@@ -204,6 +204,9 @@
     "linkFrom": "Connect {{title}}",
     "selectLink": "Research link between {{source}} and {{target}}",
     "linkDescription": "{{source}} ↔ {{target}}",
+    "linkRemoved": "Research link removed.",
+    "linkRestored": "Research link restored.",
+    "undo": "Undo",
     "removeLink": "Remove link between {{source}} and {{target}}",
     "remove": "Remove"
   },

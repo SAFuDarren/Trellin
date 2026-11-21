@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Claim } from "./client";
 
 type Point = { x: number; y: number };
-type ResearchLink = { source: string; target: string };
+export type ResearchLink = { source: string; target: string };
 export type ProjectCanvasLayout = { positions: Record<string, Point>; links: ResearchLink[] };
 export type ObligationCount = { verified: number; total: number };
 export type ProjectClaim = Claim & { obligations?: ObligationCount };
@@ -14,16 +14,21 @@ export type ProjectCanvasOperation =
 const PATH = "/api/project-canvas";
 const EMPTY: ProjectCanvasLayout = { positions: {}, links: [] };
 
+export function orderedResearchLink({ source, target }: ResearchLink): ResearchLink {
+  return source < target ? { source, target } : { source: target, target: source };
+}
+
+export function sameResearchLink(a: ResearchLink | null, b: ResearchLink): boolean {
+  return !!a && ((a.source === b.source && a.target === b.target) || (a.source === b.target && a.target === b.source));
+}
+
 function preview(layout: ProjectCanvasLayout, operation: ProjectCanvasOperation): ProjectCanvasLayout {
   if (operation.action === "move") {
     return { ...layout, positions: { ...layout.positions, [operation.id]: { x: operation.x, y: operation.y } } };
   }
-  const source = operation.source < operation.target ? operation.source : operation.target;
-  const target = source === operation.source ? operation.target : operation.source;
-  const others = layout.links.filter(
-    (link) => (link.source !== source || link.target !== target) && (link.source !== target || link.target !== source),
-  );
-  return { ...layout, links: operation.action === "link" ? [...others, { source, target }] : others };
+  const link = orderedResearchLink(operation);
+  const others = layout.links.filter((candidate) => !sameResearchLink(candidate, link));
+  return { ...layout, links: operation.action === "link" ? [...others, link] : others };
 }
 
 export function useProjectCanvasClaims(session: string, enabled: boolean) {
@@ -72,10 +77,10 @@ export function useProjectCanvas(session: string, enabled: boolean) {
       void index.refetch();
       void canvas.refetch();
     },
-    apply: (operation: ProjectCanvasOperation) => {
+    apply: (operation: ProjectCanvasOperation, onSaved?: (layout: ProjectCanvasLayout) => void) => {
       if (!canvas.isSuccess || busy.current) return;
       busy.current = true;
-      save.mutate(operation);
+      save.mutate(operation, { onSuccess: onSaved });
     },
   };
 }

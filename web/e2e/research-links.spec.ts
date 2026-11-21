@@ -42,6 +42,22 @@ async function clickLink(page: Page) {
   await expect(getMap(page).locator(".project-canvas-link")).toHaveAttribute("aria-pressed", "true");
 }
 
+async function expectLinkDetailClearOfCards(page: Page, details: Locator) {
+  const position = (await details.boundingBox())!;
+  const cards = await page
+    .locator(".project-canvas-node")
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
+  expect(
+    cards.every(
+      (card) =>
+        position.x >= card.right ||
+        position.x + position.width <= card.left ||
+        position.y >= card.bottom ||
+        position.y + position.height <= card.top,
+    ),
+  ).toBe(true);
+}
+
 test.beforeEach(async ({ request }) => {
   await request.post("/__reset", { data: {} });
 });
@@ -63,7 +79,7 @@ for (const colorScheme of ["light", "dark"] as const) {
 
     await startLinkDrag(page);
     await moveTo(page, target);
-    await expect(map.locator(".project-canvas-link-preview")).toBeVisible();
+    await expect(map.locator(".project-canvas-link-preview")).toHaveCSS("stroke-width", "2.5px");
     await expect(target).toHaveAttribute("data-link-target", "true");
     await page.keyboard.press("Escape");
     await page.mouse.up();
@@ -85,8 +101,14 @@ for (const colorScheme of ["light", "dark"] as const) {
 
     await startLinkDrag(page);
     await moveTo(page, target);
+    await expect(target).toHaveAttribute("data-link-target", "true");
+    await expect(map).toHaveCSS("outline-style", "none");
+    const previewPath = await map.locator(".project-canvas-link-preview").getAttribute("d");
+    expect(previewPath).toBeTruthy();
     await page.mouse.up();
     await expect(paths).toHaveCount(1);
+    await expect(paths).toHaveAttribute("d", previewPath!);
+    await expect(map).toHaveCSS("outline-style", "none");
     await expect.poll(() => writes).toEqual(["link"]);
     await expect(page.locator(".project-canvas-link-handle").first()).toBeAttached();
 
@@ -99,10 +121,17 @@ for (const colorScheme of ["light", "dark"] as const) {
 
     await page.reload();
     await expect(paths).toHaveCount(1);
+    await expect(paths).toHaveAttribute("d", previewPath!);
     await clickLink(page);
-    const details = map.locator(".project-canvas-link-detail");
-    await expect(details).toContainText(FIXTURE_CLAIM_TITLE);
-    await expect(details).toContainText(TARGET);
+    const details = page.locator(".project-canvas-link-detail");
+    const names = details.locator(".project-canvas-link-names span");
+    await expect(names).toHaveText([FIXTURE_CLAIM_TITLE, "↔", TARGET]);
+    await expect(details).toHaveAccessibleName(`${FIXTURE_CLAIM_TITLE} ↔ ${TARGET}`);
+    await expect(map.locator(".project-canvas-link")).toHaveCSS("outline-style", "none");
+    await expect(paths).toHaveCSS("stroke-width", "3px");
+    await expect(paths).toHaveCSS("stroke-dasharray", "none");
+    await expect(map.locator(".project-canvas-link-hit")).toHaveCSS("stroke", "rgba(0, 0, 0, 0)");
+    await expectLinkDetailClearOfCards(page, details);
     await page.keyboard.press("Escape");
     await expect(details).toHaveCount(0);
     await clickLink(page);
@@ -110,6 +139,15 @@ for (const colorScheme of ["light", "dark"] as const) {
     else await page.keyboard.press("Delete");
     await expect(paths).toHaveCount(0);
     await expect.poll(() => writes).toEqual(["link", "unlink"]);
+    const feedback = page.locator(".workbench-action-feedback");
+    await expect(feedback.getByText("Research link removed.", { exact: true })).toBeVisible();
+    await feedback.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(feedback.getByText("Research link restored.", { exact: true })).toBeVisible();
+    await expect(paths).toHaveAttribute("d", previewPath!);
+    await expect.poll(() => writes).toEqual(["link", "unlink", "link"]);
+    await page.reload();
+    await expect(paths).toHaveAttribute("d", previewPath!);
+    await expect(feedback.getByRole("button", { name: "Undo", exact: true })).toHaveCount(0);
   });
 }
 
@@ -142,6 +180,7 @@ test("keyboard linking cycles through cards and focuses a saved link for removal
   await expect(link).toBeAttached();
   await link.press("Enter");
   await expect(link).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".project-canvas-link-detail").getByRole("button", { name: "Remove" })).toBeEnabled();
   await page.keyboard.press("Backspace");
   await expect(link).toHaveCount(0);
 });
@@ -194,4 +233,105 @@ test("a link follows the pointer near the canvas edge and tracks both cards afte
     await page.mouse.up();
     await expect.poll(() => path.getAttribute("d")).not.toEqual(previous);
   }
+});
+
+test("selected links expose both names in the compact map and retain a keyboard focus indicator", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 460 });
+  await page.goto("/#session=fixture");
+  const map = getMap(page);
+  const target = mapClaim(page, TARGET);
+  await expect(target).toBeVisible();
+  await map.focus();
+  await page.keyboard.press("0");
+  await expect(map).toHaveCSS("outline-style", "solid");
+  await startLinkDrag(page);
+  await moveTo(page, target);
+  await expect(target).toHaveAttribute("data-link-target", "true");
+  await expect(map).toHaveCSS("outline-style", "none");
+  await page.mouse.up();
+  const path = map.locator("[data-research-link]");
+  await expect(path).toHaveCount(1);
+  const link = map.getByRole("button", { name: /Research link between/ });
+  await link.press("Enter");
+  const details = page.getByRole("group", { name: `${FIXTURE_CLAIM_TITLE} ↔ ${TARGET}` });
+  await expect(details).toBeVisible();
+  await expectLinkDetailClearOfCards(page, details);
+  await expect(link).toHaveCSS("outline-style", "none");
+  await expect(path).toHaveCSS("stroke-width", "4px");
+  await page.keyboard.press("Escape");
+  await expect(details).toHaveCount(0);
+  await expect(path).toHaveCount(1);
+
+  await link.press("Enter");
+  await expect(details.getByRole("button", { name: "Remove", exact: true })).toBeEnabled();
+  await page.keyboard.press("Delete");
+  const notice = page.locator(".workbench-action-toast").filter({ hasText: "Research link removed." });
+  await expect(notice).toBeVisible();
+  const noticeBounds = (await notice.boundingBox())!;
+  const zoom = page.locator(".project-canvas").getByRole("group", { name: "Zoom", exact: true });
+  const footer = page.getByRole("contentinfo", { name: "Agent chat", exact: true });
+  expect(noticeBounds.y + noticeBounds.height).toBeLessThanOrEqual((await zoom.boundingBox())!.y);
+  expect(noticeBounds.y + noticeBounds.height).toBeLessThanOrEqual((await footer.boundingBox())!.y);
+  await notice.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(path).toHaveCount(1);
+});
+
+test("failed link changes roll back and Undo can be retried", async ({ page }) => {
+  await page.goto("/#session=fixture");
+  const map = getMap(page);
+  const paths = map.locator("[data-research-link]");
+  await startLinkDrag(page);
+  await moveTo(page, mapClaim(page, TARGET));
+  await page.mouse.up();
+  await expect(paths).toHaveCount(1);
+
+  let failure: "unlink" | "link" | null = "unlink";
+  let settle!: () => void;
+  const waitToFail = new Promise<void>((resolve) => {
+    settle = resolve;
+  });
+  await page.route("**/api/project-canvas", async (route) => {
+    if (!failure || route.request().method() !== "POST" || route.request().postDataJSON().action !== failure) {
+      await route.continue();
+      return;
+    }
+    await waitToFail;
+    await route.fulfill({ status: 503, json: { error: "project_canvas.unavailable" } });
+  });
+
+  await clickLink(page);
+  const details = page.locator(".project-canvas-link-detail");
+  const feedback = page.locator(".workbench-action-feedback");
+  try {
+    await details.getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(paths).toHaveCount(0);
+    await expect(feedback.getByRole("button", { name: "Undo", exact: true })).toHaveCount(0);
+  } finally {
+    settle();
+  }
+  await expect(page.getByRole("alert").filter({ hasText: "Reload" })).toBeVisible();
+  await expect(paths).toHaveCount(1);
+  await expect(feedback.getByText("Research link removed.", { exact: true })).toHaveCount(0);
+  const undo = feedback.getByRole("button", { name: "Undo", exact: true });
+  await expect(undo).toHaveCount(0);
+
+  failure = null;
+  await clickLink(page);
+  await details.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(undo).toBeEnabled();
+  failure = "link";
+  const failedUndo = page.waitForResponse(
+    (response) => response.url().endsWith("/api/project-canvas") && response.status() === 503,
+  );
+  await undo.click();
+  await failedUndo;
+  await expect(page.getByRole("alert").filter({ hasText: "Reload" })).toBeVisible();
+  await expect(paths).toHaveCount(0);
+  await expect(undo).toBeEnabled();
+
+  failure = null;
+  await undo.click();
+  await expect(feedback.getByText("Research link restored.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(paths).toHaveCount(1);
 });

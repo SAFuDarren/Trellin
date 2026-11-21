@@ -14,7 +14,13 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
-import type { ProjectCanvasLayout, ProjectCanvasOperation } from "../api/projectCanvas";
+import {
+  orderedResearchLink,
+  sameResearchLink,
+  type ProjectCanvasLayout,
+  type ProjectCanvasOperation,
+  type ResearchLink,
+} from "../api/projectCanvas";
 import { formatShortcut, SHORTCUTS } from "../shortcuts";
 import { graphAction } from "../workbench/actions";
 import type { ClaimProgress } from "../workbench/claimProgress";
@@ -40,7 +46,6 @@ type Camera = Point & { k: number };
 type Gesture = { pointer: number; start: Point; origin: Point; moved: boolean; id?: string };
 type Preview = { id: string; point: Point };
 type KeyboardMove = Preview & { origin: Point };
-type ResearchLink = ProjectCanvasLayout["links"][number];
 type LinkGesture = { pointer: number; handle: HTMLButtonElement; source: string; client: Point };
 
 const WIDTH = 192;
@@ -49,6 +54,7 @@ const COLUMN_STEP = 240;
 const ROW_STEP = 128;
 const BOUND = 1_000_000;
 const DOUBLE_CLICK_MS = 400;
+const LINK_DETAIL_HEIGHT = 38;
 const directions: Record<string, [number, number]> = {
   ArrowLeft: [-1, 0],
   ArrowRight: [1, 0],
@@ -89,8 +95,43 @@ function linkPreview(a: Point, b: Point) {
   return `M ${a.x} ${a.y} C ${a.x} ${middle}, ${b.x} ${middle}, ${b.x} ${b.y}`;
 }
 
-function sameLink(a: ResearchLink | null, b: ResearchLink) {
-  return a?.source === b.source && a.target === b.target;
+function placeLinkDetail(
+  point: Point,
+  viewport: { width: number; height: number },
+  cardPositions: Point[],
+  camera: Camera,
+) {
+  const gap = 10;
+  const width = Math.min(336, viewport.width - gap * 2);
+  const height = LINK_DETAIL_HEIGHT;
+  const bottom = viewport.height - gap;
+  if (width < 222 || bottom < height + gap * 2) return null;
+  const x = camera.x + point.x * camera.k;
+  const y = camera.y + point.y * camera.k;
+  const halfCard = (HEIGHT * camera.k) / 2;
+  const candidates = [
+    { left: x - width / 2, top: y - height - gap },
+    { left: x - width / 2, top: y + gap },
+    { left: x - width / 2, top: y - halfCard - height - gap },
+    { left: x - width / 2, top: y + halfCard + gap },
+    { left: x + gap, top: y - height / 2 },
+    { left: x - width - gap, top: y - height / 2 },
+  ];
+  const cardBounds = cardPositions.map(({ x, y }) => ({
+    left: camera.x + x * camera.k,
+    right: camera.x + (x + WIDTH) * camera.k,
+    top: camera.y + y * camera.k,
+    bottom: camera.y + (y + HEIGHT) * camera.k,
+  }));
+  for (const candidate of candidates) {
+    const left = Math.max(gap, Math.min(viewport.width - width - gap, candidate.left));
+    const top = Math.max(gap, Math.min(bottom - height, candidate.top));
+    const collides = cardBounds.some(
+      (card) => left < card.right && left + width > card.left && top < card.bottom && top + height > card.top,
+    );
+    if (!collides) return { left, top, width };
+  }
+  return null;
 }
 
 function edgeScroll(value: number, extent: number) {
@@ -226,6 +267,7 @@ export function ProjectCanvas({
   const [linkClient, setLinkClient] = useState<Point | null>(null);
   const [linkTarget, setLinkTarget] = useState<string | null>(null);
   const [selectedLink, setSelectedLink] = useState<ResearchLink | null>(null);
+  const [linkDetailDocked, setLinkDetailDocked] = useState(false);
   const [atlasOpeningBox, setAtlasOpeningBox] = useState<AtlasBox | null>(null);
 
   const cards = useMemo(() => {
@@ -249,7 +291,7 @@ export function ProjectCanvas({
   const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const visibleLinks = layout.links.filter((link) => byId.has(link.source) && byId.has(link.target));
   const activeSource = linkSource ? byId.get(linkSource) : undefined;
-  const activeLink = visibleLinks.find((link) => sameLink(selectedLink, link));
+  const activeLink = visibleLinks.find((link) => sameResearchLink(selectedLink, link));
   const drawingLink = linkClient !== null;
   const contextCard = contextTarget && byId.get(contextTarget.id);
   const editingDisabled = Boolean(layoutUnavailable || saving);
@@ -516,9 +558,7 @@ export function ProjectCanvas({
   }
 
   function alreadyLinked(source: string, target: string) {
-    return visibleLinks.some(
-      (link) => sameLink({ source, target }, link) || sameLink({ source: target, target: source }, link),
-    );
+    return visibleLinks.some((link) => sameResearchLink(link, { source, target }));
   }
 
   function createLink(source: string, target: string) {
@@ -555,7 +595,7 @@ export function ProjectCanvas({
     beginLink(source);
     setLinkClient(client);
     movedCamera.current = true;
-    stage.current?.focus({ preventScroll: true });
+    handle.focus({ preventScroll: true });
   }
 
   function linkAction(id: string | null): FloatingOption {
@@ -837,12 +877,68 @@ export function ProjectCanvas({
 
   const toolbarLink = linkAction(selected);
   const midpoint = activeLink && connect(position(activeLink.source), position(activeLink.target)).midpoint;
+  const detailPosition =
+    midpoint && !linkDetailDocked && !atlasOpen
+      ? placeLinkDetail(
+          midpoint,
+          size,
+          cards.map((card) => position(card.id)),
+          camera,
+        )
+      : null;
+  useLayoutEffect(() => {
+    // Keep the fallback outside the stage until another link is selected. Adding
+    // the fallback row can itself resize the stage.
+    if (activeLink && !detailPosition && size.height > 0 && !linkDetailDocked) setLinkDetailDocked(true);
+  }, [activeLink, detailPosition, size.height, linkDetailDocked]);
+
+  const sourceName = activeLink ? byId.get(activeLink.source)!.title : "";
+  const targetName = activeLink ? byId.get(activeLink.target)!.title : "";
+  const linkLabel = t("projectCanvas.linkDescription", { source: sourceName, target: targetName });
+  const linkDetails = activeLink && (
+    <div
+      className="project-canvas-link-detail"
+      data-in-canvas={detailPosition ? "true" : undefined}
+      style={detailPosition ?? undefined}
+      role="group"
+      aria-label={linkLabel}
+    >
+      <div className="project-canvas-link-names" title={linkLabel} aria-hidden="true">
+        <span>{sourceName}</span>
+        <span>↔</span>
+        <span>{targetName}</span>
+      </div>
+      <button
+        type="button"
+        className="button"
+        disabled={editingDisabled}
+        onClick={() => {
+          removeLink(activeLink);
+          stage.current?.focus({ preventScroll: true });
+        }}
+      >
+        {t("projectCanvas.remove")}
+      </button>
+    </div>
+  );
+  const validTarget =
+    activeSource && linkTarget && activeSource.id !== linkTarget && !alreadyLinked(activeSource.id, linkTarget)
+      ? linkTarget
+      : null;
   const canvasBounds = linkClient && stage.current?.getBoundingClientRect();
   const linkEnd = linkClient &&
     canvasBounds && {
       x: (linkClient.x - canvasBounds.left - camera.x) / camera.k,
       y: (linkClient.y - canvasBounds.top - camera.y) / camera.k,
     };
+
+  const snappedLink =
+    activeSource && validTarget && orderedResearchLink({ source: activeSource.id, target: validTarget });
+  const previewPath = snappedLink
+    ? connect(position(snappedLink.source), position(snappedLink.target)).path
+    : activeSource &&
+      linkEnd &&
+      linkPreview({ x: activeSource.point.x + WIDTH / 2, y: activeSource.point.y + HEIGHT }, linkEnd);
 
   return (
     <div className="project-canvas" onKeyDown={onCanvasKey}>
@@ -930,6 +1026,7 @@ export function ProjectCanvas({
           </MapViewToggle>
         </div>
       </div>
+      {!detailPosition && linkDetails}
       <div
         ref={stage}
         className="stage project-canvas-stage"
@@ -974,6 +1071,8 @@ export function ProjectCanvas({
               const select = () => {
                 if (activeSource) return;
                 cancelPendingDetails();
+                movedCamera.current = true;
+                setLinkDetailDocked(false);
                 setSelectedLink(link);
               };
               return (
@@ -986,7 +1085,7 @@ export function ProjectCanvas({
                     source: byId.get(source)!.title,
                     target: byId.get(target)!.title,
                   })}
-                  aria-pressed={sameLink(selectedLink, link)}
+                  aria-pressed={sameResearchLink(selectedLink, link)}
                   onClick={(event) => {
                     event.currentTarget.focus({ preventScroll: true });
                     select();
@@ -1002,13 +1101,7 @@ export function ProjectCanvas({
                 </g>
               );
             })}
-            {activeSource && linkEnd && (
-              <path
-                className="project-canvas-link-preview"
-                d={linkPreview({ x: activeSource.point.x + WIDTH / 2, y: activeSource.point.y + HEIGHT }, linkEnd)}
-                aria-hidden="true"
-              />
-            )}
+            {previewPath && <path className="project-canvas-link-preview" d={previewPath} aria-hidden="true" />}
           </svg>
           {cards.map((card) => {
             const at = position(card.id);
@@ -1030,14 +1123,7 @@ export function ProjectCanvas({
                   className="project-canvas-node"
                   data-claim-id={card.id}
                   data-link-source={activeSource?.id === card.id ? "true" : undefined}
-                  data-link-target={
-                    activeSource &&
-                    linkTarget === card.id &&
-                    activeSource.id !== card.id &&
-                    !alreadyLinked(activeSource.id, card.id)
-                      ? "true"
-                      : undefined
-                  }
+                  data-link-target={validTarget === card.id ? "true" : undefined}
                   data-moving={keyboardMoving || preview?.id === card.id ? "true" : undefined}
                   aria-pressed={selected === card.id}
                   aria-label={card.title}
@@ -1123,33 +1209,7 @@ export function ProjectCanvas({
             );
           })}
         </div>
-        {activeLink && midpoint && (
-          <div
-            className="project-canvas-link-detail"
-            style={{
-              left: Math.max(100, Math.min(size.width - 100, camera.x + midpoint.x * camera.k)),
-              top: Math.max(38, Math.min(size.height - 12, camera.y + midpoint.y * camera.k)),
-            }}
-          >
-            <span>
-              {t("projectCanvas.linkDescription", {
-                source: byId.get(activeLink.source)!.title,
-                target: byId.get(activeLink.target)!.title,
-              })}
-            </span>
-            <button
-              type="button"
-              className="button"
-              disabled={editingDisabled}
-              onClick={() => {
-                removeLink(activeLink);
-                stage.current?.focus({ preventScroll: true });
-              }}
-            >
-              {t("projectCanvas.remove")}
-            </button>
-          </div>
-        )}
+        {detailPosition && linkDetails}
         {!cards.length && <p className="project-canvas-empty">{t("notice.noClaims")}</p>}
         {atlasOpen &&
           (atlasClaims?.length ? (

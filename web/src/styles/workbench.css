@@ -2971,15 +2971,25 @@ select:disabled {
   flex: none;
 }
 
-.workbench-action-toast {
+.workbench-action-feedback-stack {
   position: absolute;
   bottom: 52px;
   inset-inline-start: 12px;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  pointer-events: none;
+}
+
+.workbench-action-toast {
+  display: flex;
   align-items: center;
   gap: 10px;
   width: max-content;
-  max-width: calc(100% - 24px);
+  max-width: 100%;
+  pointer-events: auto;
   padding: 7px 9px;
   border: 1px solid var(--hair);
   border-radius: var(--radius-card);
