@@ -291,6 +291,7 @@
     "waiting": "Waiting for you · {{count}}",
     "none": "Nothing is waiting.",
     "allDone": "You're all caught up. New items appear here when a check or question needs you.",
+    "itemNoLongerWaiting": "This item is no longer waiting for review.",
     "openGoals": "Open research goals",
     "chooseOpenGoal": "Choose an open research goal to review its basis and search related work.",
     "kinds": {
@@ -710,6 +711,11 @@
     "claim": "Claim progress",
     "obligations": "{{verified}} of {{total}} obligations verified",
     "noObligations": "No recorded obligations",
+    "noObligationsHint": "Recorded proof obligations and their verification progress will appear here.",
+    "resultsToReview_one": "{{count}} result to review",
+    "resultsToReview_other": "{{count}} results to review",
+    "itemsToReview_one": "{{count}} item to review",
+    "itemsToReview_other": "{{count}} items to review",
     "states": {
       "review": "Waiting for your review",
       "decision": "Needs a decision",

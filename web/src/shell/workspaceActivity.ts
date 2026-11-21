@@ -1,6 +1,7 @@
 import type { AgentWorkStatus, AgentWorkSummary } from "../api/agentWork";
 import type { ConversationSummary } from "../api/conversations";
 import type { InboxItem, Job } from "../api/sections";
+import { isReviewItem } from "./reviewItems";
 
 export const ACTIVITY_STATES = ["running", "queued", "review", "attention", "completed"] as const;
 export type ActivityState = (typeof ACTIVITY_STATES)[number];
@@ -114,7 +115,7 @@ export function buildWorkspaceActivity({ jobs, tasks, threads, items, followups 
       id: `review:${item.kind}:${item.item_id}`,
       source: "review",
       item,
-      state: item.kind.startsWith("review_") || item.kind === "checker_hold" ? "review" : "attention",
+      state: isReviewItem(item) ? "review" : "attention",
       claimId: item.claim_id,
       time: activityTime(item.waiting_since, "waiting"),
     });
@@ -136,13 +137,17 @@ export function buildWorkspaceActivity({ jobs, tasks, threads, items, followups 
   const counts: Record<ActivityState, number> = { running: 0, queued: 0, review: 0, attention: 0, completed: 0 };
   const runningByClaim = new Map<string, number>();
   const runningByProofNode = new Map<string, number>();
-  const reviewByClaim = new Map<string, number>();
+  const reviewItemsByClaim = new Map<string, InboxItem[]>();
   let inboxCount = 0;
   for (const row of entries.values()) {
     counts[row.state]++;
     if (row.source === "review") inboxCount++;
     if (!row.claimId) continue;
-    if (row.state === "review") increment(reviewByClaim, row.claimId);
+    if (row.source === "review" && row.state === "review") {
+      const items = reviewItemsByClaim.get(row.claimId);
+      if (items) items.push(row.item);
+      else reviewItemsByClaim.set(row.claimId, [row.item]);
+    }
     if (row.state !== "running") continue;
     increment(runningByClaim, row.claimId);
     if (row.source === "job") {
@@ -156,7 +161,7 @@ export function buildWorkspaceActivity({ jobs, tasks, threads, items, followups 
       (right.time ? Date.parse(right.time.at) : 0) - (left.time ? Date.parse(left.time.at) : 0) ||
       left.id.localeCompare(right.id),
   );
-  return { rows, counts, runningByClaim, runningByProofNode, reviewByClaim, inboxCount };
+  return { rows, counts, runningByClaim, runningByProofNode, reviewItemsByClaim, inboxCount };
 }
 
 export type WorkspaceActivity = ReturnType<typeof buildWorkspaceActivity>;

@@ -12,6 +12,8 @@ Trellin opens the Research Multiplier workbench in a native macOS window. This l
 
 Press **⌘K** (**Ctrl+K** on other platforms) or use the search button in the left rail to open the **Command palette** anywhere in the workbench. Search the current project for a claim title, a complete reference such as `FLOW-09`, a Library entry, a conversation or an Agent. Recent results appear first. The palette can also open **Add theorem**, **Organize with AI**, **Research references**, the selected claim’s **Proof task**, or a new chat draft. Review and confirm work in the panel that opens.
 
+The project map, Claims board and inspector show recorded proof obligation counts. When none are recorded, the progress label explains what will appear there. In Claims or the claim inspector, open **Results to review** to inspect the recorded results for that claim.
+
 Use **Find claim** on the project map to search and select a card. In **Agent chat**, search for a recipient or conversation from its chooser. In these search controls and the command palette, use arrow keys to move through options, Enter to select, and Escape to return focus.
 
 In the command palette, start with `#` to search claims and their proof references, or `@` to search Agents. The footer lists these prefixes and navigation keys. When a menu or palette result shows an **Alt** shortcut, use **Option** on Mac to invoke that result while the menu or palette is open.

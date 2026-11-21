@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.68
+
+- The project map, Claims board and inspector explain when no proof obligations are recorded. Proved claims keep their proof status, and result links open the exact records awaiting review.
+
 ## 1.0.67
 
 - Open Agent activity to see recorded proof and model jobs, Agent work, conversations and results to review in one list. Filter by state and open the original work from each row. The footer, Team, Claims and Chats share the same activity counts.

@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
 import { ClarificationReview } from "../components/ClarificationReview";
@@ -9,11 +8,11 @@ import { GoalReview } from "../components/GoalReview";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { WorkbenchViewMenu } from "../components/WorkbenchViewMenu";
 import { href } from "../shell/route";
+import { GOAL_REVIEW_ROUTE, reviewItemHref, reviewItemKindLabel } from "../shell/reviewItems";
 import { nodeFormula, nodeTitle, statusText, timeText } from "../workbench/text";
 import type { GraphSnapshot } from "../workbench/types";
 
 const REVIEWER_KEY = "research-multiplier-reviewer";
-const GOAL_ROUTE = "goal:";
 const GOAL_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function readReviewer(): string {
@@ -22,12 +21,6 @@ function readReviewer(): string {
   } catch {
     return "";
   }
-}
-
-export function kindLabel(t: TFunction, item: InboxItem): string {
-  if (item.kind === "review_evidence" && item.detail?.kind === "counterexample")
-    return t("review.kinds.counterexample");
-  return t(`review.kinds.${item.kind}`, { defaultValue: item.kind.replace(/_/g, " ") });
 }
 
 export function ReviewPage({
@@ -58,10 +51,12 @@ export function ReviewPage({
       priority: 1,
     })),
   ];
-  const requestedGoal = sub.startsWith(GOAL_ROUTE) ? sub.slice(GOAL_ROUTE.length).toLowerCase() : null;
+  const requestedGoal = sub.startsWith(GOAL_REVIEW_ROUTE) ? sub.slice(GOAL_REVIEW_ROUTE.length).toLowerCase() : null;
   const selected =
     requestedGoal === null
-      ? (items.find((item) => item.item_id === sub) ?? items[0])
+      ? sub
+        ? items.find((item) => item.item_id === sub)
+        : items[0]
       : items.find((item) => item.kind === "choose_conjecture" && item.item_id === requestedGoal);
   const goalId = requestedGoal ?? (selected?.kind === "choose_conjecture" ? selected.item_id : null);
   // A decided item leaves the inbox, so its confirmation is kept here rather than on the item.
@@ -86,9 +81,9 @@ export function ReviewPage({
             sub: `${
               typeof item.detail?.clarification_status === "string"
                 ? t(`clarifications.status.${item.detail.clarification_status}`)
-                : kindLabel(t, item)
+                : reviewItemKindLabel(t, item)
             } · ${timeText(i18n.language, item.waiting_since, true)}`,
-            href: href("review", item.kind === "choose_conjecture" ? GOAL_ROUTE + item.item_id : item.item_id),
+            href: reviewItemHref(item),
             current: item === selected,
             dot: item.priority <= 1 ? "bad" : "warn",
           })),
@@ -98,7 +93,7 @@ export function ReviewPage({
           entries: openGoals.map((goal) => ({
             key: goal.id,
             label: goal.title,
-            href: href("review", GOAL_ROUTE + goal.id),
+            href: href("review", GOAL_REVIEW_ROUTE + goal.id),
             current: goal.id === goalId,
           })),
         },
@@ -124,7 +119,11 @@ export function ReviewPage({
         <>
           <PageHead title={t("rail.review")} />
           <Empty>
-            {inbox.isPending ? t("common.loading") : t(openGoals.length ? "review.chooseOpenGoal" : "review.allDone")}
+            {inbox.isPending
+              ? t("common.loading")
+              : sub && !notice
+                ? t("review.itemNoLongerWaiting")
+                : t(openGoals.length ? "review.chooseOpenGoal" : "review.allDone")}
           </Empty>
         </>
       ) : selected.kind === "clarify_formalization" && clarification ? (
@@ -342,7 +341,7 @@ function OtherItem({ item, onOpen }: { item: InboxItem; onOpen: (claimId: string
   return (
     <>
       <PageHead
-        title={kindLabel(t, item)}
+        title={reviewItemKindLabel(t, item)}
         note={timeText(i18n.language, item.waiting_since, true)}
         actions={
           item.claim_id ? (

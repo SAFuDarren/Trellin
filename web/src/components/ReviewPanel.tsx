@@ -2,11 +2,13 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { Claim } from "../api/client";
+import type { InboxItem } from "../api/sections";
 import type { ClaimProgress } from "../workbench/claimProgress";
 import { impactItems, impactLineKey, type Graph, type View } from "../workbench/graph";
 import { kindText, nodeFormula, nodeStatus, nodeTitle, nodeTone, statusText, summarize } from "../workbench/text";
 import type { ImpactEntry, ImpactPreview } from "../workbench/types";
 import { ClaimProgressSummary, claimProgressText } from "./ClaimProgress";
+import { ClaimReviewLinks } from "./ClaimReviewLinks";
 import { Mark } from "./Icons";
 
 const REFERENCE_KEYS = [
@@ -32,6 +34,7 @@ type Props = {
   claims: Claim[];
   claimId: string | null;
   claimProgress?: ClaimProgress;
+  claimReviews?: readonly InboxItem[];
   view: View;
   selected: string | null;
   assumption: string | null;
@@ -138,6 +141,7 @@ function NodeDetail({
   claims,
   claimId,
   claimProgress,
+  claimReviews,
   view,
   selected,
   assumption,
@@ -182,7 +186,9 @@ function NodeDetail({
           : nodeStatus(t, node);
   const claimStatus = claims.find((claim) => claim.id === graph.claim.id)?.status ?? graph.claim.status;
   const progress = claimProgressText(t, claimProgress, claimStatus);
-  const showNodeState = node.kind !== "goal" || isImpact || (blockers.length > 0 && !progress.state);
+  const goal = node.kind === "goal";
+  const goalReviews = goal && !isImpact ? claimReviews : undefined;
+  const showNodeState = !goal || isImpact || (claimStatus !== "proved" && blockers.length > 0 && !progress.state);
   const lean = typeof node.formalization === "string" ? node.formalization : "";
   const math = typeof node.formula === "string" ? node.formula : nodeFormula(node);
   const prose =
@@ -208,9 +214,11 @@ function NodeDetail({
             {...progress}
             label={showNodeState ? stateLabel : progress.label}
             tone={showNodeState ? tone : progress.tone}
-            count={node.kind === "goal" ? progress.count : undefined}
-            emptyCountLabel={node.kind === "goal" ? progress.emptyCountLabel : undefined}
+            count={goal ? progress.count : undefined}
+            emptyCountLabel={goal ? progress.emptyCountLabel : undefined}
+            showState={showNodeState || progress.state !== "review" || !goalReviews?.length}
           />
+          {goalReviews && <ClaimReviewLinks items={goalReviews} />}
           <span>{[graph.codes.get(node.id), kindText(t, node.kind), node.domain].filter(Boolean).join(" · ")}</span>
         </div>
         {(actions || conditionId) && (

@@ -205,9 +205,9 @@ export function Shell({ session }: { session: string }) {
                   sub={sub}
                   onOpen={open}
                   claimProgress={claimProgress}
+                  claimReviews={activity.reviewItemsByClaim}
                   atlasClaims={atlas.data?.claims}
                   running={activity.runningByClaim}
-                  review={activity.reviewByClaim}
                 />
               )
             ) : section === "library" ? (
@@ -232,6 +232,7 @@ export function Shell({ session }: { session: string }) {
                 key={session}
                 session={session}
                 claimProgress={claimProgress}
+                claimReviews={activity.reviewItemsByClaim}
                 focus={focus}
                 onFocusHandled={setFocus}
                 pendingReviews={pendingReviews}

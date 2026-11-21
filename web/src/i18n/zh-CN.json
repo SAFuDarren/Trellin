@@ -291,6 +291,7 @@
     "waiting": "等你处理 · {{count}}",
     "none": "没有待处理的事项。",
     "allDone": "都处理完了。有需要你确认的核验或问题时，会出现在这里。",
+    "itemNoLongerWaiting": "此事项已不在待审核列表中。",
     "openGoals": "开放研究目标",
     "chooseOpenGoal": "选择一个开放研究目标，核对起始依据并查找相关工作。",
     "kinds": {
@@ -710,6 +711,11 @@
     "claim": "命题进度",
     "obligations": "已验证 {{verified}} / {{total}} 项证明义务",
     "noObligations": "尚无已记录的证明义务",
+    "noObligationsHint": "已记录的证明义务和验证进度会显示在这里。",
+    "resultsToReview_one": "{{count}} 个待审核结果",
+    "resultsToReview_other": "{{count}} 个待审核结果",
+    "itemsToReview_one": "{{count}} 个待审核事项",
+    "itemsToReview_other": "{{count}} 个待审核事项",
     "states": {
       "review": "等你审核",
       "decision": "需要决定",
