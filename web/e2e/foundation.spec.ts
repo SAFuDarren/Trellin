@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
 
 // #163: interactive elements share one transition, radii come from one scale,
@@ -35,6 +35,32 @@ async function transitionOf(page: Page, selector: string) {
     });
 }
 
+async function expectToken(locator: Locator, property: "background-color" | "box-shadow", token: string) {
+  const expected = await locator.evaluate(
+    (element, { property, token }) => {
+      // Resolve the token with the browser's CSS serialization, including color-mix().
+      const probe = document.createElement("div");
+      probe.hidden = true;
+      probe.style.setProperty(property, `var(${token})`);
+      element.ownerDocument.body.append(probe);
+      const style = getComputedStyle(probe);
+      const value = style.getPropertyValue(property);
+      const defined = style.getPropertyValue(token);
+      probe.remove();
+      return { value, defined };
+    },
+    { property, token },
+  );
+  expect(expected.defined, token).not.toBe("");
+  await expect(locator).toHaveCSS(property, expected.value);
+}
+
+async function expectEnter(locator: Locator, animation: string, duration: string) {
+  await expect(locator).toBeVisible();
+  await expect(locator).toHaveCSS("animation-name", animation);
+  await expect(locator).toHaveCSS("animation-duration", duration);
+}
+
 test("workbench surfaces use the radius scale and shared state transition", async ({ page }) => {
   await page.goto("/#session=fixture");
   await mapClaim(page, FIXTURE_CLAIM_TITLE).click();
@@ -53,23 +79,76 @@ test("workbench surfaces use the radius scale and shared state transition", asyn
   expect(await radiiOutsideScale(page)).toEqual([]);
 });
 
-test("menus and dialogs enter with motion, and reduced motion removes it", async ({ page }) => {
+test("map cards distinguish hover, press and selection", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/#session=fixture");
-  await page.getByRole("button", { name: "Add theorem" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  const enter = await dialog.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return { name: style.animationName, duration: style.animationDuration, shadow: style.boxShadow };
-  });
-  expect(enter.name).toBe("rm-dialog-in");
-  expect(enter.duration).toBe("0.18s");
-  expect(enter.shadow).not.toBe("none");
-  await page.keyboard.press("Escape");
+  const card = mapClaim(page, "单射映射的复合");
+  await expect(card).toHaveAttribute("aria-pressed", "false");
+  await card.hover();
+  await expectToken(card, "background-color", "--state-hover");
+  await page.mouse.down();
+  try {
+    await expectToken(card, "background-color", "--state-pressed");
+  } finally {
+    await page.mouse.up();
+  }
 
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.getByRole("button", { name: "Add theorem" }).click();
-  await expect(dialog).toBeVisible();
-  expect(await dialog.evaluate((element) => getComputedStyle(element).animationDuration)).toBe("0s");
-  expect((await transitionOf(page, ".button")).duration).toContain("0s");
+  await expect(card).toHaveAttribute("aria-pressed", "true");
+  await card.hover();
+  await expectToken(card, "background-color", "--state-selected");
+
+  const home = page.locator("nav.rail").getByRole("link", { name: "Home", exact: true });
+  await expect(home).toHaveAttribute("aria-current", "page");
+  await home.hover();
+  await expectToken(home, "background-color", "--state-selected");
 });
+
+for (const reducedMotion of ["no-preference", "reduce"] as const) {
+  test(`workbench overlays use the motion and elevation tokens (${reducedMotion})`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion });
+    await page.goto("/#session=fixture");
+    const panelDuration = reducedMotion === "reduce" ? "0s" : "0.18s";
+    const floatDuration = reducedMotion === "reduce" ? "0s" : "0.12s";
+    const card = mapClaim(page, FIXTURE_CLAIM_TITLE);
+
+    await card.click();
+    await expectEnter(page.locator("#review"), "rm-panel-in", panelDuration);
+
+    const globalMap = page.getByRole("button", { name: "Global map", exact: true });
+    await globalMap.click();
+    const overview = page.locator(".project-canvas-stage .atlas");
+    await expectEnter(overview, "rm-fade-in", floatDuration);
+    await expectToken(overview, "box-shadow", "--elevation-float");
+    await globalMap.click();
+
+    const search = page.getByRole("button", { name: "Find claim", exact: true });
+    await search.click();
+    const searchResults = page.locator(".project-canvas-popover").filter({ has: page.getByRole("searchbox") });
+    await expectEnter(searchResults, "rm-float-in", floatDuration);
+    await expectToken(searchResults, "box-shadow", "--elevation-float");
+    await expect(searchResults.getByRole("searchbox")).toHaveCSS("border-radius", "6px");
+    await expect(searchResults.getByRole("button").first()).toHaveCSS("border-radius", "6px");
+    await search.click();
+
+    const researchActions = page.locator("summary").filter({ hasText: /^Research actions$/ });
+    await researchActions.click();
+    const actions = page.locator(".workbench-actions-items");
+    await expectEnter(actions, "rm-float-in", floatDuration);
+    await expectToken(actions, "box-shadow", "--elevation-float");
+    await researchActions.press("Escape");
+
+    await page.getByRole("button", { name: "Add theorem", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expectEnter(dialog, "rm-dialog-in", panelDuration);
+    await expectToken(dialog, "box-shadow", "--elevation-dialog");
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: "Agent chat", exact: true }).click();
+    const dock = page.getByRole("region", { name: "Agent chat", exact: true });
+    await expectEnter(dock, "rm-panel-in", panelDuration);
+    await expectToken(dock, "box-shadow", "--elevation-dialog");
+    if (reducedMotion === "reduce") {
+      await expect(card).toHaveCSS("transition-duration", "0s, 0s, 0s, 0s, 0s");
+    }
+  });
+}

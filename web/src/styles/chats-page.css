@@ -55,12 +55,6 @@
   color: var(--ink);
   text-decoration: none;
 }
-.chat-list-item:hover {
-  background: var(--track);
-}
-.chat-list-item[aria-current="page"] {
-  background: var(--pick);
-}
 .chat-list-item-heading,
 .chat-list-info {
   display: flex;

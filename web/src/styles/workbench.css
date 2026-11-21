@@ -497,11 +497,7 @@ select:disabled {
   text-align: left;
   font-weight: var(--type-regular);
 }
-.claim:hover {
-  background: var(--track);
-}
 .claim[aria-current="page"] {
-  background: var(--pick);
   font-weight: var(--type-semibold);
 }
 .claim-title {
@@ -613,8 +609,7 @@ select:disabled {
   font-weight: var(--type-medium);
 }
 .segmented button[aria-pressed="true"] {
-  background: var(--live-soft);
-  color: var(--live);
+  color: var(--ink);
   font-weight: var(--type-semibold);
 }
 .impact-bar {
@@ -732,7 +727,7 @@ select:disabled {
   height: 22px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-inline);
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--sub);
   cursor: nwse-resize;
@@ -1066,7 +1061,7 @@ select:disabled {
   min-height: 24px;
   padding: 4px;
   border: 0;
-  border-radius: var(--radius-inline);
+  border-radius: var(--radius-control);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -1185,9 +1180,8 @@ select:disabled {
   font-weight: var(--type-medium);
 }
 .chip[aria-pressed="true"] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--on-ink);
+  border-color: var(--edge);
+  color: var(--ink);
 }
 .chat-body {
   flex: 1;
@@ -1438,11 +1432,7 @@ select:disabled {
   background: transparent;
   text-align: left;
 }
-.queue-item:hover {
-  background: var(--track);
-}
 .queue-item[aria-current="true"] {
-  background: var(--pick);
   font-weight: 600;
 }
 .queue-item > span:first-child {
@@ -1695,13 +1685,11 @@ select:disabled {
   user-select: none;
 }
 .rail-link:hover {
-  background: var(--track);
   color: var(--ink);
 }
 .rail-link[aria-current="page"],
 .rail-link[aria-expanded="true"],
 .rail-link[data-current="true"] {
-  background: var(--pick);
   color: var(--ink);
 }
 .rail :focus-visible {
@@ -1830,12 +1818,8 @@ select:disabled {
   color: var(--ink);
   text-decoration: none;
 }
-.nav-item:hover {
-  background: var(--track);
-}
 .nav-item[aria-current="true"],
 .nav-item[aria-current="page"] {
-  background: var(--pick);
   font-weight: 600;
 }
 .nav-line {
@@ -1982,9 +1966,6 @@ select:disabled {
   font-size: var(--type-control-size);
   font-weight: var(--type-medium);
   white-space: nowrap;
-}
-.button:hover:not(:disabled) {
-  background: var(--track);
 }
 .button.primary {
   border-color: var(--ink);

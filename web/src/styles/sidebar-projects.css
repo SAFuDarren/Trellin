@@ -43,14 +43,10 @@
   font-weight: var(--type-regular);
   text-align: start;
 }
-.sidebar-projects-row:hover:not(:disabled, [aria-disabled="true"]) {
-  background: var(--track);
-}
 .sidebar-projects button[aria-disabled="true"]:not(:disabled) {
   cursor: wait;
 }
 .sidebar-projects-row[aria-current="page"] {
-  background: var(--pick);
   font-weight: var(--type-semibold);
 }
 .sidebar-projects-row:disabled[aria-current="page"] {

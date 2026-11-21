@@ -96,7 +96,7 @@
   min-width: 0;
   padding: 6px;
   border: 1px solid var(--hair);
-  border-radius: var(--radius-inline);
+  border-radius: var(--radius-control);
   background: var(--canvas);
   color: var(--ink);
   font-size: var(--type-control-size);
@@ -107,7 +107,7 @@
   width: 100%;
   padding: 6px;
   border: 0;
-  border-radius: var(--radius-inline);
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--ink);
   text-align: start;
@@ -210,7 +210,6 @@
 
 .project-canvas-node[aria-pressed="true"] {
   z-index: 1;
-  background: var(--pick);
 }
 
 .project-canvas-node[data-moving="true"] {
