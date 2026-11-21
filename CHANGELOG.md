@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.50
+
+- In Chats, switch a saved Agent’s tasks from the task title in the header. The menu shows the current task and its recorded state. Reopen earlier unassigned conversations and proof activity from Conversation history.
+
 ## 1.0.49
 
 - Keep the project map visible while inspecting Lean proofs, proof tasks, and review. Open Agent Chat from any page or attach the selected proof node explicitly from its details. Use Activity to check saved Agent tasks and their replies.

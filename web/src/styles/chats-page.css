@@ -1,6 +1,3 @@
-.shell:has(.chats-page) {
-  min-height: 0;
-}
 .chats-page {
   display: grid;
   grid-template-columns: clamp(205px, 24vw, 280px) minmax(0, 1fr);
