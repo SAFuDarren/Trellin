@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { ImpactPreview } from "../src/workbench/types";
 import { openMenu } from "./navigation";
 import { openProof } from "./project-map";
 
@@ -105,12 +106,73 @@ test("selecting a node shows its details and conversation", async ({ page }) => 
 });
 
 test("the impact view previews what withdrawing an assumption affects", async ({ page }) => {
+  await page.route("**/api/impact?*", async (route) => {
+    const response = await route.fetch();
+    const preview = (await response.json()) as ImpactPreview;
+    await route.fulfill({
+      response,
+      json: {
+        ...preview,
+        scope: [
+          ...(preview.scope ?? []),
+          {
+            id: "goal:other",
+            kind: "goal",
+            title: "Companion theorem",
+            claim_id: "other",
+            claim_title: "Related claim",
+          },
+        ],
+      },
+    });
+  });
   await open(page);
+  const inspector = page.locator("#review");
+  const summary = "4 affected · 1 premise previewed";
+  await expect(inspector.getByRole("button", { name: "Proof task", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "If withdrawn" }).click();
   await expect(page.locator(".impact-bar")).toContainText("Preview only");
   await expect(page.locator("#queue-title")).toHaveText("Would be affected");
-  await expect(page.locator(".queue-item")).toHaveCount(4);
+  await expect(page.locator("#queue-count")).toHaveText(summary);
+  await expect(page.locator(".legend-counts")).toContainText(summary);
+  await expect(page.locator(".queue-item")).toHaveCount(5);
+  await expect(page.locator(".queue-item").filter({ hasText: "Companion theorem · Related claim" })).toBeVisible();
+  await expect(page.locator(".queue-item").filter({ hasText: "Would be withdrawn" })).toHaveCount(1);
   await expect(page.locator('.graph-node[data-affected="true"]')).toHaveCount(4);
+  await expect(inspector.getByRole("button", { name: "Proof task", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Proof", exact: true }).click();
+  await expect(inspector.getByRole("button", { name: "Proof task", exact: true })).toBeVisible();
+});
+
+test("the withdrawal preview shows counts only after a successful read, including a known zero", async ({ page }) => {
+  let finishFirstRead = () => {};
+  const firstRead = new Promise<void>((resolve) => {
+    finishFirstRead = resolve;
+  });
+  let loadEmptyPreview = false;
+  await page.route("**/api/impact?*", async (route) => {
+    if (loadEmptyPreview) return route.fulfill({ json: { affected: [], scope: [] } });
+    await firstRead;
+    return route.fulfill({ status: 422, json: { error: "The preview is unavailable." } });
+  });
+  await open(page);
+  const toggle = page.getByRole("button", { name: "If withdrawn", exact: true });
+  await toggle.click();
+  await expect(page.locator(".impact-bar")).toContainText("Working out what depends on it");
+  await expect(page.locator("#queue-count")).toBeEmpty();
+  await expect(page.locator(".legend-counts")).not.toContainText("premise previewed");
+
+  finishFirstRead();
+  await expect(page.locator(".impact-bar")).toContainText("The preview is unavailable.");
+  await expect(page.locator("#queue-count")).toBeEmpty();
+  await expect(page.locator(".legend-counts")).not.toContainText("premise previewed");
+
+  loadEmptyPreview = true;
+  await page.getByRole("button", { name: "Proof", exact: true }).click();
+  await toggle.click();
+  const summary = "0 affected · 1 premise previewed";
+  await expect(page.locator("#queue-count")).toHaveText(summary);
+  await expect(page.locator(".legend-counts")).toContainText(summary);
 });
 
 test("queues a Codex proof note with one action, retaining a failed note and showing its persisted receipt", async ({

@@ -142,9 +142,21 @@ describe("graph model", () => {
     );
   });
 
-  it("maps impact entries through evidence aliases", () => {
-    const affected = impactItems(graph, { affected: [{ id: "evidence:e1", kind: "evidence", relation: "direct" }] });
-    expect([...affected.keys()]).toEqual(["lean:e"]);
+  it("counts each affected record once, excluding the premise being previewed", () => {
+    const affected = impactItems(
+      graph,
+      {
+        affected: [
+          { id: "evidence:e1", kind: "evidence", relation: "direct" },
+          { id: "lean:e", kind: "evidence", relation: "indirect" },
+          { id: "goal:other-claim", kind: "goal", relation: "direct" },
+        ],
+        scope: [{ id: "item:h", kind: "hypothesis" }],
+      },
+      "item:h",
+    );
+    expect([...affected.keys()]).toEqual(["lean:e", "goal:other-claim"]);
+    expect(affected.get("lean:e")?.relation).toBe("direct");
     const lit = highlights(graph, "impact", "item:h", "item:h", affected);
     expect(lit.nodes.has("lean:e")).toBe(true);
     expect([...lit.edges].map((edge) => edge.key)).toHaveLength(1);

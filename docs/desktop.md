@@ -26,6 +26,8 @@ Open a proof to start at a readable zoom on the main canvas. **Fit to window** s
 
 Changing the interface language keeps proof nodes in the same order and preserves their references and saved card sizes.
 
+In **If withdrawn**, the graph legend and inspector show the same total of affected records, including other claims, and identify the premise being previewed. Open other proof actions from **Proof**.
+
 Selected map cards, proof nodes and review rows have a Navy edge and a light tint. Hover adds a neutral highlight, and keyboard focus adds an offset outline. A spinner and count inside a proof node show its running jobs.
 
 Click a project map card to inspect the claim. Double-click the card or press **Enter** on it to open its proof. Use **Project map** or **Escape** to return. In a narrow window, **Escape** first closes the details drawer and leaves the selected node active. The zoom buttons sit below the canvas. Right-click a card or proof node for its actions, or press **Shift+F10** with the item focused. **Write proof note** opens the note editor for that node. **Show in Library** lists recorded sources used by the claim.

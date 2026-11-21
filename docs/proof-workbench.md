@@ -59,7 +59,7 @@ Review the target, approved starting basis, and proposed premise before recordin
 
 - **Proof** shows the frozen goal, checked steps, reductions and open obligations. Choose a node to see the stored statement and its current status. Long Lean statements start folded. The fold opens the exact stored text, including any binders already in the record.
 - **References** highlights recorded proof uses with solid lines and allowed premises with dotted lines. Planned steps appear as quieter dashed lines. The edge legend follows the current view. The source and version identify the record behind each node. Archived or stale proof evidence retains its status.
-- **If withdrawn** previews the consequences of withdrawing the selected approved version. It uses the same dependency closure as the withdrawal command. Existing evidence requiring recheck, affected obligations, and frozen scopes requiring review appear separately. It does not evaluate a new assumption or determine whether a theorem would become false.
+- **If withdrawn** previews the consequences of withdrawing the selected approved version. It uses the same dependency closure as the withdrawal command. The legend and inspector count each affected record once, including records from other claims. The inspector lists the selected premise separately and links to any of these records drawn in the open proof. Actual withdrawal uses the existing separate command.
 
 Some projects have no Lean statement for a record. The workbench shows its recorded wording and indicates the Lean text is unavailable. It does not invent a formula or infer a mathematical field from the checker name.
 

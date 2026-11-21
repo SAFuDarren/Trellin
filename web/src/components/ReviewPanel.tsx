@@ -58,14 +58,14 @@ export function queueEntries(
   graph: Graph | null,
   view: View,
   assumption: string | null,
-  impact: ImpactPreview | undefined,
+  affected: ReadonlyMap<string, ImpactEntry> | undefined,
 ) {
   const entries: { id: string; kind: string; tone: "review" | "bad" }[] = [];
   if (!graph) return entries;
   if (view === "impact") {
     if (assumption) entries.push({ id: assumption, kind: t("impact.previewLabel"), tone: "bad" });
-    for (const [id, effect] of impactItems(graph, impact)) {
-      if (graph.nodes.has(id) && id !== assumption) entries.push({ id, kind: t(impactLineKey(effect)), tone: "bad" });
+    for (const [id, effect] of affected ?? []) {
+      entries.push({ id, kind: t(impactLineKey(effect)), tone: "bad" });
     }
     return entries;
   }
@@ -79,8 +79,13 @@ export function queueEntries(
 
 export function ReviewPanel(props: Props) {
   const { t } = useTranslation();
-  const { graph, view, selected, assumption, impact } = props;
-  const entries = queueEntries(t, graph, view, assumption, impact);
+  const { graph, claims, claimId, view, selected, assumption, impact } = props;
+  const isImpact = view === "impact";
+  const affected = isImpact && graph && impact && assumption ? impactItems(graph, impact, assumption) : undefined;
+  const entries = queueEntries(t, graph, view, assumption, affected);
+  const count = isImpact
+    ? affected && t("impact.summary", { count: affected.size })
+    : entries.length > 0 && t("review.count", { count: entries.length });
   const reviewByEvidence = new Map(
     props.claimReviews?.filter((item) => item.kind === "review_evidence").map((item) => [item.item_id, item]),
   );
@@ -89,9 +94,9 @@ export function ReviewPanel(props: Props) {
       <section className="queue" aria-labelledby="queue-title">
         <header>
           <h2 id="queue-title" tabIndex={-1}>
-            {view === "impact" ? t("review.affected") : t("review.title")}
+            {isImpact ? t("review.affected") : t("review.title")}
           </h2>
-          <span id="queue-count">{entries.length ? t("review.count", { count: entries.length }) : ""}</span>
+          <span id="queue-count">{count}</span>
           <button type="button" className="icon-button" aria-label={t("review.close")} onClick={props.onClose}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
@@ -100,41 +105,51 @@ export function ReviewPanel(props: Props) {
           </button>
         </header>
         <ul>
-          {entries.length === 0 && <li className="queue-empty">{graph ? t("review.empty") : ""}</li>}
-          {graph &&
-            entries.map(({ id, kind, tone }) => {
-              const node = graph.nodes.get(id)!;
-              const evidenceId = node.reference?.evidence_id;
-              const item =
-                view !== "impact" && typeof evidenceId === "string" ? reviewByEvidence.get(evidenceId) : undefined;
-              const content = (
-                <>
-                  <span>
-                    <Mark tone={tone} />
-                    <span className="label">{nodeTitle(t, node)}</span>
+          {entries.length === 0 && graph && (
+            <li className="queue-empty">{t(isImpact ? "impact.noPremise" : "review.empty")}</li>
+          )}
+          {entries.map(({ id, kind, tone }) => {
+            const node = graph?.nodes.get(id);
+            const evidenceId = node?.reference?.evidence_id;
+            const item = !isImpact && typeof evidenceId === "string" ? reviewByEvidence.get(evidenceId) : undefined;
+            const effect = affected?.get(id);
+            const label = node
+              ? nodeTitle(t, node)
+              : effect
+                ? impactTitle(t, effect, claims, claimId)
+                : t("kind.record");
+            const content = (
+              <>
+                <span>
+                  <Mark tone={tone} />
+                  <span className="label" title={label}>
+                    {label}
                   </span>
-                  <span className="kind">{kind}</span>
-                </>
-              );
-              return (
-                <li key={id}>
-                  {item ? (
-                    <a className="queue-item" href={reviewItemHref(item)}>
-                      {content}
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      className="queue-item"
-                      aria-current={id === selected ? "true" : undefined}
-                      onClick={() => props.onSelect(id)}
-                    >
-                      {content}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
+                </span>
+                <span className="kind">{kind}</span>
+              </>
+            );
+            return (
+              <li key={id}>
+                {item ? (
+                  <a className="queue-item" href={reviewItemHref(item)}>
+                    {content}
+                  </a>
+                ) : node ? (
+                  <button
+                    type="button"
+                    className="queue-item"
+                    aria-current={id === selected ? "true" : undefined}
+                    onClick={() => props.onSelect(id)}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <span className="queue-item">{content}</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </section>
       <section className="node-detail" id="node-detail" tabIndex={-1} aria-label={t("review.detail")}>
@@ -158,6 +173,12 @@ function Fact({ heading, children, mono }: { heading: string; children: ReactNod
       <dd data-mono={mono ? "true" : undefined}>{children}</dd>
     </>
   );
+}
+
+function impactTitle(t: TFunction, entry: ImpactEntry, claims: Claim[], claimId: string | null): string {
+  const title = entry.title ?? entry.label ?? t(`kind.${entry.kind}`, { defaultValue: t("kind.record") });
+  const claimTitle = entry.claim_title ?? claims.find((claim) => claim.id === entry.claim_id)?.title;
+  return claimTitle && entry.claim_id !== claimId ? `${title} · ${claimTitle}` : title;
 }
 
 function NodeDetail({
@@ -198,8 +219,7 @@ function NodeDetail({
   };
   const blockers = graph.blockers.get(node.id) ?? [];
   const isImpact = view === "impact";
-  const affected = isImpact ? impactItems(graph, impact) : new Map<string, ImpactEntry>();
-  const effect = affected.get(node.id);
+  const effect = isImpact ? impactItems(graph, impact, assumption).get(node.id) : undefined;
   const tone = isImpact && (effect || node.id === assumption) ? "bad" : nodeTone(node, blockers.length > 0);
   const stateLabel =
     isImpact && node.id === assumption
@@ -236,11 +256,7 @@ function NodeDetail({
   const outgoing = graph.outgoing.get(node.id) ?? [];
   const parameters = (node.parameters ?? []).map(({ name, type }) => `${name} : ${type}`).join("\n");
   const references = REFERENCE_KEYS.filter((key) => ["string", "number"].includes(typeof node.reference?.[key]));
-  const nameFor = (entry: ImpactEntry) => {
-    const title = entry.title ?? entry.label ?? t(`kind.${entry.kind}`, { defaultValue: t("kind.record") });
-    const claimTitle = entry.claim_title ?? claims.find((claim) => claim.id === entry.claim_id)?.title;
-    return relation(entry.id, claimTitle && entry.claim_id !== claimId ? `${title} · ${claimTitle}` : title);
-  };
+  const nameFor = (entry: ImpactEntry) => relation(entry.id, impactTitle(t, entry, claims, claimId));
   const conditionId = node.kind === "proposed_premise" ? node.reference?.condition_id : undefined;
   const affectedList = impact?.affected ?? [];
   const scope = impact?.scope ?? [];
@@ -294,7 +310,9 @@ function NodeDetail({
         ) : null;
       })}
       {isImpact && node.id === assumption && (
-        <p className="detail-note">{impactLoading ? t("impact.loading") : impactError || t("impact.explain")}</p>
+        <p className="detail-note">
+          {impactError || (impactLoading && !impact ? t("impact.loading") : t("impact.explain"))}
+        </p>
       )}
       {prose && <Block label={t("detail.statement")} value={prose} />}
       {math && math !== lean && <Block label={t("detail.formula")} value={math} />}

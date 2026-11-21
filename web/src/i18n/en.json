@@ -96,12 +96,13 @@
     "impact": "If withdrawn"
   },
   "impact": {
-    "preview": "Withdraw",
+    "preview": "Premise to preview",
     "readOnly": "Preview only; nothing is changed",
     "loading": "Working out what depends on it…",
     "noPremise": "This claim has no assumption to preview yet.",
     "explain": "If you withdraw this version, everything that relies on it will need to be checked again. This is only a preview; nothing is changed.",
     "previewLabel": "Would be withdrawn",
+    "summary": "{{count}} affected · 1 premise previewed",
     "alreadyRecheck": "Already needs recheck",
     "needsRecheck": "Would need recheck",
     "waitingReduction": "Reduction would need recheck",
@@ -242,10 +243,8 @@
     "edges": "Edge styles",
     "review": "Needs review",
     "blocked": "Blocked / recheck",
-    "affected": "Affected",
     "running": "Running",
-    "queued": "Queued",
-    "badImpact": "Would need recheck / blocked"
+    "queued": "Queued"
   },
   "tone": {
     "ok": "Verified",

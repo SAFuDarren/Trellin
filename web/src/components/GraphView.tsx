@@ -88,7 +88,10 @@ export function GraphView(props: Props) {
     if (nodeMenu && !menuNode) setNodeMenu(null);
   }, [nodeMenu, menuNode]);
 
-  const affected = useMemo(() => (view === "impact" ? impactItems(graph, impact) : new Map()), [graph, view, impact]);
+  const affected = useMemo(
+    () => impactItems(graph, view === "impact" ? impact : undefined, assumption),
+    [graph, view, impact, assumption],
+  );
   const lit = useMemo(
     () => highlights(graph, view, selected, assumption, affected),
     [graph, view, selected, assumption, affected],
@@ -486,8 +489,7 @@ export function GraphView(props: Props) {
           graph={graph}
           view={view}
           edges={legendEdges}
-          assumption={assumption}
-          affected={affected}
+          affectedCount={view === "impact" && impact && assumption ? affected.size : undefined}
           running={props.running}
           queued={props.queued}
         />
@@ -508,16 +510,14 @@ function Legend({
   graph,
   view,
   edges,
-  assumption,
-  affected,
+  affectedCount,
   running,
   queued,
 }: {
   graph: Graph;
   view: View;
   edges: Iterable<Edge>;
-  assumption: string | null;
-  affected: Map<string, unknown>;
+  affectedCount?: number;
   running: number;
   queued: number;
 }) {
@@ -525,24 +525,30 @@ function Legend({
   const edgeId = useId();
   const kinds = new Set(Array.from(edges, (edge) => edge.drawKind));
   const counts = new Map<Tone, number>();
-  for (const [id, node] of graph.nodes) {
-    const tone =
-      view === "impact" && (affected.has(id) || id === assumption) ? "bad" : nodeTone(node, graph.blockers.has(id));
-    if (tone) counts.set(tone, (counts.get(tone) ?? 0) + 1);
+  if (view !== "impact") {
+    for (const [id, node] of graph.nodes) {
+      const tone = nodeTone(node, graph.blockers.has(id));
+      if (tone) counts.set(tone, (counts.get(tone) ?? 0) + 1);
+    }
   }
   const lines = (["actual", "context", "planned"] as const).filter((kind) => kinds.has(kind));
   const tones = (["ok", "review", "bad", "open", "planned"] as const).filter((tone) => counts.get(tone));
   return (
     <div className="legend">
-      <div className="legend-counts" role="status" aria-label={t("legend.label")}>
+      <div
+        className="legend-counts"
+        role="status"
+        aria-label={t(view === "impact" ? "review.affected" : "legend.label")}
+      >
+        {affectedCount !== undefined && (
+          <span>
+            <Mark tone="bad" />
+            {t("impact.summary", { count: affectedCount })}
+          </span>
+        )}
         {tones.map((tone) => {
-          const label = tone === "bad" && view === "impact" ? t("legend.badImpact") : t(`tone.${tone}`);
-          const compactLabel =
-            tone === "review"
-              ? t("legend.review")
-              : tone === "bad"
-                ? t(`legend.${view === "impact" ? "affected" : "blocked"}`)
-                : label;
+          const label = t(`tone.${tone}`);
+          const compactLabel = tone === "review" ? t("legend.review") : tone === "bad" ? t("legend.blocked") : label;
           return (
             <span key={tone} title={label}>
               <Mark tone={tone} />

@@ -207,12 +207,16 @@ function traceEdges(first: string, edgeIndex: Map<string, Edge[]>, endpoint: "so
   return traversed;
 }
 
-export function impactItems(graph: Graph, impact: ImpactPreview | null | undefined): Map<string, ImpactEntry> {
+export function impactItems(
+  graph: Graph,
+  impact: ImpactPreview | undefined,
+  assumption: string | null,
+): Map<string, ImpactEntry> {
   const results = new Map<string, ImpactEntry>();
   for (const group of [impact?.affected, impact?.scope]) {
     for (const entry of group ?? []) {
       const id = graph.evidenceAliases.get(entry.id) ?? entry.id;
-      if (!results.has(id)) results.set(id, entry);
+      if (id !== assumption && !results.has(id)) results.set(id, entry);
     }
   }
   return results;
