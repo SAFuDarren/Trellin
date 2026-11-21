@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.48
+
+- Assign project work to a saved Team agent. Preview the approved inputs, hand the recorded delivery to another agent, and accept or return the result from Agent work. Database revision `0083` keeps assignments, attempts, and decisions available after reopening.
+
 ## 1.0.47
 
 - Select a claim on the project map to read its details and review queue alongside the canvas. Open **Global map** to explore the existing overview of recent claims and proof relationships.

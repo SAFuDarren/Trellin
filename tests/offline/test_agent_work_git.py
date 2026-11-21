@@ -51,6 +51,27 @@ def test_code_input_is_limited_to_selected_files_and_pinned_version(repository):
         read_code_inputs(path, revision, ["selected.txt", "other.txt"], byte_limit=8)
 
 
+def test_code_input_rejects_implicit_parent_checkout(repository):
+    path, revision = repository
+    folder = path / "nested"
+    folder.mkdir()
+    with pytest.raises(ValueError, match="top-level Git checkout"):
+        read_code_inputs(folder, revision, ["selected.txt"], byte_limit=32)
+
+
+def test_code_input_rejects_external_git_metadata(repository):
+    path, revision = repository
+    linked = path / "linked-checkout"
+    linked.mkdir()
+    (linked / ".git").write_text("gitdir: ../.git\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="own Git objects"):
+        read_code_inputs(linked, revision, ["selected.txt"], byte_limit=32)
+    alternate = path / ".git" / "objects" / "info" / "alternates"
+    alternate.write_text("../outside\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="own Git objects"):
+        read_code_inputs(path, revision, ["selected.txt"], byte_limit=32)
+
+
 @pytest.mark.parametrize(("name", "error"), [
     ("linked", "regular Git file"),
     ("binary", "UTF-8 text"),

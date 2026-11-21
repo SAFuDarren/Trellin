@@ -10,6 +10,7 @@ import {
   type ModelConnection,
 } from "../api/modelConnections";
 import { AGENT_AVATARS, useSaveTeamAgent, useTeamAgents, type TeamAgent } from "../api/teamAgents";
+import { href } from "../shell/route";
 import { Chevron } from "./Icons";
 import { ModelConnections } from "./ModelConnections";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
@@ -140,18 +141,27 @@ export function TeamAgentProfiles({ session }: { session: string }) {
                           : runtimeStatus(t, runtime)}
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="button"
-                        aria-label={t("teamAgents.editNamed", { name: agent.name })}
-                        onClick={(event) => {
-                          returnFocus.current = event.currentTarget;
-                          setNotice("");
-                          setEditing(agent);
-                        }}
-                      >
-                        {t("teamAgents.edit")}
-                      </button>
+                      <div className="team-agent-work-actions">
+                        <a
+                          className="button"
+                          href={href("claims", "agent-work/new/agent/" + agent.id)}
+                          aria-label={t("agentWork.assignNamed", { name: agent.name })}
+                        >
+                          {t("agentWork.assign")}
+                        </a>
+                        <button
+                          type="button"
+                          className="button"
+                          aria-label={t("teamAgents.editNamed", { name: agent.name })}
+                          onClick={(event) => {
+                            returnFocus.current = event.currentTarget;
+                            setNotice("");
+                            setEditing(agent);
+                          }}
+                        >
+                          {t("teamAgents.edit")}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

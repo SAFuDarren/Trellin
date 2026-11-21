@@ -41,4 +41,8 @@ describe("Workspace event read models", () => {
       "threads",
     ]);
   });
+
+  it("refreshes agent work without treating a delivery as proof evidence", () => {
+    expect(workspaceEventQueries([{ kind: "agent-work" }], "session")).toEqual([["agent-work", "session"]]);
+  });
 });

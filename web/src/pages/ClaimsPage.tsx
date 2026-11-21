@@ -112,6 +112,9 @@ export function ClaimsPage({
       title={t("rail.claims")}
       groups={[
         {
+          entries: [{ key: "agent-work", label: t("agentWork.title"), href: href("claims", "agent-work") }],
+        },
+        {
           entries: FILTERS.map((key) => ({
             key,
             label: t(`claimsPage.filter.${key}`),

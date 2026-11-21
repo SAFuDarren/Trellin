@@ -90,6 +90,14 @@ The left column lists registered projects. When a proof is open, the centre show
 
 Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. Drag the corner of a node to adjust its width and height. With that handle focused, the arrow keys resize the node. **Research actions → Show proof overview** toggles a small map in the corner. It shows the recorded nodes of recent claims, with a dashed circle at the current claim.
 
+## Assign project work
+
+With database revision `0083`, open **Team → Agents** and choose **Assign task**. Give the agent an outcome and acceptance criteria. The workbench previews the selected agent, its model connection, the allowed operations, and the exact input. Confirm before starting. The project needs its configured scheduler login to dispatch work.
+
+For an implementation task, choose an independent Git checkout under the project's `inputs/` directory, a full commit ID, and the exact files to change. The agent proposes text replacements. Trellin builds a patch and checks that it applies to the recorded inputs in a temporary directory. The patch is a delivery for review. The apply check measures patch applicability.
+
+Choose **Assign review** on a delivery to send that version to another agent. Drafts and code patches use the same review flow. **Claims → Agent work** shows queued work, failures, delivered artifacts, and human decisions. Open a delivery to accept or return that exact version. Failed or interrupted work requires a new confirmation to retry the recorded input. Pending deliveries remain in the project after restarting the app.
+
 ## Work with the models
 
 With database revision `0079` or later, use **Chats** to start a workspace

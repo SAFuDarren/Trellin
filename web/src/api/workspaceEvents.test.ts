@@ -88,6 +88,8 @@ describe("Workspace event frames", () => {
       event("12", "verification_input.retired", { kind: "workspace", id: CLAIM }, { input_kind: "source" }),
       event("13", "new_type.recorded", { kind: "other", id: CLAIM }, {}),
       event("14", "basis_item.confirmed", { kind: "basis_item", id: CLAIM }, {}),
+      event("15", "agent_work.changed", { kind: "agent_work", id: CLAIM }, { state: "delivered", generation: 1 }),
+      event("16", "agent_work.changed", { kind: "agent_work", id: CLAIM }, { state: "delivered", generation: 0 }),
     ];
     const receive = vi.fn();
     const bytes = new TextEncoder().encode(actual.map((item) => frame(item)).join(""));
@@ -105,6 +107,7 @@ describe("Workspace event frames", () => {
           { id: "10", refresh: { kind: "evidence", claimId: CLAIM } },
           { id: "13" },
           { id: "14", refresh: { kind: "basis-item" } },
+          { id: "15", refresh: { kind: "agent-work" } },
         ],
       ],
     ]);
