@@ -58,13 +58,36 @@ test("long titles stay inside their proof node when zooming", async ({ page }) =
     const node = title.closest(".graph-node")!;
     return {
       outside: title.getBoundingClientRect().right - node.getBoundingClientRect().right,
-      clipped: title.scrollWidth > title.clientWidth,
+      clipped: title.scrollWidth > title.clientWidth || title.scrollHeight > title.clientHeight,
       contained: getComputedStyle(node).overflowX === "hidden",
     };
   });
   expect(width.outside).toBeLessThanOrEqual(0);
-  expect(width.clipped).toBe(true);
+  expect(width.clipped).toBe(false);
   expect(width.contained).toBe(true);
+});
+
+test("the proof inspector keeps the complete formula and Lean text", async ({ page }) => {
+  const title = "A detailed title for the second obligation under the recorded hypothesis and its context";
+  const formula = "∀ n, n = 0 + n" + " ∧ n = n".repeat(80);
+  const formalization = "∀ n : Nat, n = 0 + n" + "\n  ∧ n = n".repeat(100);
+  await page.route("**/api/graph?*", async (route) => {
+    const response = await route.fetch();
+    const graph = (await response.json()) as GraphSnapshot;
+    const obligation = graph.nodes.find((node) => node.title === "Proof obligation 2")!;
+    Object.assign(obligation, { title, statement: WORDING, formula, formalization });
+    await route.fulfill({ response, json: graph });
+  });
+  await page.goto("/#session=fixture");
+  await openProof(page);
+  const card = page.locator(".main-proof-graph .graph-node", { hasText: title });
+  await card.click();
+  await expect(card).not.toContainText(formula.slice(0, 16));
+  const details = page.locator("#node-detail");
+  await expect(details.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await expect(details.getByText(WORDING, { exact: true })).toBeVisible();
+  expect(await details.locator(".formula").last().textContent()).toBe(formula);
+  expect(await details.locator(".lean").textContent()).toBe(formalization);
 });
 
 test("Library shows the same state in the list and the inspector", async ({ page }) => {

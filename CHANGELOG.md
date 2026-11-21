@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.70
+
+- Proof graphs open at a readable zoom and can fit all recorded nodes in the window. Node cards wrap titles and show activity counts. The inspector shows complete formulas, Lean statements and recorded work details. Open Edge styles to read the legend.
+
 ## 1.0.69
 
 - Keep the proof task first in the inspector and move secondary actions into a menu when needed. Double-click or press Enter on a project card to open its proof, and keep adjacent cards in view when resizing the inspector (#198).

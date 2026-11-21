@@ -34,7 +34,6 @@ test("resize a graph card independently at different zooms and remember per view
   await handle.scrollIntoViewIfNeeded();
   const firstScale = await scale();
   const start = await dimensions(card);
-  const originalTitle = await card.locator(".node-title").evaluate((el) => el.clientHeight);
   const first = (await handle.boundingBox())!;
   await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
   await page.mouse.down();
@@ -64,10 +63,10 @@ test("resize a graph card independently at different zooms and remember per view
   expect(tall.x).toBeCloseTo(beforeHeight.x, 0);
   expect(tall.y).toBeCloseTo(beforeHeight.y, 0);
   const title = await card.locator(".node-title").evaluate((el) => ({
-    height: el.clientHeight,
+    fullTitle: el.clientHeight >= el.scrollHeight,
     contained: el.getBoundingClientRect().right <= el.closest(".graph-node")!.getBoundingClientRect().right,
   }));
-  expect(title.height).toBeGreaterThan(originalTitle);
+  expect(title.fullTitle).toBe(true);
   expect(title.contained).toBe(true);
   await expect(card).toHaveAttribute("title", TITLE);
 

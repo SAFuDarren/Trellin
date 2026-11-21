@@ -10,14 +10,14 @@ import type {
   ImpactEntry,
   ImpactPreview,
 } from "./types";
-import { claimCode, modelName, nodeTitle } from "./text";
+import { claimCode, harnessName, modelName, nodeTitle } from "./text";
 
-export const CARD = { width: 160, height: 72, horizontalGap: 36, verticalGap: 60, pad: 48 };
+export const CARD = { width: 216, minWidth: 140, height: 64, horizontalGap: 32, verticalGap: 44, pad: 24 };
 export type CardSize = { width: number; height: number };
 
 export function clampCardSize({ width, height }: CardSize): CardSize {
   return {
-    width: Math.round(Math.max(140, Math.min(540, width))),
+    width: Math.round(Math.max(CARD.minWidth, Math.min(540, width))),
     height: Math.round(Math.max(60, Math.min(360, height))),
   };
 }
@@ -296,9 +296,10 @@ export function liveWork(t: TFunction, graph: Graph | null, activity: ActivitySn
 }
 
 function workName(t: TFunction, record: ActivityRecord): string {
-  return record.kind === "model"
-    ? modelName(t, record)
-    : t(`activityKind.${record.kind}`, { defaultValue: t("activityKind.task") });
+  if (record.kind !== "model") return t(`activityKind.${record.kind}`, { defaultValue: t("activityKind.task") });
+  const model = modelName(t, record);
+  const agent = harnessName(record.provider ?? record.model_provider);
+  return agent && agent !== model ? t("graph.workActor", { agent, model }) : model;
 }
 
 export function workLabel(counts: Map<string, number>, separator: string): string {

@@ -111,15 +111,29 @@ describe("graph model", () => {
     expect([...lit.edges].map((edge) => edge.key)).toHaveLength(1);
   });
 
-  it("counts live work per node with model names", () => {
+  it("counts live work per node with recorded harness and model names", () => {
     const work = liveWork(
       t,
       graph,
       {
         claim_id: CLAIM,
         activity: [
-          { id: "1", kind: "model", state: "running", node_id: "obligation:r:2", model: "gpt-5-codex" },
-          { id: "2", kind: "model", state: "running", node_id: "obligation:r:2", model: "gpt-5-codex" },
+          {
+            id: "1",
+            kind: "model",
+            state: "running",
+            node_id: "obligation:r:2",
+            provider: "codex-cli",
+            model: "gpt-5-codex",
+          },
+          {
+            id: "2",
+            kind: "model",
+            state: "running",
+            node_id: "obligation:r:2",
+            provider: "codex-cli",
+            model: "gpt-5-codex",
+          },
           { id: "3", kind: "lean", state: "queued", node_id: "missing", fallback_node_id: "goal:c" },
           { id: "4", kind: "lean", state: "succeeded", node_id: "goal:c" },
         ],
@@ -128,7 +142,7 @@ describe("graph model", () => {
     );
     expect(work.running).toBe(2);
     expect(work.queued).toBe(1);
-    expect(work.byNode.get("obligation:r:2")!.running.get("GPT-5 Codex")).toBe(2);
+    expect(work.byNode.get("obligation:r:2")!.running.get("Codex · GPT-5 Codex")).toBe(2);
     expect(work.byNode.get("goal:c")!.queued.get("Lean check")).toBe(1);
   });
 });

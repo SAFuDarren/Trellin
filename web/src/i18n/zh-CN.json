@@ -210,7 +210,11 @@
     "untitled": "未命名"
   },
   "legend": {
-    "label": "图例与当前情况",
+    "label": "证明状态计数",
+    "edges": "连线样式",
+    "review": "待审核",
+    "blocked": "阻塞 / 待复核",
+    "affected": "受影响",
     "running": "运行中",
     "queued": "排队中",
     "badImpact": "将需重验 / 卡点"
@@ -446,9 +450,6 @@
     "source": "来源",
     "leanRecord": "Lean 状态",
     "usedBy": "用于",
-    "full": "展开全文",
-    "leanFull": "完整 Lean 文本",
-    "statementFull": "完整陈述",
     "parameters": "Lean 参数",
     "provenance": "来源与版本"
   },
@@ -675,7 +676,8 @@
     "projectClaims": "项目内的其他命题",
     "openClaim": "打开{{title}}，{{status}}",
     "label": "当前课题的依赖图",
-    "queued": "{{work}} 排队中"
+    "queued": "{{work}} 排队中",
+    "workActor": "{{agent}} · {{model}}"
   },
   "splitter": {
     "side": "拖动调整课题栏宽度",

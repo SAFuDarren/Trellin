@@ -736,6 +736,7 @@ export function Workbench({
             claimReviews={claimId ? claimReviews.get(claimId) : undefined}
             view={view}
             selected={selected}
+            work={selected ? work.byNode.get(selected) : undefined}
             assumption={assumption?.id ?? null}
             impact={impact.data}
             impactLoading={impact.isFetching}
