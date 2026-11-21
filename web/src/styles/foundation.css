@@ -103,6 +103,16 @@
   }
 }
 
+/* Selected research items keep a solid edge. Keyboard focus adds its own offset outline. */
+:is(.graph-node, .project-canvas-node)[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+:is(.queue-item[aria-current="true"], .board-card-toggle[aria-expanded="true"]) {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 /* A solid indicator accompanies the tint for selected navigation destinations. */
 :is(.rail-link, .nav-item, .chat-list-item, .sidebar-projects-row):is([aria-current="page"], [aria-current="true"]) {
   box-shadow: inset 2px 0 var(--accent);

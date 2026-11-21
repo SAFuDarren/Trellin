@@ -80,7 +80,7 @@ test("project claims open the existing inspector without leaving or moving the c
 
   await second.press("Space");
   await expect(second).toHaveAttribute("aria-pressed", "true");
-  await expect(second).toHaveCSS("box-shadow", "none");
+  await expect(second).toHaveCSS("box-shadow", /0px 0px 0px 1px/);
   await expect(second).toHaveCSS("background-image", "none");
   await expect(first).toHaveAttribute("aria-pressed", "false");
   await expect(detail.getByRole("heading", { name: SECOND_TITLE, exact: true })).toBeVisible();

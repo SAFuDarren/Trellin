@@ -147,7 +147,7 @@
 }
 
 .project-canvas-stage {
-  background-image: radial-gradient(var(--hair) 1px, transparent 1px);
+  background-image: radial-gradient(var(--map-grid-dot) 1.1px, transparent 1.2px);
   background-size: 24px 24px;
 }
 
@@ -183,12 +183,11 @@
   cursor: grab;
 }
 
-.project-canvas-node:hover {
+.project-canvas-node:hover:not([aria-pressed="true"]) {
   border-color: var(--edge);
 }
 
 .project-canvas-node[aria-pressed="true"] {
-  border-color: var(--accent);
   z-index: 1;
 }
 
