@@ -296,7 +296,7 @@ test("graph controls and Help retain accessible structure", async ({ page }) => 
   await expect(nodes).toHaveCount(7);
   await expect(inspect).toBeVisible();
   const map = page.getByRole("application", { name: "Project map", exact: true });
-  await page.getByRole("button", { name: "Close details" }).click();
+  await page.getByRole("button", { name: "Collapse review column" }).click();
   await expect(inspect).toBeHidden();
   await expect(map).toBeVisible();
   await page.getByRole("button", { name: "Global map", exact: true }).click();

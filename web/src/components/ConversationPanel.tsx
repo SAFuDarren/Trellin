@@ -86,6 +86,8 @@ export function ConversationPanel({
   const [showDetails, setShowDetails] = useState(false);
   const [managingModels, setManagingModels] = useState(false);
   const modelTrigger = useRef<HTMLButtonElement>(null);
+  const archiveTrigger = useRef<HTMLButtonElement>(null);
+  const restoreArchiveFocus = useRef(false);
   const [prepared, setPrepared] = useState<{ scope: string; preview: ConversationPreview } | null>(null);
   const currentScope = useRef<string | null>(null);
   const composerKeyboard = useComposerKeyboard();
@@ -132,6 +134,14 @@ export function ConversationPanel({
   useLayoutEffect(() => {
     if (feed.current && nearEnd.current) feed.current.scrollTop = feed.current.scrollHeight;
   }, [latestMessage?.id, running, sending]);
+
+  useLayoutEffect(() => {
+    if (removing || !restoreArchiveFocus.current) return;
+    restoreArchiveFocus.current = false;
+    const trigger = archiveTrigger.current;
+    const collapsedMenu = trigger?.closest("details:not([open])");
+    (collapsedMenu?.querySelector("summary") ?? trigger)?.focus();
+  }, [removing]);
 
   useEffect(() => {
     if (initialFocus.current && detail.data && !disabled) {
@@ -233,7 +243,13 @@ export function ConversationPanel({
     return t("model.fallback");
   }
   const remove = (
-    <button type="button" className="conversation-text-action" disabled={disabled} onClick={() => setRemoving(true)}>
+    <button
+      ref={archiveTrigger}
+      type="button"
+      className="conversation-text-action"
+      disabled={disabled}
+      onClick={() => setRemoving(true)}
+    >
       {t("conversations.remove")}
     </button>
   );
@@ -451,7 +467,10 @@ export function ConversationPanel({
           confirmLabel={t("conversations.confirmRemove")}
           pending={Boolean(pending)}
           blocked={running}
-          onCancel={() => setRemoving(false)}
+          onCancel={() => {
+            restoreArchiveFocus.current = true;
+            setRemoving(false);
+          }}
           onConfirm={() => void archive()}
         >
           <p>{t("conversations.removeHint")}</p>
