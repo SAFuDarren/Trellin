@@ -1,5 +1,5 @@
-import { expect, test, type Locator } from "@playwright/test";
-import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
 
 type Contrast = { foreground: string; background: string };
 
@@ -9,7 +9,11 @@ async function contrast(element: Locator, options: Contrast) {
     const root = getComputedStyle(document.documentElement);
     const context = document.createElement("canvas").getContext("2d")!;
     function luminance(property: string) {
-      const color = (property.startsWith("--") ? root : style).getPropertyValue(property).trim();
+      const value = (property.startsWith("--") ? root : style).getPropertyValue(property).trim();
+      const color = ["box-shadow", "background-image"].includes(property)
+        ? value.match(/(?:rgba?|color)\([^)]*\)/)?.[0]
+        : value;
+      if (!color) throw new Error(`No color declared for ${property}: ${value}`);
       context.clearRect(0, 0, 1, 1);
       context.fillStyle = color;
       context.fillRect(0, 0, 1, 1);
@@ -76,6 +80,105 @@ for (const colorScheme of ["light", "dark"] as const) {
     expect(await contrast(primary, { foreground: "color", background: "background-color" })).toBeGreaterThanOrEqual(
       4.5,
     );
+  });
+}
+
+async function stateOf(item: Locator) {
+  return item.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      fill: style.backgroundColor,
+      edge: style.borderTopColor,
+      ring: style.boxShadow,
+      focus: node.matches(":focus-visible"),
+    };
+  });
+}
+
+async function expectKeyboardRing(page: Page, item: Locator, surface: string) {
+  await page.keyboard.press("Tab");
+  await item.focus();
+  await expect(item).toHaveCSS("outline-style", "solid");
+  await expect(item).toHaveCSS("outline-width", "2px");
+  await expect(item).toHaveCSS("outline-offset", "2px");
+  expect(await contrast(item, { foreground: "outline-color", background: surface })).toBeGreaterThanOrEqual(3);
+}
+
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`map cards, proof nodes and review rows distinguish selection, hover and focus in ${colorScheme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+    await page.goto("/#session=fixture");
+
+    const selected = mapClaim(page, FIXTURE_CLAIM_TITLE);
+    const other = mapClaim(page, "单射映射的复合");
+    await expect(selected).toHaveAttribute("aria-pressed", "true");
+    const selectedMap = await stateOf(selected);
+    expect(selectedMap.ring).not.toBe("none");
+    expect(await contrast(selected, { foreground: "border-top-color", background: "--canvas" })).toBeGreaterThanOrEqual(
+      3,
+    );
+    expect(
+      await contrast(selected, { foreground: "border-top-color", background: "background-color" }),
+    ).toBeGreaterThanOrEqual(3);
+    await other.hover();
+    const hoveredMap = await stateOf(other);
+    expect(hoveredMap.fill).not.toBe(selectedMap.fill);
+    expect(hoveredMap.edge).not.toBe(selectedMap.edge);
+    expect(hoveredMap.focus).toBe(false);
+    await expectKeyboardRing(page, other, "--canvas");
+    await expect(other).toHaveAttribute("aria-pressed", "false");
+    await selected.hover();
+    expect(await stateOf(selected)).toEqual(selectedMap);
+
+    const canvas = page.getByRole("application", { name: "Project map", exact: true });
+    if (colorScheme === "light") {
+      const zoom = canvas.getByRole("button", { name: "Zoom to 100%" });
+      await zoom.click();
+      await expect(zoom).toHaveText("100%");
+      await expect(canvas).toHaveCSS("background-image", /radial-gradient/);
+      await expect(canvas).toHaveCSS("background-size", "24px 24px");
+      const dot = await contrast(canvas, { foreground: "background-image", background: "--canvas" });
+      expect(dot).toBeGreaterThan(1.3);
+      expect(dot).toBeLessThan(2);
+    }
+
+    await openProof(page);
+    const graph = page.locator(".main-proof-graph");
+    const selectedNode = graph.locator('.graph-node[aria-pressed="true"]');
+    const otherNode = graph.getByRole("button", { name: /^Proof obligation 1,/ });
+    const selectedProof = await stateOf(selectedNode);
+    expect(selectedProof.ring).not.toBe("none");
+    expect(
+      await contrast(selectedNode, { foreground: "border-top-color", background: "--canvas" }),
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      await contrast(selectedNode, { foreground: "border-top-color", background: "background-color" }),
+    ).toBeGreaterThanOrEqual(3);
+    await otherNode.hover();
+    const hoveredProof = await stateOf(otherNode);
+    expect(hoveredProof.fill).not.toBe(selectedProof.fill);
+    expect(hoveredProof.edge).not.toBe(selectedProof.edge);
+    expect(hoveredProof.focus).toBe(false);
+    await expectKeyboardRing(page, otherNode, "--canvas");
+    await expect(otherNode).toHaveAttribute("aria-pressed", "false");
+
+    const review = page.locator(".queue-item").first();
+    await review.hover();
+    const hoveredRow = await stateOf(review);
+    expect(hoveredRow.ring).toBe("none");
+    await review.click();
+    await expect(review).toHaveAttribute("aria-current", "true");
+    const selectedRow = await stateOf(review);
+    expect(selectedRow.fill).not.toBe(hoveredRow.fill);
+    expect(selectedRow.ring).toContain("inset");
+    expect(await contrast(review, { foreground: "box-shadow", background: "--side" })).toBeGreaterThanOrEqual(3);
+    expect(await contrast(review, { foreground: "box-shadow", background: "background-color" })).toBeGreaterThanOrEqual(
+      3,
+    );
+    await expectKeyboardRing(page, review, "--side");
+    expect((await stateOf(review)).ring).toBe(selectedRow.ring);
   });
 }
 

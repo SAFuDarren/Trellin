@@ -6,6 +6,7 @@
   --side: #efefef;
   --main: #fafafa;
   --canvas: #f4f4f4;
+  --map-grid-dot: color-mix(in srgb, var(--brand-navy) 19%, var(--canvas));
   --code: #ededed;
   --track: #e8e8e8;
   --pick: #dedede;
@@ -66,6 +67,7 @@
     --side: #222222;
     --main: #1e1e1e;
     --canvas: #171717;
+    --map-grid-dot: var(--hair);
     --code: #2b2b2b;
     --track: #2b2b2b;
     --pick: #343434;
@@ -732,7 +734,7 @@ select:disabled {
   color: var(--ink);
   text-align: left;
 }
-.graph-node:hover {
+.graph-node:hover:not([aria-pressed="true"]) {
   border-color: var(--edge);
 }
 .graph-node-resize {
@@ -771,24 +773,19 @@ select:disabled {
   stroke-width: 1.3px;
   pointer-events: none;
 }
-.graph-node[aria-pressed="true"] {
+.graph-node[data-working="true"]:not([aria-pressed="true"]) {
   border-color: var(--live);
   box-shadow: 0 0 0 2px var(--live-soft);
 }
-.graph-node[data-working="true"] {
-  border-color: var(--live);
-  box-shadow: 0 0 0 2px var(--live-soft);
-}
-.graph-node[data-working="true"][aria-pressed="true"] {
-  box-shadow: 0 0 0 2px var(--live);
-}
-.graph-node[data-affected="true"] {
+.graph-node[data-affected="true"]:not([aria-pressed="true"]) {
   border-color: var(--crit);
 }
 .graph-node[data-affected="true"][aria-pressed="true"] {
-  box-shadow: 0 0 0 2px var(--crit);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    inset 3px 0 var(--crit);
 }
-.graph-node[data-emphasis="dim"] {
+.graph-node[data-emphasis="dim"]:not([aria-pressed="true"]) {
   background: var(--canvas);
   color: var(--sub);
 }

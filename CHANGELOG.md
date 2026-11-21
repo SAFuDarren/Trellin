@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.78
+
+- Selected map cards, proof nodes and review rows use a Navy outline and tint, with separate hover and keyboard-focus states. The light project map has a more visible dotted grid.
+
 ## 1.0.77
 
 - Help includes short guides for the project map, Agent work and proof review. All guide links open real pages inside Trellin, and the window and Help use the Trellin name in both languages.
