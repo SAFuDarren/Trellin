@@ -158,6 +158,11 @@
       "node": {
         "explain": "解释这个证明步骤。",
         "next": "这个节点还有哪些内容需要检查？"
+      },
+      "blockedObligation": {
+        "explain": "这条证明义务为什么受阻？",
+        "references": "哪些已有结果可以证明这条义务？",
+        "next": "证明任务会先尝试什么？"
       }
     }
   },
@@ -931,7 +936,9 @@
     "replied": "已回复",
     "conversationMissing": "此对话不可用。请从列表选择另一条对话。",
     "contextMenu": "消息上下文",
-    "messageOnly": "仅本条消息",
+    "messageOnly": "只发送这份草稿",
+    "withoutEarlier": "发送时省略此前消息",
+    "withoutEarlierHint": "发送当前消息和明确附加的节点，之前的消息仍保留在对话中。",
     "hideRequestDetails": "收起请求详情",
     "connectedModels": "已连接的服务",
     "manageModels": "管理模型连接",

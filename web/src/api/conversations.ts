@@ -43,6 +43,7 @@ export type ConversationRequest = {
   connection_id: string;
   text: string;
   request_id: string;
+  include_history?: boolean;
 };
 export type ConversationPreview = {
   token: string;

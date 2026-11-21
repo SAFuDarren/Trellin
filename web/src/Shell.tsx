@@ -10,6 +10,7 @@ import { useProofTask } from "./api/proofTask";
 import { useAtlas, useClaims, useInbox, useTeam } from "./api/sections";
 import { workspaceEventCursor, workspaceId } from "./api/workspaceEvents";
 import { AgentChatDock, type AgentChatRequest } from "./components/AgentChatDock";
+import type { ConversationStarterScope } from "./components/ConversationRecipients";
 import { CommandPalette } from "./components/CommandPalette";
 import { Rail } from "./components/Rail";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
@@ -69,6 +70,12 @@ export function Shell({ session }: { session: string }) {
   const projectClaims = useProjectCanvasClaims(session, showsClaimProgress);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [chatRequest, setChatRequest] = useState<{ session: string; value: AgentChatRequest } | null>(null);
+  const [chatCanvas, setChatCanvas] = useState<HTMLDivElement | null>(null);
+  const [chatSelection, setChatSelection] = useState<{ session: string; scope: ConversationStarterScope } | null>(null);
+  const saveChatStarterScope = useCallback(
+    (scope: ConversationStarterScope) => setChatSelection({ session, scope }),
+    [session],
+  );
   const [palette, setPalette] = useState<{ session: string; query: string } | null>(null);
   const [projectAction, setProjectAction] = useState<{ session: string; request: ProjectActionRequest } | null>(null);
   const [lastWorkbench, setLastWorkbench] = useState<{ session: string; position: WorkbenchPosition } | null>(null);
@@ -239,7 +246,11 @@ export function Shell({ session }: { session: string }) {
                 pendingReviews={pendingReviews}
                 returnTo={position}
                 onPositionChange={saveWorkbench}
-                onChatAnchor={(anchor, title) => setChatRequest({ session, value: { anchor, title } })}
+                onChatAnchor={(anchor, title, starterScope) =>
+                  setChatRequest({ session, value: { anchor, title, starterScope } })
+                }
+                onChatCanvas={setChatCanvas}
+                onChatStarterScope={saveChatStarterScope}
                 actionRequest={projectAction?.session === session ? projectAction.request : undefined}
                 onActionHandled={clearProjectAction}
               />
@@ -250,6 +261,10 @@ export function Shell({ session }: { session: string }) {
             session={session}
             route={route}
             request={chatRequest?.session === session ? chatRequest.value : null}
+            canvas={section === "workbench" ? chatCanvas : null}
+            starterScope={
+              section === "workbench" && chatSelection?.session === session ? chatSelection.scope : undefined
+            }
             activity={activity}
             activityLoading={team.isPending || agentWorkList.isPending || conversations.isPending || inbox.isPending}
             activityUnavailable={team.isError || agentWorkList.isError || conversations.isError || inbox.isError}

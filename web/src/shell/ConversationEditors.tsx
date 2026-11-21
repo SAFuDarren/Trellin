@@ -5,6 +5,7 @@ type Editor = {
   text: string;
   selectedModel: string;
   recipientId?: string;
+  omitHistory?: boolean;
   creation?: { scope: string; id: string };
   pending: "preview" | "send" | "archive" | null;
   error: string;

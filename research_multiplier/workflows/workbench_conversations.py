@@ -23,6 +23,7 @@ _PROMPT = (
     'Reply in one JSON object of the form {"reply":"your answer"}.'
 )
 _FIELDS = {"thread_id", "connection_id", "request_id", "text"}
+_OPTIONAL_FIELDS = {"include_history"}
 _TIMEOUT_SECONDS = 85
 _TOKEN_SECONDS = 300
 _OUTPUT_TOKENS = 2400
@@ -275,8 +276,10 @@ def _history(store, identifier):
     return list(reversed(history))
 
 
-def _payload(store, current, text):
-    outgoing = {"text": text, "previous_turns": _history(store, current["id"])}
+def _payload(store, current, text, include_history):
+    outgoing = {"text": text}
+    if include_history:
+        outgoing["previous_turns"] = _history(store, current["id"])
     node = _node(store, current["claim_id"], current["statement_id"], current["node_id"])
     if node:
         outgoing["selected_node"] = node
@@ -322,11 +325,14 @@ class Discussions:
         if not connection_id.startswith("local:"):
             connection_id = str(_uuid(connection_id))
         text = _text(document["text"], 8000)
+        include_history = document.get("include_history", True)
+        if type(include_history) is not bool:
+            raise ConversationError("invalid")
         current = _thread(store, identifier)
-        return user_id, request_id, connection_id, text, current
+        return user_id, request_id, connection_id, text, include_history, current
 
     def _binding(self, store, document):
-        user_id, request_id, name, text, current = self._request(store, document)
+        user_id, request_id, name, text, include_history, current = self._request(store, document)
         if current["running"]:
             raise ConversationError("busy")
         with _agent_settings():
@@ -336,7 +342,7 @@ class Discussions:
         with self._resolve(name) as (config, identity):
             limits = _limits(config)
             external = not config.private
-        payload = _payload(store, current, text)
+        payload = _payload(store, current, text, include_history)
         authorization = {"workspace_id": str(store.workspace_id), "user_id": user_id,
                          "thread_id": str(current["id"]), "revision": current["revision"],
                          "request_id": str(request_id), "connection": identity,
@@ -349,7 +355,7 @@ class Discussions:
         return hmac.digest(self.secret, f"{expiry}:{fingerprint(authorization)}".encode(), "sha256").hex()
 
     def preview(self, store, document):
-        _document(document, _FIELDS)
+        _document(document, _FIELDS, _OPTIONAL_FIELDS)
         authorization, payload, _ = self._binding(store, document)
         expiry = int(time()) + _TOKEN_SECONDS
         identity = authorization["connection"]
@@ -357,18 +363,24 @@ class Discussions:
                 "model": identity["model"], "external": authorization["external"], "limits": authorization["limits"],
                 "outgoing": json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2)}
 
-    def accept(self, store, document):
-        _document(document, _FIELDS | {"token", "confirm_external"})
-        if type(document["confirm_external"]) is not bool:
-            raise ConversationError("invalid")
-        user_id, request_id, connection_id, text, current = self._request(store, document)
+    @staticmethod
+    def _already_accepted(store, request_id, thread_id, connection_id, text, include_history):
         existing = store.query("human", """
-            SELECT thread_id, connection ->> 'id' AS connection_id, text
+            SELECT thread_id, connection ->> 'id' AS connection_id, text,
+                   (payload -> 'user') ? 'previous_turns' AS include_history
             FROM rm.visible_conversation_turns WHERE id = %s
         """, request_id)
-        if existing:
-            if existing[0] != {"thread_id": current["id"], "connection_id": connection_id, "text": text}:
-                raise ConversationError("stale")
+        if existing and existing[0] != {"thread_id": thread_id, "connection_id": connection_id, "text": text,
+                                        "include_history": include_history}:
+            raise ConversationError("stale")
+        return bool(existing)
+
+    def accept(self, store, document):
+        _document(document, _FIELDS | {"token", "confirm_external"}, _OPTIONAL_FIELDS)
+        if type(document["confirm_external"]) is not bool:
+            raise ConversationError("invalid")
+        user_id, request_id, connection_id, text, include_history, current = self._request(store, document)
+        if self._already_accepted(store, request_id, current["id"], connection_id, text, include_history):
             return _project_thread(store, self.agents, user_id, current["id"]), False
         authorization, payload, text = self._binding(store, document)
         token = _text(document["token"], 96)
@@ -383,6 +395,10 @@ class Discussions:
                            current["id"], request_id, authorization["revision"], text,
                            store.json(authorization["connection"]), store.json(payload),
                            authorization["payload_sha256"], authorization["external"])
+        if not row["accepted"] and not self._already_accepted(
+            store, request_id, current["id"], connection_id, text, include_history,
+        ):
+            raise ConversationError("stale")
         return _project_thread(store, self.agents, user_id, current["id"]), row["accepted"]
 
     def run(self, store, thread_id, request_id):

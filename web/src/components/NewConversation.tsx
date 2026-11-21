@@ -15,13 +15,18 @@ import { useConversationEditor } from "../shell/ConversationEditors";
 import { href } from "../shell/route";
 import { ConversationModelPicker, previewMatchesModel, useConversationModels } from "./ConversationModels";
 import { ContextIcon } from "./ConversationPanel";
-import { ConversationRecipient, ConversationStarters, DIRECT_MODEL } from "./ConversationRecipients";
+import {
+  ConversationRecipient,
+  ConversationStarters,
+  DIRECT_MODEL,
+  type ConversationStarterScope,
+} from "./ConversationRecipients";
 import { Menu } from "./FloatingControls";
 import { SendArrow, Spin } from "./Icons";
 import { ModelConnections } from "./ModelConnections";
 import "../styles/conversation-composer.css";
 
-export type DraftAnchor = { anchor: ConversationAnchor; title: string };
+export type DraftAnchor = { anchor: ConversationAnchor; title: string; starterScope?: ConversationStarterScope };
 
 export function NewConversation({
   session,
@@ -30,6 +35,7 @@ export function NewConversation({
   agentsError,
   initialRecipient,
   anchor,
+  starterScope,
   onDetach,
   onCreated,
   focusComposer,
@@ -40,6 +46,7 @@ export function NewConversation({
   agentsError?: boolean;
   initialRecipient?: string;
   anchor?: DraftAnchor | null;
+  starterScope?: ConversationStarterScope;
   onDetach?: () => void;
   onCreated: (thread: ConversationSummary) => void;
   focusComposer?: boolean;
@@ -154,6 +161,7 @@ export function NewConversation({
           agent?.revision,
           connection.id,
           connection.fingerprint,
+          "with-history",
         ]);
         reviewed = { scope: threadScope, payload: preview };
       }
@@ -195,6 +203,7 @@ export function NewConversation({
         {!text && !pending && (
           <ConversationStarters
             anchor={scope}
+            scope={anchor?.starterScope ?? (anchor ? undefined : starterScope)}
             onSelect={(value) => {
               change({ text: value });
               input.current?.focus();

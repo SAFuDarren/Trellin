@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { AgentWorkSummary } from "../src/api/agentWork";
 import type { Conversation, ConversationAnchor, ConversationRequest } from "../src/api/conversations";
 import type { TeamAgent } from "../src/api/teamAgents";
-import { openProof } from "./project-map";
+import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
 
 test("Agent chat keeps map context explicit and preserves the selected Agent and draft across pages", async ({
   page,
@@ -119,8 +119,8 @@ test("Agent chat keeps map context explicit and preserves the selected Agent and
   await recipients.fill("lean");
   await recipients.press("Enter");
   const input = dock.getByRole("textbox", { name: "Message Lean Reviewer" });
-  await dock.getByRole("button", { name: "Explain this proof step." }).click();
-  await expect(input).toHaveValue("Explain this proof step.");
+  await dock.getByRole("button", { name: "Why is this proof obligation blocked?" }).click();
+  await expect(input).toHaveValue("Why is this proof obligation blocked?");
   await expect(input).toBeFocused();
   expect(created).toHaveLength(0);
   expect(sends).toHaveLength(0);
@@ -161,15 +161,22 @@ test("Agent chat keeps map context explicit and preserves the selected Agent and
   expect(sends).toEqual([{ ...previews[0], token: "previewed-context", confirm_external: true }]);
 
   await input.fill("Review this follow-up only when I send it.");
+  const history = dock.getByRole("checkbox", { name: "Send without earlier messages", exact: true });
+  await expect(history).not.toBeChecked();
+  await expect(history).toHaveAccessibleDescription(/chat history stays here/);
+  await history.press("Space");
+  await expect(history).toBeChecked();
   await dock.getByRole("button", { name: "Message context" }).click();
   await page.getByRole("menuitem", { name: "Request details" }).click();
   await expect(dock.locator(".conversation-request pre")).toHaveText('{"scope":"selected proof node only"}');
   expect(sends).toHaveLength(1);
+  expect(previews.at(-1)).toMatchObject({ text: "Review this follow-up only when I send it.", include_history: false });
   await dock.getByRole("link", { name: "Open full conversation" }).click();
   await expect(page.getByText("Check the first assumption.", { exact: true })).toBeVisible();
   await expect(dock).toBeHidden();
   const fullDraft = page.getByRole("textbox", { name: "Message Lean Reviewer" });
   await expect(fullDraft).toHaveValue("Review this follow-up only when I send it.");
+  await expect(page.getByRole("checkbox", { name: "Send without earlier messages", exact: true })).toBeChecked();
   await page.getByRole("button", { name: "Agent chat", exact: true }).click();
   await expect(fullDraft).toHaveCount(1);
   await expect(fullDraft).toBeFocused();
@@ -263,6 +270,7 @@ for (const hasAgent of [true, false]) {
     });
 
     await page.goto("/#session=fixture");
+    await page.locator("nav.rail").getByRole("link", { name: /^Team/ }).click();
     await page.getByRole("button", { name: "Agent chat", exact: true }).click();
     const dock = page.getByRole("region", { name: "Agent chat", exact: true });
     const textbox = page.getByRole("textbox", { name: hasAgent ? "Message Only Agent" : "Write a message" });
@@ -299,5 +307,63 @@ for (const hasAgent of [true, false]) {
       expect(written[0]?.body).not.toHaveProperty("claim_id");
       expect(written[2]?.body).toMatchObject({ text: starter, token: "fixture-token", confirm_external: true });
     }
+  });
+}
+
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`chat suggestions follow the selected claim and node with the zoom and inspector clear in ${colorScheme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    const writes: string[] = [];
+    await page.route(/\/api\/conversations(?:[/?]|$)/, async (route) => {
+      if (route.request().method() !== "GET") writes.push(route.request().url());
+      await route.fulfill({ json: { threads: [] } });
+    });
+    await page.goto("/#session=fixture");
+    await mapClaim(page, FIXTURE_CLAIM_TITLE).click();
+    const launcher = page.getByRole("button", { name: "Agent chat", exact: true });
+    await launcher.click();
+    const dock = page.getByRole("region", { name: "Agent chat", exact: true });
+    const inspector = page.locator("#review");
+    const input = dock.getByRole("textbox", { name: "Write a message" });
+    const starters = dock.getByRole("group", { name: "Message starters", exact: true });
+    const inCanvas = page
+      .locator(".workbench-agent-chat-slot")
+      .getByRole("region", { name: "Agent chat", exact: true });
+    const claimStarter = "Explain this claim and its assumptions.";
+    await expect(starters.getByRole("button", { name: claimStarter })).toBeVisible();
+    await expect(inCanvas).toBeVisible();
+    await expect(dock.getByText("Only this draft will be sent", { exact: true })).toBeVisible();
+    await expect(dock.getByText(/^Context ·/)).toHaveCount(0);
+    await starters.getByRole("button", { name: claimStarter }).click();
+    await expect(input).toHaveValue(claimStarter);
+    expect(writes).toEqual([]);
+    await input.clear();
+    await inspector.getByRole("button", { name: "Open proof", exact: true }).click();
+    const proof = page.locator(".main-proof-graph");
+    await proof.getByRole("button", { name: /^Proof obligation 2/ }).click();
+    for (const text of [
+      "Why is this proof obligation blocked?",
+      "Which existing results could prove this obligation?",
+      "What would a proof task try first?",
+    ]) {
+      await expect(starters.getByRole("button", { name: text, exact: true })).toBeVisible();
+    }
+    await expect(dock.getByText(/^Context ·/)).toHaveCount(0);
+    const zoom = proof.locator(".zoom");
+    const [dockBox, inspectorBox, zoomBox] = await Promise.all([
+      dock.boundingBox(),
+      inspector.boundingBox(),
+      zoom.boundingBox(),
+    ]);
+    expect(dockBox!.x + dockBox!.width).toBeLessThanOrEqual(inspectorBox!.x);
+    expect(zoomBox!.y + zoomBox!.height).toBeLessThanOrEqual(dockBox!.y);
+    await zoom.getByRole("button", { name: "Zoom in", exact: true }).click();
+
+    await inspector.getByRole("button", { name: "Ask an Agent", exact: true }).click();
+    await expect(dock.getByText("Context · Proof obligation 2", { exact: true })).toBeVisible();
+    await expect(input).toBeFocused();
+    expect(writes).toEqual([]);
   });
 }

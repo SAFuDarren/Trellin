@@ -1,4 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { ConversationSummary } from "../api/conversations";
 import { useTeamAgents } from "../api/teamAgents";
@@ -9,7 +10,7 @@ import { timeText } from "../workbench/text";
 import { ConversationPanel } from "./ConversationPanel";
 import { Chevron, Mark } from "./Icons";
 import { Picker } from "./FloatingControls";
-import { DIRECT_MODEL } from "./ConversationRecipients";
+import { DIRECT_MODEL, type ConversationStarterScope } from "./ConversationRecipients";
 import { NewConversation, type DraftAnchor } from "./NewConversation";
 import { WorkspaceActivityList } from "./WorkspaceActivity";
 import "../styles/agent-chat-dock.css";
@@ -23,6 +24,8 @@ export function AgentChatDock({
   session,
   route,
   request,
+  canvas,
+  starterScope,
   activity,
   activityLoading,
   activityUnavailable,
@@ -33,6 +36,8 @@ export function AgentChatDock({
   session: string;
   route: Route;
   request: AgentChatRequest | null;
+  canvas: HTMLElement | null;
+  starterScope?: ConversationStarterScope;
   activity: WorkspaceActivity;
   activityLoading: boolean;
   activityUnavailable: boolean;
@@ -49,6 +54,8 @@ export function AgentChatDock({
   const [initialRecipient, setInitialRecipient] = useState<string>();
   const [focusComposer, setFocusComposer] = useState(false);
   const launcher = useRef<HTMLButtonElement>(null);
+  const footerPanelHost = useRef<HTMLDivElement>(null);
+  const [panelMount] = useState(() => document.createElement("div"));
   const activityLauncher = useRef<HTMLButtonElement>(null);
   const closeControl = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -97,6 +104,17 @@ export function AgentChatDock({
     setFocusComposer(kind === "chat");
     setView(kind);
   }
+
+  useLayoutEffect(() => {
+    const host = view === "chat" && canvas ? canvas : footerPanelHost.current;
+    if (!host || panelMount.parentElement === host) return;
+    // Keep the same composer mounted while navigating between the canvas and other pages.
+    const active = document.activeElement;
+    host.append(panelMount);
+    if (active instanceof HTMLElement && panelMount.contains(active)) active.focus({ preventScroll: true });
+  }, [canvas, panelMount, view]);
+
+  useLayoutEffect(() => () => panelMount.remove(), [panelMount]);
 
   useLayoutEffect(() => {
     if (view === "activity") closeControl.current?.focus();
@@ -169,6 +187,116 @@ export function AgentChatDock({
     />
   );
 
+  const panel = (
+    <section
+      className="agent-dock-panel"
+      data-view={view ?? undefined}
+      id={panelId}
+      aria-labelledby={titleId}
+      hidden={view === null}
+      onKeyDown={(event) => {
+        if (
+          event.key !== "Escape" ||
+          event.defaultPrevented ||
+          (event.target instanceof Element && event.target.closest("dialog[open]"))
+        ) {
+          return;
+        }
+        event.preventDefault();
+        collapse();
+      }}
+    >
+      <header className="agent-dock-heading">
+        <h2 id={titleId} className={view === "chat" ? "sr-only" : undefined}>
+          {t(view === "activity" ? "agentDock.activity" : "agentDock.title")}
+        </h2>
+        {view === "chat" && (
+          <>
+            {threadPicker}
+            <div className="agent-dock-heading-actions">
+              <button
+                className="icon-button"
+                type="button"
+                aria-label={t("agentDock.newConversation")}
+                title={t("agentDock.newConversation")}
+                onClick={() => startNew()}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M3.5 8h9 M8 3.5v9" />
+                </svg>
+              </button>
+              {thread && (
+                <a className="conversation-text-action" href={href("chat", thread.id)}>
+                  {t("agentDock.openChats")}
+                </a>
+              )}
+            </div>
+          </>
+        )}
+        <button
+          className="icon-button"
+          ref={closeControl}
+          type="button"
+          aria-label={t("agentDock.close")}
+          title={t("agentDock.close")}
+          onClick={collapse}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3.5 8h9" />
+          </svg>
+        </button>
+      </header>
+      {view === "activity" ? (
+        <WorkspaceActivityList
+          activity={activity}
+          agents={agentsById}
+          loading={activityLoading}
+          unavailable={activityUnavailable}
+          onNavigate={() => setView(null)}
+          onOpenProof={onOpenProof}
+          onOpenThread={selectThread}
+        />
+      ) : view === "chat" ? (
+        <>
+          {thread?.claim_id && (
+            <div className="agent-dock-scope">
+              {anchor
+                ? t("agentDock.anchor", { title: anchor.title })
+                : t(thread.node_id ? "conversations.nodeScope" : "conversations.claimScope")}
+            </div>
+          )}
+          {thread ? (
+            <ConversationPanel
+              key={thread.id}
+              session={session}
+              thread={thread}
+              employee={agent}
+              recipientChoice={{ agents, pending: profiles.isPending, onSelect: switchRecipient }}
+              focusComposer={focusComposer}
+              onRemove={() => startNew()}
+            />
+          ) : (
+            <NewConversation
+              session={session}
+              agents={agents}
+              agentsPending={profiles.isPending}
+              agentsError={profiles.isError}
+              anchor={anchor}
+              starterScope={starterScope}
+              onDetach={() => setAnchor(null)}
+              initialRecipient={initialRecipient}
+              onCreated={(item) => {
+                setChosenId(item.id);
+                setFocusComposer(true);
+              }}
+              focusComposer={focusComposer}
+            />
+          )}
+        </>
+      ) : null}
+    </section>
+  );
+
   return (
     <footer className="agent-dock" aria-label={t("agentDock.title")}>
       <button
@@ -218,112 +346,8 @@ export function AgentChatDock({
         </svg>
         <span>{t("agentDock.title")}</span>
       </button>
-      <section
-        className="agent-dock-panel"
-        data-view={view ?? undefined}
-        id={panelId}
-        aria-labelledby={titleId}
-        hidden={view === null}
-        onKeyDown={(event) => {
-          if (
-            event.key !== "Escape" ||
-            event.defaultPrevented ||
-            (event.target instanceof Element && event.target.closest("dialog[open]"))
-          ) {
-            return;
-          }
-          event.preventDefault();
-          collapse();
-        }}
-      >
-        <header className="agent-dock-heading">
-          <h2 id={titleId} className={view === "chat" ? "sr-only" : undefined}>
-            {t(view === "activity" ? "agentDock.activity" : "agentDock.title")}
-          </h2>
-          {view === "chat" && (
-            <>
-              {threadPicker}
-              <div className="agent-dock-heading-actions">
-                <button
-                  className="icon-button"
-                  type="button"
-                  aria-label={t("agentDock.newConversation")}
-                  title={t("agentDock.newConversation")}
-                  onClick={() => startNew()}
-                >
-                  <svg viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M3.5 8h9 M8 3.5v9" />
-                  </svg>
-                </button>
-                {thread && (
-                  <a className="conversation-text-action" href={href("chat", thread.id)}>
-                    {t("agentDock.openChats")}
-                  </a>
-                )}
-              </div>
-            </>
-          )}
-          <button
-            className="icon-button"
-            ref={closeControl}
-            type="button"
-            aria-label={t("agentDock.close")}
-            title={t("agentDock.close")}
-            onClick={collapse}
-          >
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M3.5 8h9" />
-            </svg>
-          </button>
-        </header>
-        {view === "activity" ? (
-          <WorkspaceActivityList
-            activity={activity}
-            agents={agentsById}
-            loading={activityLoading}
-            unavailable={activityUnavailable}
-            onNavigate={() => setView(null)}
-            onOpenProof={onOpenProof}
-            onOpenThread={selectThread}
-          />
-        ) : view === "chat" ? (
-          <>
-            {thread?.claim_id && (
-              <div className="agent-dock-scope">
-                {anchor
-                  ? t("agentDock.anchor", { title: anchor.title })
-                  : t(thread.node_id ? "conversations.nodeScope" : "conversations.claimScope")}
-              </div>
-            )}
-            {thread ? (
-              <ConversationPanel
-                key={thread.id}
-                session={session}
-                thread={thread}
-                employee={agent}
-                recipientChoice={{ agents, pending: profiles.isPending, onSelect: switchRecipient }}
-                focusComposer={focusComposer}
-                onRemove={() => startNew()}
-              />
-            ) : (
-              <NewConversation
-                session={session}
-                agents={agents}
-                agentsPending={profiles.isPending}
-                agentsError={profiles.isError}
-                anchor={anchor}
-                onDetach={() => setAnchor(null)}
-                initialRecipient={initialRecipient}
-                onCreated={(item) => {
-                  setChosenId(item.id);
-                  setFocusComposer(true);
-                }}
-                focusComposer={focusComposer}
-              />
-            )}
-          </>
-        ) : null}
-      </section>
+      <div className="agent-dock-panel-host" ref={footerPanelHost} />
+      {createPortal(panel, panelMount)}
     </footer>
   );
 }

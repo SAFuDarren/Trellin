@@ -26,6 +26,8 @@ Click a project map card to inspect the claim. Double-click the card or press **
 
 Open **Agent chat** to start typing, or press **@** at the start of a draft to choose a recipient. If the project has one saved Agent, the composer selects it and displays its name. With multiple Agents, choose a recipient and the draft remembers it. Use **Add an Agent** if the project has none. The suggested prompts fill the draft. **Request details** opens the local conversation and shows the outgoing message for review. Send with **Enter** or **Send**. Use **Ask an Agent** on a claim or proof node when you want to attach that context. **Open full conversation** moves the current conversation and its draft to Chats, where the dock remains collapsed.
 
+In Workbench, Agent chat opens below the graph. Suggestions follow the selected claim or proof node. An existing conversation has a **Send without earlier messages** checkbox that keeps previous turns out of each request while it is checked.
+
 Use **Agent activity** in the bottom bar to see recorded proof and model jobs, Agent work, conversations and results waiting for you. Filter by state and open an item to go to its job, proof, conversation or review. The Team badge counts running activity across the project. Claims and Chats show the count for the claim or proof node they display.
 
 In Library, hover over a row or focus it with the keyboard to reveal its **Edit statement** icon. From a focused row, press **Tab** and then **Enter** to open the revision form. You can also open it from the entry inspector.

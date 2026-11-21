@@ -158,6 +158,11 @@
       "node": {
         "explain": "Explain this proof step.",
         "next": "What needs to be checked for this node?"
+      },
+      "blockedObligation": {
+        "explain": "Why is this proof obligation blocked?",
+        "references": "Which existing results could prove this obligation?",
+        "next": "What would a proof task try first?"
       }
     }
   },
@@ -931,7 +936,9 @@
     "replied": "Replied",
     "conversationMissing": "This conversation is unavailable. Choose another chat from the list.",
     "contextMenu": "Message context",
-    "messageOnly": "This message only",
+    "messageOnly": "Only this draft will be sent",
+    "withoutEarlier": "Send without earlier messages",
+    "withoutEarlierHint": "Send this message and any attached node without including earlier messages. The chat history stays here.",
     "hideRequestDetails": "Hide request details",
     "connectedModels": "Connected services",
     "manageModels": "Manage model connections",

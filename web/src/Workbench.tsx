@@ -8,6 +8,7 @@ import { useFallbackInterval } from "./api/liveUpdates";
 import { useProjectCanvas } from "./api/projectCanvas";
 import { useAtlas, useClaimGraph, useClaims, useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
+import type { ConversationStarterScope } from "./components/ConversationRecipients";
 import { GraphView } from "./components/GraphView";
 import type { FloatingGroup, FloatingOption } from "./components/FloatingControls";
 import { ProjectCanvas } from "./components/ProjectCanvas";
@@ -34,6 +35,13 @@ function errorText(t: TFunction, error: unknown): string {
   return t(`errors.${error.message}`, { defaultValue: error.message });
 }
 
+function chatStarterScope(graph: Graph | null, node?: GraphNode): ConversationStarterScope {
+  if (!node || node.kind === "goal") return "claim";
+  if (node.kind === "obligation" && (node.status === "blocked" || graph?.blockers.get(node.id)?.length))
+    return "blockedObligation";
+  return "node";
+}
+
 export type Focus = { claimId: string; nodeId?: string; proof?: boolean; nonce: number };
 type Selection = { claimId: string; nodeId?: string; referenced?: boolean };
 type MapReturn = { detailsOpen: boolean; selection: Selection | undefined };
@@ -56,6 +64,8 @@ export function Workbench({
   returnTo,
   onPositionChange,
   onChatAnchor,
+  onChatStarterScope,
+  onChatCanvas,
   actionRequest,
   onActionHandled,
 }: {
@@ -67,7 +77,9 @@ export function Workbench({
   pendingReviews: number | undefined;
   returnTo?: WorkbenchPosition;
   onPositionChange: (position: WorkbenchPosition) => void;
-  onChatAnchor: (anchor: ConversationAnchor, title: string) => void;
+  onChatAnchor: (anchor: ConversationAnchor, title: string, starterScope: ConversationStarterScope) => void;
+  onChatStarterScope: (scope: ConversationStarterScope) => void;
+  onChatCanvas: (element: HTMLDivElement | null) => void;
   actionRequest?: ProjectActionRequest;
   onActionHandled: () => void;
 }) {
@@ -150,6 +162,8 @@ export function Workbench({
   const target = selection?.claimId === claimId ? selection?.nodeId : undefined;
   const selected = target && graph?.nodes.has(target) ? target : (goal?.id ?? graph?.order[0] ?? null);
   const node = selected ? graph?.nodes.get(selected) : undefined;
+  const starterScope = claimId ? chatStarterScope(graph, node) : "project";
+  useEffect(() => onChatStarterScope(starterScope), [onChatStarterScope, starterScope]);
   const assumption = graph?.hypotheses.find(({ id }) => id === assumptionId) ?? graph?.hypotheses[0];
   const basis = assumption?.reference?.basis_version_id;
 
@@ -334,6 +348,7 @@ export function Workbench({
         node_id: target.kind === "goal" ? undefined : target.id,
       },
       target.kind === "goal" && scope.claim.title ? scope.claim.title : nodeTitle(t, target, { full: true }),
+      chatStarterScope(scope, target),
     );
   };
   const writeNote = (id: string) => {
@@ -713,6 +728,7 @@ export function Workbench({
             </div>
           )}
         </div>
+        <div className="workbench-agent-chat-slot" ref={onChatCanvas} />
       </main>
       {showReview && (
         <>
