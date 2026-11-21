@@ -88,7 +88,9 @@ existing authorized views.
 
 The left column lists registered projects. The centre shows the project map. The right column lists records awaiting review, with the selected claim or proof node and its **Proof details** below. Choose **If withdrawn** to see affected records. Drag the borders to resize the columns, or focus a border and use the arrow keys. The sizes are remembered in this browser and **Settings** can reset them. Choose **简体中文** in **Settings** to switch the interface language.
 
-Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. Drag the corner of a node to adjust its width and height. With that handle focused, the arrow keys resize the node.
+Opening a proof fits small graphs and starts large graphs at a readable zoom around the selected node. Use **Fit to window** in the corner to see the entire graph. Drag to pan. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. With the canvas focused, the arrow keys pan, + and − zoom and 0 fits.
+
+Select a node to read its full formula and Lean statement in the inspector. The activity badge shows a count. Hover over it or check the inspector for the recorded Agent and model. Open **Edge styles** to look up connection types. The status counts stay in the footer. Hover, focus or select a node to reveal its resize handle. Drag the handle or focus it and use the arrow keys.
 
 ## Assign project work
 

@@ -210,7 +210,11 @@
     "untitled": "Untitled"
   },
   "legend": {
-    "label": "Legend and current state",
+    "label": "Proof status counts",
+    "edges": "Edge styles",
+    "review": "Needs review",
+    "blocked": "Blocked / recheck",
+    "affected": "Affected",
     "running": "Running",
     "queued": "Queued",
     "badImpact": "Would need recheck / blocked"
@@ -446,9 +450,6 @@
     "source": "Source",
     "leanRecord": "Lean status",
     "usedBy": "Used by",
-    "full": "Show full text",
-    "leanFull": "Full Lean text",
-    "statementFull": "Full statement",
     "parameters": "Lean parameters",
     "provenance": "Sources and versions"
   },
@@ -675,7 +676,8 @@
     "projectClaims": "Other claims in this project",
     "openClaim": "Open {{title}}, {{status}}",
     "label": "Dependency graph of the current claim",
-    "queued": "{{work}} queued"
+    "queued": "{{work}} queued",
+    "workActor": "{{agent}} · {{model}}"
   },
   "splitter": {
     "side": "Drag to resize the claims column",

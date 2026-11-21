@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   CARD,
@@ -15,13 +15,18 @@ import {
   type NodeWork,
   type View,
 } from "../workbench/graph";
-import { kindText, nodeStatus, nodeSub, nodeTitle, nodeTone, type Tone } from "../workbench/text";
+import { kindText, nodeStatus, nodeTitle, nodeTone, type Tone } from "../workbench/text";
 import type { ImpactPreview } from "../workbench/types";
 import type { CardSizes } from "../workbench/useLayout";
-import { ContextMenu, contextMenuProps, type ContextMenuAnchor, type FloatingGroup } from "./FloatingControls";
-import { Clock, Mark, Spin } from "./Icons";
+import { ContextMenu, contextMenuProps, Popover, type ContextMenuAnchor, type FloatingGroup } from "./FloatingControls";
+import { Chevron, Clock, Mark, Spin } from "./Icons";
 
 type Camera = { x: number; y: number; k: number };
+type CameraMode = "readable" | "fit" | "manual";
+const READABLE_SCALE = 0.8;
+const OVERVIEW_SCALE = 0.62;
+const STAGE_INSET = 12;
+const ZOOM_SPACE = 48;
 type ResizePreview = { id: string; anchor: Point; size: CardSize };
 type ResizeDrag = ResizePreview & { pointerId: number; x: number; y: number; zoom: number };
 type NodeMenu = { id: string; claimId: string; view: View; anchor: ContextMenuAnchor };
@@ -68,8 +73,8 @@ export function GraphView(props: Props) {
   const [resizing, setResizing] = useState<ResizePreview | null>(null);
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const moved = useRef(false);
-  const initialNode = useRef(selected ?? graph.order[0]);
+  const cameraMode = useRef<CameraMode>("readable");
+  const initialNode = useRef(selected ?? graph.focusId ?? graph.order[0]);
   const [panning, setPanning] = useState(false);
   const [nodeMenu, setNodeMenu] = useState<NodeMenu | null>(null);
   const currentMenu =
@@ -85,18 +90,26 @@ export function GraphView(props: Props) {
     () => highlights(graph, view, selected, assumption, affected),
     [graph, view, selected, assumption, affected],
   );
+  const areaWidth = Math.max(1, stageSize.width - STAGE_INSET * 2);
+  const areaHeight = Math.max(1, stageSize.height - STAGE_INSET - ZOOM_SPACE);
+  const columns = Math.max(1, ...graph.levels.map((level) => level.length));
+  const overviewWidth = Math.floor(
+    (areaWidth / OVERVIEW_SCALE - CARD.pad * 2 - CARD.horizontalGap * (columns - 1)) / columns,
+  );
+  // Narrow cards only when a smaller card can keep every column in the overview.
+  const defaultWidth = overviewWidth >= CARD.minWidth ? Math.min(CARD.width, overviewWidth) : CARD.width;
   const sizes = useMemo(
     () =>
       new Map(
         graph.order.map((id) => [
           id,
           props.cardSizes[id] ?? {
-            width: CARD.width,
+            width: defaultWidth,
             height: heights.get(id) ?? CARD.height,
           },
         ]),
       ),
-    [graph.order, props.cardSizes, heights],
+    [graph.order, props.cardSizes, defaultWidth, heights],
   );
   const layout = useMemo(
     () => layoutGraph(graph, resizing ? new Map(sizes).set(resizing.id, resizing.size) : sizes),
@@ -105,70 +118,67 @@ export function GraphView(props: Props) {
   const { width: canvasWidth, height: canvasHeight } = layout;
   const positioned = resizing ? anchoredCamera(camera, layout, resizing.id, resizing.anchor) : camera;
 
-  // Card heights decide where edges meet them; measure after every render that may change a card.
-  // Runs after every render on purpose; it only sets state when a height actually changed.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Wrapped titles determine the layout. Camera gestures need no new card measurements.
   useLayoutEffect(() => {
     if (resizing) return;
-    const next = new Map<string, number>();
-    let changed = false;
-    for (const id of graph.order) {
-      const height = cards.current.get(id)?.offsetHeight || CARD.height;
-      next.set(id, height);
-      if (heights.get(id) !== height) changed = true;
-    }
-    if (changed || next.size !== heights.size) setHeights(next);
-  });
+    const next = new Map(graph.order.map((id) => [id, cards.current.get(id)?.offsetHeight ?? CARD.height]));
+    setHeights((current) =>
+      current.size === next.size && [...next].every(([id, height]) => current.get(id) === height) ? current : next,
+    );
+  }, [graph, props.cardSizes, resizing, defaultWidth]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = stage.current;
     if (!element) return;
-    const observer = new ResizeObserver(() =>
-      setStageSize({ width: element.clientWidth, height: element.clientHeight }),
-    );
+    const measure = () => {
+      const { clientWidth: width, clientHeight: height } = element;
+      setStageSize((current) => (current.width === width && current.height === height ? current : { width, height }));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
+  const fitScale = Math.min(1.25, areaWidth / canvasWidth, areaHeight / canvasHeight);
+  const minimumScale = Math.min(0.3, fitScale);
   const fit = useCallback(
-    (readable = false) => {
-      const { width, height } = stageSize;
-      if (!width || !height) return;
-      const k = Math.max(0.3, Math.min(1.25, (width - 32) / canvasWidth, (height - 56) / canvasHeight));
+    (mode: Exclude<CameraMode, "manual">) => {
+      if (!stageSize.width || !stageSize.height) return;
       const focus = initialNode.current;
       const point = focus ? layout.points.get(focus) : undefined;
-      if (readable && k < 0.8 && focus && point) {
-        const scale = 0.8;
+      if (mode === "readable" && fitScale < OVERVIEW_SCALE && focus && point) {
         const card = sizes.get(focus) ?? CARD;
-        setCamera({ k: scale, x: width / 2 - (point.x + card.width / 2) * scale, y: 36 - point.y * scale });
+        const k = READABLE_SCALE;
+        setCamera({
+          k,
+          x: STAGE_INSET + areaWidth / 2 - (point.x + card.width / 2) * k,
+          y: STAGE_INSET + Math.min(areaHeight / 3, areaHeight - card.height * k) - point.y * k,
+        });
         return;
       }
       setCamera({
-        k,
-        x: (width - canvasWidth * k) / 2,
-        y: Math.max(8, (height - 32 - canvasHeight * k) / 2),
+        k: fitScale,
+        x: STAGE_INSET + (areaWidth - canvasWidth * fitScale) / 2,
+        y: STAGE_INSET + (areaHeight - canvasHeight * fitScale) / 2,
       });
     },
-    [stageSize, canvasWidth, canvasHeight, layout.points, sizes],
+    [stageSize, areaWidth, areaHeight, fitScale, canvasWidth, canvasHeight, layout.points, sizes],
   );
 
-  // A new claim gets a fresh view; otherwise the camera stays where the researcher left it.
-  useEffect(() => {
-    moved.current = false;
-  }, [graph.claim.id]);
-  useEffect(() => {
-    if (!moved.current) fit(true);
+  useLayoutEffect(() => {
+    if (cameraMode.current !== "manual") fit(cameraMode.current);
   }, [fit]);
 
   const zoomAt = (factor: number, cx = stageSize.width / 2, cy = stageSize.height / 2) => {
-    moved.current = true;
+    cameraMode.current = "manual";
     setCamera(({ x, y, k }) => {
-      const next = Math.max(0.3, Math.min(2.5, k * factor));
+      const next = Math.max(minimumScale, Math.min(2.5, k * factor));
       return { k: next, x: cx - ((cx - x) * next) / k, y: cy - ((cy - y) * next) / k };
     });
   };
   const panBy = (dx: number, dy: number) => {
-    moved.current = true;
+    cameraMode.current = "manual";
     setCamera((current) => ({ ...current, x: current.x + dx, y: current.y + dy }));
   };
 
@@ -187,19 +197,19 @@ export function GraphView(props: Props) {
         const factor = Math.exp(-event.deltaY * 0.01);
         const cx = event.clientX - bounds.left;
         const cy = event.clientY - bounds.top;
-        moved.current = true;
+        cameraMode.current = "manual";
         setCamera(({ x, y, k }) => {
-          const next = Math.max(0.3, Math.min(2.5, k * factor));
+          const next = Math.max(minimumScale, Math.min(2.5, k * factor));
           return { k: next, x: cx - ((cx - x) * next) / k, y: cy - ((cy - y) * next) / k };
         });
       } else {
-        moved.current = true;
+        cameraMode.current = "manual";
         setCamera((current) => ({ ...current, x: current.x - event.deltaX, y: current.y - event.deltaY }));
       }
     };
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => element.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [minimumScale]);
 
   // Selections made by opening a menu already have a visible target.
   useEffect(() => {
@@ -226,7 +236,7 @@ export function GraphView(props: Props) {
 
   const openNodeMenu = (id: string, anchor: ContextMenuAnchor) => {
     if (drag.current || panning) return;
-    moved.current = true;
+    cameraMode.current = "manual";
     setNodeMenu({ id, claimId: graph.claim.id, view, anchor });
     if (id !== selected) props.onSelect(id);
   };
@@ -235,7 +245,7 @@ export function GraphView(props: Props) {
     const original = sizes.get(id);
     if (!original || (original.width === size.width && original.height === size.height)) return;
     const next = layoutGraph(graph, new Map(sizes).set(id, size));
-    moved.current = true;
+    cameraMode.current = "manual";
     setCamera((current) => anchoredCamera(current, next, id, anchor));
     props.onResizeCard(id, size);
   };
@@ -251,7 +261,7 @@ export function GraphView(props: Props) {
   const moveResize = (event: React.PointerEvent<HTMLButtonElement>) => {
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) return;
-    moved.current = true;
+    cameraMode.current = "manual";
     setResizing({ id: active.id, anchor: active.anchor, size: dragSize(active, event) });
   };
   const finishResize = (event: React.PointerEvent<HTMLButtonElement>, save: boolean) => {
@@ -286,7 +296,7 @@ export function GraphView(props: Props) {
     element.setPointerCapture(event.pointerId);
     setPanning(true);
     const move = (moveEvent: PointerEvent) => {
-      moved.current = true;
+      cameraMode.current = "manual";
       setCamera({
         ...start.camera,
         x: start.camera.x + moveEvent.clientX - start.x,
@@ -315,8 +325,8 @@ export function GraphView(props: Props) {
     else if (event.key === "+" || event.key === "=") zoomAt(1.2);
     else if (event.key === "-") zoomAt(1 / 1.2);
     else if (event.key === "0") {
-      moved.current = false;
-      fit();
+      cameraMode.current = "fit";
+      fit("fit");
     } else return;
     event.preventDefault();
   };
@@ -368,11 +378,8 @@ export function GraphView(props: Props) {
               const running = nodeWork?.running.size
                 ? workLabel(nodeWork.running, t("chat.listSeparator", { defaultValue: ", " }))
                 : "";
-              // The badge shortens the agent names but always shows how many jobs run.
-              const runningNames = nodeWork?.running.size
-                ? [...nodeWork.running.keys()].join(t("chat.listSeparator", { defaultValue: ", " }))
-                : "";
-              const runningCount = nodeWork ? [...nodeWork.running.values()].reduce((sum, n) => sum + n, 0) : 0;
+              const active = nodeWork && (running ? nodeWork.running : nodeWork.queued);
+              const activeCount = active ? [...active.values()].reduce((sum, count) => sum + count, 0) : 0;
               const queued =
                 !running && nodeWork?.queued.size
                   ? t("graph.queued", {
@@ -380,16 +387,14 @@ export function GraphView(props: Props) {
                     })
                   : "";
               const title = nodeTitle(t, node, { full: true });
-              const sub = nodeSub(t, node, title);
               const customSize = resizing?.id === id ? resizing.size : props.cardSizes[id];
-              const titleLines = customSize
-                ? Math.max(1, Math.floor((customSize.height - (running || queued ? 88 : 68)) / 18) + 1)
-                : 1;
+              const titleLines = customSize ? Math.max(1, Math.floor((customSize.height - 42) / 18)) : undefined;
               return (
                 <div
                   key={id}
                   className="graph-node-frame"
-                  style={{ left: point.x, top: point.y, width: customSize?.width ?? CARD.width }}
+                  data-resizing={resizing?.id === id || undefined}
+                  style={{ left: point.x, top: point.y, width: customSize?.width ?? defaultWidth }}
                 >
                   <button
                     ref={(element) => {
@@ -407,7 +412,7 @@ export function GraphView(props: Props) {
                     aria-controls="node-detail"
                     aria-label={[title, kindText(t, node.kind), caption, running || queued].filter(Boolean).join(", ")}
                     title={title}
-                    data-expanded-title={titleLines > 1 ? "true" : undefined}
+                    data-sized={customSize ? "true" : undefined}
                     style={{ height: customSize?.height, "--title-lines": titleLines } as React.CSSProperties}
                     aria-expanded={currentMenu?.id === id}
                     onClick={(event) => {
@@ -419,20 +424,15 @@ export function GraphView(props: Props) {
                       <Mark tone={nodeTone(node, blocked)} shape={node.kind === "hypothesis" ? "square" : undefined} />
                       <span className="node-title">{title}</span>
                     </span>
-                    <span className="node-sub" data-math={String(sub.math)}>
-                      {sub.text}
-                    </span>
                     <span className="node-caption">
                       <span className="node-code">{graph.codes.get(id)}</span>
-                      {caption}
+                      {activeCount > 0 && (
+                        <span className="work" data-state={running ? "running" : "queued"} title={running || queued}>
+                          {running ? <Spin /> : <Clock />}
+                          <span className="work-count">{activeCount}</span>
+                        </span>
+                      )}
                     </span>
-                    {(running || queued) && (
-                      <span className="work" data-state={running ? "running" : "queued"}>
-                        {running ? <Spin /> : <Clock />}
-                        <span className="work-text">{running ? runningNames : queued}</span>
-                        {running && runningCount > 1 && <span className="work-count">{"×" + runningCount}</span>}
-                      </span>
-                    )}
                   </button>
                   <button
                     type="button"
@@ -481,8 +481,8 @@ export function GraphView(props: Props) {
             type="button"
             aria-label={t("stage.fit")}
             onClick={() => {
-              moved.current = false;
-              fit();
+              cameraMode.current = "fit";
+              fit("fit");
             }}
           >
             <svg viewBox="0 0 14 14" aria-hidden="true">
@@ -528,6 +528,7 @@ function Legend({
   queued: number;
 }) {
   const { t } = useTranslation();
+  const edgeId = useId();
   const kinds = new Set(graph.edges.map((edge) => edge.drawKind));
   const counts = new Map<Tone, number>();
   for (const [id, node] of graph.nodes) {
@@ -538,35 +539,66 @@ function Legend({
   const lines = (["actual", "planned", "context"] as const).filter((kind) => kinds.has(kind));
   const tones = (["ok", "review", "bad", "open", "planned"] as const).filter((tone) => counts.get(tone));
   return (
-    <div className="legend" role="status" aria-label={t("legend.label")}>
-      {lines.map((kind) => (
-        <span key={kind}>
-          <i data-kind={kind} />
-          {t(`edge.${kind}`)}
-        </span>
-      ))}
-      {lines.length > 0 && <span className="rule" />}
-      {tones.map((tone) => (
-        <span key={tone}>
-          <Mark tone={tone} />
-          {tone === "bad" && view === "impact" ? t("legend.badImpact") : t(`tone.${tone}`)}
-          <b>{counts.get(tone)}</b>
-        </span>
-      ))}
-      {(running > 0 || queued > 0) && <span className="rule" />}
-      {running > 0 && (
-        <span>
-          <Spin />
-          {t("legend.running")}
-          <b>{running}</b>
-        </span>
-      )}
-      {queued > 0 && (
-        <span>
-          <Clock />
-          {t("legend.queued")}
-          <b>{queued}</b>
-        </span>
+    <div className="legend">
+      <div className="legend-counts" role="status" aria-label={t("legend.label")}>
+        {tones.map((tone) => {
+          const label = tone === "bad" && view === "impact" ? t("legend.badImpact") : t(`tone.${tone}`);
+          const compactLabel =
+            tone === "review"
+              ? t("legend.review")
+              : tone === "bad"
+                ? t(`legend.${view === "impact" ? "affected" : "blocked"}`)
+                : label;
+          return (
+            <span key={tone} title={label}>
+              <Mark tone={tone} />
+              <span className="legend-count-label">{compactLabel}</span>
+              <b>{counts.get(tone)}</b>
+            </span>
+          );
+        })}
+        {running > 0 && (
+          <span title={t("legend.running")}>
+            <Spin />
+            <span className="legend-count-label">{t("legend.running")}</span>
+            <b>{running}</b>
+          </span>
+        )}
+        {queued > 0 && (
+          <span title={t("legend.queued")}>
+            <Clock />
+            <span className="legend-count-label">{t("legend.queued")}</span>
+            <b>{queued}</b>
+          </span>
+        )}
+      </div>
+      {lines.length > 0 && (
+        <Popover
+          label={t("legend.edges")}
+          panelId={edgeId}
+          popup="dialog"
+          placement="top-end"
+          className="graph-edge-legend"
+          triggerClassName="graph-edge-legend-toggle"
+          trigger={
+            <>
+              <span className="graph-edge-legend-key" aria-hidden="true" />
+              <span className="graph-edge-legend-label">{t("legend.edges")}</span>
+              <Chevron />
+            </>
+          }
+        >
+          {() => (
+            <ul>
+              {lines.map((kind) => (
+                <li key={kind}>
+                  <i data-kind={kind} aria-hidden="true" />
+                  {t(`edge.${kind}`)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Popover>
       )}
     </div>
   );

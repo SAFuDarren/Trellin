@@ -67,16 +67,6 @@ export function nodeFormula(node: GraphNode): string {
   return "";
 }
 
-export function nodeSub(t: TFunction, node: GraphNode, title = nodeTitle(t, node)): { text: string; math: boolean } {
-  if (node.kind === "evidence") {
-    const id = node.reference?.evidence_id;
-    return { text: kindText(t, "evidence") + (id ? " · " + String(id).slice(0, 8) : ""), math: false };
-  }
-  const formula = nodeFormula(node);
-  if (formula && formula !== title) return { text: summarize(formula, 44), math: true };
-  return { text: t(`kind.${node.kind}`, { defaultValue: "" }), math: false };
-}
-
 export function nodeTone(node: GraphNode, blocked: boolean): Tone {
   if (blocked) return "bad";
   if (

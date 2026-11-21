@@ -6,8 +6,8 @@ import type { TFunction } from "i18next";
 import type { Claim } from "../api/client";
 import type { InboxItem } from "../api/sections";
 import type { ClaimProgress } from "../workbench/claimProgress";
-import { impactItems, impactLineKey, type Graph, type View } from "../workbench/graph";
-import { kindText, nodeFormula, nodeStatus, nodeTitle, nodeTone, statusText, summarize } from "../workbench/text";
+import { impactItems, impactLineKey, workLabel, type Graph, type NodeWork, type View } from "../workbench/graph";
+import { kindText, nodeStatus, nodeTitle, nodeTone, statusText } from "../workbench/text";
 import type { ImpactEntry, ImpactPreview } from "../workbench/types";
 import { ClaimProgressSummary, claimProgressText } from "./ClaimProgress";
 import { ClaimReviewLinks } from "./ClaimReviewLinks";
@@ -39,6 +39,7 @@ type Props = {
   claimReviews?: readonly InboxItem[];
   view: View;
   selected: string | null;
+  work?: NodeWork;
   assumption: string | null;
   impact: ImpactPreview | undefined;
   impactLoading: boolean;
@@ -146,6 +147,7 @@ function NodeDetail({
   claimReviews,
   view,
   selected,
+  work,
   assumption,
   impact,
   impactLoading,
@@ -192,7 +194,8 @@ function NodeDetail({
   const goalReviews = goal && !isImpact ? claimReviews : undefined;
   const showNodeState = !goal || isImpact || (claimStatus !== "proved" && blockers.length > 0 && !progress.state);
   const lean = typeof node.formalization === "string" ? node.formalization : "";
-  const math = typeof node.formula === "string" ? node.formula : nodeFormula(node);
+  const math = node.formula || node.proposition || "";
+  const listSeparator = t("chat.listSeparator", { defaultValue: ", " });
   const prose =
     typeof node.statement === "string" && node.statement !== lean && node.statement !== math ? node.statement : "";
   const incoming = graph.incoming.get(node.id) ?? [];
@@ -210,7 +213,7 @@ function NodeDetail({
   return (
     <>
       <header className="detail-header">
-        <h2>{node.kind === "goal" && graph.claim.title ? graph.claim.title : nodeTitle(t, node)}</h2>
+        <h2>{node.kind === "goal" && graph.claim.title ? graph.claim.title : nodeTitle(t, node, { full: true })}</h2>
         <div className="detail-head">
           <ClaimProgressSummary
             {...progress}
@@ -252,13 +255,16 @@ function NodeDetail({
       {isImpact && node.id === assumption && (
         <p className="detail-note">{impactLoading ? t("impact.loading") : impactError || t("impact.explain")}</p>
       )}
-      {math && math !== lean ? (
-        <Block label={t("detail.formula")} value={summarize(math, 240)} />
-      ) : prose ? (
-        <Block label={t("detail.statement")} value={summarize(prose, 240)} />
-      ) : null}
-      {lean && <Block label={t("detail.lean")} value={lean.length > 600 ? summarize(lean, 600) : lean} lean />}
+      {prose && <Block label={t("detail.statement")} value={prose} />}
+      {math && math !== lean && <Block label={t("detail.formula")} value={math} />}
+      {lean && <Block label={t("detail.lean")} value={lean} lean />}
       <dl className="facts">
+        {work && (
+          <>
+            <Fact heading={t("legend.running")}>{workLabel(work.running, listSeparator)}</Fact>
+            <Fact heading={t("legend.queued")}>{workLabel(work.queued, listSeparator)}</Fact>
+          </>
+        )}
         {typeof node.citation === "string" && <Fact heading={t("detail.source")}>{node.citation}</Fact>}
         {node.verification_status && node.verification_status !== node.status && (
           <Fact heading={t("detail.leanRecord")}>{statusText(t, node.verification_status)}</Fact>
@@ -296,12 +302,10 @@ function NodeDetail({
           </>
         )}
       </dl>
-      {(lean.length > 600 || prose.length > 240 || parameters) && (
+      {parameters && (
         <details>
-          <summary>{t("detail.full")}</summary>
-          {lean.length > 600 && <Block label={t("detail.leanFull")} value={lean} lean />}
-          {prose.length > 240 && <Block label={t("detail.statementFull")} value={prose} />}
-          {parameters && <Block label={t("detail.parameters")} value={parameters} lean />}
+          <summary>{t("detail.parameters")}</summary>
+          <pre className="lean">{parameters}</pre>
         </details>
       )}
       {references.length > 0 && (

@@ -60,11 +60,27 @@ test("claims, graph, live work, legend and details load without errors", async (
   await expect(page.locator(".graph-node")).toHaveCount(7);
   await expect(page.locator(".graph-edge")).toHaveCount(7);
   const work = card(page, /^Proof obligation 2$/).locator(".work");
-  await expect(work.locator(".work-text")).toHaveText("GPT-5 Codex");
-  await expect(work.locator(".work-count")).toHaveText("×2");
-  await expect(page.locator(".legend")).toContainText("Running");
-  // The legend's dividers stay thin lines; a page style once turned them into cards.
-  expect((await page.locator(".legend .rule").first().boundingBox())?.width ?? 99).toBeLessThan(4);
+  await expect(work).toHaveText("2");
+  await expect(work).toHaveAttribute("title", "Codex · GPT-5 Codex ×2");
+  await expect(work.locator("svg")).toBeVisible();
+  const counts = page.getByRole("status", { name: "Proof status counts" });
+  await expect(counts).toContainText("Running");
+  await expect(counts).toContainText("Queued");
+  expect(await counts.evaluate((row) => row.scrollWidth <= row.clientWidth)).toBe(true);
+  const edgeStyles = page.getByRole("button", { name: "Edge styles" });
+  const edgeLegend = page.getByRole("dialog", { name: "Edge styles" });
+  await expect(edgeStyles).toHaveAttribute("aria-expanded", "false");
+  await edgeStyles.click();
+  await expect(edgeLegend.locator("i")).toHaveCount(3);
+  await expect(counts).toBeVisible();
+  expect(
+    await counts
+      .locator(":scope > span")
+      .evaluateAll((labels) => new Set(labels.map((label) => label.getBoundingClientRect().y)).size),
+  ).toBe(1);
+  await page.keyboard.press("Escape");
+  await expect(edgeLegend).toBeHidden();
+  await expect(edgeStyles).toBeFocused();
   await expect(page.locator(".node-detail h2")).toHaveText("自然数加零的对称性");
   expect(errors).toEqual([]);
 });
@@ -78,6 +94,7 @@ test("selecting a node shows its details and conversation", async ({ page }) => 
     .click();
   await expect(page.locator(".node-detail h2")).toHaveText("Proof obligation 2");
   await expect(page.locator(".node-detail")).toContainText("Blocked:");
+  await expect(page.locator("#node-detail > .facts")).toContainText("Codex · GPT-5 Codex ×2");
   await expect(page.getByRole("region", { name: "Proof activity" }).getByRole("heading")).toContainText(
     "Proof obligation 2",
   );
