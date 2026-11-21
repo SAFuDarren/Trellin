@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import i18n from "../i18n";
+import "../i18n";
 import en from "../i18n/en.json";
 import { buildGraph } from "../workbench/graph";
 import type { GuidanceNote } from "../workbench/types";
@@ -12,7 +12,7 @@ const claim = "11111111-1111-4111-8111-111111111111";
 const statement = "22222222-2222-4222-8222-222222222222";
 const node = "goal:" + claim;
 const other = "lemma:33333333-3333-4333-8333-333333333333";
-const graph = buildGraph(i18n.t, {
+const graph = buildGraph({
   claim: { id: claim, title: "Synthetic claim", status: "open", domain: "lean-core", statement_id: statement },
   nodes: [
     { id: node, kind: "goal" },

@@ -153,8 +153,8 @@ export function Workbench({
   const library = useLibrary(session, Boolean(contextClaim));
   const snapshot = useClaimGraph(session, claimId, proofOpen || showReview || claimId === contextClaim);
   const graph = useMemo(
-    () => (snapshot.data && snapshot.data.claim.id === claimId ? buildGraph(t, snapshot.data) : null),
-    [claimId, snapshot.data, t],
+    () => (snapshot.data && snapshot.data.claim.id === claimId ? buildGraph(snapshot.data) : null),
+    [claimId, snapshot.data],
   );
   const goal =
     graph?.nodes.get(`goal:${claimId}`) ??

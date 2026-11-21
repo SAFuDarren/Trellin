@@ -10,7 +10,7 @@ import type {
   ImpactEntry,
   ImpactPreview,
 } from "./types";
-import { claimCode, harnessName, modelName, nodeTitle } from "./text";
+import { claimCode, harnessName, modelName } from "./text";
 
 export const CARD = { width: 216, minWidth: 140, height: 64, horizontalGap: 32, verticalGap: 44, pad: 24 };
 export type CardSize = { width: number; height: number };
@@ -94,10 +94,10 @@ function arrangeLevels(levels: string[][], incoming: Map<string, Edge[]>, outgoi
   }
 }
 
-export function buildGraph(t: TFunction, snapshot: GraphSnapshot): Graph {
-  const ordered = [...snapshot.nodes].sort(
-    (a, b) => nodeTitle(t, a).localeCompare(nodeTitle(t, b)) || a.id.localeCompare(b.id),
-  );
+export function buildGraph(snapshot: GraphSnapshot): Graph {
+  // The snapshot is in recorded order, with IDs breaking ties on the server.
+  // Keep that order as the starting point for ranks and temporary node codes.
+  const ordered = snapshot.nodes;
   const nodes = new Map(ordered.map((node) => [node.id, node]));
   const evidenceAliases = new Map(
     ordered
