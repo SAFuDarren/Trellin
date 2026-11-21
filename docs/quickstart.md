@@ -44,7 +44,7 @@ $RmPython = Join-Path $RmEnv "Scripts\python.exe"
 
 ## Start with your own question
 
-In the local proof workbench, use **Organize with AI** to review selected notes before creating a claim, or **Add theorem** to enter a theorem yourself. See [Project intake](project-intake.md).
+In the local proof workbench, use **Research actions → Organize with AI** to review selected notes before creating a claim, or **Add theorem** to enter a theorem yourself. See [Project intake](project-intake.md).
 
 Choose the project folder when prompted. The first command prints its actual path. In the remaining commands, replace `PATH` with that folder and run from there.
 
@@ -95,14 +95,14 @@ To work with an AI coding agent such as Claude Code or Codex, start it in the pr
 - [Recover a project archive](research-foundation.md#recover-and-monitor) using a PostgreSQL URL and a fresh target database. If a later step fails after import, keep the imported database and the archive, then retry with a fresh database and an unused directory.
 - [Verify a Lean proof in your own project](lean-core.md#check-a-lean-source-file-or-compiled-declaration) and see the confirmed assumptions and facts actually used.
 - Use **Home** to open the graph and **Switch view** in the sidebar header to open Review. The bottom rail menu opens Settings and Help. [Workbench navigation](proof-workbench.md#switch-between-the-graph-and-review)
-- In the Mac app, choose a registered project from **Projects** in the Workbench sidebar. The sidebar also opens the New Project and Open Folder dialogs. Each project restores its own selected graph node if the node is still available.
+- In the Mac app, choose a registered project from **Projects** in the Workbench sidebar. The sidebar also opens the New Project and Open Folder dialogs. On the **Project map**, select a claim and choose **Open proof** for its proof graph. Use **Find claim** to locate a claim. Drag cards and use **Link selected claim** to record research relationships. Positions and links are saved on this device per project.
 - In **Review**, open **Open research goals** to inspect an approved goal before preparing a candidate. Search local sources and claims from **Related work**. [Local goal search](research-goals.md#find-related-work-in-the-project)
 - In **Review**, open **Conjectures to compare** to compare already prepared Lean candidates and the approved basis before confirming a claim. [Conjecture review](research-goals.md#reopen-a-prepared-conjecture-in-workbench)
 - Open [Proof task in Trellin](proof-workbench.md#start-a-proof-task) to review the confirmed Lean scope, authorize proof work, and monitor its result.
 - Open **Premises** on a Lean claim to propose a premise and see it on the current graph. Review the exact basis before confirming a separate revised claim. [Premise review](proof-workbench.md#propose-a-premise)
 - In the Mac app, add your installed Codex or Claude Code from [Team → Runtimes](project-intake.md#connect-a-model) and select its model. Choose that connection for a public intake excerpt or for a released proof scope on database revision `0078`.
 - In **Team → Agents**, choose **Add agent**, select a saved model connection, and enter a name and optional role settings. The profile belongs to the current project on this device. Use **Edit** to change its details or reconnect it to another model.
-- Use [Research references](proof-workbench.md#work-with-the-models) to rename a claim's short code and reopen a saved proof node by its permanent number.
+- Use [Research actions → Research references](proof-workbench.md#work-with-the-models) to rename a claim's short code and reopen a saved proof node by its permanent number.
 - Expand a **Claims** card to read its statement and Lean in place. In **Library**, the table and inspector show each entry's recorded state.
 - On database revision `0079` or later, open **Chats**, choose an employee on the left, then select **New task** and name it. Switch tasks in the header and check which ones are waiting for a reply or need attention. A draft stays in its task while you switch in Chats. The employee's connection is selected for each follow-up. Open **Other conversations** to find earlier conversations, or start a model conversation beside a selected node in **Workbench**.
 - To send, click Send or press Enter. Use Shift+Enter for a line break. Choose **Request details** from the + menu to inspect the destination and the text that will be included. **Team → Models** uses the same saved connections as **Team → Runtimes**.

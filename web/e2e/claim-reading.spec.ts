@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { GraphSnapshot } from "../src/workbench/types";
+import { openProof } from "./project-map";
 
 const CLAIM_TITLE = "自然数加零的对称性";
 const LONG_TITLE = "Symmetry of equality on the natural numbers";
@@ -23,7 +24,6 @@ async function open(page: Page, singleGoal = false) {
     await route.fulfill({ response, json: graph });
   });
   await page.goto("/#session=fixture");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(CLAIM_TITLE);
 }
 
 test("a claim expands and collapses in place with its recorded statement", async ({ page }) => {
@@ -46,6 +46,7 @@ test("a claim expands and collapses in place with its recorded statement", async
 
 test("long titles stay inside their proof node when zooming", async ({ page }) => {
   await open(page, true);
+  await openProof(page);
   const card = page.getByRole("button", { name: new RegExp(`^${LONG_TITLE}`) });
   const label = card.locator(".node-title");
   await expect(card).toHaveAttribute("title", LONG_TITLE);

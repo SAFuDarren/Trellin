@@ -68,23 +68,32 @@ export function NavigationMenu({
         });
       }
     };
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      trigger.focus({ preventScroll: true });
-      dismiss();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        trigger.focus({ preventScroll: true });
+        dismiss();
+      } else if (event.key === "Tab" && inside(event.target)) {
+        const stops = [trigger, ...menu.querySelectorAll<HTMLAnchorElement>("a")];
+        const index = stops.findIndex((element) => element === document.activeElement);
+        const next = stops[index + (event.shiftKey ? -1 : 1)];
+        if (index >= 0 && next) {
+          event.preventDefault();
+          next.focus({ preventScroll: true });
+        }
+      }
     };
     const onFocusIn = (event: FocusEvent) => {
       if (!inside(event.target)) dismiss();
     };
 
     document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("keydown", onEscape);
+    document.addEventListener("keydown", onKey);
     document.addEventListener("focusin", onFocusIn);
     window.addEventListener("hashchange", dismiss);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("keydown", onEscape);
+      document.removeEventListener("keydown", onKey);
       document.removeEventListener("focusin", onFocusIn);
       window.removeEventListener("hashchange", dismiss);
     };
@@ -101,7 +110,10 @@ export function NavigationMenu({
         aria-expanded={open}
         aria-controls={id}
         data-current={indicator || undefined}
-        onClick={() => setOpen((current) => !current)}
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          setOpen((current) => !current);
+        }}
       >
         {children}
       </button>

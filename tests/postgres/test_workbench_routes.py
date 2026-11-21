@@ -22,7 +22,8 @@ from research_multiplier.storage.lean_progress import hold_lean_pass, pending_le
 from research_multiplier.storage.postgres import DatabaseOperationError, Store, bind_workspace
 from research_multiplier.workbench.server import WorkbenchServer
 from research_multiplier.workflows import (
-    formalization, intake, research_plans, runtime, workbench_proof_drafts, workbench_proof_tasks,
+    formalization, intake, research_plans, runtime, workbench_project_canvas, workbench_proof_drafts,
+    workbench_proof_tasks,
 )
 from tests._native_db import disposable_project_logins
 
@@ -144,6 +145,44 @@ def _request(server, method, path, *, body=None, status=200, headers=None, respo
         return payload
     finally:
         connection.close()
+
+
+def test_workbench_canvas_links_leave_recorded_proof_dependencies_intact(workbench, tmp_path, monkeypatch):
+    server, claim, *_ = workbench
+    monkeypatch.setattr(server, "project_canvas",
+                        workbench_project_canvas.ProjectCanvas(server.workspace, settings_file=tmp_path / "canvas.sqlite3"))
+    with paths.use_workspace(server.workspace, strict=True):
+        other, _ = _approved_statement(title="Second canvas fixture", sensitivity="public")
+        with Store() as store:
+            recent = store.query("human", """
+                SELECT rm.create_claim(
+                    c.contract_snapshot || jsonb_build_object(
+                        'claim_id', gen_random_uuid(), 'title', 'Newer canvas fixture ' || numbered.number
+                    )
+                ) AS id
+                FROM rm.claims c CROSS JOIN generate_series(1, 100) numbered(number)
+                WHERE c.id = %s
+            """, claim)
+            store.query("human", """
+                SELECT rm.freeze_claim(id, %s, %s) FROM unnest(%s::uuid[]) AS copies(id)
+            """, ACTOR, REASON, [row["id"] for row in recent])
+    endpoint = "/api/project-canvas"
+    recent_claims = _request(server, "GET", "/api/claims")["claims"]
+    project_claims = _request(server, "GET", endpoint + "/claims")["claims"]
+    assert len(recent_claims) == 100
+    assert claim not in {item["id"] for item in recent_claims}
+    assert {item["id"] for item in project_claims} >= {claim, other}
+    assert project_claims[:100] == recent_claims
+    before = _request(server, "GET", f"/api/graph?claim={claim}")
+    absent = {"action": "link", "source": claim, "target": str(uuid4())}
+    assert _request(server, "POST", endpoint, body=absent, status=409) == {"error": "project_canvas.missing"}
+    source, target = sorted((claim, other))
+    assert _request(server, "POST", endpoint, body={**absent, "target": other})["links"] == [
+        {"source": source, "target": target},
+    ]
+    after = _request(server, "GET", f"/api/graph?claim={claim}")
+    assert after["nodes"] == before["nodes"]
+    assert after["edges"] == before["edges"]
 
 
 @pytest.mark.parametrize(("provider", "family"), [("codex-cli", "openai"), ("claude-code", "anthropic")])

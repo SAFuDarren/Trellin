@@ -16,6 +16,10 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
   const keys = new Map<string, string[]>();
   const add = (...key: string[]) => keys.set(JSON.stringify(key), key);
   const inbox = () => add("inbox", session);
+  const claimIndexes = () => {
+    add("claims");
+    add("project-canvas-claims", session);
+  };
   const clarifications = () => add("clarification", session);
   const goals = () => add("goal-review", session);
   const intake = () => {
@@ -47,7 +51,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
         inbox();
         goals();
         clarifications();
-        add("claims");
+        claimIndexes();
         add("atlas");
         add("library");
         add("progress");
@@ -61,7 +65,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
         inbox();
         goals();
         clarifications();
-        add("claims");
+        claimIndexes();
         add("atlas");
         add("graph", event.claimId);
         add("impact", event.claimId);
@@ -82,6 +86,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
         inbox();
         if (event.kind !== "proof") {
           add("atlas");
+          add("project-canvas-claims", session);
           add("graph", event.claimId);
           add("threads");
         }
@@ -102,7 +107,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
           add("threads");
         };
         const claims = () => {
-          add("claims");
+          claimIndexes();
           add("atlas");
           inbox();
           graph();
@@ -123,6 +128,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
             break;
           case "proof":
             add("atlas");
+            add("project-canvas-claims", session);
             add("progress");
             add("activity", ...claim);
             add("team");
@@ -155,7 +161,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
             add("progress");
             add("graph");
             add("impact");
-            add("claims");
+            claimIndexes();
             add("atlas");
             inbox();
             break;

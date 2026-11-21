@@ -48,6 +48,8 @@ const PROOF_TASK = {
 const responses: Record<string, unknown> = {
   "/api/claims": { claim_id: CLAIM, claims: [{ id: CLAIM, title: "Left zero", status: "open", domain: "lean-core" }] },
   "/api/atlas": { claims: [] },
+  "/api/project-canvas": { positions: {}, links: [] },
+  "/api/project-canvas/claims": { claims: [{ id: CLAIM, title: "Left zero", status: "open", domain: "lean-core" }] },
   "/api/graph": {
     claim: { id: CLAIM, title: "Left zero", status: "open", domain: "lean-core", statement_id: "s" },
     nodes: [
@@ -83,6 +85,11 @@ function renderApp(
       <App session={session} />
     </QueryClientProvider>,
   );
+}
+
+async function openResearchAction(name: string) {
+  fireEvent.click(await screen.findByText(en.canvasShell.researchActions, { selector: "summary" }));
+  fireEvent.click(await screen.findByRole("button", { name }));
 }
 
 function keys(value: object, prefix = ""): string[] {
@@ -424,7 +431,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderApp("token");
-    fireEvent.click(await screen.findByRole("button", { name: en.lemmaPlan.title }));
+    await openResearchAction(en.lemmaPlan.title);
     const dialog = within(screen.getByRole("dialog", { name: en.lemmaPlan.title }));
     expect(dialog.getByText(goal.formalization!)).toBeTruthy();
     const plan = { format_version: 1, nodes: [{ name: "Helper", proposition: "True", proof: { trivial: true } }] };
@@ -526,7 +533,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     const { container } = renderApp("token");
-    fireEvent.click(await screen.findByRole("button", { name: en.premise.title }));
+    await openResearchAction(en.premise.title);
     const dialog = within(screen.getByRole("dialog", { name: en.premise.title }));
     fireEvent.click(dialog.getByRole("button", { name: en.premise.propose }));
     expect(dialog.getByText(en.premise.hold)).toBeTruthy();
@@ -887,6 +894,7 @@ describe("App", () => {
     expect(invalidate.mock.calls.map(([filter]) => filter?.queryKey)).toEqual([
       ["inbox", "active"],
       ["atlas"],
+      ["project-canvas-claims", "active"],
       ["graph", CLAIM],
       ["threads"],
       ["progress"],
@@ -1219,6 +1227,8 @@ describe("App", () => {
       vi.fn(async (input: string) => new Response(JSON.stringify(responses[input.split("?")[0]!] ?? {}))),
     );
     renderApp("token");
+    expect(await screen.findByRole("application", { name: en.projectCanvas.label })).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: en.projectCanvas.openProof }));
     const lemma = await screen.findByRole("button", { name: /^A helper lemma/ });
     expect(lemma.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: /^Original claim/ }));
@@ -1246,7 +1256,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderApp("token");
-    fireEvent.click(await screen.findByRole("button", { name: en.claimCodes.title }));
+    await openResearchAction(en.claimCodes.title);
     const modal = within(await screen.findByRole("dialog", { name: en.claimCodes.title }));
     fireEvent.change(modal.getByLabelText(en.claimCodes.claim), { target: { value: "new" } });
     fireEvent.click(modal.getByRole("button", { name: en.claimCodes.save }));
@@ -1278,7 +1288,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderApp("token");
-    fireEvent.click(await screen.findByRole("button", { name: en.claimCodes.title }));
+    await openResearchAction(en.claimCodes.title);
     const modal = within(await screen.findByRole("dialog", { name: en.claimCodes.title }));
     expect(modal.queryByLabelText(en.claimCodes.claim)).toBeNull();
     fireEvent.change(modal.getByLabelText(en.claimCodes.reference), { target: { value: "OLD-19" } });
@@ -1438,7 +1448,7 @@ describe("App", () => {
       }),
     );
     renderApp("token");
-    fireEvent.click(await screen.findByRole("button", { name: en.projectEntry.organize }));
+    await openResearchAction(en.projectEntry.organize);
     const dialog = within(await screen.findByRole("dialog"));
     expect(await dialog.findByRole("option", { name: "local-text" })).toBeTruthy();
     fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: wording } });
@@ -1606,7 +1616,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderApp("token");
-    fireEvent.click(await screen.findByRole("button", { name: en.projectEntry.organize }));
+    await openResearchAction(en.projectEntry.organize);
     const dialog = within(await screen.findByRole("dialog"));
     const recipient = `${choice.label} · ${choice.model}`;
     await dialog.findByRole("option", { name: recipient });

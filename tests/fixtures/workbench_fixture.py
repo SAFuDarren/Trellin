@@ -5,7 +5,7 @@ Usage: python tests/fixtures/workbench_fixture.py [--port 4174], then open /#ses
 
 The data is synthetic: five claims, one graph with running model work, a blocker, an assumption with an
 impact preview, conversation records and guidance channels for both local models and Codex. Guidance
-and synthetic update settings are kept in memory. No database, credentials or external network access are involved.
+and synthetic update and map settings are kept in memory. No database, credentials or external network access are involved.
 """
 
 import argparse
@@ -187,6 +187,7 @@ RELEASE_STATE = INITIAL_RELEASE_STATE.copy()
 AVAILABLE_RELEASE = {"version": "1.10.0", "url": "https://github.com/SAFuDarren/Trellin/releases/tag/v1.10.0",
                      "dismissed": False}
 REVIEWS = []
+PROJECT_CANVAS = {"positions": {}, "links": []}
 INITIAL_INBOX = [dict(item) for item in INBOX["items"]]
 INITIAL_GUIDANCE = [dict(item) for item in ACTIVITY["guidance"]]
 
@@ -216,8 +217,15 @@ class Handler(BaseHTTPRequestHandler):
         if route.path == "/api/release-updates":
             self.release_updates(route)
             return
+        if route.path == "/api/project-canvas":
+            self.send(json.dumps(PROJECT_CANVAS).encode(), "application/json")
+            return
+        if route.path == "/api/project-canvas/claims":
+            self.send(json.dumps({"claims": CLAIMS}, ensure_ascii=False).encode(),
+                      "application/json; charset=utf-8")
+            return
         query = parse_qs(route.query)
-        data = {"/api/claims": {"claims": CLAIMS, "claim_id": CLAIM}, "/api/graph": GRAPH, "/api/activity": ACTIVITY,
+        data = {"/api/claims": {"claims": CLAIMS, "claim_id": None}, "/api/graph": GRAPH, "/api/activity": ACTIVITY,
                 "/api/atlas": ATLAS, "/api/impact": IMPACT, "/api/inbox": INBOX, "/api/library": LIBRARY,
                 "/api/model-connections": {"connections": []},
                 "/api/model-connections/native": {"providers": [{"provider": "codex-cli", "status": "signed_in"}]},
@@ -244,7 +252,25 @@ class Handler(BaseHTTPRequestHandler):
             REVIEWS.clear()
             ACTIVITY["guidance"][:] = [dict(item) for item in INITIAL_GUIDANCE]
             RELEASE_STATE.update(INITIAL_RELEASE_STATE)
+            PROJECT_CANVAS["positions"].clear()
+            PROJECT_CANVAS["links"].clear()
             self.send(b'{"ok": true}', "application/json")
+            return
+        if route.path == "/api/project-canvas":
+            action = body["action"]
+            if action == "move":
+                PROJECT_CANVAS["positions"][body["id"]] = {"x": body["x"], "y": body["y"]}
+            elif action in {"link", "unlink"}:
+                source, target = sorted((body["source"], body["target"]))
+                link = {"source": source, "target": target}
+                if action == "link" and link not in PROJECT_CANVAS["links"]:
+                    PROJECT_CANVAS["links"].append(link)
+                elif action == "unlink" and link in PROJECT_CANVAS["links"]:
+                    PROJECT_CANVAS["links"].remove(link)
+            else:
+                self.send(b'{"error": "project_canvas.invalid"}', "application/json", 400)
+                return
+            self.send(json.dumps(PROJECT_CANVAS).encode(), "application/json")
             return
         if self.path == "/api/review":
             REVIEWS.append(body)

@@ -13,7 +13,7 @@ import pytest
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workbench.server import WorkbenchServer
-from research_multiplier.workflows import release_updates
+from research_multiplier.workflows import release_updates, workbench_project_canvas
 
 pytestmark = pytest.mark.offline
 
@@ -125,6 +125,81 @@ def test_team_agent_settings_are_scoped_to_the_local_project(tmp_path, monkeypat
         connections.append(replacement)
         relink = {**updated, "connection_id": replacement["id"]}
         assert inspect(instance, "POST", save, body=relink) == {"agent": {**relink, "revision": 3}}
+
+
+def test_canvas_layout_and_links_persist_without_crossing_workspace_boundaries(tmp_path, monkeypatch):
+    first_workspace = paths.initialize_workspace(tmp_path / "first")
+    second_workspace = paths.initialize_workspace(tmp_path / "second")
+    settings = tmp_path / "settings" / "canvas.sqlite3"
+    first, second = sorted((str(uuid4()), str(uuid4())))
+    foreign = str(uuid4())
+    visible = {first, second}
+    endpoint = "/api/project-canvas"
+    move = {"action": "move", "id": first, "x": 174, "y": -23}
+    link = {"action": "link", "source": second, "target": first}
+    unlink = {**link, "action": "unlink"}
+    empty = {"positions": {}, "links": []}
+
+    def configure(instance, identifiers):
+        monkeypatch.setattr(instance, "project_canvas",
+                            workbench_project_canvas.ProjectCanvas(instance.workspace, settings_file=settings))
+        monkeypatch.setattr(instance, "read", lambda workflow, *args: workflow(identifiers, *args))
+        monkeypatch.setattr(instance, "write", lambda *args: pytest.fail("Canvas metadata changes the proof database"))
+
+    def post(instance, body, status=200):
+        response, payload = request(instance, "POST", endpoint, body=body)
+        assert response.status == status, payload
+        return json.loads(payload)
+
+    def snapshot(instance):
+        response, payload = request(instance, "GET", endpoint)
+        assert response.status == 200, payload
+        return json.loads(payload)
+
+    monkeypatch.setattr(workbench_project_canvas.proof_graph, "visible_claim_ids",
+                        lambda visible, identifiers: visible.intersection(identifiers))
+    monkeypatch.setattr(workbench_project_canvas.proof_graph, "canvas_claim_index",
+                        lambda visible: {"claims": [{"id": identifier} for identifier in sorted(visible)]})
+    with _profile_server(first_workspace, ()) as instance:
+        configure(instance, visible)
+        assert request(instance, "GET", endpoint, session=False)[0].status == 403
+        assert request(instance, "GET", endpoint + "/claims", session=False)[0].status == 403
+        assert request(instance, "GET", endpoint + "?project=other")[0].status == 400
+        response, payload = request(instance, "GET", endpoint + "/claims")
+        assert response.status == 200
+        assert json.loads(payload) == {"claims": [{"id": first}, {"id": second}]}
+        assert request(instance, "POST", endpoint, body=move, session=False)[0].status == 403
+        assert request(instance, "POST", endpoint, body=move, origin=False)[0].status == 403
+        assert request(instance, "POST", endpoint, body=move, headers={"Origin": "https://foreign.test"})[0].status == 403
+        assert snapshot(instance) == empty
+        for body in ({**move, "x": True}, {**move, "y": float("nan")}, {**move, "y": 10**20},
+                     {**move, "project": foreign}, {**link, "source": first}):
+            assert post(instance, body, 400) == {"error": "project_canvas.invalid"}
+        assert post(instance, {**link, "source": foreign}, 409) == {"error": "project_canvas.missing"}
+        assert not settings.exists()
+
+        other_position = {**move, "id": second, "x": 100}
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            list(executor.map(lambda body: post(instance, body), (move, other_position, link)))
+        expected = {
+            "positions": {first: {"x": 174, "y": -23}, second: {"x": 100, "y": -23}},
+            "links": [{"source": first, "target": second}],
+        }
+        assert post(instance, {**link, "source": first, "target": second}) == expected
+
+    with _profile_server(second_workspace, ()) as instance:
+        configure(instance, {foreign})
+        assert snapshot(instance) == empty
+        assert post(instance, move, 409) == {"error": "project_canvas.missing"}
+        assert post(instance, unlink) == empty
+
+    visible.remove(second)
+    with _profile_server(first_workspace, ()) as instance:
+        configure(instance, visible)
+        assert snapshot(instance) == expected
+        unlinked = {**expected, "links": []}
+        assert post(instance, unlink) == unlinked
+        assert post(instance, unlink) == unlinked
 
 
 def test_page_is_served_with_strict_security_headers(server):

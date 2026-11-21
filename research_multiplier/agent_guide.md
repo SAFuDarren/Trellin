@@ -46,6 +46,8 @@ This copy matches the Research Multiplier version that wrote it. Run
    In Chats, the selected employee's saved connection handles each message
    in that task. Opening or switching tasks does not submit a request.
    Treat suggestions in chat as research notes.
+   The project map saves card positions and research links in this device's
+   settings. Proof decisions use the recorded statement and evidence.
 3. **Leave the project's records to the program.** Do not edit or delete anything
    under `runs/`, `objects/`, `evaluation/`, `backups/` or `lean-project/`, the
    `.research-multiplier*` marker files, or the database. Write your own drafts

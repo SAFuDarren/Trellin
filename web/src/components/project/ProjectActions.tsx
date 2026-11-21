@@ -30,6 +30,8 @@ export function ProjectActions({
   claimTitle,
   premiseReview,
   premiseDialog,
+  overview,
+  onToggleOverview,
   onOpenPremises,
   onClosePremises,
   onPremiseRecorded,
@@ -45,6 +47,8 @@ export function ProjectActions({
   claimTitle: string;
   premiseReview?: PremiseReview;
   premiseDialog: { id?: string } | null;
+  overview?: boolean;
+  onToggleOverview: () => void;
   onOpenPremises: (id?: string) => void;
   onClosePremises: () => void;
   onPremiseRecorded: () => Promise<void>;
@@ -56,40 +60,86 @@ export function ProjectActions({
   const [localMode, setMode] = useState<Exclude<Mode, "premises"> | null>(null);
   const mode = premiseDialog ? "premises" : localMode;
   const dialog = useRef<HTMLDialogElement>(null);
+  const actions = useRef<HTMLDetailsElement>(null);
   const title = useId();
 
   useEffect(() => {
     if (mode && dialog.current && !dialog.current.open) dialog.current.showModal();
   }, [mode]);
 
+  useEffect(() => {
+    function outside(event: PointerEvent) {
+      const menu = actions.current;
+      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+    }
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, []);
+
+  const closeActions = () => {
+    if (!actions.current?.open) return;
+    actions.current.open = false;
+    actions.current.querySelector("summary")?.focus();
+  };
+  const show = (next: Mode) => {
+    closeActions();
+    if (next === "premises") onOpenPremises();
+    else setMode(next);
+  };
+
   return (
     <div className="project-actions">
-      <button className="button" type="button" onClick={() => setMode("intake")}>
-        {t("projectEntry.organize")}
-      </button>
-      <button className="button" type="button" onClick={() => setMode("theorem")}>
+      <button className="button" type="button" onClick={() => show("theorem")}>
         {t("projectEntry.addTheorem")}
       </button>
       {claimId && (
-        <button className="button" type="button" onClick={() => setMode("proof")}>
+        <button className="button" type="button" onClick={() => show("proof")}>
           {t("proofTask.title")}
         </button>
       )}
-      {lemmaPlanScope && (
-        <button className="button" type="button" onClick={() => setMode("lemmas")}>
-          {t("lemmaPlan.title")}
-        </button>
-      )}
-      {premiseReview && (premiseReview.available || premiseReview.proposals.length > 0) && (
-        <button className="button" type="button" onClick={() => onOpenPremises()}>
-          {t("premise.title")}
-        </button>
-      )}
-      {(claimCode || claimCodesAvailable) && (
-        <button className="button" type="button" onClick={() => setMode("references")}>
-          {t("claimCodes.title")}
-        </button>
-      )}
+      <details
+        className="workbench-actions-menu"
+        ref={actions}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape" || !event.currentTarget.open) return;
+          event.preventDefault();
+          closeActions();
+        }}
+      >
+        <summary className="button">{t("canvasShell.researchActions")}</summary>
+        <div className="workbench-actions-items">
+          <button type="button" onClick={() => show("intake")}>
+            {t("projectEntry.organize")}
+          </button>
+          {lemmaPlanScope && (
+            <button type="button" onClick={() => show("lemmas")}>
+              {t("lemmaPlan.title")}
+            </button>
+          )}
+          {premiseReview && (premiseReview.available || premiseReview.proposals.length > 0) && (
+            <button type="button" onClick={() => show("premises")}>
+              {t("premise.title")}
+            </button>
+          )}
+          {(claimCode || claimCodesAvailable) && (
+            <button type="button" onClick={() => show("references")}>
+              {t("claimCodes.title")}
+            </button>
+          )}
+          {overview !== undefined && (
+            <button
+              type="button"
+              aria-pressed={overview}
+              onClick={() => {
+                onToggleOverview();
+                closeActions();
+              }}
+            >
+              {t("canvasShell.proofOverview")}
+            </button>
+          )}
+        </div>
+      </details>
       <dialog
         ref={dialog}
         className="project-entry"

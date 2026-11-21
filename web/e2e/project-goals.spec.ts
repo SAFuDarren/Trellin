@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mapClaim, openProof } from "./project-map";
 
 const ORIGINAL_CLAIM = "11111111-1111-4111-8111-111111111111";
 const NEW_GOAL = {
@@ -12,7 +13,7 @@ test("adding a project goal keeps the current proof open and draws no dependency
   let recorded = false;
   const requestedGraphs: Array<string | null> = [];
 
-  await page.route("**/api/claims", async (route) => {
+  await page.route(/\/api\/(?:project-canvas\/)?claims$/, async (route) => {
     const response = await route.fetch();
     const original = await response.json();
     await route.fulfill({
@@ -54,14 +55,13 @@ test("adding a project goal keeps the current proof open and draws no dependency
   await page.route(/\/api\/conversations(?:\?|$)/, (route) => route.fulfill({ json: { threads: [] } }));
 
   await page.goto("/#session=fixture");
+  await openProof(page);
   const heading = page.getByRole("heading", { level: 1 });
   await expect(heading).toHaveText("自然数加零的对称性");
   const originalProof = page.locator(".graph-nodes");
   const originalGoal = originalProof.locator('[data-node="goal:' + ORIGINAL_CLAIM + '"]');
   const originalNode = originalProof.getByRole("button", { name: /Proof obligation 2/ }).first();
   const edges = page.locator(".graph-edges .graph-edge");
-  const projectClaims = page.getByRole("region", { name: "Other claims in this project" });
-  await expect(projectClaims.locator(".canvas-project-claim")).toHaveCount(4);
   await expect(edges).toHaveCount(7);
   const oldPaths = await edges.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")));
   await originalNode.click();
@@ -78,28 +78,31 @@ test("adding a project goal keeps the current proof open and draws no dependency
   await dialog.getByLabel("The Lean proposition expresses my intended theorem, including its premises.").check();
   await dialog.getByRole("button", { name: "Confirm statement and add goal" }).click();
 
-  const newClaim = projectClaims.getByRole("button", { name: /^Open Natural number reflexivity/ });
+  const newClaim = mapClaim(page, NEW_GOAL.title);
   await expect(dialog).toBeHidden();
   await expect(heading).toHaveText("自然数加零的对称性");
   await expect(originalNode).toHaveAttribute("aria-pressed", "true");
   await expect(originalGoal).toBeVisible();
-  await expect(newClaim).toHaveAttribute("data-node", "goal:" + NEW_GOAL.id);
-  await expect(newClaim).toBeInViewport();
   await expect(edges).toHaveCount(7);
   expect(await edges.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")))).toEqual(oldPaths);
+  expect(requestedGraphs).not.toContain(NEW_GOAL.id);
+
+  await page.getByRole("button", { name: "Project map", exact: true }).click();
+  await expect(newClaim).toBeVisible();
   expect(requestedGraphs).not.toContain(NEW_GOAL.id);
 
   await page.reload();
+  await expect(newClaim).toBeVisible();
+  await openProof(page);
   await expect(heading).toHaveText("自然数加零的对称性");
-  await expect(newClaim).toBeInViewport();
   await expect(edges).toHaveCount(7);
   expect(await edges.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")))).toEqual(oldPaths);
   expect(requestedGraphs).not.toContain(NEW_GOAL.id);
 
-  await newClaim.click();
+  await page.getByRole("button", { name: "Project map", exact: true }).click();
+  await openProof(page, NEW_GOAL.title);
   await expect(heading).toHaveText(NEW_GOAL.title);
   await expect(originalProof.locator('[data-node="goal:' + NEW_GOAL.id + '"]')).toBeVisible();
-  await expect(projectClaims.getByRole("button", { name: /^Open 自然数加零的对称性/ })).toBeVisible();
   await expect(edges).toHaveCount(0);
   expect(requestedGraphs).toContain(NEW_GOAL.id);
 });

@@ -1,17 +1,15 @@
 """Local Team profiles reference model connections without granting dispatch."""
 
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 import json
-import os
 from pathlib import Path
 import sqlite3
-import stat
-import sys
 from uuid import UUID
 
 from research_multiplier.models.connections import ConnectionError
-from research_multiplier.storage import credentials, paths
-from research_multiplier.storage.managed_workspaces import LibraryError, application_home
+from research_multiplier.storage import paths
+from research_multiplier.storage.local_settings import has_table, private_database, settings_directory
+from research_multiplier.storage.managed_workspaces import LibraryError
 
 
 MAX_REQUEST_BYTES = 120_000
@@ -47,8 +45,7 @@ class AgentProfileError(ValueError):
 
 
 def _settings_file():
-    root = application_home() / "Settings" if sys.platform == "darwin" else credentials.directory().parent
-    return root / "team-agents.sqlite3"
+    return settings_directory() / "team-agents.sqlite3"
 
 
 def _id(value):
@@ -101,12 +98,6 @@ def _available(registry, connection_id):
         raise AgentProfileError("team_agents.connection_unavailable") from None
 
 
-def _has_table(database, name):
-    return database is not None and database.execute(
-        "SELECT 1 FROM sqlite_master WHERE name = ? AND type = 'table'", (name,),
-    ).fetchone() is not None
-
-
 class AgentProfiles:
     """Store one workspace's configuration in this device's private settings."""
 
@@ -124,27 +115,8 @@ class AgentProfiles:
             raise AgentProfileError("team_agents.unavailable")
         try:
             file = self._file if self._file is not None else _settings_file()
-            if write:
-                file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-                try:
-                    descriptor = os.open(file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                except FileExistsError:
-                    pass
-                else:
-                    os.close(descriptor)
-            try:
-                info = file.lstat()
-            except FileNotFoundError:
+            with private_database(file, write=write) as database:
                 if write:
-                    raise
-                yield None
-                return
-            if not stat.S_ISREG(info.st_mode) or os.name != "nt" and (info.st_uid != os.getuid() or info.st_mode & 0o077):
-                raise AgentProfileError("team_agents.unavailable")
-            mode = "rw" if write else "ro"
-            with closing(sqlite3.connect(file.absolute().as_uri() + f"?mode={mode}", uri=True, timeout=2)) as database, database:
-                if write:
-                    database.execute("BEGIN IMMEDIATE")
                     database.execute(_SCHEMA)
                 yield database
         except (OSError, sqlite3.Error, json.JSONDecodeError, LibraryError):
@@ -152,7 +124,7 @@ class AgentProfiles:
 
     def list(self):
         with self._database() as database:
-            if not _has_table(database, "team_agents"):
+            if not has_table(database, "team_agents"):
                 return []
             rows = database.execute("SELECT id, revision, profile FROM team_agents WHERE workspace_id = ?",
                                     (self._workspace_id,))
@@ -162,7 +134,7 @@ class AgentProfiles:
 
     def conversation_bindings(self, user_id, thread_id=None):
         with self._database() as database:
-            if not _has_table(database, "team_conversation_bindings"):
+            if not has_table(database, "team_conversation_bindings"):
                 return {}
             target = str(thread_id) if thread_id is not None else None
             return dict(database.execute("""
@@ -172,7 +144,7 @@ class AgentProfiles:
 
     def conversation_recipient(self, user_id, thread_id):
         with self._database() as database:
-            if not _has_table(database, "team_conversation_bindings"):
+            if not has_table(database, "team_conversation_bindings"):
                 return None
             row = database.execute("""
                 SELECT binding.agent_id, agent.revision, agent.profile

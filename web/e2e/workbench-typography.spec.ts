@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { Conversation, ConversationSummary } from "../src/api/conversations";
 import type { GraphSnapshot } from "../src/workbench/types";
+import { openProof } from "./project-map";
 
 const roles = {
   heading: ["15px", "600"],
@@ -41,6 +42,7 @@ for (const variant of [
     chats: "Chats",
     activity: "Proof activity",
     zoom: "Zoom in",
+    openProof: /^Open proof$/,
     received: "Included in a local proof attempt",
     replied: "Replied",
     title: "Natural-number addition in a workspace with a deliberately long claim and conversation title",
@@ -52,6 +54,7 @@ for (const variant of [
     chats: "对话",
     activity: "证明活动",
     zoom: "放大",
+    openProof: /^打开证明$/,
     received: "已纳入本机证明尝试",
     replied: "已回复",
     title: "自然数加法的证明研究与工作台长标题换行测试用于检查对话和证明活动在紧凑窗口中的布局",
@@ -123,15 +126,14 @@ for (const variant of [
 
     await page.goto("/#session=fixture");
     await expect(page.locator("html")).toHaveAttribute("lang", variant.language);
+    await openProof(page, undefined, variant.openProof);
     const sidebar = page.locator("#sidebar");
-    const search = sidebar.getByRole("searchbox");
-    if (!(await search.isVisible())) await sidebar.getByRole("button", { name: variant.expand }).click();
+    const expand = sidebar.getByRole("button", { name: variant.expand });
+    if (await expand.isVisible()) await expand.click();
     const goalCard = page.locator(`.graph-node[data-node="${goalId}"]`);
     await goalCard.press("Enter");
     await expect(page.locator(".claim-heading h1")).toHaveText(variant.title);
-    await expectTextRole([page.locator(".claim-heading h1"), sidebar.locator(".brand-name")], "heading");
-    await expect(search).toHaveCSS("font-size", "13px");
-    await expect(search).toHaveCSS("font-weight", "400");
+    await expectTextRole([page.locator(".claim-heading h1"), sidebar.locator(".sidebar-projects h2")], "heading");
     await expectTextRole([page.locator(".claim-meta")], "metadata");
 
     const inspector = page.locator(".node-detail");
@@ -176,7 +178,8 @@ for (const variant of [
 
     if (variant.width < 900) {
       await page.setViewportSize({ width: 640, height: 720 });
-      if (await search.isVisible()) await sidebar.getByRole("button", { name: "收起侧栏" }).click();
+      const collapse = sidebar.getByRole("button", { name: "收起侧栏" });
+      if (await collapse.isVisible()) await collapse.click();
       const tabs = page.locator(".stage .segmented");
       await expect
         .poll(() =>

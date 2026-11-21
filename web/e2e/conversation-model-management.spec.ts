@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Conversation, ConversationAnchor } from "../src/api/conversations";
 import type { ModelConnection } from "../src/api/modelConnections";
+import { openProof } from "./project-map";
 
 for (const surface of ["Workbench", "Chats"] as const) {
   test(`${surface} adds a specific model without losing the current conversation draft`, async ({ page, request }) => {
@@ -73,6 +74,7 @@ for (const surface of ["Workbench", "Chats"] as const) {
     await page.setViewportSize({ width: 820, height: 720 });
     await page.goto("/#session=fixture");
     if (surface === "Workbench") {
+      await openProof(page);
       await page.getByRole("button", { name: /^Proof obligation 2/ }).click();
     } else {
       await page

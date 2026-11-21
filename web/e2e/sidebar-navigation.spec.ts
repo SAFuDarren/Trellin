@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { controlledMenu, openMenu } from "./navigation";
+import { openProof } from "./project-map";
 
 test("the icon rail keeps names and badges and shows labels by pointer and keyboard", async ({ page }) => {
   await page.goto("/#session=fixture");
@@ -48,9 +49,9 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   await page.keyboard.press("Escape");
   await expect(utilities).toBeFocused();
   await expect(workbenchSidebar.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
-  await workbenchSidebar.getByRole("button", { name: "Search claims" }).click();
-  await expect(workbenchSidebar.getByRole("searchbox", { name: "Search claims" })).toBeFocused();
-  await expect(workbenchSidebar.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
+  await page.getByRole("button", { name: "Find claim", exact: true }).click();
+  await expect(page.getByRole("searchbox", { name: "Search claims on map" })).toBeVisible();
+  await expect(workbenchSidebar.getByRole("searchbox")).toHaveCount(0);
   await rail.getByRole("link", { name: "Library", exact: true }).click();
   const navigation = page.locator(".section-nav");
   const needsRecheck = navigation.getByRole("link", { name: /^Needs recheck/ });
@@ -62,6 +63,7 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
 test("dark navigation and conversation tabs use flat gray selection", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/#session=fixture");
+  await openProof(page);
 
   const proofActivity = page.getByRole("button", { name: "Proof activity" });
   await proofActivity.focus();
@@ -91,11 +93,8 @@ test("the view switcher and Home restore the selected claim and proof node", asy
   const home = page.locator("nav.rail").getByRole("link", { name: "Home", exact: true });
   const switchView = page.getByRole("button", { name: "Switch view", exact: true });
   const title = page.getByRole("heading", { level: 1 });
-  const sidebar = page.locator("#sidebar");
-  await sidebar.getByRole("button", { name: "Expand sidebar" }).click();
-  await sidebar.getByRole("button", { name: /^单射映射的复合/ }).click();
+  await openProof(page, "单射映射的复合");
   await expect(title).toHaveText("Other claim");
-  await sidebar.getByRole("button", { name: "Collapse sidebar" }).click();
   const chosen = page.getByRole("button", { name: /^Proof obligation 2\b/ });
   await chosen.click();
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
@@ -184,5 +183,5 @@ test("utilities and direct review links work in a narrow Chinese window", async 
 
   await rail.getByRole("link", { name: "主页", exact: true }).click();
   await expect(page).toHaveURL(/#workbench$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("自然数加零的对称性");
+  await expect(page.getByRole("application", { name: "项目图谱", exact: true })).toBeVisible();
 });

@@ -533,6 +533,31 @@ select {
   white-space: nowrap;
   font-weight: var(--type-regular);
 }
+.workbench-map-return {
+  padding: 0 10px 0 0;
+  border: 0;
+  border-inline-end: 1px solid var(--hair);
+  background: transparent;
+  color: var(--sub);
+  font-size: var(--type-control-size);
+}
+.workbench-map-return:hover,
+.workbench-map-return:focus-visible {
+  color: var(--ink);
+}
+.workbench-map-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 6px 18px;
+  border-bottom: 1px solid var(--hair);
+  color: var(--sub);
+  font-size: var(--type-control-size);
+}
+.workbench-map-status[role="alert"] {
+  color: var(--crit);
+}
 .segmented {
   display: inline-flex;
   padding: 3px;
@@ -662,8 +687,7 @@ select {
 .graph-node-frame {
   position: absolute;
 }
-.graph-node,
-.canvas-project-claim {
+.graph-node {
   width: 100%;
   min-height: 60px;
   overflow: hidden;
@@ -677,18 +701,8 @@ select {
   color: var(--ink);
   text-align: left;
 }
-.graph-node:hover,
-.canvas-project-claim:hover {
+.graph-node:hover {
   border-color: var(--edge);
-}
-.canvas-project-claims {
-  position: absolute;
-  display: grid;
-}
-.canvas-project-heading {
-  color: var(--sub);
-  font-size: var(--type-meta-size);
-  font-weight: var(--type-semibold);
 }
 .graph-node-resize {
   position: absolute;

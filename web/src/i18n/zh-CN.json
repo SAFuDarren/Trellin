@@ -8,6 +8,7 @@
   },
   "projects": {
     "title": "项目",
+    "current": "当前项目",
     "new": "新建项目",
     "openFolder": "打开项目文件夹",
     "empty": "还没有已登记的项目。",
@@ -71,6 +72,30 @@
     "frozenScope": "需重新确认的冻结范围",
     "effect": "影响",
     "none": "目前没有记录依赖这个版本。"
+  },
+  "projectCanvas": {
+    "label": "项目图谱",
+    "openProof": "打开证明",
+    "linkClaim": "连接所选课题",
+    "cancelLink": "取消连线",
+    "findClaim": "查找课题",
+    "searchClaims": "搜索图谱中的课题",
+    "noMatches": "没有匹配的课题。",
+    "researchLinks": "研究关联",
+    "chooseLinkTarget": "选择另一个课题，与「{{title}}」建立关联。",
+    "linkAlreadyExists": "这两个课题已有研究关联。",
+    "linkDescription": "{{source}} ↔ {{target}}",
+    "removeLink": "移除「{{source}}」与「{{target}}」的关联",
+    "remove": "移除"
+  },
+  "canvasShell": {
+    "map": "项目图谱",
+    "researchActions": "研究操作",
+    "proofOverview": "显示证明概览",
+    "reload": "重新加载图谱",
+    "claimsUnavailable": "无法加载全部课题，图谱暂时显示近期课题。",
+    "goalAdded": "已添加定理。",
+    "viewOnMap": "在项目图谱查看"
   },
   "stage": {
     "resizeNode": "调整节点大小 {{title}}",
@@ -469,6 +494,9 @@
     "fallback": "模型"
   },
   "errors": {
+    "project_canvas.invalid": "无法应用这次图谱变更，请重试。",
+    "project_canvas.missing": "此项目中的相关课题已不可用，请重新加载图谱。",
+    "project_canvas.unavailable": "无法读取或保存项目图谱，请重新加载后重试。",
     "conversation.upgrade": "更新此工作区的数据库后即可使用对话。",
     "conversation.identity": "请使用本机研究者身份打开此工作区，再使用对话。",
     "conversation.invalid": "请检查选择的对话、模型和消息。",

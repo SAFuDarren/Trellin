@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openMenu } from "./navigation";
+import { openProof } from "./project-map";
 
 // Parity checklist from docs/roadmap.md (P1.4) and the section pages (P1.5),
 // run against tests/fixtures/workbench_fixture.py.
@@ -16,6 +17,7 @@ async function open(page: Page, section?: string) {
   });
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/#session=fixture");
+  await openProof(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("自然数加零的对称性");
   if (section) await goToSection(page, section);
   return errors;
@@ -55,7 +57,6 @@ test("the interface starts in English", async ({ page }) => {
 
 test("claims, graph, live work, legend and details load without errors", async ({ page }) => {
   const errors = await open(page);
-  await expect(page.locator(".claim")).toHaveCount(5);
   await expect(page.locator(".graph-node")).toHaveCount(7);
   await expect(page.locator(".graph-edge")).toHaveCount(7);
   const work = card(page, /^Proof obligation 2$/).locator(".work");
@@ -170,6 +171,7 @@ test("queues a Codex proof note with one action, retaining a failed note and sho
     await route.fulfill({ response, json: { ...activity, guidance } });
   });
   await page.reload();
+  await openProof(page);
   await card(page, /^Proof obligation 2$/).click();
   await page.getByRole("button", { name: "Proof activity" }).click();
   await expect(status).toContainText("Included in a Codex proof attempt");
@@ -227,6 +229,7 @@ test("a blocked proof node keeps a private draft across reopen", async ({ page }
   await expect(page.locator(".chat-feed")).not.toContainText(note);
 
   await page.reload();
+  await openProof(page);
   await select();
   await expect(input).toHaveValue(note);
   await page.getByRole("button", { name: "Discard saved draft" }).click();
@@ -253,7 +256,7 @@ test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   await expect(page.locator('.splitter[data-split="side"]')).toHaveAttribute("aria-valuenow", "272");
 });
 
-test("the global map can be moved and resized", async ({ page }) => {
+test("the proof overview can be moved and resized", async ({ page }) => {
   await open(page);
   const caption = page.locator(".atlas figcaption");
   const start = await caption.boundingBox();
@@ -386,7 +389,7 @@ test("the language is chosen in settings and remembered", async ({ page }) => {
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
   await railLink(page, "主页").click();
-  await expect(page.getByRole("button", { name: "证明进展" })).toBeVisible();
+  await expect(page.getByRole("application", { name: "项目图谱" })).toBeVisible();
 });
 
 test("settings show the installed version and offer a manual stable release check", async ({ page }) => {

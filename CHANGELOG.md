@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.46
+
+- Open Workbench on a project map with a project-only sidebar. Select claims in place, drag them to arrange the map, save research links, and open the selected proof with a separate action. Related research commands share one menu.
+
 ## 1.0.45
 
 - Open Chats by employee, switch between their named tasks, and see which tasks are waiting for a reply or need attention. Follow-up messages use the employee's saved connection. Drafts stay with their task while switching in Chats.

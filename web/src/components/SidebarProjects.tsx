@@ -6,9 +6,31 @@ import "../styles/sidebar-projects.css";
 
 type SidebarProjectsProps = { open: boolean; onExpand: () => void };
 
+export function useDesktopProjectList(library = desktopProjectLibrary()) {
+  return useQuery({
+    queryKey: ["desktop-projects"],
+    queryFn: library?.list,
+    enabled: Boolean(library),
+    retry: false,
+  });
+}
+
 export function SidebarProjects(props: SidebarProjectsProps) {
+  const { t } = useTranslation();
   const library = desktopProjectLibrary();
-  return library && <RegisteredProjects {...props} library={library} />;
+  if (library) return <RegisteredProjects {...props} library={library} />;
+  return (
+    props.open && (
+      <section className="sidebar-projects" aria-labelledby="sidebar-projects-title">
+        <header>
+          <h2 id="sidebar-projects-title">{t("projects.title")}</h2>
+        </header>
+        <span className="sidebar-projects-row" aria-current="page">
+          {t("projects.current")}
+        </span>
+      </section>
+    )
+  );
 }
 
 function Folder() {
@@ -26,7 +48,7 @@ function RegisteredProjects({ library, open, onExpand }: SidebarProjectsProps & 
   const busy = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const focusHeading = useRef(false);
-  const list = useQuery({ queryKey: ["desktop-projects"], queryFn: library.list, retry: false });
+  const list = useDesktopProjectList(library);
   const activeId = list.data?.activeId;
 
   useEffect(() => {
