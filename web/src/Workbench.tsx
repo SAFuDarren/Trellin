@@ -14,7 +14,7 @@ import { ProjectCanvas } from "./components/ProjectCanvas";
 import { ProjectActions } from "./components/project/ProjectActions";
 import { ReviewPanel } from "./components/ReviewPanel";
 import { Sidebar } from "./components/Sidebar";
-import { useDesktopProjectList } from "./components/SidebarProjects";
+import { ProjectHeading, useDesktopProjectList } from "./components/SidebarProjects";
 import { Splitter } from "./components/Splitter";
 import { href } from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
@@ -33,15 +33,17 @@ function errorText(t: TFunction, error: unknown): string {
   return t(`errors.${error.message}`, { defaultValue: error.message });
 }
 
-export type Focus = { claimId: string; nodeId?: string; nonce: number };
+export type Focus = { claimId: string; nodeId?: string; proof?: boolean; nonce: number };
+type Selection = { claimId: string; nodeId?: string; referenced?: boolean };
+type MapReturn = { detailsOpen: boolean; selection: Selection | undefined };
 export type WorkbenchPosition = DesktopPosition & {
   view: View;
   detailsOpen: boolean;
   proofOpen: boolean;
   assumption: string | null;
   referenced: boolean;
+  mapReturn?: MapReturn;
 };
-type Selection = { claimId: string; nodeId?: string; referenced?: boolean };
 
 export function Workbench({
   session,
@@ -76,7 +78,20 @@ export function Workbench({
   );
   const pendingLaunch = useRef(!focus && !returnTo && !desktop);
   const [detailsOpen, setDetailsOpen] = useState(Boolean(focus || (returnTo?.detailsOpen ?? desktop)));
-  const [proofOpen, setProofOpen] = useState(Boolean(focus?.nodeId || (returnTo?.proofOpen ?? desktop)));
+  const [proofOpen, setProofOpen] = useState(
+    Boolean(
+      focus
+        ? focus.proof || focus.nodeId
+        : (returnTo?.proofOpen ?? (desktop?.nodeId && desktop.nodeId !== `goal:${desktop.claimId}`)),
+    ),
+  );
+  const proofReturn = useRef<HTMLButtonElement>(null);
+  const beforeProof = useRef<MapReturn | null>(
+    returnTo?.mapReturn ??
+      (returnTo && !returnTo.proofOpen && (focus?.proof || focus?.nodeId)
+        ? { detailsOpen: returnTo.detailsOpen, selection: returnTo }
+        : null),
+  );
   const [activityOpen, setActivityOpen] = useState(false);
   const [view, setView] = useState<View>(returnTo?.view ?? "proof");
   const [assumptionId, setAssumption] = useState<string | null>(returnTo?.assumption ?? null);
@@ -91,6 +106,8 @@ export function Workbench({
   const [live, setLive] = useState<{ side?: number; right?: number }>({});
   const canvas = useProjectCanvas(session, true);
   const projects = useDesktopProjectList();
+  const sidebarOpen =
+    sizes.sidebarOpen ?? (layout.sidebarOpen && !projects.isLoading && projects.data?.projects.length !== 1);
   const projectName =
     projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name ||
     t("projects.current");
@@ -108,18 +125,6 @@ export function Workbench({
     }
   }, [claims.data]);
 
-  useEffect(() => {
-    if (!focus) return;
-    pendingLaunch.current = false;
-    setSelection({ claimId: focus.claimId, nodeId: focus.nodeId, referenced: true });
-    setDetailsOpen(true);
-    setProofOpen(Boolean(focus.nodeId));
-    setView("proof");
-    setAssumption(null);
-    setRecordedGoal(null);
-    onFocusHandled(null);
-  }, [focus, onFocusHandled]);
-
   const mapClaims = canvas.claims ?? claims.data?.claims ?? [];
   const requestedClaim = selection?.claimId;
   const mapSelection = mapClaims.some(({ id }) => id === requestedClaim)
@@ -132,7 +137,7 @@ export function Workbench({
   const library = useLibrary(session, Boolean(contextClaim));
   const snapshot = useQuery({
     queryKey: ["graph", claimId],
-    enabled: showReview || (claimId !== null && claimId === contextClaim),
+    enabled: Boolean(claimId) && (proofOpen || showReview || claimId === contextClaim),
     queryFn: ({ signal }) =>
       api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId!), { signal }),
   });
@@ -148,6 +153,30 @@ export function Workbench({
   const node = selected ? graph?.nodes.get(selected) : undefined;
   const assumption = graph?.hypotheses.find(({ id }) => id === assumptionId) ?? graph?.hypotheses[0];
   const basis = assumption?.reference?.basis_version_id;
+
+  const rememberMap = useCallback(() => {
+    if (!proofOpen) {
+      beforeProof.current = {
+        detailsOpen,
+        selection: claimId ? { claimId, nodeId: target, referenced: selection?.referenced } : undefined,
+      };
+    }
+  }, [claimId, detailsOpen, proofOpen, selection?.referenced, target]);
+
+  useEffect(() => {
+    if (!focus) return;
+    pendingLaunch.current = false;
+    const opensProof = Boolean(focus.proof || focus.nodeId);
+    if (opensProof) rememberMap();
+    else beforeProof.current = null;
+    setSelection({ claimId: focus.claimId, nodeId: focus.nodeId, referenced: true });
+    setDetailsOpen(true);
+    setProofOpen(opensProof);
+    setView("proof");
+    setAssumption(null);
+    setRecordedGoal(null);
+    onFocusHandled(null);
+  }, [focus, onFocusHandled, rememberMap]);
 
   const openProjectAction = useCallback((id: ProjectAction) => {
     if (id === "proof-task") setDetailsOpen(true);
@@ -173,6 +202,7 @@ export function Workbench({
       proofOpen,
       assumption: assumption?.id ?? null,
       referenced: Boolean(selection?.referenced),
+      mapReturn: proofOpen ? (beforeProof.current ?? undefined) : undefined,
     });
   }, [
     claimId,
@@ -187,12 +217,12 @@ export function Workbench({
   ]);
 
   useEffect(() => {
-    if (showReview && claimId && selected) saveDesktopPosition({ claimId, nodeId: selected });
-  }, [showReview, claimId, selected]);
+    if ((showReview || proofOpen) && claimId && selected) saveDesktopPosition({ claimId, nodeId: selected });
+  }, [showReview, proofOpen, claimId, selected]);
 
   const impact = useQuery({
     queryKey: ["impact", claimId, basis],
-    enabled: showReview && proofOpen && view === "impact" && Boolean(basis),
+    enabled: proofOpen && view === "impact" && Boolean(basis),
     queryFn: ({ signal }) =>
       api<ImpactPreview>(session, "/api/impact?" + new URLSearchParams({ claim: claimId!, basis: String(basis) }), {
         signal,
@@ -200,7 +230,7 @@ export function Workbench({
   });
   const activity = useQuery({
     queryKey: ["activity", claimId],
-    enabled: showReview && proofOpen && Boolean(graph),
+    enabled: (proofOpen || activityOpen) && Boolean(graph),
     refetchInterval: useFallbackInterval(ACTIVITY_MS),
     queryFn: async ({ signal }) => {
       const reply = await api<ActivitySnapshot>(session, "/api/activity?claim=" + encodeURIComponent(claimId!), {
@@ -224,6 +254,7 @@ export function Workbench({
 
   const inspectClaim = (id: string, openDetails = true) => {
     if (claimId !== id) {
+      if (proofOpen) beforeProof.current = null;
       setProofOpen(false);
       setActivityOpen(false);
       setView("proof");
@@ -240,6 +271,8 @@ export function Workbench({
     if (next.kind === "hypothesis" && next.reference?.basis_version_id) setAssumption(id);
   };
   const openReference = (id: string, nodeId: string | null) => {
+    if (nodeId) rememberMap();
+    else beforeProof.current = null;
     setSelection({ claimId: id, nodeId: nodeId ?? undefined, referenced: true });
     setDetailsOpen(true);
     setProofOpen(Boolean(nodeId));
@@ -253,9 +286,42 @@ export function Workbench({
   };
 
   const openProof = (id: string) => {
+    rememberMap();
     inspectClaim(id);
     setProofOpen(true);
   };
+  const closeProof = useCallback(() => {
+    const previous = beforeProof.current;
+    beforeProof.current = null;
+    setProofOpen(false);
+    setView("proof");
+    if (previous) {
+      setDetailsOpen(previous.detailsOpen);
+      setSelection(previous.selection);
+    }
+    window.requestAnimationFrame(() => {
+      const id = previous ? previous.selection?.claimId : claimId;
+      const card = id && document.querySelector<HTMLButtonElement>(`[data-claim-id="${CSS.escape(id)}"]`);
+      (card || document.getElementById("map-details-toggle"))?.focus({ preventScroll: true });
+    });
+  }, [claimId]);
+  useEffect(() => {
+    if (!proofOpen) return;
+    proofReturn.current?.focus({ preventScroll: true });
+    function escape(event: KeyboardEvent) {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        document.querySelector("dialog[open]")
+      )
+        return;
+      event.preventDefault();
+      closeProof();
+    }
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [proofOpen, closeProof]);
   const openProofTask = (id: string) => {
     if (id !== claimId) inspectClaim(id);
     openProjectAction("proof-task");
@@ -273,12 +339,14 @@ export function Workbench({
   };
   const writeNote = (id: string) => {
     selectNode(id);
+    setDetailsOpen(true);
     setAllNodes(false);
     setActivityOpen(true);
     window.requestAnimationFrame(() => document.getElementById("guidance-text")?.focus());
   };
   const openNodeDetails = (id: string) => {
     selectNode(id);
+    setDetailsOpen(true);
     window.requestAnimationFrame(() => document.getElementById("node-detail")?.focus());
   };
   const copy = async (text: string) => {
@@ -369,12 +437,12 @@ export function Workbench({
   };
   const showRecordedGoal = async (id: string) => {
     await queries.invalidateQueries();
-    if (!showReview) inspectClaim(id);
+    if (!proofOpen && !showReview) inspectClaim(id);
     setRecordedGoal(id);
   };
   const closeInspector = () => {
     setDetailsOpen(false);
-    document.getElementById("map-details-toggle")?.focus();
+    document.getElementById(proofOpen ? "proof-details-toggle" : "map-details-toggle")?.focus();
   };
 
   const notice = !session
@@ -398,7 +466,7 @@ export function Workbench({
     : claims.data
       ? t("sidebar.connected", { count: mapClaims.length })
       : t("sidebar.connecting");
-  const actionsClaim = showReview ? graph?.claim : undefined;
+  const actionsClaim = showReview || proofOpen ? graph?.claim : undefined;
   const lean = goal?.reference;
   const lemmaPlanScope =
     actionsClaim?.lemma_plan_ready &&
@@ -428,16 +496,16 @@ export function Workbench({
     <div
       className="app"
       id="workbench"
-      data-sidebar={layout.sidebarOpen ? "open" : "collapsed"}
+      data-sidebar={sidebarOpen ? "open" : "collapsed"}
       data-review={showReview ? "open" : "collapsed"}
-      data-view="project"
+      data-view={proofOpen ? "proof" : "project"}
       style={{ "--side-w": `${side}px`, "--right-w": `${right}px` } as React.CSSProperties}
     >
       <Sidebar
         pendingReviews={pendingReviews}
-        open={layout.sidebarOpen}
+        open={sidebarOpen}
         workspaceState={workspaceState}
-        onToggle={() => layout.update({ sidebarOpen: !layout.sidebarOpen })}
+        onToggle={() => layout.update({ sidebarOpen: !sidebarOpen })}
         onRefresh={refresh}
         refreshing={claims.isFetching}
       />
@@ -451,8 +519,24 @@ export function Workbench({
       <main className="main">
         <header className="toolbar">
           <div className="claim-heading">
-            <h1 title={projectName}>{projectName}</h1>
-            <span className="claim-meta">{t("canvasShell.map")}</span>
+            {proofOpen ? (
+              <>
+                <button
+                  ref={proofReturn}
+                  type="button"
+                  className="conversation-text-action proof-return"
+                  onClick={() => closeProof()}
+                >
+                  <span aria-hidden="true">‹</span> {t("canvasShell.map")}
+                </button>
+                <h1 title={graph?.claim.title ?? undefined}>{graph?.claim.title || t("graph.label")}</h1>
+              </>
+            ) : (
+              <>
+                <ProjectHeading name={projectName} />
+                <span className="claim-meta">{t("canvasShell.map")}</span>
+              </>
+            )}
           </div>
           <div className="project-toolbar-actions">
             <ProjectActions
@@ -505,28 +589,119 @@ export function Workbench({
                 </button>
               </div>
             )}
-            <section className="graph-area project-map-area">
-              <ProjectCanvas
-                claims={mapClaims}
-                claimProgress={claimProgress}
-                selected={mapSelection}
-                onSelect={inspectClaim}
-                onContextClaim={handleContextClaim}
-                claimActions={claimActions}
-                detailsOpen={showReview}
-                onToggleDetails={() => (showReview ? closeInspector() : setDetailsOpen(true))}
-                atlasClaims={atlas.data?.claims}
-                atlasOpen={mapAtlasOpen}
-                atlasBox={sizes.atlas}
-                atlasError={atlas.isError ? errorText(t, atlas.error) : undefined}
-                onToggleAtlas={() => setMapAtlasOpen((open) => !open)}
-                onAtlasBox={(box, persist) => layout.update({ atlas: box }, persist)}
-                layout={canvas.layout}
-                onLayout={canvas.apply}
-                layoutUnavailable={canvas.loading || Boolean(canvas.loadError)}
-                saving={canvas.saving}
-              />
-            </section>
+            <div className="workbench-surfaces" data-proof-open={proofOpen}>
+              <section className="graph-area project-map-area" inert={proofOpen}>
+                <ProjectCanvas
+                  claims={mapClaims}
+                  claimProgress={claimProgress}
+                  selected={mapSelection}
+                  onSelect={inspectClaim}
+                  onOpenProof={openProof}
+                  active={!proofOpen}
+                  onContextClaim={handleContextClaim}
+                  claimActions={claimActions}
+                  detailsOpen={showReview}
+                  onToggleDetails={() => (showReview ? closeInspector() : setDetailsOpen(true))}
+                  atlasClaims={atlas.data?.claims}
+                  atlasOpen={mapAtlasOpen}
+                  atlasBox={sizes.atlas}
+                  atlasError={atlas.isError ? errorText(t, atlas.error) : undefined}
+                  onToggleAtlas={() => setMapAtlasOpen((open) => !open)}
+                  onAtlasBox={(box, persist) => layout.update({ atlas: box }, persist)}
+                  layout={canvas.layout}
+                  onLayout={canvas.apply}
+                  layoutUnavailable={canvas.loading || Boolean(canvas.loadError)}
+                  saving={canvas.saving}
+                />
+              </section>
+              {proofOpen && (
+                <div className="proof-surface">
+                  {graph && claimId ? (
+                    <>
+                      <div className="proof-tools">
+                        <div className="segmented proof-lenses" role="group" aria-label={t("views.label")}>
+                          {(["proof", "references", "impact"] as const).map((lens) => (
+                            <button
+                              key={lens}
+                              type="button"
+                              aria-pressed={view === lens}
+                              onClick={() => changeView(lens)}
+                            >
+                              {t(`views.${lens}`)}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          id="proof-details-toggle"
+                          type="button"
+                          className="button"
+                          aria-expanded={showReview}
+                          aria-controls="review"
+                          onClick={() => setDetailsOpen(!showReview)}
+                        >
+                          {t("canvasShell.details")}
+                        </button>
+                      </div>
+                      {view === "impact" && (
+                        <div className="impact-bar">
+                          {graph.hypotheses.length > 0 && (
+                            <>
+                              <label htmlFor="premise-select">{t("impact.preview")}</label>
+                              <select
+                                id="premise-select"
+                                value={assumption?.id ?? ""}
+                                onChange={(event) => selectNode(event.target.value)}
+                              >
+                                {graph.hypotheses.map((premise) => (
+                                  <option key={premise.id} value={premise.id}>
+                                    {nodeTitle(t, premise)}
+                                  </option>
+                                ))}
+                              </select>
+                            </>
+                          )}
+                          <span role="status">
+                            {impact.isFetching
+                              ? t("impact.loading")
+                              : impact.isError
+                                ? errorText(t, impact.error)
+                                : graph.hypotheses.length
+                                  ? t("impact.readOnly")
+                                  : t("impact.noPremise")}
+                          </span>
+                        </div>
+                      )}
+                      {graph.order.length === 1 && goal && view === "proof" && (
+                        <p className="main-proof-empty">{t("projectCanvas.proofEmpty")}</p>
+                      )}
+                      {graph.order.length > 0 && (
+                        <section className="graph-area main-proof-graph" aria-label={t("graph.label")}>
+                          <GraphView
+                            key={claimId}
+                            graph={graph}
+                            view={view}
+                            selected={selected}
+                            assumption={assumption?.id ?? null}
+                            impact={impact.data}
+                            work={work.byNode}
+                            running={work.running}
+                            queued={work.queued}
+                            cardSizes={sizes.cards[`${claimId}:${view}`] ?? NO_CARD_SIZES}
+                            onResizeCard={(id, size) => layout.resizeCard(`${claimId}:${view}`, id, size)}
+                            onSelect={selectNode}
+                            nodeActions={nodeActions}
+                          />
+                        </section>
+                      )}
+                    </>
+                  ) : (
+                    <p className="notice" role={snapshot.isError ? "alert" : "status"}>
+                      {detailsNotice || t("notice.loadingClaim")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
         <div className="workbench-action-feedback" aria-live="polite">
@@ -565,6 +740,7 @@ export function Workbench({
               graph &&
               node &&
               [
+                ...(!proofOpen && claimId ? [graphAction(t, "open-proof", () => openProof(claimId))] : []),
                 graphAction(t, "ask-agent", () => askAgent(graph, node)),
                 graphAction(t, "proof-task", () => openProofTask(graph.claim.id)),
               ].map((action) => (
@@ -579,94 +755,26 @@ export function Workbench({
           >
             {graph && claimId && (
               <details
-                className="inspector-disclosure"
-                open={proofOpen}
-                onToggle={(event) => setProofOpen(event.currentTarget.open)}
+                className="inspector-disclosure inspector-activity"
+                open={activityOpen}
+                onToggle={(event) => setActivityOpen(event.currentTarget.open)}
               >
-                <summary>{t("projectCanvas.proofDetails")}</summary>
-                {proofOpen && (
-                  <>
-                    <div className="segmented inspector-lenses" role="group" aria-label={t("views.label")}>
-                      {(["proof", "references", "impact"] as const).map((lens) => (
-                        <button key={lens} type="button" aria-pressed={view === lens} onClick={() => changeView(lens)}>
-                          {t(`views.${lens}`)}
-                        </button>
-                      ))}
-                    </div>
-                    {view === "impact" && (
-                      <div className="impact-bar">
-                        {graph.hypotheses.length > 0 && (
-                          <>
-                            <label htmlFor="premise-select">{t("impact.preview")}</label>
-                            <select
-                              id="premise-select"
-                              value={assumption?.id ?? ""}
-                              onChange={(event) => selectNode(event.target.value)}
-                            >
-                              {graph.hypotheses.map((premise) => (
-                                <option key={premise.id} value={premise.id}>
-                                  {nodeTitle(t, premise)}
-                                </option>
-                              ))}
-                            </select>
-                          </>
-                        )}
-                        <span role="status">
-                          {impact.isFetching
-                            ? t("impact.loading")
-                            : impact.isError
-                              ? errorText(t, impact.error)
-                              : graph.hypotheses.length
-                                ? t("impact.readOnly")
-                                : t("impact.noPremise")}
-                        </span>
-                      </div>
-                    )}
-                    {graph.order.length === 1 && goal && view === "proof" && (
-                      <p className="inspector-proof-empty">{t("projectCanvas.proofEmpty")}</p>
-                    )}
-                    {graph.order.length > 0 && (
-                      <section className="graph-area inspector-graph" aria-label={t("graph.label")}>
-                        <GraphView
-                          graph={graph}
-                          view={view}
-                          selected={selected}
-                          assumption={assumption?.id ?? null}
-                          impact={impact.data}
-                          work={work.byNode}
-                          running={work.running}
-                          queued={work.queued}
-                          cardSizes={sizes.cards[`${claimId}:${view}`] ?? NO_CARD_SIZES}
-                          onResizeCard={(id, size) => layout.resizeCard(`${claimId}:${view}`, id, size)}
-                          onSelect={selectNode}
-                          nodeActions={nodeActions}
-                        />
-                      </section>
-                    )}
-                    <details
-                      className="inspector-disclosure inspector-activity"
-                      open={activityOpen}
-                      onToggle={(event) => setActivityOpen(event.currentTarget.open)}
-                    >
-                      <summary>{t("conversations.proofActivity")}</summary>
-                      <ProofActivity
-                        session={session}
-                        graph={graph}
-                        claimId={claimId}
-                        selected={node?.kind === "proposed_premise" ? null : selected}
-                        activity={activity.data}
-                        activityError={activityError}
-                        running={work.running}
-                        queued={work.queued}
-                        active={activityOpen}
-                        allNodes={allNodes}
-                        onAllNodes={() => setAllNodes(!allNodes)}
-                        onSelect={selectNode}
-                        onSent={() => void queries.invalidateQueries({ queryKey: ["activity", claimId] })}
-                      />
-                    </details>
-                  </>
-                )}
+                <summary>{t("conversations.proofActivity")}</summary>
+                <ProofActivity
+                  session={session}
+                  graph={graph}
+                  claimId={claimId}
+                  selected={node?.kind === "proposed_premise" ? null : selected}
+                  activity={activity.data}
+                  activityError={activityError}
+                  running={work.running}
+                  queued={work.queued}
+                  active={activityOpen}
+                  allNodes={allNodes}
+                  onAllNodes={() => setAllNodes(!allNodes)}
+                  onSelect={selectNode}
+                  onSent={() => void queries.invalidateQueries({ queryKey: ["activity", claimId] })}
+                />
               </details>
             )}
           </ReviewPanel>

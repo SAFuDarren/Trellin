@@ -69,6 +69,7 @@ export function GraphView(props: Props) {
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const moved = useRef(false);
+  const initialNode = useRef(selected ?? graph.order[0]);
   const [panning, setPanning] = useState(false);
   const [nodeMenu, setNodeMenu] = useState<NodeMenu | null>(null);
   const currentMenu =
@@ -129,23 +130,34 @@ export function GraphView(props: Props) {
     return () => observer.disconnect();
   }, []);
 
-  const fit = useCallback(() => {
-    const { width, height } = stageSize;
-    if (!width || !height) return;
-    const k = Math.max(0.3, Math.min(1.25, (width - 32) / canvasWidth, (height - 56) / canvasHeight));
-    setCamera({
-      k,
-      x: (width - canvasWidth * k) / 2,
-      y: Math.max(8, (height - 32 - canvasHeight * k) / 2),
-    });
-  }, [stageSize, canvasWidth, canvasHeight]);
+  const fit = useCallback(
+    (readable = false) => {
+      const { width, height } = stageSize;
+      if (!width || !height) return;
+      const k = Math.max(0.3, Math.min(1.25, (width - 32) / canvasWidth, (height - 56) / canvasHeight));
+      const focus = initialNode.current;
+      const point = focus ? layout.points.get(focus) : undefined;
+      if (readable && k < 0.8 && focus && point) {
+        const scale = 0.8;
+        const card = sizes.get(focus) ?? CARD;
+        setCamera({ k: scale, x: width / 2 - (point.x + card.width / 2) * scale, y: 36 - point.y * scale });
+        return;
+      }
+      setCamera({
+        k,
+        x: (width - canvasWidth * k) / 2,
+        y: Math.max(8, (height - 32 - canvasHeight * k) / 2),
+      });
+    },
+    [stageSize, canvasWidth, canvasHeight, layout.points, sizes],
+  );
 
   // A new claim gets a fresh view; otherwise the camera stays where the researcher left it.
   useEffect(() => {
     moved.current = false;
   }, [graph.claim.id]);
   useEffect(() => {
-    if (!moved.current) fit();
+    if (!moved.current) fit(true);
   }, [fit]);
 
   const zoomAt = (factor: number, cx = stageSize.width / 2, cy = stageSize.height / 2) => {

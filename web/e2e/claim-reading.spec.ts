@@ -52,7 +52,7 @@ test("long titles stay inside their proof node when zooming", async ({ page }) =
   const label = card.locator(".node-title");
   await expect(card).toHaveAttribute("title", LONG_TITLE);
   await expect(label).toHaveText(LONG_TITLE);
-  await page.locator("#review").getByRole("button", { name: "Fit to window", exact: true }).click();
+  await page.locator(".main-proof-graph").getByRole("button", { name: "Fit to window", exact: true }).click();
   await expect(card).toBeInViewport();
   const width = await label.evaluate((title) => {
     const node = title.closest(".graph-node")!;

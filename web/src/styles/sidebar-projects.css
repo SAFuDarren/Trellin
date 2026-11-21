@@ -90,3 +90,29 @@
   align-self: flex-start;
   margin-inline-start: 8px;
 }
+.project-switcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.project-switcher-trigger:hover {
+  background: var(--track);
+}
+
+.project-switcher-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-switcher-panel {
+  width: 268px;
+  padding: 5px;
+}

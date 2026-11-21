@@ -7,6 +7,7 @@ import type { GraphSnapshot } from "../src/workbench/types";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
 
 const CLAIM_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_CLAIM_ID = "aaaaaaaa-0000-4000-8000-000000000001";
 const OBLIGATION_ID = "obligation:55555555-5555-4555-8555-555555555555:2";
 const LIBRARY_ID = "99999999-9999-4999-8999-999999999999";
 const PALETTE = "Command palette";
@@ -44,6 +45,8 @@ async function withReferences(page: Page) {
     const code = new URL(route.request().url()).searchParams.get("code");
     if (code === "ZADD" || code === "ZADD-02") {
       await route.fulfill({ json: { claim_id: CLAIM_ID, node_id: code === "ZADD-02" ? OBLIGATION_ID : null } });
+    } else if (code === "OTHER-02") {
+      await route.fulfill({ json: { claim_id: OTHER_CLAIM_ID, node_id: OBLIGATION_ID } });
     } else {
       await route.fulfill({ status: 404, json: { error: "claim_code.missing" } });
     }
@@ -96,11 +99,27 @@ test("keyboard search opens claims and exact proof references on the project map
   await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
 
   await choose(page, "ZADD-02", "ZADD-02");
-  await expect(map).toBeVisible();
-  const node = page.locator(`.inspector-graph [data-node="${OBLIGATION_ID}"]`);
+  await expect(map).toBeHidden();
+  const node = page.locator(`.main-proof-graph [data-node="${OBLIGATION_ID}"]`);
   await expect(node).toBeVisible();
   await expect(node).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#node-detail").getByRole("heading", { name: "Proof obligation 2" })).toBeVisible();
+
+  const original = mapClaim(page, FIXTURE_CLAIM_TITLE);
+  await choose(page, "OTHER-02", "OTHER-02");
+  await expect(page.locator(".claim-heading h1")).toHaveText("Other claim");
+  await page.keyboard.press("Escape");
+  await expect(original).toHaveAttribute("aria-pressed", "true");
+  await expect(original).toBeFocused();
+
+  await page.getByRole("button", { name: "Collapse review column" }).click();
+  await page.locator("nav.rail").getByRole("link", { name: "Library", exact: true }).click();
+  await choose(page, "OTHER-02", "OTHER-02");
+  await expect(page.locator(".claim-heading h1")).toHaveText("Other claim");
+  await page.locator(".proof-return").click();
+  await expect(original).toHaveAttribute("aria-pressed", "true");
+  await expect(original).toBeFocused();
+  await expect(page.locator("#review")).toBeHidden();
 });
 
 test("Library, conversation and Agent results take the existing routes", async ({ page }) => {

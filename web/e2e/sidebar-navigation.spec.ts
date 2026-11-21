@@ -92,7 +92,8 @@ test("the view switcher and Home restore the selected claim and proof node", asy
   const switchView = page.getByRole("button", { name: "Switch view", exact: true });
   const title = page.getByRole("heading", { level: 1 });
   await openProof(page, "单射映射的复合");
-  await expect(mapClaim(page, "单射映射的复合")).toHaveAttribute("aria-pressed", "true");
+  const proof = page.locator(".main-proof-graph");
+  await expect(proof).toBeVisible();
   const chosen = page.getByRole("button", { name: /^Proof obligation 2\b/ });
   await chosen.click();
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
@@ -130,10 +131,12 @@ test("the view switcher and Home restore the selected claim and proof node", asy
       await home.click();
     }
     await expect(page).toHaveURL(/#workbench$/);
-    await expect(mapClaim(page, "单射映射的复合")).toHaveAttribute("aria-pressed", "true");
+    await expect(proof).toBeVisible();
     await expect(chosen).toHaveAttribute("aria-pressed", "true");
     await expect(home).toHaveAttribute("aria-current", "page");
   }
+  await page.locator(".proof-return").click();
+  await expect(mapClaim(page, "单射映射的复合")).toHaveAttribute("aria-pressed", "true");
 });
 
 test("utilities and direct review links work in a narrow Chinese window", async ({ page, request }) => {

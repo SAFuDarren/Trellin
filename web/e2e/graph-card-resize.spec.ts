@@ -25,7 +25,7 @@ test("resize a graph card independently at different zooms and remember per view
   await openProof(page);
   const card = page.locator('.graph-node[data-kind="goal"]');
   const handle = page.getByRole("button", { name: `Resize node ${TITLE}`, exact: true });
-  const proof = page.locator(".inspector-graph");
+  const proof = page.locator(".main-proof-graph");
   const scale = () =>
     proof.locator(".plot").evaluate((plot) => new DOMMatrixReadOnly(getComputedStyle(plot).transform).a);
   await expect(card).toHaveAttribute("title", TITLE);

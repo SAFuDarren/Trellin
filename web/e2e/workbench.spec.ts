@@ -18,7 +18,7 @@ async function open(page: Page, section?: string) {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/#session=fixture");
   await openProof(page);
-  await expect(page.getByRole("application", { name: "Project map", exact: true })).toBeVisible();
+  await expect(page.locator(".main-proof-graph")).toBeVisible();
   if (section) await goToSection(page, section);
   return errors;
 }
@@ -255,6 +255,7 @@ test("a blocked proof node keeps a private draft across reopen", async ({ page }
 
 test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   await open(page);
+  await page.locator(".proof-return").click();
   const canvas = page.getByRole("application", { name: "Project map", exact: true });
   const level = canvas.locator(".zoom-level");
   const before = await level.textContent();
@@ -273,6 +274,7 @@ test("zoom, splitters and sidebar are remembered", async ({ page }) => {
 
 test("the global map can be moved and resized", async ({ page }) => {
   await open(page);
+  await page.locator(".proof-return").click();
   await page.getByRole("button", { name: "Global map", exact: true }).click();
   const caption = page.locator(".atlas figcaption");
   const start = await caption.boundingBox();
@@ -296,6 +298,7 @@ test("graph controls and Help retain accessible structure", async ({ page }) => 
   const nodes = page.locator('.graph-node[aria-controls="node-detail"]');
   await expect(nodes).toHaveCount(7);
   await expect(inspect).toBeVisible();
+  await page.locator(".proof-return").click();
   const map = page.getByRole("application", { name: "Project map", exact: true });
   await page.getByRole("button", { name: "Collapse review column" }).click();
   await expect(inspect).toBeHidden();
@@ -347,7 +350,6 @@ test("every section opens through the rail or a navigation menu without errors",
     await expect(page.locator("#section-title")).toHaveText(heading);
   }
   await railLink(page, "Home").click();
-  await openProof(page);
   await expect(page.locator(".graph-node")).toHaveCount(7);
   expect(errors).toEqual([]);
 });

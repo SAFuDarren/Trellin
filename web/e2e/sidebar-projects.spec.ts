@@ -17,6 +17,28 @@ async function stubLibrary(page: Page, reply: (request: Request) => unknown) {
   });
 }
 
+test("a single registered project starts compact and the heading opens the existing project controls", async ({
+  page,
+}) => {
+  const project = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Only Research Project", available: true };
+  const actions: DesktopProjectAction[] = [];
+  await stubLibrary(page, (request) => {
+    if (request.action === "list") return { projects: [project], activeId: project.id };
+    actions.push(request);
+    return true;
+  });
+  await page.goto("/#session=fixture");
+  await expect(page.locator("#workbench")).toHaveAttribute("data-sidebar", "collapsed");
+  const switcher = page.getByRole("button", { name: `Switch project, ${project.name}`, exact: true });
+  await switcher.press("Enter");
+  const dialog = page.getByRole("dialog", { name: `Switch project, ${project.name}` });
+  await expect(dialog.getByRole("button", { name: project.name })).toHaveAttribute("aria-current", "page");
+  await dialog.getByRole("button", { name: "Open project folder" }).click();
+  await expect.poll(() => actions).toEqual([{ action: "folder" }]);
+  await page.keyboard.press("Escape");
+  await expect(switcher).toBeFocused();
+});
+
 test("the sidebar lists and opens registered desktop projects", async ({ page }) => {
   const first = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "First Research", available: true };
   const second = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Second Research", available: true };

@@ -125,7 +125,9 @@ test("the claim menu opens existing proof tools, copies exact text and shows rec
 
   await claim.press("Shift+F10");
   await action(menu, "Open proof").click();
-  await expect(review.locator(".graph-node").first()).toBeVisible();
+  await expect(page.locator(".main-proof-graph .graph-node").first()).toBeVisible();
+  await expect(review.locator(".graph-node")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("application", { name: "Project map", exact: true })).toBeVisible();
 
   await claim.press("Shift+F10");
@@ -161,7 +163,7 @@ test("the proof node menu keeps camera and focus, copies exact node text, and op
   });
   await page.goto("/#session=fixture");
   await openProof(page);
-  const stage = page.locator(".inspector-graph .stage");
+  const stage = page.locator(".main-proof-graph .stage");
   const plot = stage.locator(".plot");
   const node = stage.getByRole("button", { name: /^Proof obligation 2,/ });
   const menu = actionsFor(page, OBLIGATION);
@@ -203,7 +205,7 @@ test("a missing saved reference explains why copying is unavailable and does not
   const clipboard = await captureClipboard(page);
   await page.goto("/#session=fixture");
   await openProof(page);
-  const node = page.locator(".inspector-graph").getByRole("button", { name: /^Proof obligation 1,/ });
+  const node = page.locator(".main-proof-graph").getByRole("button", { name: /^Proof obligation 1,/ });
   await node.press("Shift+F10");
   const menu = actionsFor(page, "Proof obligation 1");
   const copy = action(menu, "Copy reference");

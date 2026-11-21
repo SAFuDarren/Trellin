@@ -25,6 +25,7 @@
   },
   "projects": {
     "title": "项目",
+    "switch": "切换项目，{{name}}",
     "current": "当前项目",
     "new": "新建项目",
     "openFolder": "打开项目文件夹",
