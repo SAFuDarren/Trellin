@@ -3,6 +3,23 @@
     "name": "Research Multiplier",
     "language": "Language"
   },
+  "palette": {
+    "title": "Command palette",
+    "search": "Search or run a command",
+    "close": "Close command palette",
+    "escapeKey": "Esc",
+    "loading": "Searching…",
+    "noResults": "No matching results",
+    "refine": "Refine your search to see more results.",
+    "recent": "Recent",
+    "references": "Proof references",
+    "claims": "Claims",
+    "library": "Library",
+    "conversations": "Conversations",
+    "agents": "Agents",
+    "actions": "Actions",
+    "startChat": "Start a chat"
+  },
   "session": {
     "missing": "Open the workbench with the link printed by `research-multiplier workbench`."
   },

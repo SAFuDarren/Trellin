@@ -5,6 +5,7 @@ import { href, type Section } from "../shell/route";
 import { NavigationMenu } from "./NavigationMenu";
 
 const ICONS: Record<string, string> = {
+  search: "M20 20l-4.2-4.2M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z",
   workbench: "M3.5 10.5 12 3.5l8.5 7M5.5 9v10.5a1 1 0 0 0 1 1h3.25v-6h4.5v6h3.25a1 1 0 0 0 1-1V9",
   claims:
     "M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 5 4.5ZM9.5 4.5v15M15 4.5v15",
@@ -37,9 +38,11 @@ export function Icon({ name }: { name: string }) {
 export function Rail({
   current,
   badges,
+  onSearch,
 }: {
   current: Section;
   badges: Partial<Record<Section, { count: number; live?: boolean }>>;
+  onSearch: () => void;
 }) {
   const { t } = useTranslation();
   const [hint, setHint] = useState<Hint | null>(null);
@@ -120,6 +123,17 @@ export function Rail({
         ))}
       </div>
       <div className="rail-foot">
+        <button
+          className="rail-link"
+          type="button"
+          aria-label={t("palette.title")}
+          aria-haspopup="dialog"
+          aria-keyshortcuts="Meta+K Control+K"
+          title={t("palette.title")}
+          onClick={onSearch}
+        >
+          <Icon name="search" />
+        </button>
         <NavigationMenu
           label={t("navigation.utilities")}
           className="rail-link"

@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { graphAction, graphActionLabel, type ProjectAction } from "../../workbench/actions";
 import type { PremiseReview } from "../../workbench/types";
-import { Menu } from "../FloatingControls";
+import { Menu, type FloatingOption } from "../FloatingControls";
 import { Chevron } from "../Icons";
 import { ClaimCodesPane } from "./ClaimCodesPane";
 import { IntakePane } from "./IntakePane";
@@ -11,16 +12,12 @@ import { ProofTaskPane } from "./ProofTaskPane";
 import { TheoremPane } from "./TheoremPane";
 import "../../styles/project-entry.css";
 
-const captions = {
-  intake: "projectEntry.organize",
-  theorem: "projectEntry.addTheorem",
-  proof: "proofTask.title",
+const localCaptions = {
   lemmas: "lemmaPlan.title",
   premises: "premise.title",
-  references: "claimCodes.title",
 } as const;
 
-type Mode = keyof typeof captions;
+type Mode = ProjectAction | keyof typeof localCaptions;
 
 /** Project actions and proof work scoped to the selected claim. */
 export function ProjectActions({
@@ -32,7 +29,8 @@ export function ProjectActions({
   claimTitle,
   premiseReview,
   premiseDialog,
-  proofDialog,
+  projectAction,
+  onProjectAction,
   onOpenPremises,
   onClose,
   onPremiseRecorded,
@@ -48,7 +46,8 @@ export function ProjectActions({
   claimTitle: string;
   premiseReview?: PremiseReview;
   premiseDialog: { id?: string } | null;
-  proofDialog: boolean;
+  projectAction: ProjectAction | null;
+  onProjectAction: (id: ProjectAction) => void;
   onOpenPremises: (id?: string) => void;
   onClose: () => void;
   onPremiseRecorded: () => Promise<void>;
@@ -57,8 +56,8 @@ export function ProjectActions({
   onOpenReference: (claimId: string, nodeId: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const [localMode, setMode] = useState<Exclude<Mode, "premises" | "proof"> | null>(null);
-  const mode = premiseDialog ? "premises" : proofDialog ? "proof" : localMode;
+  const [showLemmas, setShowLemmas] = useState(false);
+  const mode: Mode | null = premiseDialog ? "premises" : (projectAction ?? (showLemmas ? "lemmas" : null));
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
 
@@ -66,20 +65,21 @@ export function ProjectActions({
     if (mode && dialog.current && !dialog.current.open) dialog.current.showModal();
   }, [mode]);
 
-  const show = (next: Exclude<Mode, "proof">) => {
-    if (next === "premises") onOpenPremises();
-    else setMode(next);
-  };
-  const researchActions: Exclude<Mode, "theorem" | "proof">[] = ["intake"];
-  if (lemmaPlanScope) researchActions.push("lemmas");
+  const addTheorem = graphAction(t, "add-theorem", () => onProjectAction("add-theorem"));
+  const researchActions: FloatingOption[] = [
+    graphAction(t, "organize-research", () => onProjectAction("organize-research")),
+  ];
+  if (lemmaPlanScope)
+    researchActions.push({ id: "lemmas", label: t(localCaptions.lemmas), onSelect: () => setShowLemmas(true) });
   if (premiseReview && (premiseReview.available || premiseReview.proposals.length > 0))
-    researchActions.push("premises");
-  if (claimCode || claimCodesAvailable) researchActions.push("references");
+    researchActions.push({ id: "premises", label: t(localCaptions.premises), onSelect: () => onOpenPremises() });
+  if (claimCode || claimCodesAvailable)
+    researchActions.push(graphAction(t, "research-references", () => onProjectAction("research-references")));
 
   return (
     <div className="project-actions">
-      <button className="button" type="button" onClick={() => show("theorem")}>
-        {t("projectEntry.addTheorem")}
+      <button className="button" type="button" onClick={addTheorem.onSelect}>
+        {addTheorem.label}
       </button>
       <Menu
         label={t("canvasShell.researchActions")}
@@ -92,32 +92,30 @@ export function ProjectActions({
         triggerClassName="button workbench-actions-trigger"
         className="workbench-actions-items"
         placement="bottom-end"
-        groups={[
-          {
-            options: researchActions.map((id) => ({ id, label: t(captions[id]), onSelect: () => show(id) })),
-          },
-        ]}
+        groups={[{ options: researchActions }]}
       />
       <dialog
         ref={dialog}
         className="project-entry"
         aria-labelledby={title}
         onClose={() => {
-          setMode(null);
+          setShowLemmas(false);
           onClose();
         }}
       >
         {mode && (
           <>
             <header className="project-entry-head">
-              <h2 id={title}>{t(captions[mode])}</h2>
+              <h2 id={title}>
+                {mode === "premises" || mode === "lemmas" ? t(localCaptions[mode]) : graphActionLabel(t, mode)}
+              </h2>
               <button className="button" type="button" onClick={() => dialog.current?.close()}>
                 {t("projectEntry.close")}
               </button>
             </header>
             <div className="project-entry-body">
-              {mode === "intake" && <IntakePane session={session} onRecorded={onRecorded} />}
-              {mode === "theorem" && (
+              {mode === "organize-research" && <IntakePane session={session} onRecorded={onRecorded} />}
+              {mode === "add-theorem" && (
                 <TheoremPane
                   session={session}
                   onRecorded={(claimId) => {
@@ -130,7 +128,7 @@ export function ProjectActions({
                   }}
                 />
               )}
-              {mode === "proof" && claimId && <ProofTaskPane key={claimId} session={session} claimId={claimId} />}
+              {mode === "proof-task" && claimId && <ProofTaskPane key={claimId} session={session} claimId={claimId} />}
               {mode === "lemmas" &&
                 (lemmaPlanScope ? (
                   <LemmaPlanPane key={lemmaPlanScope.statementId} session={session} scope={lemmaPlanScope} />
@@ -152,7 +150,7 @@ export function ProjectActions({
                   }}
                 />
               )}
-              {mode === "references" && (
+              {mode === "research-references" && (
                 <ClaimCodesPane
                   key={claimId ?? "workspace"}
                   session={session}

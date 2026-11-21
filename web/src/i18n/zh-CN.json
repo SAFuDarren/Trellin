@@ -3,6 +3,23 @@
     "name": "Research Multiplier",
     "language": "语言"
   },
+  "palette": {
+    "title": "命令面板",
+    "search": "搜索或运行命令",
+    "close": "关闭命令面板",
+    "escapeKey": "Esc",
+    "loading": "正在搜索…",
+    "noResults": "没有匹配的结果",
+    "refine": "缩小搜索范围可查看更多结果。",
+    "recent": "最近访问",
+    "references": "证明引用",
+    "claims": "课题",
+    "library": "文库",
+    "conversations": "对话",
+    "agents": "Agent",
+    "actions": "操作",
+    "startChat": "发起对话"
+  },
   "session": {
     "missing": "请用 `research-multiplier workbench` 打印的链接打开工作台。"
   },

@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.58
+
+- Press ⌘K or Ctrl+K from any workbench page to find claims, Lean proof references, Library entries, conversations and Agents. Pick a recent item or open an existing research action with the same confirmation steps.
+
 ## 1.0.57
 
 - Right-click a project map card or proof node to use its research actions, copy a saved reference or Lean statement, and find related Library sources. Shift+F10 also opens the menu.

@@ -1,6 +1,9 @@
 import type { TFunction } from "i18next";
 
 const LABELS = {
+  "add-theorem": "projectEntry.addTheorem",
+  "organize-research": "projectEntry.organize",
+  "research-references": "claimCodes.title",
   "open-proof": "projectCanvas.openProof",
   "proof-task": "proofTask.title",
   "ask-agent": "projectCanvas.askAgent",
@@ -13,8 +16,15 @@ const LABELS = {
 
 type ActionId = keyof typeof LABELS;
 
+export type ProjectAction = "add-theorem" | "organize-research" | "research-references" | "proof-task";
+export type ProjectActionRequest = { id: Exclude<ProjectAction, "proof-task"> } | { id: "proof-task"; claimId: string };
+
+export function graphActionLabel(t: TFunction, id: ActionId) {
+  return t(LABELS[id]);
+}
+
 export function graphAction(t: TFunction, id: ActionId, onSelect: (() => void) | undefined, detail?: string) {
-  return { id, label: t(LABELS[id]), disabled: !onSelect, detail, onSelect };
+  return { id, label: graphActionLabel(t, id), disabled: !onSelect, detail, onSelect };
 }
 
 export function graphCopyActions(

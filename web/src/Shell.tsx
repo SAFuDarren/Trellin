@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { LiveWorkspaceUpdates, WORKSPACE_WRITES } from "./api/liveUpdates";
 import { useReleaseUpdates } from "./api/releaseUpdates";
-import { useInbox, useTeam } from "./api/sections";
+import { useClaims, useInbox, useTeam } from "./api/sections";
 import { workspaceEventCursor, workspaceId } from "./api/workspaceEvents";
-import { AgentChatDock, type AgentChatAnchor } from "./components/AgentChatDock";
+import { AgentChatDock, type AgentChatRequest } from "./components/AgentChatDock";
+import { CommandPalette } from "./components/CommandPalette";
 import { Rail } from "./components/Rail";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
 import { AgentWorkPage } from "./pages/AgentWorkPage";
@@ -17,14 +19,17 @@ import { ReviewPage } from "./pages/ReviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TeamPage } from "./pages/TeamPage";
 import { ConversationEditors } from "./shell/ConversationEditors";
+import { usePaletteResults } from "./shell/paletteResults";
 import { useRoute } from "./shell/route";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
 import { Workbench, type Focus, type WorkbenchPosition } from "./Workbench";
+import { graphAction, type ProjectActionRequest } from "./workbench/actions";
 import { resetLayout } from "./workbench/useLayout";
 
 /** The function rail on the left and the page it selects. */
 export function Shell({ session }: { session: string }) {
+  const { t } = useTranslation();
   const [route, go] = useRoute();
   const releaseUpdates = useReleaseUpdates(session);
   const queries = useQueryClient();
@@ -38,8 +43,33 @@ export function Shell({ session }: { session: string }) {
   const live = comprehensive && sessionConnection?.workspace === workspace && Boolean(sessionConnection?.live);
   const team = useTeam(session, live);
   const [focus, setFocus] = useState<Focus | null>(null);
-  const [chatAnchor, setChatAnchor] = useState<{ session: string; value: AgentChatAnchor } | null>(null);
+  const [chatRequest, setChatRequest] = useState<{ session: string; value: AgentChatRequest } | null>(null);
+  const [palette, setPalette] = useState<{ session: string; query: string } | null>(null);
+  const [projectAction, setProjectAction] = useState<{ session: string; request: ProjectActionRequest } | null>(null);
   const [lastWorkbench, setLastWorkbench] = useState<{ session: string; position: WorkbenchPosition } | null>(null);
+  const position = lastWorkbench?.session === session ? lastWorkbench.position : undefined;
+  const paletteOpen = palette?.session === session;
+  const openPalette = useCallback(() => setPalette({ session, query: "" }), [session]);
+  const clearProjectAction = useCallback(() => setProjectAction(null), []);
+
+  useEffect(() => {
+    function shortcut(event: KeyboardEvent) {
+      if (
+        event.key.toLowerCase() !== "k" ||
+        (!event.metaKey && !event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey ||
+        event.isComposing ||
+        event.defaultPrevented
+      )
+        return;
+      if (document.querySelector("dialog[open]") && !paletteOpen) return;
+      event.preventDefault();
+      if (!event.repeat && !paletteOpen) openPalette();
+    }
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, [openPalette, paletteOpen]);
   const saveWorkbench = useCallback(
     (position: WorkbenchPosition) => {
       setLastWorkbench({ session, position });
@@ -71,6 +101,37 @@ export function Shell({ session }: { session: string }) {
     setFocus({ claimId, nodeId, nonce: Date.now() });
     go("workbench");
   };
+  const runProjectAction = (request: ProjectActionRequest) => {
+    setProjectAction({ session, request });
+    go("workbench");
+  };
+  const claimMetadata = useClaims(session, paletteOpen);
+  const paletteResults = usePaletteResults({
+    session,
+    workspaceId: workspace ?? inbox.data?.review_identity?.workspace_id,
+    query: paletteOpen ? palette.query : "",
+    enabled: paletteOpen,
+    t,
+    open,
+    go,
+  });
+  const claimId = position?.claimId;
+  const actionGroup = {
+    label: t("palette.actions"),
+    options: [
+      graphAction(t, "add-theorem", () => runProjectAction({ id: "add-theorem" })),
+      graphAction(t, "organize-research", () => runProjectAction({ id: "organize-research" })),
+      ...(claimMetadata.data?.claim_codes
+        ? [graphAction(t, "research-references", () => runProjectAction({ id: "research-references" }))]
+        : []),
+      ...(claimId ? [graphAction(t, "proof-task", () => runProjectAction({ id: "proof-task", claimId }))] : []),
+      {
+        id: "start-chat",
+        label: t("palette.startChat"),
+        onSelect: () => setChatRequest({ session, value: { newConversation: true } }),
+      },
+    ],
+  };
   const running = team.data?.jobs?.filter((job) => job.state === "running").length ?? 0;
   const pendingReviews = inbox.data
     ? (inbox.data.items?.length ?? 0) + (inbox.data.clarification_review?.followups.length ?? 0)
@@ -91,7 +152,7 @@ export function Shell({ session }: { session: string }) {
                 onConnection={setConnection}
               />
             )}
-            <Rail current={section} badges={{ team: { count: running, live: true } }} />
+            <Rail current={section} badges={{ team: { count: running, live: true } }} onSearch={openPalette} />
             {section === "review" ? (
               <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
             ) : section === "claims" ? (
@@ -119,9 +180,11 @@ export function Shell({ session }: { session: string }) {
                 focus={focus}
                 onFocusHandled={setFocus}
                 pendingReviews={pendingReviews}
-                returnTo={lastWorkbench?.session === session ? lastWorkbench.position : undefined}
+                returnTo={position}
                 onPositionChange={saveWorkbench}
-                onChatAnchor={(anchor, title) => setChatAnchor({ session, value: { anchor, title } })}
+                onChatAnchor={(anchor, title) => setChatRequest({ session, value: { anchor, title } })}
+                actionRequest={projectAction?.session === session ? projectAction.request : undefined}
+                onActionHandled={clearProjectAction}
               />
             )}
             <ReleaseUpdateNotice updates={releaseUpdates} />
@@ -129,7 +192,20 @@ export function Shell({ session }: { session: string }) {
           <AgentChatDock
             session={session}
             route={route}
-            anchorRequest={chatAnchor?.session === session ? chatAnchor.value : null}
+            request={chatRequest?.session === session ? chatRequest.value : null}
+          />
+          <CommandPalette
+            open={paletteOpen}
+            groups={
+              paletteOpen && !palette.query.trim()
+                ? [...paletteResults.groups.slice(0, 1), actionGroup, ...paletteResults.groups.slice(1)]
+                : [...paletteResults.groups, actionGroup]
+            }
+            loading={paletteResults.isLoading}
+            onClose={() => setPalette(null)}
+            onQueryChange={(query) =>
+              setPalette((current) => (current?.session === session ? { session, query } : current))
+            }
           />
         </div>
       </ConversationEditors>

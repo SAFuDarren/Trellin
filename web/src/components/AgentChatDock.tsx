@@ -20,17 +20,18 @@ import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import "../styles/agent-chat-dock.css";
 
 export type AgentChatAnchor = { anchor: ConversationAnchor; title: string };
+export type AgentChatRequest = AgentChatAnchor | { newConversation: true };
 
 type AgentDockView = "chat" | "activity";
 
 export function AgentChatDock({
   session,
   route,
-  anchorRequest,
+  request,
 }: {
   session: string;
   route: Route;
-  anchorRequest: AgentChatAnchor | null;
+  request: AgentChatRequest | null;
 }) {
   const { t, i18n } = useTranslation();
   const conversations = useConversations(session);
@@ -38,7 +39,7 @@ export function AgentChatDock({
   const actions = useConversationActions(session);
   const sending = useConversationSending(session);
   const [view, setView] = useState<AgentDockView | null>(null);
-  const [handledAnchor, setHandledAnchor] = useState<AgentChatAnchor | null>(null);
+  const [handledRequest, setHandledRequest] = useState<AgentChatRequest | null>(null);
   const [anchor, setAnchor] = useState<AgentChatAnchor | null>(null);
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -48,7 +49,7 @@ export function AgentChatDock({
   const [error, setError] = useState("");
   const [focusComposer, setFocusComposer] = useState(false);
   const [recovering, setRecovering] = useState(false);
-  const latestAnchor = useRef(anchorRequest);
+  const latestRequest = useRef(request);
   const createRequest = useRef<{ key: string; id: string } | null>(null);
   const revision = useRef(0);
   const busy = useRef(false);
@@ -93,11 +94,16 @@ export function AgentChatDock({
   const runningCount = activeChats.length + runningWork.length;
   const attentionCount = failedChats.length + attentionWork.length;
 
-  if (anchorRequest && anchorRequest !== handledAnchor) {
-    setHandledAnchor(anchorRequest);
-    setAnchor(anchorRequest);
+  if (request && request !== handledRequest) {
+    const anchored = "anchor" in request ? request : null;
+    setHandledRequest(request);
+    setAnchor(anchored);
     setChosenId(null);
-    setTitle(anchorRequest.title.slice(0, 200));
+    setTitle(anchored?.title.slice(0, 200) ?? "");
+    if (!anchored) {
+      setAgentId(null);
+      setDirectModel(false);
+    }
     setError("");
     setRecovering(false);
     setFocusComposer(false);
@@ -114,11 +120,11 @@ export function AgentChatDock({
 
   useLayoutEffect(() => {
     if (view !== null) closeControl.current?.focus();
-  }, [view]);
+  }, [view, request]);
 
   useLayoutEffect(() => {
-    latestAnchor.current = anchorRequest;
-  }, [anchorRequest]);
+    latestRequest.current = request;
+  }, [request]);
 
   function collapse() {
     setView(null);
@@ -175,7 +181,7 @@ export function AgentChatDock({
     if ((!agent && !directModel) || busy.current) return;
     busy.current = true;
     const selected = revision.current;
-    const startingAnchor = anchorRequest;
+    const startingRequest = request;
     const name = title.trim() || t("conversations.defaultTitle");
     const scope = anchor?.anchor ?? {};
     const key = JSON.stringify([agent?.id, scope, name]);
@@ -186,12 +192,12 @@ export function AgentChatDock({
     try {
       const next = await actions.create(name, scope, agent?.id, id);
       createRequest.current = null;
-      if (selected !== revision.current || latestAnchor.current !== startingAnchor) return;
+      if (selected !== revision.current || latestRequest.current !== startingRequest) return;
       setChosenId(next.id);
       setFocusComposer(true);
       setRecovering(false);
     } catch (cause) {
-      if (selected !== revision.current || latestAnchor.current !== startingAnchor) return;
+      if (selected !== revision.current || latestRequest.current !== startingRequest) return;
       if (cause instanceof ApiError && (cause.code ?? cause.message) === "conversation.stale") {
         createRequest.current = null;
       }

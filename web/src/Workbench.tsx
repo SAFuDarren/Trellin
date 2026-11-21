@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { api, type ClaimsResponse } from "./api/client";
+import { api } from "./api/client";
 import type { ConversationAnchor } from "./api/conversations";
 import { useFallbackInterval } from "./api/liveUpdates";
 import { useProjectCanvas } from "./api/projectCanvas";
-import { useLibrary } from "./api/sections";
+import { useClaims, useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
 import type { FloatingGroup, FloatingOption } from "./components/FloatingControls";
@@ -17,7 +17,7 @@ import { Sidebar } from "./components/Sidebar";
 import { useDesktopProjectList } from "./components/SidebarProjects";
 import { Splitter } from "./components/Splitter";
 import { href } from "./shell/route";
-import { graphAction, graphCopyActions } from "./workbench/actions";
+import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
 import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
 import { nodeTitle } from "./workbench/text";
@@ -50,6 +50,8 @@ export function Workbench({
   returnTo,
   onPositionChange,
   onChatAnchor,
+  actionRequest,
+  onActionHandled,
 }: {
   session: string;
   focus?: Focus | null;
@@ -58,6 +60,8 @@ export function Workbench({
   returnTo?: WorkbenchPosition;
   onPositionChange: (position: WorkbenchPosition) => void;
   onChatAnchor: (anchor: ConversationAnchor, title: string) => void;
+  actionRequest?: ProjectActionRequest;
+  onActionHandled: () => void;
 }) {
   const { t } = useTranslation();
   const queries = useQueryClient();
@@ -77,7 +81,7 @@ export function Workbench({
   const [recordedGoal, setRecordedGoal] = useState<string | null>(null);
   const [allNodes, setAllNodes] = useState(false);
   const [premiseDialog, setPremiseDialog] = useState<{ id?: string } | null>(null);
-  const [proofDialog, setProofDialog] = useState(false);
+  const [projectAction, setProjectAction] = useState<ProjectAction | null>(null);
   const [contextClaim, setContextClaim] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<{ id: number; copied: boolean }>();
   const copySequence = useRef(0);
@@ -88,10 +92,7 @@ export function Workbench({
     projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name ||
     t("projects.current");
 
-  const claims = useQuery({
-    queryKey: ["claims"],
-    queryFn: ({ signal }) => api<ClaimsResponse>(session, "/api/claims", { signal }),
-  });
+  const claims = useClaims(session);
   const atlas = useQuery({
     queryKey: ["atlas"],
     queryFn: ({ signal }) => api<Atlas>(session, "/api/atlas", { signal }),
@@ -149,6 +150,20 @@ export function Workbench({
   const node = selected ? graph?.nodes.get(selected) : undefined;
   const assumption = graph?.hypotheses.find(({ id }) => id === assumptionId) ?? graph?.hypotheses[0];
   const basis = assumption?.reference?.basis_version_id;
+
+  const openProjectAction = useCallback((id: ProjectAction) => {
+    if (id === "proof-task") setDetailsOpen(true);
+    setProjectAction(id);
+  }, []);
+
+  useEffect(() => {
+    if (!actionRequest) return;
+    if (actionRequest.id === "proof-task" && claimId !== actionRequest.claimId) {
+      setSelection({ claimId: actionRequest.claimId, referenced: true });
+    }
+    openProjectAction(actionRequest.id);
+    onActionHandled();
+  }, [actionRequest, claimId, onActionHandled, openProjectAction]);
 
   useEffect(() => {
     if (!claimId) return;
@@ -245,8 +260,7 @@ export function Workbench({
   };
   const openProofTask = (id: string) => {
     if (id !== claimId) inspectClaim(id);
-    setDetailsOpen(true);
-    setProofDialog(true);
+    openProjectAction("proof-task");
   };
 
   const askAgent = (scope: Graph, target: GraphNode) => {
@@ -445,18 +459,19 @@ export function Workbench({
           <div className="project-toolbar-actions">
             <ProjectActions
               session={session}
-              claimId={actionsClaim?.id ?? null}
+              claimId={(projectAction === "proof-task" ? claimId : actionsClaim?.id) ?? null}
               claimCode={actionsClaim?.code}
               claimCodesAvailable={Boolean(claims.data?.claim_codes)}
               lemmaPlanScope={lemmaPlanScope}
               claimTitle={actionsClaim?.title ?? ""}
               premiseReview={actionsClaim?.premise_review}
               premiseDialog={premiseDialog}
-              proofDialog={proofDialog}
+              projectAction={projectAction}
+              onProjectAction={openProjectAction}
               onOpenPremises={(id) => setPremiseDialog({ id })}
               onClose={() => {
                 setPremiseDialog(null);
-                setProofDialog(false);
+                setProjectAction(null);
               }}
               onPremiseRecorded={openRecorded}
               onRecorded={openRecorded}
