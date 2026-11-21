@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.59
+
+- Project map cards, the claim inspector, and Claims show the verified and total recorded obligations for the current statement, alongside the current review, decision or verification state.
+
 ## 1.0.58
 
 - Press ⌘K or Ctrl+K from any workbench page to find claims, Lean proof references, Library entries, conversations and Agents. Pick a recent item or open an existing research action with the same confirmation steps.

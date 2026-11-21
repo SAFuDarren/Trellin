@@ -11,11 +11,13 @@ import {
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
 import type { ProjectCanvasLayout, ProjectCanvasOperation } from "../api/projectCanvas";
+import type { ClaimProgress } from "../workbench/claimProgress";
 import type { Point } from "../workbench/graph";
-import { nodeStatus, nodeTitle, nodeTone } from "../workbench/text";
+import { nodeTitle } from "../workbench/text";
 import type { AtlasClaim } from "../workbench/types";
 import type { AtlasBox } from "../workbench/useLayout";
 import { AtlasMap, atlasOpening, atlasPlacement } from "./AtlasMap";
+import { ClaimProgressSummary, claimProgressText } from "./ClaimProgress";
 import {
   ContextMenu,
   contextMenuProps,
@@ -25,7 +27,7 @@ import {
   type FloatingGroup,
   type FloatingOption,
 } from "./FloatingControls";
-import { Chevron, Mark } from "./Icons";
+import { Chevron } from "./Icons";
 import "../styles/project-canvas.css";
 
 type Camera = Point & { k: number };
@@ -82,6 +84,7 @@ function visibleOffset(offset: number, start: number, extent: number, available:
 
 type Props = {
   claims: Claim[];
+  claimProgress?: ReadonlyMap<string, ClaimProgress>;
   selected: string | null;
   onSelect: (id: string) => void;
   onContextClaim: (id: string | null) => void;
@@ -102,6 +105,7 @@ type Props = {
 
 export function ProjectCanvas({
   claims,
+  claimProgress,
   selected,
   onSelect,
   onContextClaim,
@@ -146,8 +150,7 @@ export function ProjectCanvas({
       return {
         id: claim.id,
         title: nodeTitle(t, node, { full: true }),
-        status: nodeStatus(t, node),
-        tone: nodeTone(node, false),
+        status: claim.status,
         domain: claim.domain,
         point: layout.positions[claim.id] ?? {
           x: (index % columns) * COLUMN_STEP,
@@ -540,6 +543,7 @@ export function ProjectCanvas({
             const at = position(card.id);
             const menu = contextMenuProps((anchor) => openContextMenu(card.id, anchor));
             const movingShortcuts = layoutUnavailable ? "" : " ArrowLeft ArrowRight ArrowUp ArrowDown";
+            const progress = claimProgressText(t, claimProgress?.get(card.id), card.status);
             return (
               <button
                 {...menu}
@@ -555,7 +559,7 @@ export function ProjectCanvas({
                 data-moving={preview?.id === card.id ? "true" : undefined}
                 aria-pressed={selected === card.id}
                 aria-label={card.title}
-                aria-description={card.status}
+                aria-description={[progress.label, progress.count, card.domain].filter(Boolean).join(" · ")}
                 aria-keyshortcuts={menu["aria-keyshortcuts"] + movingShortcuts}
                 title={card.title}
                 style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
@@ -570,11 +574,7 @@ export function ProjectCanvas({
                 }}
               >
                 <span className="project-canvas-title">{card.title}</span>
-                <span className="project-canvas-meta">
-                  <Mark tone={card.tone} />
-                  <span>{card.status}</span>
-                  {card.domain && <span className="project-canvas-domain">{card.domain}</span>}
-                </span>
+                <ClaimProgressSummary {...progress} detail={card.domain} />
               </button>
             );
           })}

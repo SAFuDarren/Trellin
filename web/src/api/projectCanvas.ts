@@ -5,6 +5,8 @@ import { api, type Claim } from "./client";
 type Point = { x: number; y: number };
 type ResearchLink = { source: string; target: string };
 export type ProjectCanvasLayout = { positions: Record<string, Point>; links: ResearchLink[] };
+export type ObligationCount = { verified: number; total: number };
+export type ProjectClaim = Claim & { obligations?: ObligationCount };
 export type ProjectCanvasOperation =
   | ({ action: "move"; id: string } & Point)
   | ({ action: "link" | "unlink" } & ResearchLink);
@@ -24,16 +26,20 @@ function preview(layout: ProjectCanvasLayout, operation: ProjectCanvasOperation)
   return { ...layout, links: operation.action === "link" ? [...others, { source, target }] : others };
 }
 
+export function useProjectCanvasClaims(session: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["project-canvas-claims", session],
+    queryFn: ({ signal }) => api<{ claims: ProjectClaim[] }>(session, `${PATH}/claims`, { signal }),
+    enabled,
+    retry: false,
+  });
+}
+
 export function useProjectCanvas(session: string, enabled: boolean) {
   const queries = useQueryClient();
   const key = ["project-canvas", session];
   const busy = useRef(false);
-  const index = useQuery({
-    queryKey: ["project-canvas-claims", session],
-    queryFn: ({ signal }) => api<{ claims: Claim[] }>(session, `${PATH}/claims`, { signal }),
-    enabled,
-    retry: false,
-  });
+  const index = useProjectCanvasClaims(session, enabled);
   const canvas = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => api<ProjectCanvasLayout>(session, PATH, { signal }),

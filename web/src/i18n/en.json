@@ -661,6 +661,20 @@
       "team": "{{count}} running"
     }
   },
+  "claimProgress": {
+    "claim": "Claim progress",
+    "obligations": "{{verified}} of {{total}} obligations verified",
+    "noObligations": "No recorded obligations",
+    "states": {
+      "review": "Waiting for your review",
+      "decision": "Needs a decision",
+      "verifying": "Verification running",
+      "running": "Proof task running",
+      "recheck": "Needs recheck",
+      "ready": "Ready to start",
+      "queued": "Proof task queued"
+    }
+  },
   "claimsPage": {
     "openWorkbench": "Open in Workbench",
     "noStatement": "There is no recorded statement for this claim.",

@@ -6,6 +6,19 @@ from research_multiplier import general_lean, lean_parameters
 from research_multiplier.workflows import claim_references
 
 
+_CURRENT_PACKET = """
+    SELECT p.id, p.version, p.approved
+    FROM rm.formalization_status p
+    WHERE p.claim_id = claim.id AND NOT p.superseded
+    ORDER BY p.approved DESC, p.proposed_at DESC, p.id LIMIT 1
+"""
+_CURRENT_STATEMENT = """
+    SELECT s.id, s.version, s.statement_sha256, s.approved, s.check_ready, s.body
+    FROM rm.lean_statement_status s
+    WHERE s.packet_id = packet.id AND s."current"
+    ORDER BY s.proposed_at DESC, s.id LIMIT 1
+"""
+
 _ANCHOR = """
 selected AS (
     SELECT claim.id, claim.title, claim.statement, claim.domain, claim.contract_snapshot, status.status
@@ -14,16 +27,10 @@ selected AS (
     WHERE claim.id = %s::uuid AND claim.contract_sha256 IS NOT NULL
 ),
 packet AS (
-    SELECT p.id, p.version, p.approved
-    FROM rm.formalization_status p JOIN selected ON p.claim_id = selected.id
-    WHERE NOT p.superseded
-    ORDER BY p.approved DESC, p.proposed_at DESC, p.id LIMIT 1
+    SELECT current_packet.* FROM selected claim CROSS JOIN LATERAL (""" + _CURRENT_PACKET + """) current_packet
 ),
 statement AS (
-    SELECT s.id, s.version, s.statement_sha256, s.approved, s.check_ready, s.body
-    FROM rm.lean_statement_status s JOIN packet ON packet.id = s.packet_id
-    WHERE s."current"
-    ORDER BY s.proposed_at DESC, s.id LIMIT 1
+    SELECT current_statement.* FROM packet CROSS JOIN LATERAL (""" + _CURRENT_STATEMENT + """) current_statement
 )
 """
 
@@ -344,13 +351,29 @@ def _snapshot(row):
     }
 
 
-_VISIBLE_CLAIMS = """
-    SELECT claim.id::text AS id, claim.title, effective.status, claim.domain
+_CLAIM_COLUMNS = "claim.id::text AS id, claim.title, effective.status, claim.domain"
+_CLAIMS_FROM = """
     FROM rm.claims claim JOIN rm.claim_foundation_status effective ON effective.id = claim.id
+"""
+_CLAIMS_VISIBLE = """
     WHERE claim.contract_sha256 IS NOT NULL AND claim.kind = 'researcher_claim'
       AND effective.status NOT IN ('superseded', 'archived')
 """
+_VISIBLE_CLAIMS = "SELECT " + _CLAIM_COLUMNS + _CLAIMS_FROM + _CLAIMS_VISIBLE
 _CLAIM_ORDER = " ORDER BY claim.created_at DESC, claim.id"
+
+# Count recorded route positions before the graph can fold discharged obligations into lemma links.
+_CANVAS_CLAIMS = "SELECT " + _CLAIM_COLUMNS + """,
+    jsonb_build_object('verified', count.verified, 'total', count.total) AS obligations
+""" + _CLAIMS_FROM + """
+    LEFT JOIN LATERAL (""" + _CURRENT_PACKET + """) packet ON true
+    LEFT JOIN LATERAL (""" + _CURRENT_STATEMENT + """) statement ON true
+    CROSS JOIN LATERAL (
+        SELECT count(*) AS total, count(*) FILTER (WHERE obligation.item ->> 'lemma_id' IS NOT NULL) AS verified
+        FROM rm.lean_reduction_status(statement.id) route
+        CROSS JOIN LATERAL jsonb_array_elements(route.obligations) obligation(item)
+    ) count
+""" + _CLAIMS_VISIBLE + _CLAIM_ORDER
 
 
 def claims(store):
@@ -359,8 +382,8 @@ def claims(store):
 
 
 def canvas_claim_index(store):
-    """Read the workspace's visible project graph, including older claims."""
-    return {"claims": store.query("human", _VISIBLE_CLAIMS + _CLAIM_ORDER)}
+    """Read visible claims and their current recorded obligation counts, including older claims."""
+    return {"claims": store.query("human", _CANVAS_CLAIMS)}
 
 
 def visible_claim_ids(store, identifiers):

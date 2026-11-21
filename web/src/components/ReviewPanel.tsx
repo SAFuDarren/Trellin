@@ -2,9 +2,11 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { Claim } from "../api/client";
+import type { ClaimProgress } from "../workbench/claimProgress";
 import { impactItems, impactLineKey, type Graph, type View } from "../workbench/graph";
 import { kindText, nodeFormula, nodeStatus, nodeTitle, nodeTone, statusText, summarize } from "../workbench/text";
 import type { ImpactEntry, ImpactPreview } from "../workbench/types";
+import { ClaimProgressSummary, claimProgressText } from "./ClaimProgress";
 import { Mark } from "./Icons";
 
 const REFERENCE_KEYS = [
@@ -29,6 +31,7 @@ type Props = {
   graph: Graph | null;
   claims: Claim[];
   claimId: string | null;
+  claimProgress?: ClaimProgress;
   view: View;
   selected: string | null;
   assumption: string | null;
@@ -134,6 +137,7 @@ function NodeDetail({
   graph,
   claims,
   claimId,
+  claimProgress,
   view,
   selected,
   assumption,
@@ -176,6 +180,9 @@ function NodeDetail({
         : blockers.length
           ? t("node.blocked")
           : nodeStatus(t, node);
+  const claimStatus = claims.find((claim) => claim.id === graph.claim.id)?.status ?? graph.claim.status;
+  const progress = claimProgressText(t, claimProgress, claimStatus);
+  const showNodeState = node.kind !== "goal" || isImpact || blockers.length > 0 || node.status !== claimStatus;
   const lean = typeof node.formalization === "string" ? node.formalization : "";
   const math = typeof node.formula === "string" ? node.formula : nodeFormula(node);
   const prose =
@@ -196,11 +203,21 @@ function NodeDetail({
     <>
       <div className="detail-head">
         <span>{[graph.codes.get(node.id), kindText(t, node.kind), node.domain].filter(Boolean).join(" · ")}</span>
-        <span className="detail-state">
-          <Mark tone={tone} />
-          {stateLabel}
-        </span>
+        {showNodeState ? (
+          <span className="detail-state">
+            <Mark tone={tone} />
+            {stateLabel}
+          </span>
+        ) : (
+          <ClaimProgressSummary {...progress} />
+        )}
       </div>
+      {showNodeState && (
+        <div className="detail-claim-progress">
+          <span className="field-label">{t("claimProgress.claim")}</span>
+          <ClaimProgressSummary {...progress} />
+        </div>
+      )}
       <h2>{node.kind === "goal" && graph.claim.title ? graph.claim.title : nodeTitle(t, node)}</h2>
       {actions && <div className="inspector-actions">{actions}</div>}
       {conditionId && (

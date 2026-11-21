@@ -126,10 +126,11 @@ export function useClaims(session: string, enabled = true) {
     enabled,
   });
 }
-export function useAtlas(session: string) {
+export function useAtlas(session: string, enabled = true) {
   return useQuery({
-    queryKey: ["atlas"],
+    queryKey: ["atlas", session],
     queryFn: ({ signal }) => api<Atlas>(session, "/api/atlas", { signal }),
+    enabled,
     retry: false,
   });
 }

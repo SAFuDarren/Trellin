@@ -2,15 +2,16 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import { useAtlas, useClaims, useTeam } from "../api/sections";
+import { useClaims, type Job } from "../api/sections";
+import { ClaimProgressSummary, claimProgressText } from "../components/ClaimProgress";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { Spin } from "../components/Icons";
 import { href } from "../shell/route";
+import type { ClaimProgress } from "../workbench/claimProgress";
 import { statusText } from "../workbench/text";
-import type { GraphSnapshot } from "../workbench/types";
+import type { AtlasClaim, GraphSnapshot } from "../workbench/types";
 
 const COLUMNS = ["open", "awaiting_interpretation_review", "needs_recheck", "proved", "refuted"] as const;
-const DONE = new Set(["verified", "proved", "proved_goal", "approved", "route_checked", "lemma_verified"]);
 const FILTERS = ["all", "review", "blocked", "running"] as const;
 
 function ClaimPreview({
@@ -65,19 +66,23 @@ export function ClaimsPage({
   session,
   sub,
   onOpen,
+  claimProgress,
+  atlasClaims,
+  jobs,
 }: {
   session: string;
   sub: string;
   onOpen: (claimId: string) => void;
+  claimProgress: ReadonlyMap<string, ClaimProgress>;
+  atlasClaims?: AtlasClaim[];
+  jobs?: Job[];
 }) {
   const { t } = useTranslation();
   const [expandedClaim, setExpandedClaim] = useState<string | null>(null);
   const claims = useClaims(session);
-  const atlas = useAtlas(session);
-  const team = useTeam(session);
-  const counts = new Map((atlas.data?.claims ?? []).map((claim) => [claim.id, claim]));
+  const counts = new Map((atlasClaims ?? []).map((claim) => [claim.id, claim]));
   const running = new Map<string, number>();
-  for (const job of team.data?.jobs ?? []) {
+  for (const job of jobs ?? []) {
     if (job.state === "running" && job.claim_id) running.set(job.claim_id, (running.get(job.claim_id) ?? 0) + 1);
   }
   const list = claims.data?.claims ?? [];
@@ -166,8 +171,7 @@ export function ClaimsPage({
                 </header>
                 {cards.map((claim) => {
                   const record = counts.get(claim.id);
-                  const total = record?.nodes.length ?? 0;
-                  const done = record?.nodes.filter((node) => DONE.has(node.status ?? "")).length ?? 0;
+                  const progress = claimProgress.get(claim.id);
                   const live = running.get(claim.id) ?? 0;
                   const expanded = expandedClaim === claim.id;
                   const previewId = "claim-preview-" + claim.id;
@@ -181,15 +185,18 @@ export function ClaimsPage({
                         onClick={() => setExpandedClaim(expanded ? null : claim.id)}
                       >
                         <span className="title">{claim.title || t("sidebar.untitled")}</span>
-                        {total > 0 && (
+                        {progress?.obligations && progress.obligations.total > 0 && (
                           <span className="progress" aria-hidden="true">
-                            <span className="done" style={{ width: `${Math.round((done / total) * 100)}%` }} />
+                            <span
+                              className="done"
+                              style={{
+                                width: `${Math.round((progress.obligations.verified / progress.obligations.total) * 100)}%`,
+                              }}
+                            />
                           </span>
                         )}
-                        <span className="meta">
-                          <span>{claim.domain || t("sidebar.uncategorized")}</span>
-                          {total > 0 && <span>{"· " + t("claimsPage.verified", { done, total })}</span>}
-                        </span>
+                        <ClaimProgressSummary {...claimProgressText(t, progress, claim.status)} />
+                        <span className="meta">{claim.domain || t("sidebar.uncategorized")}</span>
                         {(record?.awaiting_review || record?.blocked || live > 0) && (
                           <span className="tags">
                             {live > 0 && (

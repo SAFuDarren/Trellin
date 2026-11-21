@@ -1,0 +1,35 @@
+.claim-progress {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.claim-progress-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.claim-progress-state .mark {
+  flex-shrink: 0;
+}
+
+.claim-progress-state .mark[data-tone="live"] {
+  border-color: var(--live);
+  background: var(--live);
+}
+
+.claim-progress-count {
+  padding-inline-start: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-claim-progress {
+  display: grid;
+  gap: 3px;
+  margin-block: 6px 10px;
+}
