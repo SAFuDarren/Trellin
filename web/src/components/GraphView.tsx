@@ -18,11 +18,13 @@ import {
 import { kindText, nodeStatus, nodeSub, nodeTitle, nodeTone, type Tone } from "../workbench/text";
 import type { ImpactPreview } from "../workbench/types";
 import type { CardSizes } from "../workbench/useLayout";
+import { ContextMenu, contextMenuProps, type ContextMenuAnchor, type FloatingGroup } from "./FloatingControls";
 import { Clock, Mark, Spin } from "./Icons";
 
 type Camera = { x: number; y: number; k: number };
 type ResizePreview = { id: string; anchor: Point; size: CardSize };
 type ResizeDrag = ResizePreview & { pointerId: number; x: number; y: number; zoom: number };
+type NodeMenu = { id: string; claimId: string; view: View; anchor: ContextMenuAnchor };
 
 function anchoredCamera(camera: Camera, layout: Layout, id: string, anchor: Point): Camera {
   const point = layout.points.get(id);
@@ -53,6 +55,7 @@ type Props = {
   cardSizes: CardSizes;
   onResizeCard: (id: string, size: CardSize) => void;
   onSelect: (id: string) => void;
+  nodeActions: (id: string) => FloatingGroup[];
 };
 
 export function GraphView(props: Props) {
@@ -67,6 +70,14 @@ export function GraphView(props: Props) {
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const moved = useRef(false);
   const [panning, setPanning] = useState(false);
+  const [nodeMenu, setNodeMenu] = useState<NodeMenu | null>(null);
+  const currentMenu =
+    nodeMenu?.claimId === graph.claim.id && nodeMenu.view === view && nodeMenu.id === selected ? nodeMenu : null;
+  const menuNode = currentMenu ? graph.nodes.get(currentMenu.id) : undefined;
+
+  useEffect(() => {
+    if (nodeMenu && !menuNode) setNodeMenu(null);
+  }, [nodeMenu, menuNode]);
 
   const affected = useMemo(() => (view === "impact" ? impactItems(graph, impact) : new Map()), [graph, view, impact]);
   const lit = useMemo(
@@ -178,9 +189,9 @@ export function GraphView(props: Props) {
     return () => element.removeEventListener("wheel", onWheel);
   }, []);
 
-  // Keep the selected card on screen when it is chosen from elsewhere.
+  // Selections made by opening a menu already have a visible target.
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || currentMenu?.id === selected) return;
     const point = layout.points.get(selected);
     const { width, height } = stageSize;
     const size = sizes.get(selected);
@@ -200,6 +211,13 @@ export function GraphView(props: Props) {
     // Only react to a new selection, not to every layout change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
+
+  const openNodeMenu = (id: string, anchor: ContextMenuAnchor) => {
+    if (drag.current || panning) return;
+    moved.current = true;
+    setNodeMenu({ id, claimId: graph.claim.id, view, anchor });
+    if (id !== selected) props.onSelect(id);
+  };
 
   const commitResize = (id: string, size: CardSize, anchor: Point) => {
     const original = sizes.get(id);
@@ -379,7 +397,11 @@ export function GraphView(props: Props) {
                     title={title}
                     data-expanded-title={titleLines > 1 ? "true" : undefined}
                     style={{ height: customSize?.height, "--title-lines": titleLines } as React.CSSProperties}
-                    onClick={() => props.onSelect(id)}
+                    aria-expanded={currentMenu?.id === id}
+                    onClick={(event) => {
+                      if (!event.ctrlKey) props.onSelect(id);
+                    }}
+                    {...contextMenuProps((anchor) => openNodeMenu(id, anchor))}
                   >
                     <span className="node-head">
                       <Mark tone={nodeTone(node, blocked)} shape={node.kind === "hypothesis" ? "square" : undefined} />
@@ -457,6 +479,15 @@ export function GraphView(props: Props) {
           </button>
         </div>
       </div>
+      {currentMenu && menuNode && (
+        <ContextMenu
+          key={currentMenu.id}
+          anchor={currentMenu.anchor}
+          label={t("graphActions.forTarget", { title: nodeTitle(t, menuNode, { full: true }) })}
+          groups={props.nodeActions(currentMenu.id)}
+          onDismiss={() => setNodeMenu(null)}
+        />
+      )}
       <Legend
         graph={graph}
         view={view}

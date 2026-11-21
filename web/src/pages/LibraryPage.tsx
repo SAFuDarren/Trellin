@@ -61,6 +61,7 @@ export function LibraryPage({
     const [type, value] = filterKey.split(":");
     if (type === "kind") return (item.kind ?? "item") === value;
     if (type === "origin") return item.origin === value;
+    if (type === "claim") return item.used_by.some(({ id }) => id === value);
     if (type === "state") return value === "recheck" ? item.needs_recheck : item.retired;
     return true;
   };
@@ -91,7 +92,14 @@ export function LibraryPage({
     <SectionLayout
       title={t("rail.library")}
       groups={[
-        { entries: [entry("", t("library.all"), items.length)] },
+        {
+          entries: [
+            entry("", t("library.all"), items.length),
+            ...(filterKey.startsWith("claim:")
+              ? [entry(filterKey, t("graphActions.librarySources"), shown.length)]
+              : []),
+          ],
+        },
         {
           name: t("library.byKind"),
           entries: kinds.map((kind) =>

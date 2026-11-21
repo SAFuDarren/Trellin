@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
   type Ref,
   type RefObject,
@@ -16,6 +17,10 @@ import "../styles/floating-controls.css";
 
 type Placement = "bottom-start" | "bottom-end" | "top-start" | "top-end";
 type Dismiss = (restoreFocus?: boolean) => void;
+type Point = { x: number; y: number };
+type Edge = "first" | "last";
+
+export type ContextMenuAnchor = { element: HTMLButtonElement; point?: Point };
 
 type FloatingTrigger = {
   label: string;
@@ -56,6 +61,7 @@ function positionPanel(
   panel: HTMLElement,
   placement: Placement,
   keepVisible: HTMLElement | null | undefined,
+  point?: Point,
 ) {
   const margin = 8;
   const gap = 5;
@@ -64,7 +70,9 @@ function positionPanel(
   const left = viewport?.offsetLeft ?? 0;
   const right = left + (viewport?.width ?? document.documentElement.clientWidth);
   const bottom = top + (viewport?.height ?? document.documentElement.clientHeight);
-  const anchor = trigger.getBoundingClientRect();
+  const anchor = point
+    ? { left: point.x, right: point.x, top: point.y, bottom: point.y }
+    : trigger.getBoundingClientRect();
   const protectedArea = keepVisible?.getBoundingClientRect();
   const topEdge = Math.min(anchor.top, protectedArea?.top ?? anchor.top);
   const bottomEdge = Math.max(anchor.bottom, protectedArea?.bottom ?? anchor.bottom);
@@ -84,72 +92,52 @@ function positionPanel(
   panel.style.top = `${Math.max(top + margin, Math.min(y, bottom - panel.offsetHeight - margin))}px`;
 }
 
-export function Popover({
-  label,
-  trigger,
-  triggerClassName,
+function FloatingLayer({
+  element,
+  point,
   className,
   placement = "bottom-start",
   keepVisible,
-  triggerId,
-  triggerRef,
-  disabled,
-  dataCurrent,
-  onOpenChange,
-  panelId,
-  popup,
-  selectedLabel,
+  dialog,
+  dismissOnAnchor = false,
+  onDismiss,
   children,
-}: FloatingTrigger & {
-  panelId: string;
-  popup: "menu" | "dialog";
-  selectedLabel?: string;
-  children: (dismiss: Dismiss, edge: "first" | "last") => ReactNode;
+}: {
+  element: HTMLButtonElement;
+  point?: Point;
+  className?: string;
+  placement?: Placement;
+  keepVisible?: RefObject<HTMLElement | null>;
+  dialog?: { id: string; label: string };
+  dismissOnAnchor?: boolean;
+  onDismiss: () => void;
+  children: (dismiss: Dismiss) => ReactNode;
 }) {
-  const anchor = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
-  const [host, setHost] = useState<HTMLElement | null>(null);
-  const [edge, setEdge] = useState<"first" | "last">("first");
-  const open = host !== null;
-  const setTrigger = useCallback(
-    (element: HTMLButtonElement | null) => {
-      anchor.current = element;
-      if (typeof triggerRef === "function") return triggerRef(element);
-      if (triggerRef) triggerRef.current = element;
-    },
-    [triggerRef],
-  );
+  // A native dialog owns its top layer, including controls portaled into it.
+  const host = element.closest<HTMLDialogElement>("dialog[open]") ?? document.body;
   const dismiss = useCallback<Dismiss>(
     (restoreFocus = true) => {
-      if (restoreFocus) anchor.current?.focus({ preventScroll: true });
-      setHost(null);
-      onOpenChange?.(false);
+      if (restoreFocus) element.focus({ preventScroll: true });
+      onDismiss();
     },
-    [onOpenChange],
+    [element, onDismiss],
   );
 
-  function show(element: HTMLButtonElement, initialEdge: "first" | "last" = "first") {
-    setEdge(initialEdge);
-    // Portal within the native dialog's top layer when the trigger belongs to it.
-    setHost(element.closest<HTMLDialogElement>("dialog[open]") ?? document.body);
-    onOpenChange?.(true);
-  }
-
   useLayoutEffect(() => {
-    const button = anchor.current;
     const floating = panel.current;
-    if (!open || !button || !floating) return;
-    const place = () => positionPanel(button, floating, placement, keepVisible?.current);
+    if (!floating) return;
+    const place = () => positionPanel(element, floating, placement, keepVisible?.current, point);
     place();
     const resize = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(place);
-    resize?.observe(button);
+    resize?.observe(element);
     resize?.observe(floating);
     if (keepVisible?.current) resize?.observe(keepVisible.current);
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     window.visualViewport?.addEventListener("resize", place);
     window.visualViewport?.addEventListener("scroll", place);
-    host?.addEventListener("animationend", place);
+    host.addEventListener("animationend", place);
     (floating.querySelector<HTMLElement>("[data-floating-focus]") ?? floating).focus({ preventScroll: true });
     return () => {
       resize?.disconnect();
@@ -157,24 +145,26 @@ export function Popover({
       window.removeEventListener("scroll", place, true);
       window.visualViewport?.removeEventListener("resize", place);
       window.visualViewport?.removeEventListener("scroll", place);
-      host?.removeEventListener("animationend", place);
+      host.removeEventListener("animationend", place);
     };
-  }, [host, keepVisible, open, placement]);
+  }, [element, host, keepVisible, placement, point]);
 
   useEffect(() => {
-    const button = anchor.current;
     const floating = panel.current;
-    if (!open || !button || !floating) return;
+    if (!floating) return;
 
     const inside = (target: EventTarget | null) =>
-      target instanceof Node && (button.contains(target) || floating.contains(target));
+      target instanceof Node && (element.contains(target) || floating.contains(target));
     const pointerDown = (event: PointerEvent) => {
-      if (inside(event.target)) return;
+      const { target } = event;
+      if (target instanceof Node && (floating.contains(target) || (!dismissOnAnchor && element.contains(target)))) {
+        return;
+      }
       const hadFocus = inside(document.activeElement);
       dismiss(false);
       if (hadFocus) {
         window.requestAnimationFrame(() => {
-          if (document.activeElement === document.body && button.isConnected) button.focus({ preventScroll: true });
+          if (document.activeElement === document.body && element.isConnected) element.focus({ preventScroll: true });
         });
       }
     };
@@ -210,12 +200,63 @@ export function Popover({
       document.removeEventListener("focusin", focusIn);
       window.removeEventListener("hashchange", navigation);
     };
-  }, [dismiss, open]);
+  }, [dismiss, dismissOnAnchor, element]);
+
+  return createPortal(
+    <div
+      ref={panel}
+      className={className ? `floating-popover ${className}` : "floating-popover"}
+      id={dialog?.id}
+      role={dialog ? "dialog" : undefined}
+      aria-label={dialog?.label}
+      tabIndex={-1}
+    >
+      {children(dismiss)}
+    </div>,
+    host,
+  );
+}
+
+export function Popover({
+  label,
+  trigger,
+  triggerClassName,
+  className,
+  placement,
+  keepVisible,
+  triggerId,
+  triggerRef,
+  disabled,
+  dataCurrent,
+  onOpenChange,
+  panelId,
+  popup,
+  selectedLabel,
+  children,
+}: FloatingTrigger & {
+  panelId: string;
+  popup: "menu" | "dialog";
+  selectedLabel?: string;
+  children: (dismiss: Dismiss, edge: Edge) => ReactNode;
+}) {
+  const [element, setElement] = useState<HTMLButtonElement | null>(null);
+  const [edge, setEdge] = useState<Edge>("first");
+  const open = element !== null;
+  const close = useCallback(() => {
+    setElement(null);
+    onOpenChange?.(false);
+  }, [onOpenChange]);
+
+  function show(button: HTMLButtonElement, initialEdge: Edge = "first") {
+    setEdge(initialEdge);
+    setElement(button);
+    onOpenChange?.(true);
+  }
 
   return (
     <>
       <button
-        ref={setTrigger}
+        ref={triggerRef}
         id={triggerId}
         type="button"
         className={triggerClassName ? `floating-trigger ${triggerClassName}` : "floating-trigger"}
@@ -227,7 +268,13 @@ export function Popover({
         aria-controls={open ? panelId : undefined}
         data-current={dataCurrent || undefined}
         disabled={disabled}
-        onClick={(event) => (open ? dismiss() : show(event.currentTarget))}
+        onClick={(event) => {
+          if (!open) show(event.currentTarget);
+          else {
+            event.currentTarget.focus({ preventScroll: true });
+            close();
+          }
+        }}
         onKeyDown={(event) => {
           if (open || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
           event.preventDefault();
@@ -236,22 +283,53 @@ export function Popover({
       >
         {trigger ?? label}
       </button>
-      {host &&
-        createPortal(
-          <div
-            ref={panel}
-            className={className ? `floating-popover ${className}` : "floating-popover"}
-            id={popup === "dialog" ? panelId : undefined}
-            role={popup === "dialog" ? "dialog" : undefined}
-            aria-label={popup === "dialog" ? label : undefined}
-            tabIndex={-1}
-          >
-            {children(dismiss, edge)}
-          </div>,
-          host,
-        )}
+      {element && (
+        <FloatingLayer
+          element={element}
+          className={className}
+          placement={placement}
+          keepVisible={keepVisible}
+          dialog={popup === "dialog" ? { id: panelId, label } : undefined}
+          onDismiss={close}
+        >
+          {(dismiss) => children(dismiss, edge)}
+        </FloatingLayer>
+      )}
     </>
   );
+}
+
+export function contextMenuProps(onOpen: (anchor: ContextMenuAnchor) => void) {
+  return {
+    "aria-haspopup": "menu" as const,
+    "aria-keyshortcuts": "ContextMenu Shift+F10",
+    onContextMenu(event: MouseEvent<HTMLButtonElement>) {
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const pointer = event.button !== 0 || event.ctrlKey || event.clientX !== 0 || event.clientY !== 0;
+      onOpen({
+        element: event.currentTarget,
+        point: pointer ? { x: event.clientX, y: event.clientY } : undefined,
+      });
+    },
+    onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.nativeEvent.isComposing ||
+        event.keyCode === 229 ||
+        !(event.key === "ContextMenu" || (event.shiftKey && event.key === "F10"))
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onOpen({ element: event.currentTarget });
+    },
+  };
 }
 
 function fold(text: string) {
@@ -288,16 +366,19 @@ function MenuContent({
   id: string;
   label: string;
   groups: FloatingGroup[];
-  edge: "first" | "last";
+  edge: Edge;
   onSelect?: (id: string) => void;
   dismiss: Dismiss;
 }) {
   const typeahead = useRef({ text: "", at: 0 });
   const nonemptyGroups = groups.filter(({ options }) => options.length > 0);
-  const available = nonemptyGroups.flatMap(({ options }) => options.filter((option) => !option.disabled));
-  const initial = edge === "first" ? available[0]?.id : available.at(-1)?.id;
+  const options = nonemptyGroups.flatMap((group) => group.options);
+  const available = options.filter((option) => !option.disabled);
+  const initialOptions = available.length ? available : options;
+  const initial = edge === "first" ? initialOptions[0]?.id : initialOptions.at(-1)?.id;
   function handleKey(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey || event.ctrlKey || event.metaKey)
+      return;
     const elements = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("[data-menu-option]"));
     if (elements.length === 0) return;
     const current = elements.findIndex((element) => element === document.activeElement);
@@ -334,6 +415,7 @@ function MenuContent({
   }
 
   function choose(option: FloatingOption) {
+    if (option.disabled) return;
     dismiss();
     option.onSelect?.();
     onSelect?.(option.id);
@@ -361,7 +443,7 @@ function MenuContent({
               const attributes = {
                 className: "floating-option",
                 tabIndex: -1,
-                "data-menu-option": option.disabled ? undefined : option.label,
+                "data-menu-option": option.label,
                 "data-floating-focus": initial === option.id ? "" : undefined,
                 "data-destructive": option.destructive || undefined,
                 "aria-label": option.count === undefined ? option.label : `${option.label} ${option.count}`,
@@ -393,7 +475,6 @@ function MenuContent({
                   type="button"
                   role={option.current === undefined ? "menuitem" : "menuitemradio"}
                   aria-checked={option.current}
-                  disabled={option.disabled}
                   onClick={() => choose(option)}
                 >
                   {content}
@@ -433,6 +514,25 @@ export function Menu({
   );
 }
 
+export function ContextMenu({
+  anchor,
+  label,
+  groups,
+  onDismiss,
+}: {
+  anchor: ContextMenuAnchor;
+  label: string;
+  groups: FloatingGroup[];
+  onDismiss: () => void;
+}) {
+  const id = useId();
+  return (
+    <FloatingLayer element={anchor.element} point={anchor.point} dismissOnAnchor onDismiss={onDismiss}>
+      {(dismiss) => <MenuContent id={id} label={label} groups={groups} edge="first" dismiss={dismiss} />}
+    </FloatingLayer>
+  );
+}
+
 function PickerContent({
   groups,
   searchLabel,
@@ -447,7 +547,7 @@ function PickerContent({
   emptyLabel: string;
   value?: string;
   footer?: ReactNode;
-  edge: "first" | "last";
+  edge: Edge;
   onChoose: (option: FloatingOption) => void;
 }) {
   const id = useId();
