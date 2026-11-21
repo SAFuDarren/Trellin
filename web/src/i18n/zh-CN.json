@@ -138,6 +138,7 @@
     "linkClaim": "连接所选课题",
     "cancelLink": "取消连线",
     "findClaim": "查找课题",
+    "toggleHint": "{{label}}（{{shortcut}}）",
     "searchClaims": "搜索图谱中的课题",
     "noMatches": "没有匹配的课题。",
     "researchLinks": "研究关联",

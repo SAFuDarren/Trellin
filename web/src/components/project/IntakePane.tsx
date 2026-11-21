@@ -336,7 +336,7 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
           )}
           <div className="project-entry-buttons">
             <button
-              className="button primary"
+              className={release ? "button" : "button primary"}
               type="submit"
               disabled={working || Boolean(release) || tooLarge || !notes.trim() || !canChoose}
             >

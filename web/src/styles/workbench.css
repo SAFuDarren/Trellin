@@ -2018,13 +2018,13 @@ select:disabled {
   white-space: nowrap;
 }
 .button.primary {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--on-ink);
+  border-color: var(--action-fill);
+  background: var(--action-fill);
+  color: var(--action-label);
 }
 .button.primary:hover:not(:disabled) {
   opacity: 0.88;
-  background: var(--ink);
+  background: var(--action-fill);
 }
 .button:disabled {
   opacity: 0.5;

@@ -14,6 +14,11 @@
   --state-selected: var(--pick);
   --state-pressed: color-mix(in srgb, var(--state-selected) 85%, var(--ink));
 
+  /* At most one filled .button.primary per action area. Keep secondary .button
+     controls outlined and use quiet text or icon controls for tertiary actions. */
+  --action-fill: var(--ink);
+  --action-label: var(--on-ink);
+
   /* Radius scale. Glyph shapes (status marks, dots) keep their own geometry. */
   --radius-inline: 4px; /* keycaps, legend keys, tiny badges */
   --radius-control: 6px; /* buttons, inputs, menu items, list rows */
