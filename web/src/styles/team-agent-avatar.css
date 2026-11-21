@@ -6,7 +6,7 @@
   height: 26px;
   overflow: hidden;
   border: 1px solid var(--hair);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--track);
   color: var(--ink);
   font-size: var(--type-meta-size);

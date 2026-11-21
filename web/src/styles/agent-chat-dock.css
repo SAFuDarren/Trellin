@@ -37,7 +37,7 @@
   min-height: 30px;
   padding: 3px 8px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--sub);
   font-size: var(--type-meta-size);
@@ -99,9 +99,9 @@
   height: min(540px, calc(100vh - 75px));
   height: min(540px, calc(100dvh - 75px));
   border: 1px solid var(--node-line);
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   background: var(--main);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 20%);
+  box-shadow: var(--elevation-dialog);
 }
 
 .agent-dock-heading {
@@ -169,7 +169,7 @@
   min-height: 30px;
   max-width: 260px;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   list-style: none;
   font-weight: var(--type-medium);
@@ -210,9 +210,9 @@
   overflow: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--node-line);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--main);
-  box-shadow: 0 7px 20px rgb(0 0 0 / 16%);
+  box-shadow: var(--elevation-float);
 }
 
 .agent-dock-options > input,
@@ -221,7 +221,7 @@
   min-height: 32px;
   padding: 6px 9px;
   border: 1px solid var(--hair);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: var(--side);
   color: var(--ink);
 }
@@ -250,7 +250,7 @@
   width: 100%;
   padding: 6px 8px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--ink);
   text-decoration: none;
@@ -315,7 +315,7 @@
   gap: 3px 8px;
   padding: 5px 8px;
   border: 1px solid var(--hair);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--side);
   overflow-wrap: anywhere;
 }
