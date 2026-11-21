@@ -288,6 +288,7 @@
     "close": "收起审阅栏",
     "empty": "目前没有需要你处理的记录。",
     "detail": "节点详情",
+    "moreInspectorActions": "更多课题操作",
     "waiting": "等你处理 · {{count}}",
     "none": "没有待处理的事项。",
     "allDone": "都处理完了。有需要你确认的核验或问题时，会出现在这里。",

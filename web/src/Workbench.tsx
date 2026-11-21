@@ -743,21 +743,13 @@ export function Workbench({
             notice={detailsNotice ? { text: detailsNotice, error: snapshot.isError } : undefined}
             actions={
               graph &&
-              node &&
-              [
-                ...(!proofOpen && claimId ? [graphAction(t, "open-proof", () => openProof(claimId))] : []),
-                graphAction(t, "ask-agent", () => askAgent(graph, node)),
-                graphAction(t, "proof-task", () => openProofTask(graph.claim.id)),
-              ].map((action) => (
-                <button
-                  key={action.id}
-                  type="button"
-                  className={action.id === "proof-task" ? "button primary" : "button"}
-                  onClick={action.onSelect}
-                >
-                  {action.label}
-                </button>
-              ))
+              node && {
+                primary: graphAction(t, "proof-task", () => openProofTask(graph.claim.id)),
+                secondary: [
+                  ...(!proofOpen && claimId ? [graphAction(t, "open-proof", () => openProof(claimId))] : []),
+                  graphAction(t, "ask-agent", () => askAgent(graph, node)),
+                ],
+              }
             }
             onSelect={selectNode}
             onReviewPremise={(id) => setPremiseDialog({ id })}

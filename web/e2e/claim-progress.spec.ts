@@ -263,13 +263,13 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   await expect(detailHeader.nth(2).getByRole("button", { name: "Proof task", exact: true })).toBeVisible();
   await expect(detail.locator(".claim-progress-state")).toHaveCount(0);
 
-  await mapClaim(page, recheck.title!).press("Enter");
+  await mapClaim(page, recheck.title!).press("Space");
   await expectProgress(detail, "Needs recheck", "bad", OLDER);
-  await mapClaim(page, missing.title!).press("Enter");
+  await mapClaim(page, missing.title!).press("Space");
   await expectProgress(detail, "In progress", "open", null);
 
   const readyCard = mapClaim(page, ready.title!);
-  await readyCard.press("Enter");
+  await readyCard.press("Space");
   await expectProgress(readyCard, "Ready to start", "open", ZERO);
   await expect(readyCard).toHaveAccessibleDescription(/No recorded obligations/);
   await expectProgress(detail, "Ready to start", "open", ZERO);
