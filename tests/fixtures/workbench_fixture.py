@@ -225,6 +225,18 @@ class Handler(BaseHTTPRequestHandler):
                       "application/json; charset=utf-8")
             return
         query = parse_qs(route.query)
+        if route.path == "/api/proof-task" and len(query.get("claim", [])) == 1:
+            identifier = query["claim"][0]
+            claim = next((item for item in CLAIMS if item["id"] == identifier), None)
+            task = {
+                "claim_id": identifier, "title": claim["title"] if claim else "Other claim",
+                "state": "waiting", "blocker": "proof_task.unresolved",
+                "can_start": False, "can_stop": False, "local_model_allowed": False,
+                "scope": {"token": None, "proposition": None, "basis": [], "omitted_basis": 0},
+                "decisions": [], "policy": None, "receipt": None, "adopted": False,
+            }
+            self.send(json.dumps(task, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+            return
         data = {"/api/claims": {"claims": CLAIMS, "claim_id": None}, "/api/graph": GRAPH, "/api/activity": ACTIVITY,
                 "/api/atlas": ATLAS, "/api/impact": IMPACT, "/api/inbox": INBOX, "/api/library": LIBRARY,
                 "/api/model-connections": {"connections": []},

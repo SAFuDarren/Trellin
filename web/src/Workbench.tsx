@@ -6,7 +6,7 @@ import { api } from "./api/client";
 import type { ConversationAnchor } from "./api/conversations";
 import { useFallbackInterval } from "./api/liveUpdates";
 import { useProjectCanvas } from "./api/projectCanvas";
-import { useClaims, useLibrary } from "./api/sections";
+import { type useAtlas, useClaims, useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
 import type { FloatingGroup, FloatingOption } from "./components/FloatingControls";
@@ -18,10 +18,11 @@ import { useDesktopProjectList } from "./components/SidebarProjects";
 import { Splitter } from "./components/Splitter";
 import { href } from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
+import type { ClaimProgress } from "./workbench/claimProgress";
 import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
 import { nodeTitle } from "./workbench/text";
-import type { ActivitySnapshot, Atlas, GraphNode, GraphSnapshot, ImpactPreview } from "./workbench/types";
+import type { ActivitySnapshot, GraphNode, GraphSnapshot, ImpactPreview } from "./workbench/types";
 import { clampSize, useLayout } from "./workbench/useLayout";
 
 const ACTIVITY_MS = 4000;
@@ -44,6 +45,8 @@ type Selection = { claimId: string; nodeId?: string; referenced?: boolean };
 
 export function Workbench({
   session,
+  atlas,
+  claimProgress,
   focus,
   onFocusHandled,
   pendingReviews,
@@ -54,6 +57,8 @@ export function Workbench({
   onActionHandled,
 }: {
   session: string;
+  atlas: ReturnType<typeof useAtlas>;
+  claimProgress: ReadonlyMap<string, ClaimProgress>;
   focus?: Focus | null;
   onFocusHandled: (focus: null) => void;
   pendingReviews: number | undefined;
@@ -93,12 +98,6 @@ export function Workbench({
     t("projects.current");
 
   const claims = useClaims(session);
-  const atlas = useQuery({
-    queryKey: ["atlas"],
-    queryFn: ({ signal }) => api<Atlas>(session, "/api/atlas", { signal }),
-    enabled: mapAtlasOpen,
-    retry: false,
-  });
 
   useEffect(() => {
     if (!claims.data || !pendingLaunch.current) return;
@@ -510,6 +509,7 @@ export function Workbench({
             <section className="graph-area project-map-area">
               <ProjectCanvas
                 claims={mapClaims}
+                claimProgress={claimProgress}
                 selected={mapSelection}
                 onSelect={inspectClaim}
                 onContextClaim={handleContextClaim}
@@ -554,6 +554,7 @@ export function Workbench({
             graph={graph}
             claims={mapClaims}
             claimId={claimId}
+            claimProgress={claimId ? claimProgress.get(claimId) : undefined}
             view={view}
             selected={selected}
             assumption={assumption?.id ?? null}

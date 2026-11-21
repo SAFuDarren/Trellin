@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { LiveWorkspaceUpdates, WORKSPACE_WRITES } from "./api/liveUpdates";
 import { useReleaseUpdates } from "./api/releaseUpdates";
-import { useClaims, useInbox, useTeam } from "./api/sections";
+import { useProofTask } from "./api/proofTask";
+import { useAtlas, useClaims, useInbox, useTeam } from "./api/sections";
 import { workspaceEventCursor, workspaceId } from "./api/workspaceEvents";
 import { AgentChatDock, type AgentChatRequest } from "./components/AgentChatDock";
 import { CommandPalette } from "./components/CommandPalette";
@@ -25,12 +26,16 @@ import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceE
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
 import { Workbench, type Focus, type WorkbenchPosition } from "./Workbench";
 import { graphAction, type ProjectActionRequest } from "./workbench/actions";
+import { buildClaimProgress } from "./workbench/claimProgress";
 import { resetLayout } from "./workbench/useLayout";
 
 /** The function rail on the left and the page it selects. */
 export function Shell({ session }: { session: string }) {
   const { t } = useTranslation();
   const [route, go] = useRoute();
+  const { section, sub } = route;
+  const agentWork = sub === "agent-work" || sub.startsWith("agent-work/");
+  const showsClaimProgress = section === "workbench" || (section === "claims" && !agentWork);
   const releaseUpdates = useReleaseUpdates(session);
   const queries = useQueryClient();
   const [connection, setConnection] = useState<WorkspaceConnection | null>(null);
@@ -42,12 +47,25 @@ export function Shell({ session }: { session: string }) {
   const comprehensive = eventFeed?.coverage === WORKSPACE_WRITES;
   const live = comprehensive && sessionConnection?.workspace === workspace && Boolean(sessionConnection?.live);
   const team = useTeam(session, live);
+  const atlas = useAtlas(session, showsClaimProgress);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [chatRequest, setChatRequest] = useState<{ session: string; value: AgentChatRequest } | null>(null);
   const [palette, setPalette] = useState<{ session: string; query: string } | null>(null);
   const [projectAction, setProjectAction] = useState<{ session: string; request: ProjectActionRequest } | null>(null);
   const [lastWorkbench, setLastWorkbench] = useState<{ session: string; position: WorkbenchPosition } | null>(null);
   const position = lastWorkbench?.session === session ? lastWorkbench.position : undefined;
+  // Only the selected claim needs the detailed proof-task read. The indexes cover the rest of the map.
+  const proofTask = useProofTask(session, showsClaimProgress ? (position?.claimId ?? null) : null, live, 10000);
+  const claimProgress = useMemo(
+    () =>
+      buildClaimProgress({
+        atlas: atlas.data?.claims,
+        inbox: inbox.data?.items,
+        jobs: team.data?.jobs,
+        proofTask: proofTask.data,
+      }),
+    [atlas.data, inbox.data, team.data, proofTask.data],
+  );
   const paletteOpen = palette?.session === session;
   const openPalette = useCallback(() => setPalette({ session, query: "" }), [session]);
   const clearProjectAction = useCallback(() => setProjectAction(null), []);
@@ -136,7 +154,6 @@ export function Shell({ session }: { session: string }) {
   const pendingReviews = inbox.data
     ? (inbox.data.items?.length ?? 0) + (inbox.data.clarification_review?.followups.length ?? 0)
     : undefined;
-  const { section, sub } = route;
   return (
     <LiveWorkspaceUpdates.Provider value={live}>
       <ConversationEditors key={session} session={session}>
@@ -156,10 +173,17 @@ export function Shell({ session }: { session: string }) {
             {section === "review" ? (
               <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
             ) : section === "claims" ? (
-              sub === "agent-work" || sub.startsWith("agent-work/") ? (
+              agentWork ? (
                 <AgentWorkPage session={session} sub={sub} />
               ) : (
-                <ClaimsPage session={session} sub={sub} onOpen={open} />
+                <ClaimsPage
+                  session={session}
+                  sub={sub}
+                  onOpen={open}
+                  claimProgress={claimProgress}
+                  atlasClaims={atlas.data?.claims}
+                  jobs={team.data?.jobs}
+                />
               )
             ) : section === "library" ? (
               <LibraryPage session={session} sub={sub} onOpen={open} />
@@ -177,6 +201,8 @@ export function Shell({ session }: { session: string }) {
               <Workbench
                 key={session}
                 session={session}
+                atlas={atlas}
+                claimProgress={claimProgress}
                 focus={focus}
                 onFocusHandled={setFocus}
                 pendingReviews={pendingReviews}

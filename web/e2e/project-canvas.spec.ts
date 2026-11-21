@@ -69,7 +69,7 @@ test("project claims open the existing inspector without leaving or moving the c
   const detail = inspector.locator("#node-detail");
   await expect(detail.getByText(FIRST_STATEMENT, { exact: true })).toBeVisible();
   await expect(detail.getByText("∀ n : Nat, n = 0 + n", { exact: true })).toBeVisible();
-  await expect(detail.getByText("In progress", { exact: true })).toBeVisible();
+  await expect(detail.getByText("Waiting for your review", { exact: true })).toBeVisible();
   await detail.getByText("Sources and versions", { exact: true }).click();
   await expect(detail.getByText("Lean statement ID", { exact: true })).toBeVisible();
   await expect(

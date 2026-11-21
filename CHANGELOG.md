@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.59
+
+- Project map cards, the claim inspector, and Claims show recorded proof progress and the current review, decision or verification state. The count covers proof nodes in the graph summary.
+
 ## 1.0.58
 
 - Press ⌘K or Ctrl+K from any workbench page to find claims, Lean proof references, Library entries, conversations and Agents. Pick a recent item or open an existing research action with the same confirmation steps.

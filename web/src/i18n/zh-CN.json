@@ -661,6 +661,19 @@
       "team": "{{count}} 项运行中"
     }
   },
+  "claimProgress": {
+    "claim": "命题进度",
+    "nodes": "已验证 {{done}} / {{total}} 个证明节点",
+    "states": {
+      "review": "等你审核",
+      "decision": "需要决定",
+      "verifying": "正在验证",
+      "running": "证明任务运行中",
+      "recheck": "需要复核",
+      "ready": "可以开始证明",
+      "queued": "证明任务排队中"
+    }
+  },
   "claimsPage": {
     "openWorkbench": "在工作台打开",
     "noStatement": "这项课题没有已记录的陈述。",
