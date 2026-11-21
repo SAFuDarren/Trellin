@@ -274,9 +274,10 @@ An issue is done when every acceptance criterion holds and a test or a check in 
   | Lint and offline tests | 1 min | 15 min |
   | Web interface (React) | 2 min | 20 min (end-to-end step 10 min) |
   | Installed package smoke check | 1 min | 20 min |
-  | Required release regressions | 14 min | 30 min |
+  | Required release regressions | 14 min (2 min when scoped out) | 30 min |
   | DCO | under 1 min | 5 min |
 
+- **Long regressions run where they can matter.** Every pull request builds the wheel, checks the version marker and compares the CLI against its baseline. The PostgreSQL and Lean regressions in the same job are skipped for a pull request that only touches `web/`, `research_multiplier/workbench/app/`, `docs/`, `brand/`, `desktop/`, Markdown files at the root, issue and pull request templates, `tests/compat_validation/PACKAGE_VERSION`, or the version line of `pyproject.toml`. Any other path runs them, and so does every push to `main`, the weekly schedule and a manual run. The job summary says which applied. Extend the list only when a path cannot affect the database boundary or proof checking.
 - **Do not wait on a hung job.** A job that runs well past its usual time with no new log output is hung. Cancel the run (`gh run cancel ID`), read its log (`gh run view ID --log`), and either fix the cause or rerun once (`gh run rerun ID --failed`). If it hangs again, treat it as an incident (below) and fix the cause before merging.
 - **Do not download what the runner already has.** Prefer tools on the runner image (for example its Google Chrome for the end-to-end tests) and pinned versions over downloads during the run.
 - **Merge only on green.** Never merge with a required check pending or failed, and never disable, skip or loosen a check to make it pass. A flaky check gets an issue and a fix.

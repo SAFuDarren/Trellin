@@ -79,6 +79,55 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # A pull request checks out its merge commit; the first parent is the base.
+          fetch-depth: 2
+      - name: Decide whether this change needs the PostgreSQL and Lean regressions
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          python - <<'PYCODE'
+          import os
+          import re
+          import subprocess
+
+          # Changes confined to these paths cannot affect the database boundary or
+          # proof checking (#169). Everything else, and every push to main, schedule
+          # or manual run, gets the full regressions.
+          SAFE = (
+              re.compile(r"web/"),
+              re.compile(r"research_multiplier/workbench/app/"),
+              re.compile(r"docs/"),
+              re.compile(r"brand/"),
+              re.compile(r"desktop/"),
+              re.compile(r"\.github/(ISSUE_TEMPLATE/|pull_request_template\.md$)"),
+              re.compile(r"[^/]+\.md$"),
+              re.compile(r"tests/compat_validation/PACKAGE_VERSION$"),
+          )
+
+          def git(*args):
+              return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
+
+          def version_only(path):
+              # pyproject.toml may change only its static [project] version line.
+              lines = [line for line in git("diff", "--unified=0", "HEAD^1", "HEAD", "--", path).splitlines()
+                       if line[:1] in "+-" and not line.startswith(("+++", "---"))]
+              return bool(lines) and all(re.fullmatch(r'[+-]version = "[0-9.]+"', line) for line in lines)
+
+          full, reason = True, f"{os.environ['EVENT']} runs the full regressions"
+          if os.environ["EVENT"] == "pull_request":
+              files = git("diff", "--name-only", "HEAD^1", "HEAD").split()
+              other = [f for f in files if not any(p.match(f) for p in SAFE)
+                       and not (f == "pyproject.toml" and version_only(f))]
+              full = bool(other) or not files
+              reason = (f"changes outside the interface and records, for example {other[0]}" if other
+                        else "only the interface, documentation and version records changed")
+          print(f"Full regressions: {full} ({reason})")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"full={'true' if full else 'false'}\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(f"PostgreSQL and Lean regressions: {'run' if full else 'skipped'} ({reason}).\n")
+          PYCODE
       - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
@@ -142,6 +191,7 @@ jobs:
           candidate=$(python -c 'from importlib.metadata import distribution; print(distribution("research-multiplier").locate_file(""))')
           python "$RM_VALIDATION_DIR/check_cli_compatibility.py" "$RM_VALIDATION_DIR/cli-baseline.json" "$candidate"
       - name: Install native PostgreSQL 18 and pgvector
+        if: steps.scope.outputs.full == 'true'
         shell: bash
         run: |
           pgdg_key="$RUNNER_TEMP/postgresql-pgdg.asc"
@@ -161,6 +211,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql-18 postgresql-18-pgvector
       - name: Start a disposable PostgreSQL cluster
+        if: steps.scope.outputs.full == 'true'
         shell: bash
         run: |
           pg_bin=/usr/lib/postgresql/18/bin
@@ -179,6 +230,7 @@ jobs:
             --command "SELECT version(), extversion FROM pg_extension WHERE extname = 'vector';"
           echo "RM_TEST_DSN=postgresql:///research_multiplier_test?user=postgres&host=$pg_socket&port=$pg_port" >> "$GITHUB_ENV"
       - name: Verify installed schema against disposable PostgreSQL
+        if: steps.scope.outputs.full == 'true'
         working-directory: ${{ runner.temp }}
         run: |
           unset PYTHONPATH
@@ -203,12 +255,14 @@ jobs:
                   raise SystemExit("The disposable database did not reach the installed schema head.")
           PYCODE
       - name: Run the in-repository PostgreSQL tests
+        if: steps.scope.outputs.full == 'true'
         timeout-minutes: 8
         working-directory: ${{ runner.temp }}
         run: |
           unset PYTHONPATH
           python -m pytest --import-mode=importlib -p no:cacheprovider -m postgres "$GITHUB_WORKSPACE/tests"
       - name: Run the compatibility PostgreSQL suite
+        if: steps.scope.outputs.full == 'true'
         timeout-minutes: 15
         working-directory: ${{ runner.temp }}
         run: |
@@ -217,6 +271,7 @@ jobs:
           pg_restore --version
           python "$RM_VALIDATION_DIR/run_regressions.py" postgres
       - name: Prepare the pinned Lean project
+        if: steps.scope.outputs.full == 'true'
         working-directory: ${{ runner.temp }}
         run: |
           archive="$RUNNER_TEMP/lean-4.19.0-linux.tar.zst"
@@ -235,12 +290,14 @@ jobs:
           cd "$rm_lean_fixture"
           lake exe cache get Mathlib.Data.Real.Basic Mathlib.Tactic.Linarith Mathlib.Tactic.NormNum
       - name: Run the in-repository Lean tests
+        if: steps.scope.outputs.full == 'true'
         timeout-minutes: 8
         working-directory: ${{ runner.temp }}
         run: |
           unset PYTHONPATH
           python -m pytest --import-mode=importlib -p no:cacheprovider -m lean "$GITHUB_WORKSPACE/tests"
       - name: Run required Lean regressions
+        if: steps.scope.outputs.full == 'true'
         timeout-minutes: 22
         env:
           RM_TEST_LEAN_PROJECT: ${{ runner.temp }}/rm-lean-fixture

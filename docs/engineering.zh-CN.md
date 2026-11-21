@@ -277,9 +277,10 @@ issue 的每一条验收标准都满足、并且有测试或 CI 检查能证明�
   | Lint and offline tests | 1 分钟 | 15 分钟 |
   | Web interface (React) | 2 分钟 | 20 分钟（端到端测试这一步 10 分钟） |
   | Installed package smoke check | 1 分钟 | 20 分钟 |
-  | Required release regressions | 14 分钟 | 30 分钟 |
+  | Required release regressions | 14 分钟（按路径跳过时约 2 分钟） | 30 分钟 |
   | DCO | 不到 1 分钟 | 5 分钟 |
 
+- **长回归只在可能受影响时运行。** 每个 PR 都会构建 wheel、核对版本标记，并把 CLI 与基线比对。同一个 job 里的 PostgreSQL 和 Lean 回归，在 PR 只改动 `web/`、`research_multiplier/workbench/app/`、`docs/`、`brand/`、`desktop/`、根目录的 Markdown 文件、issue 和 PR 模板、`tests/compat_validation/PACKAGE_VERSION` 或 `pyproject.toml` 的版本号这一行时跳过。改动其他任何路径都会运行；推送到 `main`、每周定时运行和手动运行也总会运行。job 摘要会写明本次是否运行。只有确认某个路径不会影响数据库边界或证明检查时，才把它加进这份清单。
 - **卡住了就别等。** 一个 job 远远超过平时耗时、日志又没有新输出，就是卡住了。取消这次运行（`gh run cancel ID`），读日志（`gh run view ID --log`），然后修掉原因，或者重跑一次（`gh run rerun ID --failed`）。如果重跑又卡住，按下面的事故复盘处理，修好原因再合并。
 - **运行环境里已有的东西不要再下载。** 优先用 runner 镜像自带的工具（例如端到端测试用镜像里的 Google Chrome），并固定版本，不要在运行时下载。
 - **全绿才合并。** 有必需的检查还在等待或已失败时，不要合并；也不要为了通过而关闭、跳过或放宽检查。时好时坏的检查要开 issue 修好。
