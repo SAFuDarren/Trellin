@@ -150,9 +150,7 @@ test("a 55-node proof starts at a readable zoom in a minimum-size window and fit
     });
   });
   await page.goto("/#session=fixture");
-  const card = mapClaim(page, FIXTURE_CLAIM_TITLE);
-  await card.click();
-  await page.locator("#review").getByRole("button", { name: "Open proof", exact: true }).click();
+  await openProof(page);
   const graph = page.locator(".main-proof-graph");
   await expect(graph.locator(".graph-node")).toHaveCount(55);
   await expect(graph.locator(".zoom-level")).toHaveText("80%");

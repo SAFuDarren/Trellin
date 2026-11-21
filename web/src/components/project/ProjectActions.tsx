@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { graphAction, graphActionLabel, type ProjectAction } from "../../workbench/actions";
 import type { PremiseReview } from "../../workbench/types";
 import { Menu, type FloatingOption } from "../FloatingControls";
-import { Chevron } from "../Icons";
+import { Chevron, WorkbenchIcon } from "../Icons";
 import { ClaimCodesPane } from "./ClaimCodesPane";
 import { IntakePane } from "./IntakePane";
 import { LemmaPlanPane, type LemmaPlanScope } from "./LemmaPlanPane";
@@ -78,14 +78,22 @@ export function ProjectActions({
 
   return (
     <div className="project-actions">
-      <button className="button primary" type="button" onClick={addTheorem.onSelect}>
-        {addTheorem.label}
+      <button
+        className="button primary project-add-theorem"
+        type="button"
+        aria-label={addTheorem.label}
+        title={addTheorem.label}
+        onClick={addTheorem.onSelect}
+      >
+        <WorkbenchIcon name="add" />
+        <span>{addTheorem.label}</span>
       </button>
       <Menu
         label={t("canvasShell.researchActions")}
         trigger={
           <>
-            {t("canvasShell.researchActions")}
+            <WorkbenchIcon name="organize" />
+            <span>{t("canvasShell.researchActions")}</span>
             <Chevron />
           </>
         }

@@ -92,6 +92,9 @@ for (const title of ["单射映射的复合", "连续自然数之积的奇偶性
     await expect(page.locator(".main-proof-graph")).toBeVisible();
 
     await page.keyboard.press("Escape");
+    await expect(inspector).toBeHidden();
+    await expect(page.locator(".main-proof-graph")).toBeVisible();
+    await page.keyboard.press("Escape");
     await expect(stage).toBeVisible();
     await expect(inspector).toBeHidden();
     await expect(card).toHaveAttribute("aria-pressed", "true");
@@ -120,6 +123,9 @@ test("compact single click highlights immediately and keeps explicit proof entry
     await actions.getByRole("button", { name: "More inspector actions", exact: true }).click();
     await page.getByRole("menuitem", { name: "Open proof", exact: true }).click();
   }
+  await expect(proof).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(inspector).toBeHidden();
   await expect(proof).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(proof).toBeHidden();
