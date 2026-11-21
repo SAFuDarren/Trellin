@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
 
-const PRIMARY = "button.button.primary:visible";
+const PRIMARY = ".button.primary:visible";
 
 test("the header, inspector and current dialog each have one filled main action", async ({ page }) => {
   await page.route("**/api/proof-task?*", (route) => {
@@ -52,8 +52,9 @@ test("the header, inspector and current dialog each have one filled main action"
   await mapClaim(page, FIXTURE_CLAIM_TITLE).click();
   const inspector = page.locator("#review");
   await expect(inspector.locator(PRIMARY)).toHaveCount(1);
-  await expect(inspector.locator(PRIMARY)).toHaveAccessibleName("Proof task");
-  await inspector.locator(PRIMARY).click();
+  await expect(inspector.locator(PRIMARY)).toHaveAccessibleName("Review");
+  const task = inspector.getByRole("button", { name: "Proof task", exact: true });
+  await task.click();
   const proof = page.getByRole("dialog", { name: "Proof task", exact: true });
   await expect(proof.locator(PRIMARY)).toHaveCount(1);
   await expect(proof.locator(PRIMARY)).toHaveAccessibleName("Authorize and start");

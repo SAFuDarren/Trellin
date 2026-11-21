@@ -337,7 +337,12 @@
       "review_formalpedia_basis": "待审阅的定理库前提",
       "review_lean_scope_change": "待审阅的 Lean 范围变更"
     },
-    "evidenceExplain": "Lean 已经核验通过这个结果。批准后，它会作为这个课题的证据记录下来；如果需要修改，可以附上说明退回。",
+    "evidenceExplain": "批准会将此核验结果记录为课题已接受的证据。如果需要修改，请附上理由退回。",
+    "goalEvidenceExplain": "批准会记录对这个课题的 Lean 陈述已有的核验证明。课题的证明状态由单独的流程确认。",
+    "counterexampleExplain": "批准会将此核验结果记录为课题已接受的反证。课题状态由单独的流程确认。",
+    "decisionLabel": "审阅决定",
+    "submitDecision": "记录决定",
+    "chooseDecision": "请先选择批准或退回。",
     "reviewer": "你的名字",
     "reason": "理由",
     "reasonHint": "例如：范围一致，只用到了假设 H₁",

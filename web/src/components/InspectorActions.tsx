@@ -2,7 +2,15 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Menu, type FloatingOption } from "./FloatingControls";
 
-export function InspectorActions({ primary, secondary }: { primary: FloatingOption; secondary: FloatingOption[] }) {
+export function InspectorActions({
+  primary,
+  primaryOptions,
+  secondary,
+}: {
+  primary: FloatingOption;
+  primaryOptions?: FloatingOption[];
+  secondary: FloatingOption[];
+}) {
   const { t } = useTranslation();
   const row = useRef<HTMLDivElement>(null);
   const measure = useRef<HTMLDivElement>(null);
@@ -42,9 +50,23 @@ export function InspectorActions({ primary, secondary }: { primary: FloatingOpti
 
   return (
     <div ref={row} className="inspector-actions">
-      <button type="button" className="button primary" onClick={primary.onSelect}>
-        {primary.label}
-      </button>
+      {primary.href ? (
+        <a className="button primary" href={primary.href}>
+          {primary.label}
+        </a>
+      ) : primaryOptions ? (
+        <Menu
+          label={primary.label}
+          trigger={primary.label}
+          triggerClassName="button primary"
+          placement="bottom-start"
+          groups={[{ options: primaryOptions }]}
+        />
+      ) : (
+        <button type="button" className="button primary" onClick={primary.onSelect}>
+          {primary.label}
+        </button>
+      )}
       {secondary.slice(0, visible).map((action) => (
         <button key={action.id} type="button" className="button" onClick={action.onSelect}>
           {action.label}

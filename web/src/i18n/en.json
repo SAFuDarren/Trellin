@@ -337,7 +337,12 @@
       "review_formalpedia_basis": "Library premise to review",
       "review_lean_scope_change": "Lean scope change to review"
     },
-    "evidenceExplain": "Lean has verified this result. Approve it to record it as evidence for the claim, or return it with a note on what should change.",
+    "evidenceExplain": "Approval records this verified result as accepted evidence for the claim. Return it with a reason if it needs changes.",
+    "goalEvidenceExplain": "Approval records acceptance of this verified proof of the claim’s Lean statement. The claim’s proof status is finalized separately.",
+    "counterexampleExplain": "Approval records this verified result as accepted evidence against the claim. The claim’s status is finalized separately.",
+    "decisionLabel": "Decision",
+    "submitDecision": "Record decision",
+    "chooseDecision": "Choose Approve or Return first.",
     "reviewer": "Your name",
     "reason": "Reason",
     "reasonHint": "For example: the scope matches, and the only premise used is H₁",

@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 export const FIXTURE_CLAIM_TITLE = "自然数加零的对称性";
 
@@ -10,5 +10,13 @@ export async function openProof(page: Page, title = FIXTURE_CLAIM_TITLE, label =
   const back = page.locator(".proof-return");
   if (await back.isVisible()) await back.click();
   await mapClaim(page, title).click();
-  await page.locator("#review").getByRole("button", { name: label }).click();
+  const inspector = page.locator("#review");
+  const open = inspector.getByRole("button", { name: label });
+  const more = inspector.getByRole("button", { name: /^(More inspector actions|更多课题操作)$/ });
+  await expect(open.or(more).first()).toBeVisible();
+  if (await open.isVisible()) await open.click();
+  else {
+    await more.click();
+    await page.getByRole("menuitem", { name: label }).click();
+  }
 }

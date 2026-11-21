@@ -36,6 +36,8 @@ In Workbench, Agent chat opens below the graph. Suggestions follow the selected 
 
 Use **Agent activity** in the bottom bar to see recorded proof and model jobs, Agent work, conversations and results waiting for you. Filter by state and open an item to go to its job, proof, conversation or review. The Team badge counts running activity across the project. Claims and Chats show the count for the claim or proof node they display. An empty panel shows a link to Agent work. A chat without messages opens at the height of its composer and suggestions.
 
+When a result is waiting, choose **Review** from its inspector or the queue above it. The bottom-bar review count opens the result directly when there is one, or shows only reviews when several are waiting. Review lists show the checked result before its claim. Choose **Approve** or **Return**, write the reason, and record your choice with **⌘↵** (**Ctrl+Enter** on other platforms) or **Record decision**. Trellin records approval as acceptance of the evidence and records the reviewer’s attribution.
+
 In Library, hover over a row or focus it with the keyboard to reveal its **Edit statement** icon. From a focused row, press **Tab** and then **Enter** to open the revision form. You can also open it from the entry inspector.
 
 The project map, claim inspector and Claims page show the claim’s recorded review, decision and verification state. Select a claim to load its current proof task. The count covers obligations recorded in reduction routes for the current Lean statement. An obligation counts as verified while its checked proof remains current. If two routes record the same proposition, each occurrence counts in its route.

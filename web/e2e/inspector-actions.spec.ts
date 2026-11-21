@@ -1,15 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
 
-async function expectOneActionRow(page: Page) {
+async function expectOneActionRow(page: Page, mainAction: string) {
   const actions = page.locator(".inspector-actions");
-  await expect(actions.getByRole("button").first()).toHaveText("Proof task");
-  await expect(actions.getByRole("button", { name: "Proof task" })).toHaveClass(/\bprimary\b/);
+  await expect(actions.locator(".button.primary:visible")).toHaveAccessibleName(mainAction);
   await expect
     .poll(() =>
       actions.evaluate((row) => {
         const boundary = row.getBoundingClientRect();
-        const controls = Array.from(row.querySelectorAll("button"), (button) => button.getBoundingClientRect());
+        const controls = Array.from(row.querySelectorAll("button, a"), (button) => button.getBoundingClientRect());
         const first = controls[0];
         return (
           !!first && controls.every((rect) => Math.abs(rect.top - first.top) < 1 && rect.right <= boundary.right + 1)
@@ -32,9 +31,9 @@ for (const viewport of [
     await page.goto("/#session=fixture");
     const claim = mapClaim(page, FIXTURE_CLAIM_TITLE);
     await claim.click();
-    const actions = await expectOneActionRow(page);
-    // Larger controls exercise the overflow menu even if all three labels fit at the default font size.
-    await actions.evaluate((row: HTMLElement) => row.style.setProperty("--type-control-size", "17px"));
+    const actions = await expectOneActionRow(page, "Review");
+    // Exercise the same overflow path when translations or available space make the labels too wide.
+    await actions.evaluate((row: HTMLElement) => row.style.setProperty("max-width", "190px"));
     const more = actions.getByRole("button", { name: "More inspector actions", exact: true });
     await more.click();
     await expect(page.getByRole("menuitem", { name: "Ask an Agent", exact: true })).toBeVisible();
@@ -45,7 +44,7 @@ for (const viewport of [
     const node = page.locator(".main-proof-graph .graph-node").filter({ hasText: "Proof obligation 2" });
     await node.press("Enter");
     await expect(node).toHaveAttribute("aria-pressed", "true");
-    await expectOneActionRow(page);
+    await expectOneActionRow(page, "Proof task");
     await expect(actions.getByRole("button", { name: "Open proof", exact: true })).toHaveCount(0);
   });
 }

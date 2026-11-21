@@ -12,6 +12,7 @@ import type { ImpactEntry, ImpactPreview } from "../workbench/types";
 import { ClaimProgressSummary, claimProgressText } from "./ClaimProgress";
 import { ClaimReviewLinks } from "./ClaimReviewLinks";
 import { Mark } from "./Icons";
+import { reviewItemHref, reviewLinkLabel, reviewOptions } from "../shell/reviewItems";
 
 const REFERENCE_KEYS = [
   "claim_id",
@@ -80,6 +81,9 @@ export function ReviewPanel(props: Props) {
   const { t } = useTranslation();
   const { graph, view, selected, assumption, impact } = props;
   const entries = queueEntries(t, graph, view, assumption, impact);
+  const reviewByEvidence = new Map(
+    props.claimReviews?.filter((item) => item.kind === "review_evidence").map((item) => [item.item_id, item]),
+  );
   return (
     <aside className="review" id="review" aria-label={t("review.label")}>
       <section className="queue" aria-labelledby="queue-title">
@@ -98,22 +102,39 @@ export function ReviewPanel(props: Props) {
         <ul>
           {entries.length === 0 && <li className="queue-empty">{graph ? t("review.empty") : ""}</li>}
           {graph &&
-            entries.map(({ id, kind, tone }) => (
-              <li key={id}>
-                <button
-                  type="button"
-                  className="queue-item"
-                  aria-current={id === selected ? "true" : undefined}
-                  onClick={() => props.onSelect(id)}
-                >
+            entries.map(({ id, kind, tone }) => {
+              const node = graph.nodes.get(id)!;
+              const evidenceId = node.reference?.evidence_id;
+              const item =
+                view !== "impact" && typeof evidenceId === "string" ? reviewByEvidence.get(evidenceId) : undefined;
+              const content = (
+                <>
                   <span>
                     <Mark tone={tone} />
-                    <span className="label">{nodeTitle(t, graph.nodes.get(id)!)}</span>
+                    <span className="label">{nodeTitle(t, node)}</span>
                   </span>
                   <span className="kind">{kind}</span>
-                </button>
-              </li>
-            ))}
+                </>
+              );
+              return (
+                <li key={id}>
+                  {item ? (
+                    <a className="queue-item" href={reviewItemHref(item)}>
+                      {content}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      className="queue-item"
+                      aria-current={id === selected ? "true" : undefined}
+                      onClick={() => props.onSelect(id)}
+                    >
+                      {content}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
         </ul>
       </section>
       <section className="node-detail" id="node-detail" tabIndex={-1} aria-label={t("review.detail")}>
@@ -156,7 +177,7 @@ function NodeDetail({
   onSelect,
   onReviewPremise,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const node = graph && selected ? graph.nodes.get(selected) : undefined;
   if (!graph || !node) return null;
   const relation = (id: string, fallback = "") => {
@@ -192,6 +213,19 @@ function NodeDetail({
   const progress = claimProgressText(t, claimProgress, claimStatus);
   const goal = node.kind === "goal";
   const goalReviews = goal && !isImpact ? claimReviews : undefined;
+  const evidenceReviews =
+    !isImpact && claimReviews
+      ? claimReviews.filter(
+          (item) => item.kind === "review_evidence" && (goal || item.item_id === node.reference?.evidence_id),
+        )
+      : [];
+  const primaryReview = evidenceReviews[0];
+  const otherReviews = goalReviews?.filter((item) => item.kind !== "review_evidence");
+  const reviewAction = {
+    id: "review-evidence",
+    label: t("rail.review"),
+    href: primaryReview && evidenceReviews.length === 1 ? reviewItemHref(primaryReview) : undefined,
+  };
   const showNodeState = !goal || isImpact || (claimStatus !== "proved" && blockers.length > 0 && !progress.state);
   const lean = typeof node.formalization === "string" ? node.formalization : "";
   const math = node.formula || node.proposition || "";
@@ -223,14 +257,21 @@ function NodeDetail({
             emptyCountLabel={goal ? progress.emptyCountLabel : undefined}
             showState={showNodeState || progress.state !== "review" || !goalReviews?.length}
           />
-          {goalReviews && <ClaimReviewLinks items={goalReviews} />}
+          {goal && primaryReview && (
+            <span className="tag claim-review-link" data-tone="review">
+              {reviewLinkLabel(t, evidenceReviews)}
+            </span>
+          )}
+          {otherReviews && <ClaimReviewLinks items={otherReviews} />}
           <span>{[graph.codes.get(node.id), kindText(t, node.kind), node.domain].filter(Boolean).join(" · ")}</span>
         </div>
         {actions ? (
           <InspectorActions
-            primary={actions.primary}
+            primary={primaryReview ? reviewAction : actions.primary}
+            primaryOptions={evidenceReviews.length > 1 ? reviewOptions(t, i18n.language, evidenceReviews) : undefined}
             secondary={[
               ...actions.secondary,
+              ...(primaryReview ? [actions.primary] : []),
               ...(conditionId
                 ? [{ id: "review-premise", label: t("premise.review"), onSelect: () => onReviewPremise(conditionId) }]
                 : []),

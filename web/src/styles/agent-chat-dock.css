@@ -75,8 +75,10 @@
   background: var(--live);
 }
 
-.agent-dock-status > span[data-tone="pending"] {
+.agent-dock-review {
   color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .agent-dock svg {

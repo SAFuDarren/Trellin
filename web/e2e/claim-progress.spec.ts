@@ -256,11 +256,11 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   const detail = page.locator("#node-detail");
   await expect(detail.getByRole("heading", { name: review.title!, exact: true })).toBeVisible();
   await expect(detail.locator(".claim-progress-count")).toHaveText(PARTIAL);
-  await expect(detail.getByRole("link", { name: "1 result to review", exact: true })).toBeVisible();
+  await expect(detail.getByText("1 result to review", { exact: true })).toBeVisible();
   const detailHeader = detail.locator(".detail-header > *");
   await expect(detailHeader.nth(0)).toHaveText(review.title!);
   await expect(detailHeader.nth(1)).toContainText("1 result to review");
-  await expect(detailHeader.nth(2).getByRole("button", { name: "Proof task", exact: true })).toBeVisible();
+  await expect(detailHeader.nth(2).getByRole("link", { name: "Review", exact: true })).toBeVisible();
   await expect(detail.locator(".claim-progress-state")).toHaveCount(0);
 
   await mapClaim(page, recheck.title!).press("Space");
@@ -348,7 +348,7 @@ test("a committed workspace event updates proof progress on the open canvas and 
   await emitEvent(event);
   await expectProgress(card, "Waiting for your review", "review", UPDATED);
   await expect(detail.locator(".claim-progress-count")).toHaveText(UPDATED);
-  await expect(detail.getByRole("link", { name: "1 result to review", exact: true })).toBeVisible();
+  await expect(detail.getByText("1 result to review", { exact: true })).toBeVisible();
   await expect(card).toHaveAttribute("aria-pressed", "true");
   expect(reloads).toBe(0);
 });
@@ -375,7 +375,7 @@ test("a proved claim keeps its status and opens either recorded result by identi
   await map.click();
   const detail = page.locator("#node-detail");
   await expectProgress(detail, "Proved", "ok", null);
-  await expect(detail.getByRole("button", { name: "2 results to review", exact: true })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "Review", exact: true })).toBeVisible();
 
   await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
   const provedColumn = page.getByRole("region", { name: "Proved", exact: true });
@@ -399,5 +399,5 @@ test("a proved claim keeps its status and opens either recorded result by identi
     window.location.hash = "#review/55555555-5555-4555-8555-555555555558";
   });
   await expect(page.getByText("This item is no longer waiting for review.", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Approve", exact: true })).toHaveCount(0);
 });

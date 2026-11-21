@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TeamAgent } from "../api/teamAgents";
-import { reviewItemHref, reviewItemKindLabel } from "../shell/reviewItems";
+import { reviewItemHref, reviewItemKindLabel, reviewResultName } from "../shell/reviewItems";
 import { href } from "../shell/route";
 import {
   ACTIVITY_STATES,
@@ -27,6 +27,8 @@ function relativeTime(language: string, at: string, now: number) {
 export function WorkspaceActivityList({
   activity,
   agents,
+  selectedFilter,
+  onFilter,
   loading,
   unavailable,
   onNavigate,
@@ -35,6 +37,8 @@ export function WorkspaceActivityList({
 }: {
   activity: WorkspaceActivity;
   agents: ReadonlyMap<string, TeamAgent>;
+  selectedFilter: ActivityState | "all";
+  onFilter: (filter: ActivityState | "all") => void;
   loading: boolean;
   unavailable: boolean;
   onNavigate: () => void;
@@ -42,7 +46,6 @@ export function WorkspaceActivityList({
   onOpenThread: (thread: Extract<ActivityRow, { source: "chat" }>["thread"]) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const [selectedFilter, setFilter] = useState<ActivityState | "all">("all");
   const hasActivity = activity.rows.length > 0;
   const filter = hasActivity ? selectedFilter : "all";
   const [now, setNow] = useState(Date.now);
@@ -102,13 +105,16 @@ export function WorkspaceActivityList({
           url: href("chat", thread.id),
         };
       }
-      case "review":
+      case "review": {
+        const kind = reviewItemKindLabel(t, row.item);
+        const evidence = row.item.kind === "review_evidence";
         return {
-          title: row.item.claim_title || reviewItemKindLabel(t, row.item),
-          status: t(`workspaceActivity.filter.${row.state}`),
-          details: [row.item.claim_title && reviewItemKindLabel(t, row.item)],
+          title: evidence ? reviewResultName(row.item) || kind : row.item.claim_title || kind,
+          status: evidence ? t("review.title") : t(`workspaceActivity.filter.${row.state}`),
+          details: [evidence ? row.item.claim_title : row.item.claim_title && kind],
           url: reviewItemHref(row.item),
         };
+      }
     }
   }
 
@@ -117,7 +123,7 @@ export function WorkspaceActivityList({
       {hasActivity && (
         <div className="agent-dock-activity-filters" role="group" aria-label={t("workspaceActivity.filters")}>
           {FILTERS.map((state) => (
-            <button key={state} type="button" aria-pressed={filter === state} onClick={() => setFilter(state)}>
+            <button key={state} type="button" aria-pressed={filter === state} onClick={() => onFilter(state)}>
               {t(`workspaceActivity.filter.${state}`)}
             </button>
           ))}
@@ -204,7 +210,7 @@ export function WorkspaceActivityList({
                   {t("workspaceActivity.openWork")}
                 </a>
               ) : (
-                <button type="button" onClick={() => setFilter("all")}>
+                <button type="button" onClick={() => onFilter("all")}>
                   {t("workspaceActivity.showAll")}
                 </button>
               )}
