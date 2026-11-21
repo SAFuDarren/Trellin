@@ -41,7 +41,7 @@ test("running proof jobs agree across Agent activity, Claims, Chats and the Team
   await rail.getByRole("link", { name: "Claims", exact: true }).click();
   const card = page.locator(".board-card").filter({ hasText: CLAIM_TITLE });
   await expect(card.getByText("2 running", { exact: true })).toBeVisible();
-  await expect(card.getByText("1 awaiting review", { exact: true })).toBeVisible();
+  await expect(card.getByRole("link", { name: "1 result to review", exact: true })).toBeVisible();
   await expect(launcher.getByText("1 to review", { exact: true })).toBeVisible();
 
   await rail.getByRole("link", { name: "Chats", exact: true }).click();

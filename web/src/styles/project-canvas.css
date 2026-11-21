@@ -221,7 +221,7 @@
   line-height: 1.15;
 }
 
-.project-canvas-node .claim-progress-count {
+.project-canvas-node :is(.claim-progress-count, .claim-progress-empty) {
   padding-inline-start: 0;
   font-size: calc(var(--type-meta-size) - 1px);
 }

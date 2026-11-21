@@ -67,7 +67,7 @@ describe("workspace activity", () => {
     expect(activity.counts).toEqual({ running: 3, queued: 1, review: 2, attention: 1, completed: 0 });
     expect(activity.runningByClaim.get("claim")).toBe(2);
     expect(activity.runningByProofNode.get(proofActivityKey("claim", "proof-node"))).toBe(1);
-    expect(activity.reviewByClaim.get("claim")).toBe(1);
+    expect(activity.reviewItemsByClaim.get("claim")).toEqual([item]);
     expect(activity.inboxCount).toBe(2);
   });
 });

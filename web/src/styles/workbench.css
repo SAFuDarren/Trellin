@@ -2220,6 +2220,9 @@ select:disabled {
   text-align: left;
   overflow-wrap: anywhere;
 }
+.board-card-tags {
+  padding: 0 13px 12px;
+}
 .board-preview {
   padding: 12px 13px;
   border-top: 1px solid var(--node-line);

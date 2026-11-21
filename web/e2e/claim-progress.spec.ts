@@ -10,6 +10,7 @@ const WORKSPACE = "11111111-2222-4333-8444-555555555555";
 const WAITING_SINCE = "2026-11-21T00:00:00Z";
 const PARTIAL = "1 of 2 obligations verified";
 const ZERO = "No recorded obligations";
+const ZERO_HINT = "Recorded proof obligations and their verification progress will appear here.";
 const OLDER = "2 of 7 obligations verified";
 const UPDATED = "2 of 2 obligations verified";
 const LONG_TITLE =
@@ -48,11 +49,11 @@ function reviewItem(target: Claim, decisionRequired = false): InboxItem {
   };
 }
 
-async function fixture(page: Page, displayedClaims = claims, live = false) {
+async function fixture(page: Page, displayedClaims = claims, live = false, extraReviews: InboxItem[] = []) {
   let verificationComplete = false;
   const proofTaskReads: string[] = [];
   function atlasClaim(target: Claim): AtlasClaim {
-    const goal = { id: `goal:${target.id}`, kind: "goal", status: "open", title: target.title ?? "" };
+    const goal = { id: `goal:${target.id}`, kind: "goal", status: target.status ?? "open", title: target.title ?? "" };
     const nodes = [goal];
     const edges: [string, string][] = [];
     if (target.id !== ready.id) {
@@ -123,7 +124,19 @@ async function fixture(page: Page, displayedClaims = claims, live = false) {
     const snapshot: GraphSnapshot = {
       claim: withoutTotals(target),
       focus_id: graph.nodes[0]?.id,
-      nodes: graph.nodes,
+      nodes: [
+        ...graph.nodes,
+        ...extraReviews
+          .filter((item) => item.claim_id === target.id)
+          .map((item) => ({
+            id: `lean:${item.item_id}`,
+            kind: "evidence",
+            title: String(item.detail?.title ?? ""),
+            citation: String(item.detail?.title ?? ""),
+            status: "awaiting_review",
+            reference: { evidence_id: item.item_id },
+          })),
+      ],
       edges: graph.edges.map(([source, target]) => ({ source, target, kind: "actual" })),
     };
     return route.fulfill({ json: snapshot });
@@ -131,13 +144,16 @@ async function fixture(page: Page, displayedClaims = claims, live = false) {
   await page.route("**/api/inbox", (route) =>
     route.fulfill({
       json: {
-        items: displayedClaims.flatMap((target) =>
-          target.id === review.id || (target.id === verification.id && verificationComplete)
-            ? [reviewItem(target)]
-            : target.id === decision.id
-              ? [reviewItem(target, true)]
-              : [],
-        ),
+        items: [
+          ...displayedClaims.flatMap((target) =>
+            target.id === review.id || (target.id === verification.id && verificationComplete)
+              ? [reviewItem(target)]
+              : target.id === decision.id
+                ? [reviewItem(target, true)]
+                : [],
+          ),
+          ...extraReviews,
+        ],
         ...(live
           ? {
               workspace_events: {
@@ -207,7 +223,8 @@ async function expectProgress(surface: Locator, label: string, tone: string, cou
   const empty = surface.locator(".claim-progress-empty");
   if (count === ZERO) {
     await expect(empty).toBeVisible();
-    await expect(empty).toHaveAttribute("aria-label", ZERO);
+    await expect(empty).toHaveText(ZERO);
+    await expect(empty).toHaveAttribute("title", ZERO_HINT);
   } else {
     await expect(empty).toHaveCount(0);
   }
@@ -238,12 +255,13 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   await mapClaim(page, review.title!).click();
   const detail = page.locator("#node-detail");
   await expect(detail.getByRole("heading", { name: review.title!, exact: true })).toBeVisible();
-  await expectProgress(detail, "Waiting for your review", "review");
+  await expect(detail.locator(".claim-progress-count")).toHaveText(PARTIAL);
+  await expect(detail.getByRole("link", { name: "1 result to review", exact: true })).toBeVisible();
   const detailHeader = detail.locator(".detail-header > *");
   await expect(detailHeader.nth(0)).toHaveText(review.title!);
-  await expect(detailHeader.nth(1)).toContainText("Waiting for your review");
+  await expect(detailHeader.nth(1)).toContainText("1 result to review");
   await expect(detailHeader.nth(2).getByRole("button", { name: "Proof task", exact: true })).toBeVisible();
-  await expect(detail.locator(".claim-progress-state")).toHaveCount(1);
+  await expect(detail.locator(".claim-progress-state")).toHaveCount(0);
 
   await mapClaim(page, recheck.title!).press("Enter");
   await expectProgress(detail, "Needs recheck", "bad", OLDER);
@@ -269,9 +287,12 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   const uncounted = page.locator(".board-card").filter({ hasText: missing.title! });
   await expect(uncounted.locator(".claim-progress")).toHaveCount(0);
   const reviewCard = page.locator(".board-card").filter({ hasText: review.title! });
-  await expect(reviewCard.getByText("1 awaiting review", { exact: true })).toHaveCount(1);
-  await expect(reviewCard.getByText("Waiting for your review", { exact: true })).toHaveCount(0);
+  await expect(reviewCard.locator(".claim-progress-state")).toHaveCount(0);
   await expect(reviewCard.locator(".claim-progress-count")).toHaveText(PARTIAL);
+  await expect(reviewCard.getByRole("link", { name: "1 result to review", exact: true })).toHaveAttribute(
+    "href",
+    `#review/${reviewItem(review).item_id}`,
+  );
   await expectProgress(page.locator(".board-card").filter({ hasText: ready.title! }), "Ready to start", "open", ZERO);
 });
 
@@ -326,7 +347,57 @@ test("a committed workspace event updates proof progress on the open canvas and 
   finishVerification();
   await emitEvent(event);
   await expectProgress(card, "Waiting for your review", "review", UPDATED);
-  await expectProgress(detail, "Waiting for your review", "review", UPDATED);
+  await expect(detail.locator(".claim-progress-count")).toHaveText(UPDATED);
+  await expect(detail.getByRole("link", { name: "1 result to review", exact: true })).toBeVisible();
   await expect(card).toHaveAttribute("aria-pressed", "true");
   expect(reloads).toBe(0);
+});
+
+test("a proved claim keeps its status and opens either recorded result by identity", async ({ page }) => {
+  const proved: ProjectClaim = {
+    ...claim(6, "A result already proved", "proved"),
+    obligations: { verified: 0, total: 0 },
+  };
+  const first = {
+    ...reviewItem(proved),
+    detail: { kind: "lean", title: "Alternative verified route" },
+  };
+  const second = {
+    ...reviewItem(proved),
+    item_id: "55555555-5555-4555-8555-555555555559",
+    detail: { kind: "lean", title: "Independent verified evidence" },
+  };
+  await fixture(page, [proved, ready, review], false, [first, second]);
+  await page.goto("/#session=fixture");
+
+  const map = mapClaim(page, proved.title!);
+  await expectProgress(map, "Proved", "ok", null);
+  await map.click();
+  const detail = page.locator("#node-detail");
+  await expectProgress(detail, "Proved", "ok", null);
+  await expect(detail.getByRole("button", { name: "2 results to review", exact: true })).toBeVisible();
+
+  await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
+  const provedColumn = page.getByRole("region", { name: "Proved", exact: true });
+  const provedCard = provedColumn.locator(".board-card").filter({ hasText: proved.title! });
+  await expect(provedCard.locator(".claim-progress-empty")).toHaveCount(0);
+  await expect(provedCard.locator(".progress")).toHaveCount(0);
+  await provedCard.getByRole("button", { name: "2 results to review", exact: true }).press("Enter");
+  const menu = page.getByRole("menu", { name: "2 results to review", exact: true });
+  await expect(menu.getByRole("menuitem", { name: first.detail.title, exact: true })).toHaveAttribute(
+    "href",
+    `#review/${first.item_id}`,
+  );
+  const exact = menu.getByRole("menuitem", { name: second.detail.title, exact: true });
+  await expect(exact).toHaveAttribute("href", `#review/${second.item_id}`);
+  await exact.click();
+  await expect(page).toHaveURL(new RegExp(`#review/${second.item_id}$`));
+  await expect(page.locator(".page-head h2")).toHaveText(second.detail.title);
+  await expect(page.locator(".page-head h2")).not.toHaveText(first.detail.title);
+
+  await page.evaluate(() => {
+    window.location.hash = "#review/55555555-5555-4555-8555-555555555558";
+  });
+  await expect(page.getByText("This item is no longer waiting for review.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
 });

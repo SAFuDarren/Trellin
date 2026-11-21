@@ -18,6 +18,7 @@ import { ProjectHeading, useDesktopProjectList } from "./components/SidebarProje
 import { Splitter } from "./components/Splitter";
 import { href } from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
+import type { InboxItem } from "./api/sections";
 import type { ClaimProgress } from "./workbench/claimProgress";
 import { desktopPosition, desktopProjectName, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
@@ -48,6 +49,7 @@ export type WorkbenchPosition = DesktopPosition & {
 export function Workbench({
   session,
   claimProgress,
+  claimReviews,
   focus,
   onFocusHandled,
   pendingReviews,
@@ -59,6 +61,7 @@ export function Workbench({
 }: {
   session: string;
   claimProgress: ReadonlyMap<string, ClaimProgress>;
+  claimReviews: ReadonlyMap<string, readonly InboxItem[]>;
   focus?: Focus | null;
   onFocusHandled: (focus: null) => void;
   pendingReviews: number | undefined;
@@ -730,6 +733,7 @@ export function Workbench({
             claims={mapClaims}
             claimId={claimId}
             claimProgress={claimId ? claimProgress.get(claimId) : undefined}
+            claimReviews={claimId ? claimReviews.get(claimId) : undefined}
             view={view}
             selected={selected}
             assumption={assumption?.id ?? null}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TeamAgent } from "../api/teamAgents";
-import { kindLabel } from "../pages/ReviewPage";
+import { reviewItemHref, reviewItemKindLabel } from "../shell/reviewItems";
 import { href } from "../shell/route";
 import {
   ACTIVITY_STATES,
@@ -102,10 +102,10 @@ export function WorkspaceActivityList({
       }
       case "review":
         return {
-          title: row.item.claim_title || kindLabel(t, row.item),
+          title: row.item.claim_title || reviewItemKindLabel(t, row.item),
           status: t(`workspaceActivity.filter.${row.state}`),
-          details: [row.item.claim_title && kindLabel(t, row.item)],
-          url: href("review", (row.item.kind === "choose_conjecture" ? "goal:" : "") + row.item.item_id),
+          details: [row.item.claim_title && reviewItemKindLabel(t, row.item)],
+          url: reviewItemHref(row.item),
         };
     }
   }

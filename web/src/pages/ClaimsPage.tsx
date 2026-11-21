@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import { useClaims } from "../api/sections";
+import { useClaims, type InboxItem } from "../api/sections";
 import { ClaimProgressSummary, claimProgressText } from "../components/ClaimProgress";
+import { ClaimReviewLinks } from "../components/ClaimReviewLinks";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { Spin } from "../components/Icons";
 import { href } from "../shell/route";
@@ -67,17 +68,17 @@ export function ClaimsPage({
   sub,
   onOpen,
   claimProgress,
+  claimReviews,
   atlasClaims,
   running,
-  review,
 }: {
   session: string;
   sub: string;
   onOpen: (claimId: string) => void;
   claimProgress: ReadonlyMap<string, ClaimProgress>;
+  claimReviews: ReadonlyMap<string, readonly InboxItem[]>;
   atlasClaims?: AtlasClaim[];
   running: ReadonlyMap<string, number>;
-  review: ReadonlyMap<string, number>;
 }) {
   const { t } = useTranslation();
   const [expandedClaim, setExpandedClaim] = useState<string | null>(null);
@@ -91,7 +92,7 @@ export function ClaimsPage({
   const shown = list.filter((claim) => {
     const record = counts.get(claim.id);
     if (domain && (claim.domain || t("sidebar.uncategorized")) !== domain) return false;
-    if (filter === "review") return (review.get(claim.id) ?? 0) > 0;
+    if (filter === "review") return Boolean(claimReviews.get(claim.id)?.length);
     if (filter === "blocked") return (record?.blocked ?? 0) > 0;
     if (filter === "running") return (running.get(claim.id) ?? 0) > 0;
     return true;
@@ -101,7 +102,7 @@ export function ClaimsPage({
       key === "all"
         ? true
         : key === "review"
-          ? (review.get(claim.id) ?? 0) > 0
+          ? Boolean(claimReviews.get(claim.id)?.length)
           : key === "blocked"
             ? (counts.get(claim.id)?.blocked ?? 0) > 0
             : (running.get(claim.id) ?? 0) > 0,
@@ -175,9 +176,9 @@ export function ClaimsPage({
                   const repeatColumn =
                     summary.label === statusText(t, status) ||
                     (status === "awaiting_interpretation_review" && summary.state === "decision");
-                  const waiting = review.get(claim.id) ?? 0;
+                  const reviewItems = claimReviews.get(claim.id);
                   const showRunning = live > 0;
-                  const showReview = waiting > 0;
+                  const showReview = Boolean(reviewItems?.length);
                   const repeatCount =
                     (showReview && summary.state === "review") || (showRunning && summary.state === "running");
                   const showBlocked =
@@ -206,27 +207,23 @@ export function ClaimsPage({
                         )}
                         <ClaimProgressSummary {...summary} showState={!repeatColumn && !repeatCount} />
                         <span className="meta">{claim.domain || t("sidebar.uncategorized")}</span>
-                        {(showReview || showBlocked || showRunning) && (
-                          <span className="tags">
-                            {showRunning && (
-                              <span className="tag" data-tone="live">
-                                <Spin />
-                                {t("claimsPage.running", { count: live })}
-                              </span>
-                            )}
-                            {showReview && (
-                              <span className="tag" data-tone="review">
-                                {t("sidebar.awaitingReview", { count: waiting })}
-                              </span>
-                            )}
-                            {showBlocked && (
-                              <span className="tag" data-tone="bad">
-                                {t("sidebar.blocked", { count: record!.blocked })}
-                              </span>
-                            )}
-                          </span>
-                        )}
                       </button>
+                      {(showReview || showBlocked || showRunning) && (
+                        <div className="tags board-card-tags">
+                          {showRunning && (
+                            <span className="tag" data-tone="live">
+                              <Spin />
+                              {t("claimsPage.running", { count: live })}
+                            </span>
+                          )}
+                          {reviewItems && <ClaimReviewLinks items={reviewItems} />}
+                          {showBlocked && (
+                            <span className="tag" data-tone="bad">
+                              {t("sidebar.blocked", { count: record!.blocked })}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {expanded && (
                         <ClaimPreview
                           session={session}
