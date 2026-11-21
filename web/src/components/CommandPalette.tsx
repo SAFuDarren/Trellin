@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { paletteQuery } from "../shell/paletteQuery";
+import { formatShortcut } from "../shortcuts";
 import { PickerContent, type FloatingGroup } from "./FloatingControls";
 import "../styles/command-palette.css";
 
@@ -80,23 +81,23 @@ export function CommandPalette({
               aria-keyshortcuts="Escape"
               onClick={dismiss}
             >
-              <kbd>{t("palette.escapeKey")}</kbd>
+              <kbd>{formatShortcut("Escape")}</kbd>
             </button>
           }
           footer={
             <div className="command-palette-keys" role="group" aria-label={t("palette.keyboardHelp")}>
               <span>
-                <kbd>↑</kbd>
-                <kbd>↓</kbd>
+                <kbd>{formatShortcut("ArrowUp")}</kbd>
+                <kbd>{formatShortcut("ArrowDown")}</kbd>
                 {t("palette.navigate")}
               </span>
               <span>
-                <kbd>↵</kbd>
+                <kbd>{formatShortcut("Enter")}</kbd>
                 {t("palette.open")}
               </span>
               <span>
                 <kbd>#</kbd>
-                {t("palette.claims")}
+                {t("palette.claimSearch")}
               </span>
               <span>
                 <kbd>@</kbd>

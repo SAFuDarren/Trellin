@@ -13,6 +13,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { formatShortcut } from "../shortcuts";
 import "../styles/floating-controls.css";
 
 type Placement = "bottom-start" | "bottom-end" | "top-start" | "top-end";
@@ -42,6 +43,7 @@ export type FloatingOption = {
   detail?: string;
   icon?: ReactNode;
   searchText?: string;
+  matchText?: string;
   disabled?: boolean;
   destructive?: boolean;
   shortcut?: string;
@@ -358,7 +360,7 @@ function OptionContent({ option, checked }: { option: FloatingOption; checked?: 
       </span>
       {option.shortcut && (
         <kbd className="floating-shortcut" aria-hidden="true">
-          {option.shortcut}
+          {formatShortcut(option.shortcut)}
         </kbd>
       )}
       {option.count !== undefined && <span className="floating-count">{option.count}</span>}
@@ -588,7 +590,7 @@ export function PickerContent({
       .map((group) => ({
         ...group,
         options: group.options.filter((option) => {
-          const haystack = fold([option.label, option.detail, option.searchText].join(" "));
+          const haystack = fold(option.matchText ?? [option.label, option.detail, option.searchText].join(" "));
           return terms.every((term) => haystack.includes(term));
         }),
       }))

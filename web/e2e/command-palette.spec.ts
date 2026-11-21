@@ -3,8 +3,8 @@ import type { ClaimsResponse } from "../src/api/client";
 import type { Conversation } from "../src/api/conversations";
 import type { TeamAgent } from "../src/api/teamAgents";
 import { SECTIONS } from "../src/shell/route";
-import type { GraphSnapshot } from "../src/workbench/types";
-import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
+import type { Atlas, GraphNode, GraphSnapshot } from "../src/workbench/types";
+import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
 
 const CLAIM_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_CLAIM_ID = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -25,10 +25,11 @@ async function openPalette(page: Page, shortcut = "Control+k") {
   return search;
 }
 
-async function choose(page: Page, query: string, label: string) {
+async function choose(page: Page, query: string, label: string, group?: string) {
   const search = await openPalette(page);
   await search.fill(query);
-  const result = palette(page).getByRole("option", { name: label, exact: true });
+  const list = group ? palette(page).getByRole("group", { name: group, exact: true }) : palette(page);
+  const result = list.getByRole("option", { name: label, exact: true });
   await expect(result).toBeEnabled();
   await expect(search).toHaveAttribute("aria-activedescendant", (await result.getAttribute("id"))!);
   await search.press("Enter");
@@ -83,6 +84,97 @@ test("both shortcuts work throughout the shell and Escape restores the previous 
   const launcher = page.locator("nav.rail").getByRole("button", { name: PALETTE, exact: true });
   await launcher.click();
   await expect(palette(page).getByRole("combobox")).toBeFocused();
+});
+
+for (const [platform, shortcut, actionHint, openHint] of [
+  ["MacIntel", "Meta+k", "⌥N", "⌥P"],
+  ["Win32", "Control+k", "Alt+N", "Alt+P"],
+] as const) {
+  test(`visible shortcut hints follow ${platform} in the palette, context menu and Help`, async ({ page }) => {
+    await page.addInitScript((value) => Object.defineProperty(navigator, "platform", { value }), platform);
+    await page.goto("/#session=fixture");
+    const glyph = platform === "MacIntel" ? "⌘K" : "Ctrl+K";
+    const launcher = page.locator("nav.rail").getByRole("button", { name: PALETTE, exact: true });
+    await expect(launcher).toHaveAttribute("title", `Command palette (${glyph})`);
+
+    const query = await openPalette(page, shortcut);
+    const add = palette(page).getByRole("option", { name: "Add theorem", exact: true });
+    await expect(add.locator("kbd")).toHaveText(actionHint);
+    await expect(add).toHaveAttribute("aria-keyshortcuts", "Alt+N");
+    await expect(palette(page).locator(".command-palette-keys")).toContainText(platform === "MacIntel" ? "↵" : "Enter");
+    await query.press("Escape");
+
+    const card = mapClaim(page, FIXTURE_CLAIM_TITLE);
+    await card.press("Shift+F10");
+    const open = page.getByRole("menuitem", { name: "Open proof", exact: true });
+    await expect(open.locator("kbd")).toHaveText(openHint);
+    await expect(open).toHaveAttribute("aria-keyshortcuts", "Alt+P");
+    await page.keyboard.press("Escape");
+
+    await page.goto("/#help");
+    await expect(page.getByRole("main").getByText(glyph, { exact: true })).toBeVisible();
+  });
+}
+
+test("proof node titles are searchable with the open claim first and move focus to the chosen node", async ({
+  page,
+}) => {
+  const otherNode: GraphNode = { id: "obligation:another:7", kind: "obligation", title: "Proof obligation 7" };
+  const reads = new Set<string>();
+  await page.route("**/api/atlas", async (route) => {
+    const response = await route.fetch();
+    const atlas = (await response.json()) as Atlas;
+    await route.fulfill({
+      response,
+      // The open claim can be outside the Atlas window.
+      json: {
+        claims: atlas.claims
+          .filter(({ id }) => id !== CLAIM_ID)
+          .map((claim) => (claim.id === OTHER_CLAIM_ID ? { ...claim, nodes: [...claim.nodes, otherNode] } : claim)),
+      },
+    });
+  });
+  await page.route("**/api/graph?*", async (route) => {
+    const claimId = new URL(route.request().url()).searchParams.get("claim")!;
+    reads.add(claimId);
+    const response = await route.fetch();
+    const graph = (await response.json()) as GraphSnapshot;
+    if (claimId === OTHER_CLAIM_ID) {
+      const goal: GraphNode = { id: `goal:${claimId}`, kind: "goal", title: "Another root" };
+      graph.nodes = [goal, otherNode];
+      graph.edges = [{ source: otherNode.id, target: goal.id, kind: "planned" }];
+    }
+    await route.fulfill({ response, json: graph });
+  });
+  await page.goto("/#session=fixture");
+  await openProof(page);
+
+  const query = await openPalette(page);
+  await query.fill("# obligation");
+  const dialog = palette(page);
+  const current = dialog.getByRole("group", { name: "This claim’s proof nodes" });
+  const others = dialog.getByRole("group", { name: "Other proof nodes" });
+  await expect(current.getByRole("option")).toHaveText([/Proof obligation 1/, /Proof obligation 2/]);
+  const crossClaim = others.getByRole("option", { name: "Proof obligation 7" });
+  await expect(crossClaim).toBeVisible();
+  expect([...reads]).toEqual([CLAIM_ID]);
+  await expect(query).toHaveAttribute(
+    "aria-activedescendant",
+    (await current.getByRole("option").first().getAttribute("id"))!,
+  );
+  await query.press("ArrowDown");
+  await query.press("Enter");
+  await expect(page.locator(`.main-proof-graph [data-node="${OBLIGATION_ID}"]`)).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  const crossClaimQuery = await openPalette(page);
+  await crossClaimQuery.fill("proof obligation 7");
+  await expect(crossClaim).toBeEnabled();
+  await crossClaimQuery.press("Enter");
+  await expect(page.locator(`.main-proof-graph [data-node="${otherNode.id}"]`)).toHaveAttribute("aria-pressed", "true");
+  expect([...reads]).toEqual([CLAIM_ID, OTHER_CLAIM_ID]);
 });
 
 test("the # prefix searches claims and exact proof references with the keyboard", async ({ page }) => {
@@ -162,7 +254,7 @@ test("Library and conversation results keep their routes and @ narrows to Agents
   await page.getByRole("searchbox", { name: /^Search by name or statement/ }).fill("Nat.add_zero");
   await expect(page.getByRole("row", { name: /Nat\.add_zero/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /Nat\.mul_comm/ })).toHaveCount(0);
-  await choose(page, "mul_comm", "Nat.mul_comm");
+  await choose(page, "mul_comm", "Nat.mul_comm", "Library");
   await expect(page).toHaveURL((url) => url.hash === `#library/~${LIBRARY_ID}`);
   await expect(page.getByRole("complementary", { name: "Nat.mul_comm", exact: true })).toBeVisible();
 
@@ -266,7 +358,8 @@ test("palette actions open the existing forms and wait for explicit authorizatio
   const search = await openPalette(page);
   const chooser = palette(page);
   const legend = chooser.getByRole("group", { name: "Keyboard shortcuts" });
-  await expect(legend.locator("kbd")).toHaveText(["↑", "↓", "↵", "#", "@"]);
+  const mac = await page.evaluate(() => navigator.platform.startsWith("Mac"));
+  await expect(legend.locator("kbd")).toHaveText(["↑", "↓", mac ? "↵" : "Enter", "#", "@"]);
   const backdrop = await chooser.evaluate((element) => getComputedStyle(element, "::backdrop").backgroundColor);
   expect(backdrop).toBe("rgba(0, 0, 0, 0.34)");
   await search.fill("proof");
@@ -275,7 +368,7 @@ test("palette actions open the existing forms and wait for explicit authorizatio
   await expect(proofAction.locator("svg.workbench-icon")).toBeVisible();
   await expect(proofAction).toHaveAttribute("aria-keyshortcuts", "Alt+T");
   const keyHint = proofAction.locator("kbd");
-  await expect(keyHint).toHaveText("Alt+T");
+  await expect(keyHint).toHaveText(mac ? "⌥T" : "Alt+T");
   const [hintBounds, textBounds] = await Promise.all([
     keyHint.boundingBox(),
     proofAction.locator(".floating-option-text").boundingBox(),

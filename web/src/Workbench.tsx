@@ -6,7 +6,7 @@ import { api } from "./api/client";
 import type { ConversationAnchor } from "./api/conversations";
 import { useFallbackInterval } from "./api/liveUpdates";
 import { useProjectCanvas } from "./api/projectCanvas";
-import { useAtlas, useClaims, useLibrary } from "./api/sections";
+import { useAtlas, useClaimGraph, useClaims, useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
 import type { FloatingGroup, FloatingOption } from "./components/FloatingControls";
@@ -23,7 +23,7 @@ import type { ClaimProgress } from "./workbench/claimProgress";
 import { desktopPosition, desktopProjectName, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
 import { nodeTitle } from "./workbench/text";
-import type { ActivitySnapshot, GraphNode, GraphSnapshot, ImpactPreview } from "./workbench/types";
+import type { ActivitySnapshot, GraphNode, ImpactPreview } from "./workbench/types";
 import { clampSize, useLayout } from "./workbench/useLayout";
 
 const ACTIVITY_MS = 4000;
@@ -139,12 +139,7 @@ export function Workbench({
   const claimId = selection?.referenced ? selection.claimId : mapSelection;
   const showReview = detailsOpen && Boolean(claimId);
   const library = useLibrary(session, Boolean(contextClaim));
-  const snapshot = useQuery({
-    queryKey: ["graph", claimId],
-    enabled: Boolean(claimId) && (proofOpen || showReview || claimId === contextClaim),
-    queryFn: ({ signal }) =>
-      api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId!), { signal }),
-  });
+  const snapshot = useClaimGraph(session, claimId, proofOpen || showReview || claimId === contextClaim);
   const graph = useMemo(
     () => (snapshot.data && snapshot.data.claim.id === claimId ? buildGraph(t, snapshot.data) : null),
     [claimId, snapshot.data, t],

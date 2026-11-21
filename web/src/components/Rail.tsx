@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { href, type Section } from "../shell/route";
+import { formatShortcut } from "../shortcuts";
 import { WorkbenchIcon } from "./Icons";
 import { NavigationMenu } from "./NavigationMenu";
 
@@ -109,7 +110,7 @@ export function Rail({
           aria-label={t("palette.title")}
           aria-haspopup="dialog"
           aria-keyshortcuts="Meta+K Control+K"
-          title={t("palette.title")}
+          title={t("common.shortcutHint", { label: t("palette.title"), shortcut: formatShortcut("Primary+K") })}
           onClick={onSearch}
         >
           <WorkbenchIcon name="search" />

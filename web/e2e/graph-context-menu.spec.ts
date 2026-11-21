@@ -123,7 +123,8 @@ test("the claim menu opens existing proof tools, copies exact text and shows rec
   const copyLean = action(menu, "Copy Lean statement");
   await expect(copyLean.locator("svg.workbench-icon")).toBeVisible();
   await expect(copyLean).toHaveAttribute("aria-keyshortcuts", "Alt+L");
-  await expect(copyLean.locator("kbd")).toHaveText("Alt+L");
+  const mac = await page.evaluate(() => navigator.platform.startsWith("Mac"));
+  await expect(copyLean.locator("kbd")).toHaveText(mac ? "⌥L" : "Alt+L");
   await action(menu, "Open proof").press("Alt+l");
   await expect.poll(clipboard).toBe(GOAL_LEAN);
 

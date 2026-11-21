@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./client";
 import { useFallbackInterval } from "./liveUpdates";
-import type { ActivityRecord, Atlas, GraphNode } from "../workbench/types";
+import type { ActivityRecord, Atlas, GraphNode, GraphSnapshot } from "../workbench/types";
 import type { ClaimsResponse } from "./client";
 
 export type InboxItem = {
@@ -132,6 +132,14 @@ export function useAtlas(session: string, enabled = true) {
     queryFn: ({ signal }) => api<Atlas>(session, "/api/atlas", { signal }),
     enabled,
     retry: false,
+  });
+}
+export function useClaimGraph(session: string, claimId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["graph", claimId],
+    queryFn: ({ signal }) =>
+      api<GraphSnapshot>(session, "/api/graph?" + new URLSearchParams({ claim: claimId! }), { signal }),
+    enabled: Boolean(claimId) && enabled,
   });
 }
 export function useInbox(session: string, streamHealthy = false) {

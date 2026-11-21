@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
 import type { ProjectCanvasLayout, ProjectCanvasOperation } from "../api/projectCanvas";
+import { formatShortcut } from "../shortcuts";
 import { graphAction } from "../workbench/actions";
 import type { ClaimProgress } from "../workbench/claimProgress";
 import type { Point } from "../workbench/graph";
@@ -124,7 +125,7 @@ function MapViewToggle({
         {children}
       </button>
       <span id={hint} className="map-view-hint" role="tooltip">
-        {t("projectCanvas.toggleHint", { label, shortcut })}
+        {t("common.shortcutHint", { label, shortcut: formatShortcut(shortcut) })}
       </span>
     </span>
   );

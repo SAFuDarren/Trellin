@@ -7,13 +7,15 @@
     "title": "Command palette",
     "search": "Search or run a command",
     "close": "Close command palette",
-    "escapeKey": "Esc",
     "loading": "Searching…",
     "noResults": "No matching results",
     "refine": "Refine your search to see more results.",
     "recent": "Recent",
     "references": "Proof references",
+    "currentProofNodes": "This claim’s proof nodes",
+    "otherProofNodes": "Other proof nodes",
     "claims": "Claims",
+    "claimSearch": "Claims and proof nodes",
     "library": "Library",
     "conversations": "Conversations",
     "agents": "Agents",
@@ -168,7 +170,6 @@
     "linkClaim": "Link selected claim",
     "cancelLink": "Cancel link",
     "findClaim": "Find claim",
-    "toggleHint": "{{label}} ({{shortcut}})",
     "searchClaims": "Search claims on map",
     "noMatches": "No matching claims.",
     "researchLinks": "Research links",
@@ -190,8 +191,8 @@
   },
   "stage": {
     "resizeNode": "Resize node {{title}}",
-    "resizeHelp": "Drag to resize. Arrow keys adjust width or height. Hold Shift for larger steps.",
-    "label": "Dependency graph. Drag to pan; pinch or hold Ctrl while scrolling to zoom; plus and minus zoom; 0 fits the window.",
+    "resizeHelp": "Drag to resize. Arrow keys adjust width or height. Hold {{shortcut}} for larger steps.",
+    "label": "Dependency graph. Drag to pan; pinch or hold {{shortcut}} while scrolling to zoom; plus and minus zoom; 0 fits the window.",
     "roleDescription": "zoomable canvas",
     "zoom": "Zoom",
     "zoomIn": "Zoom in",
@@ -687,6 +688,7 @@
   "common": {
     "cancel": "Cancel",
     "loading": "Loading…",
+    "shortcutHint": "{{label}} ({{shortcut}})",
     "openInWorkbench": "Open in workbench"
   },
   "navigation": {
@@ -1283,12 +1285,15 @@
     },
     "canvas": "Graph canvas",
     "keys": {
+      "palette": {
+        "what": "Find a claim, proof node or command"
+      },
       "drag": {
         "key": "Drag",
         "what": "Pan the graph"
       },
       "zoom": {
-        "key": "Ctrl or ⌘ + scroll, or pinch",
+        "key": "{{shortcut}} + scroll, or pinch",
         "what": "Zoom around the pointer"
       },
       "keys": {

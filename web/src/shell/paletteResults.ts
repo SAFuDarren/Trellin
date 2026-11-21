@@ -4,18 +4,20 @@ import type { TFunction } from "i18next";
 import { api } from "../api/client";
 import { useConversations } from "../api/conversations";
 import { useProjectCanvasClaims } from "../api/projectCanvas";
-import type { LibraryItem } from "../api/sections";
+import { useAtlas, useClaimGraph, type LibraryItem } from "../api/sections";
 import { useTeamAgents } from "../api/teamAgents";
 import { workspaceId as isWorkspaceId } from "../api/workspaceEvents";
 import type { FloatingGroup, FloatingOption } from "../components/FloatingControls";
 import { WorkbenchIcon } from "../components/Icons";
 import { itemName } from "../pages/LibraryPage";
-import { normalizeReferenceCode } from "../workbench/text";
+import { nodeTitle, normalizeReferenceCode } from "../workbench/text";
+import type { GraphNode } from "../workbench/types";
 import { paletteQuery, type PaletteScope } from "./paletteQuery";
 import type { Section } from "./route";
 
 const REFERENCE = /^[A-Z][A-Z0-9]{1,11}(?:-[0-9]{1,10})?$/;
 const REFERENCE_ID = "reference:";
+const NODE_ID = "node:";
 const RECENT_LIMIT = 6;
 const EMPTY_RECENTS: readonly string[] = [];
 type ResolvedReference = { claim_id: string; node_id: string | null };
@@ -33,6 +35,7 @@ function readRecents(key: string | undefined): readonly string[] {
 export function usePaletteResults({
   session,
   workspaceId,
+  claimId,
   query,
   enabled,
   t,
@@ -41,6 +44,7 @@ export function usePaletteResults({
 }: {
   session: string;
   workspaceId?: string | null;
+  claimId?: string | null;
   query: string;
   enabled: boolean;
   t: TFunction;
@@ -67,6 +71,9 @@ export function usePaletteResults({
   }, [enabled, exact]);
 
   const claims = useProjectCanvasClaims(session, enabled);
+  const searchNodes = enabled && scope !== "agents" && (Boolean(text) || ids.some((id) => id.startsWith(NODE_ID)));
+  const atlas = useAtlas(session, searchNodes);
+  const snapshot = useClaimGraph(session, claimId ?? null, searchNodes);
   const library = useQuery({
     queryKey: ["library", session, project],
     queryFn: ({ signal }) => api<{ items: LibraryItem[] }>(session, "/api/library", { signal }),
@@ -121,6 +128,26 @@ export function usePaletteResults({
   const currentClaims = claims.data?.claims ?? [];
   const currentConversations = conversations.data?.threads ?? [];
   const claimTitles = new Map(currentClaims.map((claim) => [claim.id, claim.title || t("sidebar.untitled")]));
+  const indexedClaims = atlas.data?.claims ?? [];
+  const currentNodes =
+    snapshot.data?.claim.id === claimId ? snapshot.data?.nodes : indexedClaims.find(({ id }) => id === claimId)?.nodes;
+  const resolved = references[codes.indexOf(exact)]?.data;
+  function proofNodes(id: string, nodes: readonly GraphNode[]): FloatingOption[] {
+    const title = claimTitles.get(id);
+    if (!title) return [];
+    return nodes.flatMap((node) => {
+      const optionId = NODE_ID + id + ":" + node.id;
+      if ((!text && !ids.includes(optionId)) || (resolved?.claim_id === id && resolved.node_id === node.id)) return [];
+      const label = nodeTitle(t, node, { full: true });
+      const detail = [title, node.code].filter(Boolean).join(" · ");
+      return [
+        {
+          ...result(optionId, label, () => open(id, node.id), detail),
+          matchText: [label, node.title, node.citation, node.code].filter(Boolean).join(" "),
+        },
+      ];
+    });
+  }
   const agentNames = new Map(agents.data?.agents.map((agent) => [agent.id, agent.name]));
   const firstConversationByAgent = new Map<string, string>();
   currentConversations.forEach(({ id, agent_id }) => {
@@ -168,6 +195,18 @@ export function usePaletteResults({
       ),
     },
     {
+      scope: "claims",
+      icon: "proof",
+      label: t("palette.currentProofNodes"),
+      options: claimId ? proofNodes(claimId, currentNodes ?? []) : [],
+    },
+    {
+      scope: "claims",
+      icon: "proof",
+      label: t("palette.otherProofNodes"),
+      options: indexedClaims.flatMap(({ id, nodes }) => (id === claimId ? [] : proofNodes(id, nodes))),
+    },
+    {
       icon: "chat",
       label: t("palette.conversations"),
       options: currentConversations.map(({ id, title, agent_id }) =>
@@ -196,10 +235,12 @@ export function usePaletteResults({
       return { label, options: options.map((option) => ({ ...option, icon: glyph })) };
     });
   const byId = new Map(scopedGroups.flatMap(({ options }) => options.map((option) => [option.id, option])));
-  const recent = new Set(ids);
+  // Once searching, proof nodes stay grouped in claim order even when previously visited.
+  const visibleRecents = text ? ids.filter((id) => !id.startsWith(NODE_ID)) : ids;
+  const recent = new Set(visibleRecents);
   return {
     groups: [
-      { label: t("palette.recent"), options: ids.flatMap((id) => byId.get(id) ?? []) },
+      { label: t("palette.recent"), options: visibleRecents.flatMap((id) => byId.get(id) ?? []) },
       ...scopedGroups.map((group) => ({ ...group, options: group.options.filter(({ id }) => !recent.has(id)) })),
     ],
     scoped: Boolean(scope),
@@ -208,6 +249,7 @@ export function usePaletteResults({
       library.isPending ||
       conversations.isPending ||
       agents.isPending ||
+      (searchNodes && (atlas.isPending || (Boolean(claimId) && snapshot.isPending))) ||
       Boolean(exact && (exact !== settledReference || references[codes.indexOf(exact)]?.isPending)),
   };
 }
