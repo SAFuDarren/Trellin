@@ -63,6 +63,7 @@ test("the sidebar lists and opens registered desktop projects", async ({ page })
   });
   await page.setViewportSize({ width: 640, height: 720 });
   await page.goto("/#session=fixture");
+  await expect(page.getByRole("heading", { name: first.name, exact: true })).toBeVisible();
 
   const sidebar = page.locator("#sidebar");
   const projects = sidebar.getByRole("region", { name: "Projects" });
@@ -104,6 +105,7 @@ test("the sidebar lists and opens registered desktop projects", async ({ page })
   await expect(projects.getByRole("status")).toHaveCount(0);
   await expect(firstRow).toHaveAttribute("aria-current", "page");
   await page.reload();
+  await expect(page.getByRole("heading", { name: second.name, exact: true })).toBeVisible();
   await expect(secondRow).toHaveAttribute("aria-current", "page");
   await expect(firstRow).toBeEnabled();
 
@@ -121,6 +123,12 @@ test("the sidebar lists and opens registered desktop projects", async ({ page })
   await expect(projects).toHaveCount(0);
   await openProjects.press("Enter");
   await expect(heading).toBeFocused();
+});
+
+test("the map heading falls back to the name of the opened project directory", async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(window, "trellinProjectName", { value: "My opened research" }));
+  await page.goto("/#session=fixture");
+  await expect(page.getByRole("heading", { name: "My opened research", exact: true })).toBeVisible();
 });
 
 test("an empty desktop library retains the project actions and can recover from a list error", async ({ page }) => {

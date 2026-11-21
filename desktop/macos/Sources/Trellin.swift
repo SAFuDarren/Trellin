@@ -360,11 +360,19 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     private func showWorkbench(url: URL, workspace: URL, name: String?, leanMissing: Bool) {
         saveLast()
         serverURL = url
+        let folderName = workspace.lastPathComponent == "Trellin"
+            ? workspace.deletingLastPathComponent().lastPathComponent : workspace.lastPathComponent
+        let projectName = name ?? folderName
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(self, name: bridge)
         configuration.userContentController.add(self, name: upgradeBridge)
         configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: projectsBridge)
+        if let encoded = try? JSONEncoder().encode(projectName), let value = String(data: encoded, encoding: .utf8) {
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: "window.trellinProjectName = \(value);", injectionTime: .atDocumentStart, forMainFrameOnly: true
+            ))
+        }
         if let position = last?.position {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: position.script, injectionTime: .atDocumentStart, forMainFrameOnly: true
@@ -375,9 +383,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         web.navigationDelegate = self
         web.uiDelegate = self
         webView = web
-        let folderName = workspace.lastPathComponent == "Trellin"
-            ? workspace.deletingLastPathComponent().lastPathComponent : workspace.lastPathComponent
-        window.subtitle = leanMissing ? localized("lean") : (name ?? folderName)
+        window.subtitle = leanMissing ? localized("lean") : projectName
         window.contentView = web
         web.load(URLRequest(url: url))
     }

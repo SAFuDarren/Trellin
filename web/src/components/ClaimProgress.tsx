@@ -20,9 +20,11 @@ export function claimProgressText(t: TFunction, progress: ClaimProgress | undefi
   const fallback = { id: "", kind: "goal", status };
   const count = progress?.obligations;
   return {
+    state,
     label: state ? t(`claimProgress.states.${state}`) : nodeStatus(t, fallback),
     tone: state ? TONES[state] : nodeTone(fallback, false),
-    count: count && (count.total ? t("claimProgress.obligations", count) : t("claimProgress.noObligations")),
+    count: count?.total ? t("claimProgress.obligations", count) : undefined,
+    emptyCountLabel: count?.total === 0 ? t("claimProgress.noObligations") : undefined,
   };
 }
 
@@ -30,15 +32,26 @@ export function ClaimProgressSummary({
   label,
   tone,
   count,
+  emptyCountLabel,
   detail,
-}: ReturnType<typeof claimProgressText> & { detail?: string | null }) {
+  showState = true,
+}: ReturnType<typeof claimProgressText> & { detail?: string | null; showState?: boolean }) {
+  if (!showState && !count && !emptyCountLabel && !detail) return null;
   return (
     <span className="claim-progress">
-      <span className="claim-progress-state" data-tone={tone}>
-        <span className="mark" data-tone={tone} aria-hidden="true" />
-        <span>{label}</span>
-      </span>
-      {count ? <span className="claim-progress-count">{count}</span> : detail && <span>{detail}</span>}
+      {showState && (
+        <span className="claim-progress-state" data-tone={tone}>
+          <span className="mark" data-tone={tone} aria-hidden="true" />
+          <span>{label}</span>
+        </span>
+      )}
+      {count ? (
+        <span className="claim-progress-count">{count}</span>
+      ) : emptyCountLabel ? (
+        <span className="claim-progress-empty" role="img" aria-label={emptyCountLabel} title={emptyCountLabel} />
+      ) : (
+        detail && <span>{detail}</span>
+      )}
     </span>
   );
 }

@@ -28,8 +28,16 @@
   font-variant-numeric: tabular-nums;
 }
 
-.detail-claim-progress {
-  display: grid;
-  gap: 3px;
-  margin-block: 6px 10px;
+.claim-progress-count:only-child {
+  padding-inline-start: 0;
+}
+
+.claim-progress-empty {
+  display: block;
+  width: 20px;
+  height: 5px;
+  margin-block: 4px;
+  background: var(--track);
+  border: 1px solid var(--sub);
+  border-radius: var(--radius-pill);
 }

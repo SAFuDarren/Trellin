@@ -19,7 +19,7 @@ import { Splitter } from "./components/Splitter";
 import { href } from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
 import type { ClaimProgress } from "./workbench/claimProgress";
-import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
+import { desktopPosition, desktopProjectName, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
 import { nodeTitle } from "./workbench/text";
 import type { ActivitySnapshot, GraphNode, GraphSnapshot, ImpactPreview } from "./workbench/types";
@@ -109,7 +109,8 @@ export function Workbench({
   const sidebarOpen =
     sizes.sidebarOpen ?? (layout.sidebarOpen && !projects.isLoading && projects.data?.projects.length !== 1);
   const projectName =
-    projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name ||
+    projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name.trim() ||
+    desktopProjectName() ||
     t("projects.current");
 
   const claims = useClaims(session);

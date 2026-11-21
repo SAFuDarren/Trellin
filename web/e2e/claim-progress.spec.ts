@@ -205,7 +205,14 @@ async function expectProgress(surface: Locator, label: string, tone: string, cou
   await expect(state).toHaveText(label);
   await expect(state).toHaveAttribute("data-tone", tone);
   const renderedCount = surface.locator(".claim-progress-count");
-  if (count === null) await expect(renderedCount).toHaveCount(0);
+  const empty = surface.locator(".claim-progress-empty");
+  if (count === ZERO) {
+    await expect(empty).toBeVisible();
+    await expect(empty).toHaveAttribute("aria-label", ZERO);
+  } else {
+    await expect(empty).toHaveCount(0);
+  }
+  if (count === null || count === ZERO) await expect(renderedCount).toHaveCount(0);
   else await expect(renderedCount).toHaveText(count);
 }
 
@@ -233,6 +240,11 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   const detail = page.locator("#node-detail");
   await expect(detail.getByRole("heading", { name: review.title!, exact: true })).toBeVisible();
   await expectProgress(detail, "Waiting for your review", "review");
+  const detailHeader = detail.locator(".detail-header > *");
+  await expect(detailHeader.nth(0)).toHaveText(review.title!);
+  await expect(detailHeader.nth(1)).toContainText("Waiting for your review");
+  await expect(detailHeader.nth(2).getByRole("button", { name: "Proof task", exact: true })).toBeVisible();
+  await expect(detail.locator(".claim-progress-state")).toHaveCount(1);
 
   await mapClaim(page, recheck.title!).press("Enter");
   await expectProgress(detail, "Needs recheck", "bad", OLDER);
@@ -242,13 +254,23 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   const readyCard = mapClaim(page, ready.title!);
   await readyCard.press("Enter");
   await expectProgress(readyCard, "Ready to start", "open", ZERO);
+  await expect(readyCard).toHaveAccessibleDescription(/No recorded obligations/);
   await expectProgress(detail, "Ready to start", "open", ZERO);
 
   await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
-  for (const [target, label, tone, count] of states) {
+  for (const [target, label, tone, count] of states.slice(0, 3)) {
     const card = page.locator(".board-card").filter({ hasText: target.title! });
     await expectProgress(card, label, tone, count);
   }
+  const recheckColumn = page.getByRole("region", { name: "Needs recheck", exact: true });
+  await expect(recheckColumn.getByText("Needs recheck", { exact: true })).toHaveCount(1);
+  const recheckCard = recheckColumn.locator(".board-card").filter({ hasText: recheck.title! });
+  await expect(recheckCard.locator(".claim-progress-state")).toHaveCount(0);
+  await expect(recheckCard.locator(".claim-progress-count")).toHaveText(OLDER);
+  const uncounted = page.locator(".board-card").filter({ hasText: missing.title! });
+  await expect(uncounted.locator(".claim-progress")).toHaveCount(0);
+  const reviewCard = page.locator(".board-card").filter({ hasText: review.title! });
+  await expect(reviewCard.getByText("1 awaiting review", { exact: true })).toHaveCount(0);
   await expectProgress(page.locator(".board-card").filter({ hasText: ready.title! }), "Ready to start", "open", ZERO);
 });
 
