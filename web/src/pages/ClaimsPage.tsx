@@ -172,7 +172,15 @@ export function ClaimsPage({
                 {cards.map((claim) => {
                   const record = counts.get(claim.id);
                   const progress = claimProgress.get(claim.id);
+                  const summary = claimProgressText(t, progress, claim.status);
                   const live = running.get(claim.id) ?? 0;
+                  const repeatColumn =
+                    summary.label === statusText(t, status) ||
+                    (status === "awaiting_interpretation_review" && summary.state === "decision");
+                  const showRunning = live > 0 && summary.state !== "running" && summary.state !== "verifying";
+                  const showReview = Boolean(record?.awaiting_review) && summary.state !== "review";
+                  const showBlocked =
+                    Boolean(record?.blocked) && summary.state !== "decision" && summary.state !== "recheck";
                   const expanded = expandedClaim === claim.id;
                   const previewId = "claim-preview-" + claim.id;
                   return (
@@ -195,22 +203,22 @@ export function ClaimsPage({
                             />
                           </span>
                         )}
-                        <ClaimProgressSummary {...claimProgressText(t, progress, claim.status)} />
+                        <ClaimProgressSummary {...summary} showState={!repeatColumn} />
                         <span className="meta">{claim.domain || t("sidebar.uncategorized")}</span>
-                        {(record?.awaiting_review || record?.blocked || live > 0) && (
+                        {(showReview || showBlocked || showRunning) && (
                           <span className="tags">
-                            {live > 0 && (
+                            {showRunning && (
                               <span className="tag" data-tone="live">
                                 <Spin />
                                 {t("claimsPage.running", { count: live })}
                               </span>
                             )}
-                            {(record?.awaiting_review ?? 0) > 0 && (
+                            {showReview && (
                               <span className="tag" data-tone="review">
                                 {t("sidebar.awaitingReview", { count: record!.awaiting_review })}
                               </span>
                             )}
-                            {(record?.blocked ?? 0) > 0 && (
+                            {showBlocked && (
                               <span className="tag" data-tone="bad">
                                 {t("sidebar.blocked", { count: record!.blocked })}
                               </span>

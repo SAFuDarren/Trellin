@@ -182,7 +182,7 @@ function NodeDetail({
           : nodeStatus(t, node);
   const claimStatus = claims.find((claim) => claim.id === graph.claim.id)?.status ?? graph.claim.status;
   const progress = claimProgressText(t, claimProgress, claimStatus);
-  const showNodeState = node.kind !== "goal" || isImpact || blockers.length > 0 || node.status !== claimStatus;
+  const showNodeState = node.kind !== "goal" || isImpact || (blockers.length > 0 && !progress.state);
   const lean = typeof node.formalization === "string" ? node.formalization : "";
   const math = typeof node.formula === "string" ? node.formula : nodeFormula(node);
   const prose =
@@ -201,30 +201,29 @@ function NodeDetail({
   const scope = impact?.scope ?? [];
   return (
     <>
-      <div className="detail-head">
-        <span>{[graph.codes.get(node.id), kindText(t, node.kind), node.domain].filter(Boolean).join(" · ")}</span>
-        {showNodeState ? (
-          <span className="detail-state">
-            <Mark tone={tone} />
-            {stateLabel}
-          </span>
-        ) : (
-          <ClaimProgressSummary {...progress} />
-        )}
-      </div>
-      {showNodeState && (
-        <div className="detail-claim-progress">
-          <span className="field-label">{t("claimProgress.claim")}</span>
-          <ClaimProgressSummary {...progress} />
+      <header className="detail-header">
+        <h2>{node.kind === "goal" && graph.claim.title ? graph.claim.title : nodeTitle(t, node)}</h2>
+        <div className="detail-head">
+          <ClaimProgressSummary
+            {...progress}
+            label={showNodeState ? stateLabel : progress.label}
+            tone={showNodeState ? tone : progress.tone}
+            count={node.kind === "goal" ? progress.count : undefined}
+            emptyCountLabel={node.kind === "goal" ? progress.emptyCountLabel : undefined}
+          />
+          <span>{[graph.codes.get(node.id), kindText(t, node.kind), node.domain].filter(Boolean).join(" · ")}</span>
         </div>
-      )}
-      <h2>{node.kind === "goal" && graph.claim.title ? graph.claim.title : nodeTitle(t, node)}</h2>
-      {actions && <div className="inspector-actions">{actions}</div>}
-      {conditionId && (
-        <button type="button" className="button" onClick={() => onReviewPremise(conditionId)}>
-          {t("premise.review")}
-        </button>
-      )}
+        {(actions || conditionId) && (
+          <div className="inspector-actions">
+            {actions}
+            {conditionId && (
+              <button type="button" className="button" onClick={() => onReviewPremise(conditionId)}>
+                {t("premise.review")}
+              </button>
+            )}
+          </div>
+        )}
+      </header>
       {blockers.map((blockage, position) => {
         const explanation = blockage.reason || blockage.detail || blockage.status;
         return explanation ? (

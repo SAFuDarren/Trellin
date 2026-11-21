@@ -40,7 +40,7 @@ export function ProjectHeading({ name }: { name: string }) {
   const label = t("projects.switch", { name });
   const library = desktopProjectLibrary();
   return (
-    <h1 title={name}>
+    <h1 aria-label={name} title={name}>
       {library ? (
         <Popover
           label={label}

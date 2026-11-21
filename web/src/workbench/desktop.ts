@@ -9,6 +9,7 @@ export type DesktopProjectLibrary = {
 
 type DesktopWindow = Window & {
   trellinPosition?: DesktopPosition;
+  trellinProjectName?: string;
   webkit?: {
     messageHandlers?: {
       trellinPosition?: { postMessage: (position: DesktopPosition) => void };
@@ -17,6 +18,11 @@ type DesktopWindow = Window & {
     };
   };
 };
+
+export function desktopProjectName(): string | undefined {
+  const name = (window as DesktopWindow).trellinProjectName;
+  return typeof name === "string" ? name.trim() || undefined : undefined;
+}
 
 export function desktopPosition(): DesktopPosition | undefined {
   return (window as DesktopWindow).trellinPosition;

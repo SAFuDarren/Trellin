@@ -1553,6 +1553,11 @@ select:disabled {
 .inspector-activity .chat-feed {
   max-height: 14rem;
 }
+.detail-header {
+  display: grid;
+  gap: 8px;
+}
+
 .detail-head {
   display: flex;
   flex-wrap: wrap;
@@ -1563,12 +1568,14 @@ select:disabled {
   color: var(--sub);
   font-weight: var(--type-regular);
 }
-.detail-state {
-  display: inline-flex;
+.detail-head .claim-progress {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  font-weight: var(--type-medium);
-  color: var(--ink);
+  gap: 8px;
+}
+.detail-head .claim-progress-count {
+  padding-inline-start: 0;
 }
 .node-detail h2 {
   font-size: var(--type-title-size);

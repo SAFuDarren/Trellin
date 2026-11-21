@@ -603,7 +603,9 @@ export function ProjectCanvas({
                 data-moving={preview?.id === card.id ? "true" : undefined}
                 aria-pressed={selected === card.id}
                 aria-label={card.title}
-                aria-description={[progress.label, progress.count, card.domain].filter(Boolean).join(" · ")}
+                aria-description={[progress.label, progress.count ?? progress.emptyCountLabel, card.domain]
+                  .filter(Boolean)
+                  .join(" · ")}
                 aria-keyshortcuts={menu["aria-keyshortcuts"] + movingShortcuts}
                 title={card.title}
                 style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
