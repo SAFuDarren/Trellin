@@ -10,6 +10,10 @@
   --duration-enter: 120ms;
   --duration-panel: 180ms;
 
+  --state-hover: var(--track);
+  --state-selected: var(--pick);
+  --state-pressed: color-mix(in srgb, var(--state-selected) 85%, var(--ink));
+
   /* Radius scale. Glyph shapes (status marks, dots) keep their own geometry. */
   --radius-inline: 4px; /* keycaps, legend keys, tiny badges */
   --radius-control: 6px; /* buttons, inputs, menu items, list rows */
@@ -59,6 +63,42 @@
     opacity var(--duration-base) var(--ease);
 }
 
+/* Keep the same neutral fills across ordinary controls and navigable rows. */
+:is(
+  .button:where(:not(.primary)),
+  .chip,
+  .segmented :where(button),
+  .claim,
+  .graph-node,
+  .project-canvas-node,
+  .board-card-toggle,
+  .queue-item,
+  .chat-list-item,
+  .sidebar-projects-row,
+  .rail-link,
+  .nav-item,
+  [role="tab"]
+) {
+  &:hover:where(:not(:disabled, [aria-disabled="true"])) {
+    background-color: var(--state-hover);
+  }
+
+  &:is(
+    [aria-pressed="true"],
+    [aria-selected="true"],
+    [aria-current="page"],
+    [aria-current="true"],
+    [aria-expanded="true"],
+    [data-current="true"]
+  ) {
+    background-color: var(--state-selected);
+  }
+
+  &:active:where(:not(:disabled, [aria-disabled="true"])) {
+    background-color: var(--state-pressed);
+  }
+}
+
 @keyframes rm-float-in {
   from {
     opacity: 0;
@@ -94,9 +134,15 @@
   .project-canvas-popover,
   .workbench-actions-items
 ) {
+  box-shadow: var(--elevation-float);
   animation: rm-float-in var(--duration-enter) var(--ease);
 }
-:where(.agent-dock-panel) {
+/* The draggable overview enters without moving its saved hit target. */
+:where(.atlas) {
+  box-shadow: var(--elevation-float);
+  animation: rm-fade-in var(--duration-enter) var(--ease);
+}
+:where(.agent-dock-panel, .review) {
   animation: rm-panel-in var(--duration-panel) var(--ease);
 }
 :where(dialog[open]) {

@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.55
+
+- Workbench controls and project cards show consistent hover, press and selection states. The claim inspector and Global map use the shared entrance timing, and floating controls share one shadow.
+
 ## 1.0.53
 
 - Buttons, cards, list rows and menus ease between states instead of jumping. Menus, the Agent dock and dialogs fade in, and corners and shadows follow one scale. With reduced motion turned on in macOS, nothing moves.
