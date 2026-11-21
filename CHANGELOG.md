@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.84
+
+- The proof graph’s References view highlights recorded proof uses and allowed premises, shows planned steps as quieter dashed lines, and explains the line styles in English and Chinese. The legend follows the current view.
+
 ## 1.0.83
 
 - Narrow proof and map windows use a details drawer and a separate zoom footer. The selected proof node and nearby map cards stay in view when the inspector opens or the window changes size.

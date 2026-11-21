@@ -92,6 +92,7 @@
     "label": "Graph view",
     "proof": "Proof",
     "references": "References",
+    "referencesDescription": "Solid lines show recorded proof uses, dotted lines show allowed premises, and dashed lines show planned steps.",
     "impact": "If withdrawn"
   },
   "impact": {

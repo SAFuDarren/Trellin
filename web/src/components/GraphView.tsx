@@ -11,6 +11,7 @@ import {
   layoutGraph,
   workLabel,
   type CardSize,
+  type Edge,
   type Graph,
   type Layout,
   type Point,
@@ -344,6 +345,7 @@ export function GraphView(props: Props) {
   };
 
   const isImpact = view === "impact";
+  const legendEdges = view === "references" || (view === "proof" && !selected) ? graph.edges : lit.edges;
   return (
     <>
       <div
@@ -417,7 +419,7 @@ export function GraphView(props: Props) {
                     className="graph-node"
                     data-node={id}
                     data-kind={node.kind}
-                    data-emphasis={!isImpact || lit.nodes.has(id) ? "strong" : "dim"}
+                    data-emphasis={view === "proof" || lit.nodes.has(id) ? "strong" : "dim"}
                     data-affected={String(isImpact && (Boolean(effect) || id === assumption))}
                     data-working={String(Boolean(running))}
                     aria-pressed={id === selected}
@@ -483,6 +485,7 @@ export function GraphView(props: Props) {
         <Legend
           graph={graph}
           view={view}
+          edges={legendEdges}
           assumption={assumption}
           affected={affected}
           running={props.running}
@@ -504,6 +507,7 @@ export function GraphView(props: Props) {
 function Legend({
   graph,
   view,
+  edges,
   assumption,
   affected,
   running,
@@ -511,6 +515,7 @@ function Legend({
 }: {
   graph: Graph;
   view: View;
+  edges: Iterable<Edge>;
   assumption: string | null;
   affected: Map<string, unknown>;
   running: number;
@@ -518,14 +523,14 @@ function Legend({
 }) {
   const { t } = useTranslation();
   const edgeId = useId();
-  const kinds = new Set(graph.edges.map((edge) => edge.drawKind));
+  const kinds = new Set(Array.from(edges, (edge) => edge.drawKind));
   const counts = new Map<Tone, number>();
   for (const [id, node] of graph.nodes) {
     const tone =
       view === "impact" && (affected.has(id) || id === assumption) ? "bad" : nodeTone(node, graph.blockers.has(id));
     if (tone) counts.set(tone, (counts.get(tone) ?? 0) + 1);
   }
-  const lines = (["actual", "planned", "context"] as const).filter((kind) => kinds.has(kind));
+  const lines = (["actual", "context", "planned"] as const).filter((kind) => kinds.has(kind));
   const tones = (["ok", "review", "bad", "open", "planned"] as const).filter((tone) => counts.get(tone));
   return (
     <div className="legend">
@@ -578,7 +583,7 @@ function Legend({
           }
         >
           {() => (
-            <ul>
+            <ul data-edge-view={view}>
               {lines.map((kind) => (
                 <li key={kind}>
                   <i data-kind={kind} aria-hidden="true" />
