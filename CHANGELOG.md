@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.76
+
+- Empty Agent chat and activity panels size to their contents. Start with a draft suggestion or open Agent work from the compact panel.
+
 ## 1.0.75
 
 - Draw research links from claim handles, select links directly for removal, and use the same actions from the keyboard (#196).
