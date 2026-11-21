@@ -27,6 +27,7 @@ import {
   useModelConnections,
 } from "../api/modelConnections";
 import { useLocalTextModels } from "../api/localModels";
+import { useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { useComposerKeyboard } from "../hooks/useComposerKeyboard";
 import { timeText } from "../workbench/text";
 import { Chevron, SendArrow, Spin } from "./Icons";
@@ -38,14 +39,23 @@ export function ConversationPanel({
   thread,
   onRemove,
   header,
+  employee,
+  draft,
 }: {
   session: string;
   thread: ConversationSummary;
   onRemove: () => void;
   header?: (removeControl: ReactNode) => ReactNode;
+  employee?: Pick<TeamAgent, "id" | "name" | "connection_id" | "revision">;
+  draft?: { text: string; onChange: (text: string) => void; onSent?: (submittedText: string) => void };
 }) {
   const { t, i18n } = useTranslation();
   const detail = useConversation(session, thread.id);
+  const employeeId = detail.data?.thread.agent_id ?? thread.agent_id;
+  const profiles = useTeamAgents(session, Boolean(employeeId && !employee));
+  const agent =
+    employee?.id === employeeId ? employee : profiles.data?.agents.find((profile) => profile.id === employeeId);
+  const employeeScoped = Boolean(employeeId);
   const actions = useConversationActions(session);
   const models = useModelConnections(session);
   const local = useLocalTextModels(session);
@@ -70,7 +80,9 @@ export function ConversationPanel({
     }),
   ];
   const [selected, setSelected] = useState("");
-  const [text, setText] = useState("");
+  const [localText, setLocalText] = useState("");
+  const text = draft?.text ?? localText;
+  const setText = draft?.onChange ?? setLocalText;
   const [pending, setPending] = useState<"preview" | "send" | "archive" | null>(null);
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState(false);
@@ -91,16 +103,27 @@ export function ConversationPanel({
   const sending = pending === "send";
   const latestError = detail.data?.thread.latest_error;
   const latestMessage = messages[messages.length - 1];
-  const connection = options.find((option) => option.id === selected);
+  const connection = options.find((option) => option.id === (employeeScoped ? agent?.connection_id : selected));
+  const startedAt = running && latestMessage?.role === "user" ? latestMessage.at : undefined;
+  const messageLabel = agent ? t("employeeChats.messageEmployee", { name: agent.name }) : t("conversations.message");
+  const waiting = agent ? t("conversations.awaitingEmployee", { name: agent.name }) : t("conversations.awaitingReply");
   const disabled = Boolean(pending || running || removing);
   const canPrepare = Boolean(!disabled && !detail.isError && detail.data && connection && text.trim());
-  const scope = JSON.stringify([thread.id, detail.data?.thread.revision, connection?.id, connection?.fingerprint]);
+  const scope = JSON.stringify([
+    thread.id,
+    detail.data?.thread.revision,
+    employeeId,
+    agent?.revision,
+    connection?.id,
+    connection?.fingerprint,
+  ]);
   const details = prepared?.scope === scope ? prepared.preview : null;
   const hasHistory = messages.some((message) => message.role === "assistant");
   const context = [
     thread.node_id && t("conversations.includesNode"),
     hasHistory && t("conversations.includesRecent"),
   ].filter(Boolean);
+  const taskScope = employeeScoped && t("employeeChats.taskScope", { title: thread.title });
   const destination = connection && t(connection.local ? "conversations.onDevice" : "conversations.external");
 
   useLayoutEffect(() => {
@@ -157,7 +180,8 @@ export function ConversationPanel({
       }
       if (send) {
         await actions.send(body, preview.token, preview.external);
-        setText("");
+        if (draft?.onSent) draft.onSent(textToSend);
+        else setText("");
         changeDraft();
         setShowDetails(false);
       } else {
@@ -196,8 +220,7 @@ export function ConversationPanel({
 
   const recipient = (provider: string, model: string) => conversationRecipientLabel(t, provider, model);
 
-  function speaker(message: ConversationMessage): string {
-    if (message.role === "user") return t("conversations.you");
+  function modelSpeaker(message: ConversationMessage): string {
     if (message.provider && message.model) return recipient(message.provider, message.model);
     if (message.provider && message.requested_model) {
       return t("conversations.requestedModel", { name: recipient(message.provider, message.requested_model) });
@@ -232,7 +255,15 @@ export function ConversationPanel({
           {messages.map((message) => (
             <li key={message.id} data-from={message.role === "user" ? "you" : "model"}>
               <span className="speaker">
-                <b>{speaker(message)}</b>
+                <b>
+                  {message.role === "user" ? (
+                    t("conversations.you")
+                  ) : agent ? (
+                    <span title={modelSpeaker(message)}>{agent.name}</span>
+                  ) : (
+                    modelSpeaker(message)
+                  )}
+                </b>
                 {message.at && <time dateTime={message.at}>{timeText(i18n.language, message.at)}</time>}
               </span>
               <p className={message.role === "user" ? "bubble" : "message"}>{message.text}</p>
@@ -240,14 +271,16 @@ export function ConversationPanel({
           ))}
           {(sending || running) && (
             <li className="chat-send-status">
-              <span role="status">{t(running ? "conversations.awaitingReply" : "conversations.sending")}</span>
+              {employeeScoped && <Spin />}
+              <span role="status">{running ? waiting : t("conversations.sending")}</span>
+              {employeeScoped && startedAt && <ReplyElapsed start={startedAt} locale={i18n.language} />}
             </li>
           )}
         </ol>
       )}
       <form className="composer direct-composer" onSubmit={send}>
         <label className="sr-only" htmlFor={formId + "-text"}>
-          {t("conversations.message")}
+          {messageLabel}
         </label>
         <textarea
           {...composerKeyboard}
@@ -257,7 +290,7 @@ export function ConversationPanel({
           rows={2}
           maxLength={1500}
           disabled={disabled || !detail.data}
-          placeholder={t("conversations.message")}
+          placeholder={messageLabel}
           onChange={(event) => {
             setText(event.target.value);
             changeDraft();
@@ -287,61 +320,69 @@ export function ConversationPanel({
               {t(showDetails ? "conversations.hideRequestDetails" : "conversations.requestDetails")}
             </button>
           </ComposerMenu>
-          <ComposerMenu
-            kind="model"
-            triggerRef={modelTrigger}
-            label={t("conversations.model")}
-            tooltip={connection?.label ?? t("conversations.chooseModel")}
-            valueId={connection ? formId + "-model-label" : undefined}
-            trigger={
-              <>
-                <span id={formId + "-model-label"} className="composer-model-label">
-                  {connection?.label ?? t("conversations.chooseModel")}
-                </span>
-                <Chevron />
-              </>
-            }
-            disabled={disabled}
-          >
-            {[
-              { label: t("conversations.onDevice"), matches: options.filter((model) => model.local) },
-              { label: t("conversations.connectedModels"), matches: options.filter((model) => !model.local) },
-            ].map(
-              ({ label, matches }) =>
-                matches.length > 0 && (
-                  <div className="composer-model-group" key={label} role="group" aria-label={label}>
-                    <p aria-hidden="true">{label}</p>
-                    {matches.map((model) => (
-                      <button
-                        key={model.id}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={connection?.id === model.id}
-                        tabIndex={-1}
-                        className="composer-menu-item"
-                        onClick={() => {
-                          setSelected(model.id);
-                          changeDraft();
-                        }}
-                      >
-                        <span>{model.description ? recipient(model.provider, model.model) : model.label}</span>
-                        {model.description && <small>{model.description}</small>}
-                      </button>
-                    ))}
-                  </div>
-                ),
-            )}
-            {models.isPending || local.isPending ? <p role="status">{t("common.loading")}</p> : null}
-            <button
-              type="button"
-              className="composer-menu-item composer-model-settings"
-              role="menuitem"
-              tabIndex={-1}
-              onClick={() => setManagingModels(true)}
+          {employeeScoped ? (
+            connection && (
+              <span className="composer-fixed-recipient" title={connection.label}>
+                {connection.label}
+              </span>
+            )
+          ) : (
+            <ComposerMenu
+              kind="model"
+              triggerRef={modelTrigger}
+              label={t("conversations.model")}
+              tooltip={connection?.label ?? t("conversations.chooseModel")}
+              valueId={connection ? formId + "-model-label" : undefined}
+              trigger={
+                <>
+                  <span id={formId + "-model-label"} className="composer-model-label">
+                    {connection?.label ?? t("conversations.chooseModel")}
+                  </span>
+                  <Chevron />
+                </>
+              }
+              disabled={disabled}
             >
-              {t(options.length ? "conversations.manageModels" : "conversations.connect")}
-            </button>
-          </ComposerMenu>
+              {[
+                { label: t("conversations.onDevice"), matches: options.filter((model) => model.local) },
+                { label: t("conversations.connectedModels"), matches: options.filter((model) => !model.local) },
+              ].map(
+                ({ label, matches }) =>
+                  matches.length > 0 && (
+                    <div className="composer-model-group" key={label} role="group" aria-label={label}>
+                      <p aria-hidden="true">{label}</p>
+                      {matches.map((model) => (
+                        <button
+                          key={model.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={connection?.id === model.id}
+                          tabIndex={-1}
+                          className="composer-menu-item"
+                          onClick={() => {
+                            setSelected(model.id);
+                            changeDraft();
+                          }}
+                        >
+                          <span>{model.description ? recipient(model.provider, model.model) : model.label}</span>
+                          {model.description && <small>{model.description}</small>}
+                        </button>
+                      ))}
+                    </div>
+                  ),
+              )}
+              {models.isPending || local.isPending ? <p role="status">{t("common.loading")}</p> : null}
+              <button
+                type="button"
+                className="composer-menu-item composer-model-settings"
+                role="menuitem"
+                tabIndex={-1}
+                onClick={() => setManagingModels(true)}
+              >
+                {t(options.length ? "conversations.manageModels" : "conversations.connect")}
+              </button>
+            </ComposerMenu>
+          )}
           <button
             type="submit"
             className="send"
@@ -354,6 +395,11 @@ export function ConversationPanel({
           </button>
         </div>
         {models.isError && <p role="alert">{t("modelConnections.failed")}</p>}
+        {employeeScoped && !connection && !models.isPending && !(profiles.isPending && !employee) && (
+          <p className="composer-status" role="status">
+            {t("conversations.employeeConnectionUnavailable")}
+          </p>
+        )}
         {!sending && (error || latestError) && (
           <p className="composer-status" data-error="true" role="alert">
             {error || errorText(latestError ?? "")}
@@ -374,7 +420,7 @@ export function ConversationPanel({
         )}
       </form>
       <div className="conversation-context">
-        <p id={formId + "-scope"}>{[destination, ...context].filter(Boolean).join(" · ")}</p>
+        <p id={formId + "-scope"}>{[taskScope, destination, ...context].filter(Boolean).join(" · ")}</p>
         {!header && <div className="conversation-secondary">{remove}</div>}
       </div>
       <div className="conversation-request" id={formId + "-request"} hidden={!showDetails}>
@@ -389,7 +435,7 @@ export function ConversationPanel({
             {t("conversations.previewRequest")}
           </button>
         ) : (
-          <p>{t("conversations.previewHint")}</p>
+          <p>{t(employeeScoped ? "conversations.employeePreviewHint" : "conversations.previewHint")}</p>
         )}
       </div>
       {managingModels && (
@@ -414,6 +460,26 @@ export function ConversationPanel({
         </Confirmation>
       )}
     </section>
+  );
+}
+
+function ReplyElapsed({ start, locale }: { start: string; locale: string }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const seconds = Math.max(0, Math.floor((now - Date.parse(start)) / 1000));
+  if (!Number.isFinite(seconds)) return null;
+  const elapsed = seconds >= 60 ? Math.floor(seconds / 60) : seconds;
+  return (
+    <span className="chat-send-elapsed" aria-hidden="true">
+      {new Intl.NumberFormat(locale, {
+        style: "unit",
+        unit: seconds >= 60 ? "minute" : "second",
+        unitDisplay: "short",
+      }).format(elapsed)}
+    </span>
   );
 }
 

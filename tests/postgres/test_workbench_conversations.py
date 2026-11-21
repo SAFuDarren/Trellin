@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Consent and durable conversation regressions against real project bindings."""
 
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 import json
 from time import monotonic, sleep
@@ -12,11 +13,16 @@ import pytest
 from research_multiplier.model_adapters import ModelConfig
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
-from research_multiplier.workflows import workbench_conversations
+from research_multiplier.workflows import workbench_agents, workbench_conversations
 from tests.postgres.test_workbench_routes import _request, workbench  # noqa: F401
 
 
 pytestmark = pytest.mark.postgres
+
+
+@pytest.fixture(autouse=True)
+def isolated_team_settings(tmp_path, monkeypatch):
+    monkeypatch.setattr(workbench_agents, "_settings_file", lambda: tmp_path / "team-agents.sqlite3")
 
 
 def test_workbench_conversation_consent_and_archive(workbench, monkeypatch):
@@ -36,7 +42,7 @@ def test_workbench_conversation_consent_and_archive(workbench, monkeypatch):
     monkeypatch.setattr(workbench_conversations, "complete_structured", reply)
     base = "/api/conversations"
     thread = _request(server, "POST", base + "/create", body={"title": "A free discussion"})["thread"]
-    assert thread["claim_id"] is None and thread["messages"] == []
+    assert thread["claim_id"] is None and thread["agent_id"] is None and thread["messages"] == []
     assert _request(server, "GET", base)["threads"][0]["latest_turn"] is None
     request = {"thread_id": thread["id"], "connection_id": identity["id"],
                "request_id": str(uuid4()), "text": "What is the next question?"}
@@ -113,3 +119,108 @@ def test_workbench_conversation_checks_scope_before_external_preview(workbench, 
         "error": "conversation.stale"
     }
     assert _request(server, "GET", base + "/thread?thread_id=" + thread["id"])["thread"]["messages"] == []
+
+
+def test_named_conversation_binds_employee_and_exact_consent(workbench, monkeypatch):
+    server, _, _, _ = workbench
+    identity = {"id": str(uuid4()), "provider": "codex-cli", "model": "gpt-fixture", "fingerprint": "a" * 64}
+    config = ModelConfig("codex-cli", identity["model"], "openai", "", binary="/usr/bin/true")
+    other_connection = {**identity, "id": str(uuid4())}
+    monkeypatch.setattr(server.connections, "list", lambda: [
+        {**connection, "status": "connected"} for connection in (identity, other_connection)
+    ])
+    monkeypatch.setattr(server.discussions.registry, "resolve", lambda _: (config, identity))
+    monkeypatch.setattr(server.discussions.registry, "use", lambda _: nullcontext((config, identity)))
+    sent = []
+
+    def reply(selected, service, system, user, cap, timeout):
+        sent.append({"system": system, "user": user})
+        metadata = {"provider": selected.provider, "id": identity["model"],
+                    "parameters": {"requested_model": selected.model, "model_id_reported": True}}
+        return SimpleNamespace(output={"reply": "An answer for this task."}, metadata=metadata)
+
+    monkeypatch.setattr(workbench_conversations, "complete_structured", reply)
+    agents_path = "/api/team-agents/save"
+    profile = {"id": str(uuid4()), "revision": 0, "connection_id": identity["id"], "name": "Reviewer",
+               "description": "", "avatar": "book", "instructions": "Device-only configuration text.",
+               "starters": []}
+    first = _request(server, "POST", agents_path, body=profile)["agent"]
+    second = _request(server, "POST", agents_path, body={**profile, "id": str(uuid4()), "name": "Writer"})["agent"]
+    base = "/api/conversations"
+    draft = {"title": "Check the argument", "agent_id": first["id"], "request_id": str(uuid4())}
+
+    with ThreadPoolExecutor(max_workers=2) as requests:
+        left, right = requests.map(lambda _: _request(server, "POST", base + "/create", body=draft)["thread"],
+                                   range(2))
+    assert left == right
+    assert left["agent_id"] == first["id"] and left["messages"] == []
+    assert _request(server, "POST", base + "/create",
+                    body={**draft, "agent_id": second["id"]}, status=409) == {"error": "conversation.stale"}
+    other = _request(server, "POST", base + "/create", body={
+        **draft, "agent_id": second["id"], "request_id": str(uuid4()),
+    })["thread"]
+    assert other["id"] != left["id"] and other["agent_id"] == second["id"]
+    listed = _request(server, "GET", base)["threads"]
+    assert {item["id"]: item["agent_id"] for item in listed} == {left["id"]: first["id"], other["id"]: second["id"]}
+    assert sent == []
+
+    request = {"thread_id": left["id"], "connection_id": identity["id"],
+               "request_id": str(uuid4()), "text": "What is the missing step?"}
+    assert _request(server, "POST", base + "/preview",
+                    body={**request, "connection_id": other_connection["id"]}, status=409) == {
+        "error": "conversation.stale",
+    }
+    preview = _request(server, "POST", base + "/preview", body=request)
+    assert "Device-only configuration text." not in preview["outgoing"]
+    agreement = {**request, "token": preview["token"], "confirm_external": True}
+    assert _request(server, "POST", base + "/send",
+                    body={**agreement, "thread_id": other["id"]}, status=409) == {"error": "conversation.stale"}
+    updated = _request(server, "POST", agents_path, body={**first, "description": "Revised role"})["agent"]
+    assert _request(server, "POST", base + "/send", body=agreement, status=409) == {"error": "conversation.stale"}
+    assert sent == []
+
+    preview = _request(server, "POST", base + "/preview", body=request)
+    agreement = {**agreement, "token": preview["token"]}
+    _request(server, "POST", base + "/send", body=agreement)
+    deadline = monotonic() + 5
+    while monotonic() < deadline:
+        thread = _request(server, "GET", base + "/thread?thread_id=" + left["id"])["thread"]
+        if not thread["running"]:
+            break
+        sleep(.02)
+    assert thread["agent_id"] == first["id"]
+    assert not thread["running"]
+    assert thread["messages"][-1]["text"] == "An answer for this task."
+    assert sent == [json.loads(preview["outgoing"])]
+    assert _request(server, "GET", base + "/thread?thread_id=" + other["id"])["thread"]["messages"] == []
+
+    _request(server, "POST", agents_path, body={**updated, "connection_id": other_connection["id"]})
+    _request(server, "POST", base + "/send", body=agreement)
+    assert sent == [json.loads(preview["outgoing"])]
+    assert _request(server, "POST", base + "/preview",
+                    body={**request, "request_id": str(uuid4())}, status=409) == {"error": "conversation.stale"}
+    _request(server, "POST", base + "/archive", body={"thread_id": left["id"]})
+    assert _request(server, "POST", base + "/create", body=draft, status=409) == {"error": "conversation.stale"}
+
+
+def test_named_conversation_create_rollback_keeps_request_reserved(workbench, monkeypatch):
+    server, _, _, _ = workbench
+    connection = {"id": str(uuid4()), "status": "connected", "fingerprint": "fixture"}
+    monkeypatch.setattr(server.connections, "list", lambda: [connection])
+    agent = _request(server, "POST", "/api/team-agents/save", body={
+        "id": str(uuid4()), "revision": 0, "connection_id": connection["id"], "name": "Reader",
+        "description": "", "avatar": "book", "instructions": "", "starters": [],
+    })["agent"]
+    draft = {"title": "Inspect the assumptions", "agent_id": agent["id"], "request_id": str(uuid4())}
+
+    def rollback(store):
+        workbench_conversations.create(store, server.team_agents, draft)
+        raise RuntimeError("Simulate rollback after staging binding")
+
+    with pytest.raises(RuntimeError, match="Simulate rollback"):
+        server.write(rollback)
+    base = "/api/conversations"
+    assert _request(server, "GET", base) == {"threads": []}
+    assert _request(server, "POST", base + "/create", body=draft, status=409) == {"error": "conversation.stale"}
+    fresh = _request(server, "POST", base + "/create", body={**draft, "request_id": str(uuid4())})["thread"]
+    assert fresh["agent_id"] == agent["id"]

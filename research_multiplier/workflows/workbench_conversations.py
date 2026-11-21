@@ -15,6 +15,7 @@ from research_multiplier.protocol.serialization import fingerprint
 from research_multiplier.storage.postgres import DatabaseOperationError
 
 from . import proof_graph, workbench_intake
+from .workbench_agents import AgentProfileError
 
 _PROMPT = (
     'Discuss the research question. Distinguish conjectures from established results. '
@@ -61,6 +62,15 @@ def _document(document, required, optional=()):
         raise ConversationError("invalid")
 
 
+@contextmanager
+def _agent_settings():
+    try:
+        yield
+    except AgentProfileError as error:
+        code = "stale" if str(error) == "team_agents.conflict" else "unavailable"
+        raise ConversationError(code) from None
+
+
 def _identity(store):
     installed, = store.query("human", """
         SELECT to_regclass('rm.visible_conversation_threads') IS NOT NULL AS installed
@@ -88,14 +98,23 @@ def _thread(store, identifier):
     return rows[0]
 
 
-def threads(store, claim_id=None):
-    _identity(store)
-    return {"threads": store.query("human", f"""
-        WITH recent_threads AS MATERIALIZED (
-            SELECT {_THREAD_FIELDS}
+def threads(store, agents, claim_id=None):
+    # The read transaction takes its PostgreSQL snapshot before the settings
+    # lookup. A newly published thread can never appear ahead of its binding.
+    user_id = _identity(store)
+    with _agent_settings():
+        bindings = agents.conversation_bindings(user_id)
+    named_ids = [UUID(identifier) for identifier in bindings]
+    rows = store.query("human", f"""
+        WITH matching_threads AS NOT MATERIALIZED (
+            SELECT {_THREAD_FIELDS}, t.id = ANY(%s::uuid[]) AS named
             FROM rm.visible_conversation_threads t
             WHERE %s::uuid IS NULL OR t.claim_id = %s
-            ORDER BY updated_at DESC, id LIMIT 200
+        ), recent_threads AS (
+            SELECT {_THREAD_FIELDS} FROM matching_threads WHERE named
+            UNION ALL
+            (SELECT {_THREAD_FIELDS} FROM matching_threads WHERE NOT named
+             ORDER BY updated_at DESC, id LIMIT 200)
         )
         SELECT t.*, coalesce(turn.running, false) AS running,
                CASE WHEN turn.id IS NOT NULL THEN jsonb_build_object(
@@ -117,7 +136,8 @@ def threads(store, claim_id=None):
             ORDER BY position DESC LIMIT 1
         ) turn ON true
         ORDER BY t.updated_at DESC, t.id
-    """, claim_id, claim_id)}
+    """, named_ids, claim_id, claim_id)
+    return {"threads": [{**row, "agent_id": bindings.get(str(row["id"]))} for row in rows]}
 
 
 def _messages(store, identifier):
@@ -146,15 +166,16 @@ def _messages(store, identifier):
     return messages, error
 
 
-def thread(store, identifier):
-    _identity(store)
-    return _project_thread(store, identifier)
+def thread(store, agents, identifier):
+    return _project_thread(store, agents, _identity(store), identifier)
 
 
-def _project_thread(store, identifier):
+def _project_thread(store, agents, user_id, identifier):
     current = _thread(store, identifier)
     messages, error = _messages(store, identifier)
-    return {"thread": {**current, "messages": messages, "latest_error": error}}
+    with _agent_settings():
+        agent_id = agents.conversation_bindings(user_id, identifier).get(str(identifier))
+    return {"thread": {**current, "agent_id": agent_id, "messages": messages, "latest_error": error}}
 
 
 def _node(store, claim_id, statement_id, node_id):
@@ -183,19 +204,45 @@ def _node(store, claim_id, statement_id, node_id):
     return excerpt
 
 
-def create(store, document):
-    _document(document, {"title"}, {"claim_id", "statement_id", "node_id"})
-    _identity(store)
+def create(store, agents, document):
+    _document(document, {"title"}, {"claim_id", "statement_id", "node_id", "agent_id", "request_id"})
+    if ("agent_id" in document) != ("request_id" in document):
+        raise ConversationError("invalid")
+    user_id = _identity(store)
     title = _text(document["title"], 200)
     claim_id = _uuid(document["claim_id"]) if document.get("claim_id") is not None else None
     statement_id = _uuid(document["statement_id"]) if document.get("statement_id") is not None else None
     node_id = _text(document["node_id"], 200) if document.get("node_id") is not None else None
     if claim_id is None and (statement_id is not None or node_id is not None):
         raise ConversationError("invalid")
-    _node(store, claim_id, statement_id, node_id)
-    row, = store.query("human", "SELECT rm.create_conversation_thread(%s,%s,%s,%s) AS id",
-                       title, claim_id, statement_id, node_id)
-    return _project_thread(store, row["id"])
+    def create_thread():
+        _node(store, claim_id, statement_id, node_id)
+        row, = store.query("human", "SELECT rm.create_conversation_thread(%s,%s,%s,%s) AS id",
+                           title, claim_id, statement_id, node_id)
+        return row["id"]
+
+    if "agent_id" not in document:
+        return _project_thread(store, agents, user_id, create_thread())
+
+    agent_id, request_id = str(_uuid(document["agent_id"])), str(_uuid(document["request_id"]))
+    request_fingerprint = fingerprint({
+        "agent_id": agent_id, "title": title, "node_id": node_id,
+        "claim_id": str(claim_id) if claim_id else None,
+        "statement_id": str(statement_id) if statement_id else None,
+    })
+    # A retry waits for the PostgreSQL transaction that published its binding.
+    # A binding left by a rollback or archive stays reserved to the original request.
+    store.query("human", "SELECT pg_advisory_xact_lock(hashtextextended(%s, 106))",
+                f"{store.workspace_id}:{user_id}:{request_id}")
+    with _agent_settings():
+        identifier = UUID(agents.bind_conversation(user_id, request_id, agent_id,
+                                                   request_fingerprint, create_thread))
+    try:
+        return _project_thread(store, agents, user_id, identifier)
+    except ConversationError as error:
+        if error.code == "conversation.missing":
+            raise ConversationError("stale") from None
+        raise
 
 
 def archive(store, document):
@@ -245,8 +292,9 @@ def _limits(config):
 class Discussions:
     """Preview exact content and claim a durable request before giving it to a worker."""
 
-    def __init__(self, registry):
+    def __init__(self, registry, agents):
         self.registry = registry
+        self.agents = agents
         self.secret = secrets.token_bytes(32)
 
     @contextmanager
@@ -281,6 +329,10 @@ class Discussions:
         user_id, request_id, name, text, current = self._request(store, document)
         if current["running"]:
             raise ConversationError("busy")
+        with _agent_settings():
+            employee = self.agents.conversation_recipient(user_id, current["id"])
+        if employee is not None and name != employee["connection_id"]:
+            raise ConversationError("stale")
         with self._resolve(name) as (config, identity):
             limits = _limits(config)
             external = not config.private
@@ -289,6 +341,8 @@ class Discussions:
                          "thread_id": str(current["id"]), "revision": current["revision"],
                          "request_id": str(request_id), "connection": identity,
                          "payload_sha256": fingerprint(payload), "external": external, "limits": limits}
+        if employee is not None:
+            authorization["employee"] = {"id": employee["id"], "revision": employee["revision"]}
         return authorization, payload, text
 
     def _sign(self, expiry, authorization):
@@ -307,7 +361,7 @@ class Discussions:
         _document(document, _FIELDS | {"token", "confirm_external"})
         if type(document["confirm_external"]) is not bool:
             raise ConversationError("invalid")
-        _, request_id, connection_id, text, current = self._request(store, document)
+        user_id, request_id, connection_id, text, current = self._request(store, document)
         existing = store.query("human", """
             SELECT thread_id, connection ->> 'id' AS connection_id, text
             FROM rm.visible_conversation_turns WHERE id = %s
@@ -315,7 +369,7 @@ class Discussions:
         if existing:
             if existing[0] != {"thread_id": current["id"], "connection_id": connection_id, "text": text}:
                 raise ConversationError("stale")
-            return _project_thread(store, current["id"]), False
+            return _project_thread(store, self.agents, user_id, current["id"]), False
         authorization, payload, text = self._binding(store, document)
         token = _text(document["token"], 96)
         prefix, _, signature = token.partition(".")
@@ -329,7 +383,7 @@ class Discussions:
                            current["id"], request_id, authorization["revision"], text,
                            store.json(authorization["connection"]), store.json(payload),
                            authorization["payload_sha256"], authorization["external"])
-        return _project_thread(store, current["id"]), row["accepted"]
+        return _project_thread(store, self.agents, user_id, current["id"]), row["accepted"]
 
     def run(self, store, thread_id, request_id):
         rows = store.query("human", """

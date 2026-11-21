@@ -16,10 +16,11 @@ export type TeamAgent = {
 
 const teamAgentsKey = (session: string) => ["team-agents", session];
 
-export function useTeamAgents(session: string) {
+export function useTeamAgents(session: string, enabled = true) {
   return useQuery({
     queryKey: teamAgentsKey(session),
     queryFn: ({ signal }) => api<{ agents: TeamAgent[] }>(session, "/api/team-agents", { signal }),
+    enabled,
     retry: false,
   });
 }

@@ -86,11 +86,19 @@ Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around
 
 ## Work with the models
 
-With database revision `0079`, use **Chats** to start a workspace discussion
-before creating a claim. In **Workbench**, select a claim or node and open
-**Conversation**. Open the model menu to choose an available on-device model
-or a connection you added in Team. The composer identifies the external
-recipient and the recent turns and selected node excerpt that may be included.
+With database revision `0079` or later, use **Chats** to start a workspace
+discussion before creating a claim. Select an employee saved in **Team** and
+name a new task. The header lets you switch that employee's tasks, shows how
+many are waiting for a reply or need attention, and keeps existing
+conversations available from **Other conversations**. Drafts stay with their task while
+you switch in the open Chats page. A waiting turn shows its elapsed time from
+acceptance. The employee and task link are stored with this project's settings
+on this device.
+
+In **Workbench**, select a claim or node and open **Conversation**. Open the
+model menu to choose an available on-device model or a connection you added in
+Team. Both composers identify the destination and any included context,
+including recent turns and, when selected, a node excerpt.
 Open the + menu and choose **Request details** to inspect the exact contents.
 The send button authorizes and submits that request in one step. Project files
 are outside that payload.

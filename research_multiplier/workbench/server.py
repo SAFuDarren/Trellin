@@ -115,10 +115,9 @@ _GOAL_REVIEW_ERRORS = {
     "goalReview.stale": HTTPStatus.CONFLICT,
     "goalReview.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
 }
-_CONVERSATION_WRITES = {
-    "/api/conversations/create": workbench_conversations.create,
-    "/api/conversations/archive": workbench_conversations.archive,
-}
+_CONVERSATION_CREATE = "/api/conversations/create"
+_CONVERSATION_ARCHIVE = "/api/conversations/archive"
+_CONVERSATION_WRITES = {_CONVERSATION_CREATE, _CONVERSATION_ARCHIVE}
 _CONVERSATION_INFERENCE = {"/api/conversations/preview", "/api/conversations/send"}
 _LIBRARY_WRITES = {"/api/library/preview", "/api/library/revise"}
 _LIBRARY_ERRORS = {
@@ -234,7 +233,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self.connections = connections.Registry()
         self.team_agents = workbench_agents.AgentProfiles(workspace)
         self.public_intake = workbench_intake.PublicIntake(self.connections)
-        self.discussions = workbench_conversations.Discussions(self.connections)
+        self.discussions = workbench_conversations.Discussions(self.connections, self.team_agents)
         self._proof_task_lock = threading.Lock()
         self._lemma_plan_lock = threading.Lock()
         self.closing = threading.Event()
@@ -300,7 +299,7 @@ class WorkbenchServer(ThreadingHTTPServer):
                 threading.Thread(target=self._work_on_conversation, args=(identifier, request), daemon=True).start()
             except RuntimeError:
                 self.write(workbench_conversations.interrupted, identifier, request)
-                return self.read(workbench_conversations.thread, identifier)
+                return self.read(workbench_conversations.thread, self.team_agents, identifier)
         return result
 
     def _work_on_conversation(self, thread_id, request_id):
@@ -468,9 +467,10 @@ class _Handler(BaseHTTPRequestHandler):
             return workbench_intake.models()
         if route.path == "/api/conversations":
             claim = _uuid_parameters(route.query, "claim_id")[0] if route.query else None
-            return self.server.read(workbench_conversations.threads, claim)
+            return self.server.read(workbench_conversations.threads, self.server.team_agents, claim)
         if route.path == "/api/conversations/thread":
-            return self.server.read(workbench_conversations.thread, *_uuid_parameters(route.query, "thread_id"))
+            return self.server.read(workbench_conversations.thread, self.server.team_agents,
+                                    *_uuid_parameters(route.query, "thread_id"))
         if route.path == "/api/claims":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
@@ -859,8 +859,11 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.add_guidance(*self._guidance_body()))
             elif self.path in {_PROOF_DRAFT_ROUTE, _PROOF_DRAFT_DISCARD}:
                 self._json(HTTPStatus.OK, self._proof_draft_write())
-            elif self.path in _CONVERSATION_WRITES:
-                self._json(HTTPStatus.OK, self.server.write(_CONVERSATION_WRITES[self.path], self._body()))
+            elif self.path == _CONVERSATION_CREATE:
+                self._json(HTTPStatus.OK, self.server.write(workbench_conversations.create,
+                                                            self.server.team_agents, self._body()))
+            elif self.path == _CONVERSATION_ARCHIVE:
+                self._json(HTTPStatus.OK, self.server.write(workbench_conversations.archive, self._body()))
             elif self.path == "/api/conversations/preview":
                 self._json(HTTPStatus.OK, self.server.read(self.server.discussions.preview, self._body(64_000)))
             elif self.path == "/api/conversations/send":

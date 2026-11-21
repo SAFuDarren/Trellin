@@ -9,6 +9,7 @@ export type ConversationAnchor = { claim_id?: string; statement_id?: string; nod
 export type ConversationSummary = {
   id: string;
   title: string;
+  agent_id?: string | null;
   claim_id: string | null;
   statement_id: string | null;
   node_id: string | null;
@@ -97,9 +98,13 @@ export function useConversation(session: string, id: string) {
 export function useConversationActions(session: string) {
   const queries = useQueryClient();
   return {
-    async create(title: string, anchor: ConversationAnchor) {
+    async create(title: string, anchor: ConversationAnchor, agentId?: string, requestId?: string) {
       const { thread } = await api<{ thread: ConversationSummary }>(session, `${ROOT}/create`, {
-        data: { title, ...anchor },
+        data: {
+          title,
+          ...anchor,
+          ...(agentId ? { agent_id: agentId, request_id: requestId ?? crypto.randomUUID() } : {}),
+        },
       });
       await queries.invalidateQueries({ queryKey: conversationKey(session) });
       return thread;

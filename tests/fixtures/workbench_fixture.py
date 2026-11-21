@@ -221,6 +221,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/atlas": ATLAS, "/api/impact": IMPACT, "/api/inbox": INBOX, "/api/library": LIBRARY,
                 "/api/model-connections": {"connections": []},
                 "/api/model-connections/native": {"providers": [{"provider": "codex-cli", "status": "signed_in"}]},
+                "/api/team-agents": {"agents": []},
                 "/api/team": TEAM, "/api/progress": PROGRESS, "/api/threads": THREADS, "/api/doctor": DOCTOR}.get(route.path)
         if data is None:
             self.send(b'{"error": "Page unavailable."}', "application/json", 404)
