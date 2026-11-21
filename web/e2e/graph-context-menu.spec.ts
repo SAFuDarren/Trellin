@@ -120,7 +120,11 @@ test("the claim menu opens existing proof tools, copies exact text and shows rec
   await expect(page.locator(".workbench-action-feedback")).toHaveText(/Copied to clipboard/);
 
   await claim.press("Shift+F10");
-  await action(menu, "Copy Lean statement").click();
+  const copyLean = action(menu, "Copy Lean statement");
+  await expect(copyLean.locator("svg.workbench-icon")).toBeVisible();
+  await expect(copyLean).toHaveAttribute("aria-keyshortcuts", "Alt+L");
+  await expect(copyLean.locator("kbd")).toHaveText("Alt+L");
+  await action(menu, "Open proof").press("Alt+l");
   await expect.poll(clipboard).toBe(GOAL_LEAN);
 
   await claim.press("Shift+F10");
@@ -131,11 +135,21 @@ test("the claim menu opens existing proof tools, copies exact text and shows rec
   await expect(page.getByRole("application", { name: "Project map", exact: true })).toBeVisible();
 
   await claim.press("Shift+F10");
-  await action(menu, "Proof task").click();
+  const proofAction = action(menu, "Proof task");
+  await expect(proofAction).toHaveAttribute("aria-keyshortcuts", "Alt+T");
+  const proofIcon = await proofAction.locator("svg path").getAttribute("d");
+  await action(menu, "Open proof").press("Alt+t");
   const proofTask = page.getByRole("dialog", { name: "Proof task", exact: true });
   await expect(proofTask).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(proofTask).toBeHidden();
+  await page.keyboard.press("Control+k");
+  const palette = page.getByRole("dialog", { name: "Command palette", exact: true });
+  const paletteProof = palette.getByRole("option", { name: "Proof task", exact: true });
+  await expect(paletteProof).toHaveAttribute("aria-keyshortcuts", "Alt+T");
+  await expect(paletteProof.locator("svg path")).toHaveAttribute("d", proofIcon!);
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
 
   await claim.press("Shift+F10");
   await action(menu, "Ask an Agent").click();
@@ -211,6 +225,8 @@ test("a missing saved reference explains why copying is unavailable and does not
   const copy = action(menu, "Copy reference");
   await expect(copy).toBeDisabled();
   await expect(copy).toHaveAccessibleDescription(/saved reference/i);
+  await expect(copy).not.toHaveAttribute("aria-keyshortcuts", "Alt+C");
+  await menu.press("Alt+c");
   await copy.press("Enter");
   await expect(menu).toBeVisible();
   expect(await clipboard()).toBe("");

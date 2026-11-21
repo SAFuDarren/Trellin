@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { queryOptions, useQueries, useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { api } from "../api/client";
@@ -8,8 +8,10 @@ import type { LibraryItem } from "../api/sections";
 import { useTeamAgents } from "../api/teamAgents";
 import { workspaceId as isWorkspaceId } from "../api/workspaceEvents";
 import type { FloatingGroup, FloatingOption } from "../components/FloatingControls";
+import { WorkbenchIcon } from "../components/Icons";
 import { itemName } from "../pages/LibraryPage";
 import { normalizeReferenceCode } from "../workbench/text";
+import { paletteQuery, type PaletteScope } from "./paletteQuery";
 import type { Section } from "./route";
 
 const REFERENCE = /^[A-Z][A-Z0-9]{1,11}(?:-[0-9]{1,10})?$/;
@@ -44,7 +46,7 @@ export function usePaletteResults({
   t: TFunction;
   open: (claimId: string, nodeId?: string) => void;
   go: (section: Section, sub?: string) => void;
-}): { groups: FloatingGroup[]; isLoading: boolean } {
+}): { groups: FloatingGroup[]; isLoading: boolean; scoped: boolean } {
   const project = isWorkspaceId(workspaceId) ? workspaceId : undefined;
   const key = project ? "trellin-palette-recent:" + project : undefined;
   const [stored, setStored] = useState(() => ({ session, project, ids: readRecents(key) }));
@@ -53,8 +55,9 @@ export function usePaletteResults({
     : stored.session === session && stored.project === project
       ? stored.ids
       : readRecents(key);
+  const { scope, text } = paletteQuery(query);
   // Copied prose can contain a typographic dash. Send the resolver its canonical ASCII query.
-  const code = enabled ? normalizeReferenceCode(query).replace(/[‐‑‒–—−－]/g, "-") : "";
+  const code = enabled && scope !== "agents" ? normalizeReferenceCode(text).replace(/[‐‑‒–—−－]/g, "-") : "";
   const exact = REFERENCE.test(code) ? code : "";
   const [settledReference, setSettledReference] = useState("");
   useEffect(() => {
@@ -89,7 +92,7 @@ export function usePaletteResults({
       }),
     ),
   });
-  if (!enabled) return { groups: [], isLoading: false };
+  if (!enabled) return { groups: [], isLoading: false, scoped: false };
 
   function remember(id: string) {
     const next = [id, ...ids.filter((item) => item !== id)].slice(0, RECENT_LIMIT);
@@ -123,8 +126,10 @@ export function usePaletteResults({
   currentConversations.forEach(({ id, agent_id }) => {
     if (agent_id && !firstConversationByAgent.has(agent_id)) firstConversationByAgent.set(agent_id, id);
   });
-  const groups: FloatingGroup[] = [
+  const groups: (FloatingGroup & { scope?: PaletteScope; icon: string })[] = [
     {
+      scope: "claims",
+      icon: "proof",
       label: t("palette.references"),
       options: codes.flatMap((reference, index) => {
         const data = references[index]?.data;
@@ -136,18 +141,21 @@ export function usePaletteResults({
             reference,
             () => open(data.claim_id, data.node_id ?? undefined),
             title,
-            reference === exact ? query.trim() : undefined,
+            reference === exact ? text : undefined,
           ),
         ];
       }),
     },
     {
+      scope: "claims",
+      icon: "claims",
       label: t("palette.claims"),
       options: currentClaims.map(({ id, domain }) =>
         result("claim:" + id, claimTitles.get(id)!, () => open(id), domain ?? undefined),
       ),
     },
     {
+      icon: "library",
       label: t("palette.library"),
       options: (library.data?.items ?? []).map((item) =>
         result(
@@ -160,12 +168,15 @@ export function usePaletteResults({
       ),
     },
     {
+      icon: "chat",
       label: t("palette.conversations"),
       options: currentConversations.map(({ id, title, agent_id }) =>
         result("conversation:" + id, title, () => go("chat", id), agentNames.get(agent_id ?? "")),
       ),
     },
     {
+      scope: "agents",
+      icon: "team",
       label: t("palette.agents"),
       options: (agents.data?.agents ?? []).map(({ id, name, description }) =>
         result(
@@ -178,13 +189,20 @@ export function usePaletteResults({
       ),
     },
   ];
-  const byId = new Map(groups.flatMap(({ options }) => options.map((option) => [option.id, option])));
+  const scopedGroups = groups
+    .filter((group) => !scope || group.scope === scope)
+    .map(({ label, icon, options }) => {
+      const glyph = createElement(WorkbenchIcon, { name: icon });
+      return { label, options: options.map((option) => ({ ...option, icon: glyph })) };
+    });
+  const byId = new Map(scopedGroups.flatMap(({ options }) => options.map((option) => [option.id, option])));
   const recent = new Set(ids);
   return {
     groups: [
       { label: t("palette.recent"), options: ids.flatMap((id) => byId.get(id) ?? []) },
-      ...groups.map((group) => ({ ...group, options: group.options.filter(({ id }) => !recent.has(id)) })),
+      ...scopedGroups.map((group) => ({ ...group, options: group.options.filter(({ id }) => !recent.has(id)) })),
     ],
+    scoped: Boolean(scope),
     isLoading:
       claims.isPending ||
       library.isPending ||

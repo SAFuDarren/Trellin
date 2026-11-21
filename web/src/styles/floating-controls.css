@@ -88,6 +88,13 @@ dialog[open]:has(> .floating-popover) {
   justify-content: center;
 }
 
+.floating-option-icon .workbench-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--sub);
+  stroke-width: 1.6;
+}
+
 .floating-option-text {
   display: grid;
   flex: 1;
@@ -109,6 +116,14 @@ dialog[open]:has(> .floating-popover) {
 .floating-check {
   flex: 0 0 auto;
   margin-inline-start: auto;
+}
+
+.floating-shortcut {
+  padding: 1px 4px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  font-family: var(--mono);
+  white-space: nowrap;
 }
 
 .floating-check {

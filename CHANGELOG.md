@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.64
+
+- The command palette shows icons and keyboard hints. Use `#` to find claims and their proof references, or `@` to find Agents. Map and proof menus display shortcuts for actions that support them.
+
 ## 1.0.63
 
 - Each workbench area gives its main action one filled button. The project map uses icon toggles for Details and Global map, with keyboard shortcuts and visible pressed states. Find claim uses the same outlined style as neighbouring actions.

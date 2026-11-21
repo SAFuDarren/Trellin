@@ -336,6 +336,14 @@ function fold(text: string) {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase();
 }
 
+function shortcutOption(event: KeyboardEvent, options: FloatingOption[]) {
+  if (event.defaultPrevented || event.repeat || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+    return;
+  // Option-letter combinations may produce a symbol rather than a letter on macOS.
+  const letter = /^Key[A-Z]$/.test(event.code) ? event.code.slice(3) : event.key.toUpperCase();
+  return options.find((option) => option.onSelect && option.shortcut === `Alt+${letter}`);
+}
+
 function OptionContent({ option, checked }: { option: FloatingOption; checked?: boolean }) {
   return (
     <>
@@ -348,7 +356,11 @@ function OptionContent({ option, checked }: { option: FloatingOption; checked?: 
         <span>{option.label}</span>
         {option.detail && <small>{option.detail}</small>}
       </span>
-      {option.shortcut && <kbd className="floating-shortcut">{option.shortcut}</kbd>}
+      {option.shortcut && (
+        <kbd className="floating-shortcut" aria-hidden="true">
+          {option.shortcut}
+        </kbd>
+      )}
       {option.count !== undefined && <span className="floating-count">{option.count}</span>}
       {checked && <span className="floating-check" aria-hidden="true" />}
     </>
@@ -377,8 +389,14 @@ function MenuContent({
   const initialOptions = available.length ? available : options;
   const initial = edge === "first" ? initialOptions[0]?.id : initialOptions.at(-1)?.id;
   function handleKey(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey || event.ctrlKey || event.metaKey)
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    const shortcut = shortcutOption(event, available);
+    if (shortcut) {
+      event.preventDefault();
+      choose(shortcut);
       return;
+    }
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     const elements = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("[data-menu-option]"));
     if (elements.length === 0) return;
     const current = elements.findIndex((element) => element === document.activeElement);
@@ -449,6 +467,7 @@ function MenuContent({
                 "aria-label": option.count === undefined ? option.label : `${option.label} ${option.count}`,
                 "aria-description": option.detail,
                 "aria-disabled": option.disabled || undefined,
+                "aria-keyshortcuts": option.shortcut,
               };
               const content = <OptionContent option={option} checked={option.current} />;
               if (option.href && !option.disabled) {
@@ -541,6 +560,7 @@ export function PickerContent({
   value,
   footer,
   limit,
+  filterText,
   edge = "first",
   onQueryChange,
   onChoose,
@@ -552,6 +572,7 @@ export function PickerContent({
   value?: string;
   footer?: ReactNode;
   limit?: { perGroup: number; label: string };
+  filterText?: (query: string) => string;
   edge?: Edge;
   onQueryChange?: (query: string) => void;
   onChoose: (option: FloatingOption) => void;
@@ -560,8 +581,9 @@ export function PickerContent({
   const listRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(value);
+  const search = filterText?.(query) ?? query;
   const matches = useMemo(() => {
-    const terms = fold(query.trim()).split(/\s+/);
+    const terms = fold(search.trim()).split(/\s+/);
     return groups
       .map((group) => ({
         ...group,
@@ -571,7 +593,7 @@ export function PickerContent({
         }),
       }))
       .filter((group) => group.options.length > 0);
-  }, [groups, query]);
+  }, [groups, search]);
   const filtered = limit
     ? matches.map((group) => ({ ...group, options: group.options.slice(0, limit.perGroup) }))
     : matches;
@@ -590,6 +612,12 @@ export function PickerContent({
 
   function handleKey(event: KeyboardEvent<HTMLInputElement>) {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    const shortcut = shortcutOption(event, enabled);
+    if (shortcut) {
+      event.preventDefault();
+      onChoose(shortcut);
+      return;
+    }
     if (event.key === "Enter") {
       event.preventDefault();
       if (active) onChoose(active);
@@ -646,6 +674,7 @@ export function PickerContent({
                 aria-description={option.detail}
                 aria-selected={option.id === value}
                 aria-disabled={option.disabled || undefined}
+                aria-keyshortcuts={option.shortcut}
                 tabIndex={-1}
                 className="floating-option"
                 data-highlighted={option.id === active?.id || undefined}

@@ -18,7 +18,11 @@
     "conversations": "Conversations",
     "agents": "Agents",
     "actions": "Actions",
-    "startChat": "Start a chat"
+    "startChat": "Start a chat",
+    "keyboardHelp": "Keyboard shortcuts",
+    "navigate": "Navigate",
+    "open": "Open",
+    "referenceKeywords": "proof node claim code short reference"
   },
   "session": {
     "missing": "Open the workbench with the link printed by `research-multiplier workbench`."

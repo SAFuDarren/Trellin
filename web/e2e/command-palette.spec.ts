@@ -85,11 +85,19 @@ test("both shortcuts work throughout the shell and Escape restores the previous 
   await expect(palette(page).getByRole("combobox")).toBeFocused();
 });
 
-test("keyboard search opens claims and exact proof references on the project map", async ({ page }) => {
+test("the # prefix searches claims and exact proof references with the keyboard", async ({ page }) => {
   await withReferences(page);
   await page.goto("/#session=fixture");
   await page.goto("/#library");
-  await choose(page, "加零", FIXTURE_CLAIM_TITLE);
+  const query = await openPalette(page);
+  await query.fill("#");
+  const results = palette(page).getByRole("listbox");
+  const claimResult = results.getByRole("option", { name: FIXTURE_CLAIM_TITLE, exact: true });
+  await expect(claimResult.locator("svg.workbench-icon")).toBeVisible();
+  await expect(results.getByRole("option", { name: "Nat.add_zero", exact: true })).toHaveCount(0);
+  await expect(results.getByRole("option", { name: "Add theorem", exact: true })).toHaveCount(0);
+  await query.press("Escape");
+  await choose(page, "# 加零", FIXTURE_CLAIM_TITLE);
   const map = page.getByRole("application", { name: "Project map", exact: true });
   await expect(map).toBeVisible();
   await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
@@ -98,7 +106,7 @@ test("keyboard search opens claims and exact proof references on the project map
   await choose(page, "zadd", "ZADD");
   await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
 
-  await choose(page, "ZADD-02", "ZADD-02");
+  await choose(page, "#ZADD-02", "ZADD-02");
   await expect(map).toBeHidden();
   const node = page.locator(`.main-proof-graph [data-node="${OBLIGATION_ID}"]`);
   await expect(node).toBeVisible();
@@ -122,7 +130,7 @@ test("keyboard search opens claims and exact proof references on the project map
   await expect(page.locator("#review")).toBeHidden();
 });
 
-test("Library, conversation and Agent results take the existing routes", async ({ page }) => {
+test("Library and conversation results keep their routes and @ narrows to Agents", async ({ page }) => {
   const agent: TeamAgent = {
     id: "4b9987f9-9836-485b-892f-4f11ca4fc215",
     revision: 1,
@@ -135,7 +143,7 @@ test("Library, conversation and Agent results take the existing routes", async (
   };
   const thread: Conversation = {
     id: "3a9987f9-9836-485b-892f-4f11ca4fc215",
-    title: "Explore multiplication lemmas",
+    title: "Lean Reviewer discussion of multiplication lemmas",
     agent_id: null,
     claim_id: null,
     node_id: null,
@@ -162,9 +170,22 @@ test("Library, conversation and Agent results take the existing routes", async (
   await expect(page).toHaveURL((url) => url.hash === `#chat/${thread.id}`);
   await expect(page.getByRole("heading", { name: thread.title })).toBeVisible();
 
-  await choose(page, "lean reviewer", agent.name);
+  const search = await openPalette(page);
+  await search.fill("lean reviewer");
+  await expect(palette(page).getByRole("option", { name: thread.title, exact: true })).toBeVisible();
+  await search.fill("@ lean reviewer");
+  const agentResult = palette(page).getByRole("option", { name: agent.name, exact: true });
+  await expect(agentResult.locator("svg.workbench-icon")).toBeVisible();
+  await expect(palette(page).getByRole("option", { name: thread.title, exact: true })).toHaveCount(0);
+  await search.press("Enter");
   await expect(page).toHaveURL((url) => url.hash === `#chat/employee%2F${agent.id}`);
   await expect(page.getByRole("heading", { name: agent.name })).toBeVisible();
+
+  const scopedRecent = await openPalette(page);
+  await scopedRecent.fill("@ lean reviewer");
+  await expect(palette(page).getByRole("group", { name: "Recent", exact: true }).getByRole("option")).toHaveText(
+    agent.name,
+  );
 });
 
 test("recent results lead the list and stay inside the active project", async ({ page }) => {
@@ -242,7 +263,26 @@ test("palette actions open the existing forms and wait for explicit authorizatio
   await selected.click();
   await expect(selected).toHaveAttribute("aria-pressed", "true");
   await page.goto("/#library");
-  await choose(page, "proof task", "Proof task");
+  const search = await openPalette(page);
+  const chooser = palette(page);
+  const legend = chooser.getByRole("group", { name: "Keyboard shortcuts" });
+  await expect(legend.locator("kbd")).toHaveText(["↑", "↓", "↵", "#", "@"]);
+  const backdrop = await chooser.evaluate((element) => getComputedStyle(element, "::backdrop").backgroundColor);
+  expect(backdrop).toBe("rgba(0, 0, 0, 0.34)");
+  await search.fill("proof");
+  await expect(chooser.getByRole("option", { name: "Research references", exact: true })).toBeVisible();
+  const proofAction = chooser.getByRole("option", { name: "Proof task", exact: true });
+  await expect(proofAction.locator("svg.workbench-icon")).toBeVisible();
+  await expect(proofAction).toHaveAttribute("aria-keyshortcuts", "Alt+T");
+  const keyHint = proofAction.locator("kbd");
+  await expect(keyHint).toHaveText("Alt+T");
+  const [hintBounds, textBounds] = await Promise.all([
+    keyHint.boundingBox(),
+    proofAction.locator(".floating-option-text").boundingBox(),
+  ]);
+  expect(hintBounds!.x).toBeGreaterThan(textBounds!.x + textBounds!.width);
+  await search.press("Alt+t");
+  await expect(chooser).toBeHidden();
   const proofTask = page.getByRole("dialog", { name: "Proof task", exact: true });
   await expect(proofTask.getByRole("heading", { name: FIXTURE_CLAIM_TITLE })).toBeVisible();
   await expect(proofTask.getByRole("checkbox", { name: /I authorize proof work/ })).not.toBeChecked();

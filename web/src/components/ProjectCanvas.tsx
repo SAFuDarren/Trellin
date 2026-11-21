@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
 import type { ProjectCanvasLayout, ProjectCanvasOperation } from "../api/projectCanvas";
+import { graphAction } from "../workbench/actions";
 import type { ClaimProgress } from "../workbench/claimProgress";
 import type { Point } from "../workbench/graph";
 import { nodeTitle } from "../workbench/text";
@@ -379,17 +380,17 @@ export function ProjectCanvas({
 
   function linkAction(id: string | null): FloatingOption {
     const disabled = !activeSource && (!id || cards.length < 2 || editingDisabled);
-    return {
-      id: "link-claim",
-      label: t(activeSource ? "projectCanvas.cancelLink" : "projectCanvas.linkClaim"),
-      disabled,
-      detail: disabled ? t("graphActions.linkUnavailable") : undefined,
-      onSelect: () => {
-        if (disabled) return;
-        setLinkSource(activeSource ? null : id);
-        setLinkNotice("");
-      },
-    };
+    return graphAction(
+      t,
+      activeSource ? "cancel-link" : "link-claim",
+      disabled
+        ? undefined
+        : () => {
+            setLinkSource(activeSource ? null : id);
+            setLinkNotice("");
+          },
+      disabled ? t("graphActions.linkUnavailable") : undefined,
+    );
   }
 
   function choose(id: string) {
