@@ -19,7 +19,11 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 Use **Home** in the rail to return to Workbench. In the Workbench or Review sidebar header, **Switch view** shows the number of items awaiting review. Open **Review** there and return with **Workbench** or **Home**. Your graph keeps its selected claim and node while you switch.
 
-Use the left sidebar to open a project. Its **Project map** shows the project's claims on one canvas. Click a card to select it or choose **Find claim** to bring it into view. Choose **Open proof** to read the selected proof. Use **Project map** in the proof header to return. Drag cards or focus a card and use the arrow keys to move it. To record a research relationship, select a claim, choose **Link selected claim**, and select the other claim. Escape cancels the link. **Research links** lists saved links and lets you remove them. Positions and research links are saved per project in this device's settings. The proof view shows recorded proof dependencies.
+Use the left sidebar to open a project. Its **Project map** shows the project's claims on one canvas. Click a card or choose **Find claim** to select it and read its statement, Lean text, and review items in the right-hand details panel. Use **Details** to toggle the panel. Choose **Open proof** to read the selected proof and **Project map** in the proof header to return.
+
+Choose **Global map** to show the existing overview of recent claims and their recorded proof dependencies in the current workspace. Move it by its title, resize it from the corner, or choose a claim in the overview to bring its card into view.
+
+Drag cards or focus a card and use the arrow keys to move it. To record a research relationship, select a claim, choose **Link selected claim**, and select the other claim. Escape cancels the link. **Research links** lists saved links and lets you remove them. Positions and research links are saved per project in this device's settings.
 
 Open **Settings and help** at the bottom of the rail to find settings or the usage guide. Press Escape to close either menu and return focus to its button.
 

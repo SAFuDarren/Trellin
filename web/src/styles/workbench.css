@@ -223,6 +223,23 @@ select {
   overflow: auto;
 }
 
+@media (max-width: 720px) {
+  .app[data-view="project"] {
+    position: relative;
+  }
+  .app[data-view="project"] .review {
+    position: absolute;
+    z-index: 4;
+    inset-block: 0;
+    inset-inline-end: 0;
+    width: min(var(--right-w), calc(100% - 48px));
+    border-inline-start: 1px solid var(--hair);
+  }
+  .app[data-view="project"] .splitter[data-split="right"] {
+    display: none;
+  }
+}
+
 .splitter {
   position: relative;
   z-index: 3;
@@ -997,6 +1014,15 @@ select {
 .atlas[data-small="true"] .atlas-keys {
   display: none;
 }
+.atlas[data-interactive="true"] {
+  border: 1px solid var(--hair);
+  background: var(--main);
+}
+.atlas[data-interactive="true"] .atlas-keys {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+}
 .atlas line {
   stroke-width: 0.7;
 }
@@ -1025,6 +1051,27 @@ select {
 .atlas-keys span[data-current="true"] {
   color: var(--ink);
   font-weight: 600;
+}
+.atlas-keys button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  min-height: 24px;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.atlas-keys button:hover,
+.atlas-keys button[aria-pressed="true"] {
+  background: var(--pick);
+  color: var(--ink);
+}
+.atlas-keys button:focus-visible {
+  outline-offset: -2px;
 }
 .atlas-keys i {
   display: inline-block;

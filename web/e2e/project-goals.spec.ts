@@ -89,8 +89,10 @@ test("adding a project goal keeps the current proof open and draws no dependency
 
   await page.getByRole("button", { name: "Project map", exact: true }).click();
   await expect(newClaim).toBeVisible();
-  expect(requestedGraphs).not.toContain(NEW_GOAL.id);
+  await expect(page.locator("#node-detail").getByRole("heading", { name: NEW_GOAL.title })).toBeVisible();
+  await expect(originalProof).toHaveCount(0);
 
+  requestedGraphs.length = 0;
   await page.reload();
   await expect(newClaim).toBeVisible();
   await openProof(page);

@@ -1,9 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
 import type { ProjectCanvasLayout, ProjectCanvasOperation } from "../api/projectCanvas";
 import type { Point } from "../workbench/graph";
 import { nodeStatus, nodeTitle, nodeTone } from "../workbench/text";
+import type { AtlasClaim } from "../workbench/types";
+import type { AtlasBox } from "../workbench/useLayout";
+import { AtlasMap, atlasPlacement } from "./AtlasMap";
 import { Mark } from "./Icons";
 import "../styles/project-canvas.css";
 
@@ -54,11 +66,24 @@ function zoomCamera(camera: Camera, factor: number, center: Point) {
   };
 }
 
+function visibleOffset(offset: number, start: number, extent: number, available: number) {
+  if (extent > available) return (available - extent) / 2 - start;
+  return Math.max(-start, Math.min(offset, available - start - extent));
+}
+
 type Props = {
   claims: Claim[];
   selected: string | null;
   onSelect: (id: string) => void;
   onOpenClaim: (id: string) => void;
+  detailsOpen: boolean;
+  onToggleDetails: () => void;
+  atlasClaims: AtlasClaim[] | undefined;
+  atlasOpen: boolean;
+  atlasBox: AtlasBox | null;
+  onToggleAtlas: () => void;
+  onAtlasBox: (box: AtlasBox, persist: boolean) => void;
+  atlasError?: string;
   layout: ProjectCanvasLayout;
   onLayout: (edit: ProjectCanvasOperation) => void;
   layoutUnavailable?: boolean;
@@ -70,6 +95,14 @@ export function ProjectCanvas({
   selected,
   onSelect,
   onOpenClaim,
+  detailsOpen,
+  onToggleDetails,
+  atlasClaims,
+  atlasOpen,
+  atlasBox,
+  onToggleAtlas,
+  onAtlasBox,
+  atlasError,
   layout,
   onLayout,
   layoutUnavailable,
@@ -82,6 +115,8 @@ export function ProjectCanvas({
   const nodes = useRef(new Map<string, HTMLButtonElement>());
   const movedCamera = useRef(false);
   const gesture = useRef<Gesture | null>(null);
+  const draggedCard = useRef<string | null>(null);
+  const inspected = useRef<string | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -116,6 +151,7 @@ export function ProjectCanvas({
   const normalizedQuery = query.trim().toLocaleLowerCase(i18n.language);
   const matches = cards.filter((card) => card.title.toLocaleLowerCase(i18n.language).includes(normalizedQuery));
   const center = { x: size.width / 2, y: size.height / 2 };
+  const mapBox = atlasPlacement(atlasBox, size.width, size.height);
 
   useEffect(() => {
     const target = stage.current;
@@ -149,10 +185,26 @@ export function ProjectCanvas({
     if (!movedCamera.current) fit(false);
   }, [fit]);
 
+  useLayoutEffect(() => {
+    const id = detailsOpen ? selected : null;
+    if (inspected.current === id) return;
+    inspected.current = id;
+    const target = stage.current;
+    const point = id ? byId.get(id)?.point : undefined;
+    if (!target || !point) return;
+    const { clientWidth, clientHeight } = target;
+    setCamera((current) => {
+      const x = visibleOffset(current.x, point.x * current.k, WIDTH * current.k, clientWidth);
+      const y = visibleOffset(current.y, point.y * current.k, HEIGHT * current.k, clientHeight);
+      return x === current.x && y === current.y ? current : { ...current, x, y };
+    });
+  }, [byId, detailsOpen, selected]);
+
   useEffect(() => {
     const target = stage.current;
     if (!target) return;
     const wheel = (event: WheelEvent) => {
+      if ((event.target as Element).closest(".atlas")) return;
       event.preventDefault();
       if (gesture.current) return;
       movedCamera.current = true;
@@ -186,14 +238,17 @@ export function ProjectCanvas({
     } else {
       setLinkNotice("");
     }
+    movedCamera.current = true;
     onSelect(id);
   }
 
   function reveal(id: string) {
     const card = byId.get(id);
     if (!card) return;
-    choose(id);
+    // Finding a card is navigation. Only a deliberate card activation completes a link.
     movedCamera.current = true;
+    setLinkNotice("");
+    onSelect(id);
     setCamera((current) => ({
       ...current,
       x: center.x - (card.point.x + WIDTH / 2) * current.k,
@@ -205,6 +260,7 @@ export function ProjectCanvas({
 
   function startGesture(event: PointerEvent<HTMLElement>, id?: string) {
     if (event.button !== 0 || gesture.current) return;
+    draggedCard.current = null;
     const origin = id ? byId.get(id)?.point : camera;
     if (!origin || (id && (activeSource || editingDisabled))) return;
     event.stopPropagation();
@@ -249,6 +305,7 @@ export function ProjectCanvas({
     if (!current || current.pointer !== event.pointerId) return;
     gesture.current = null;
     if (save && current.id && current.moved && !editingDisabled) {
+      draggedCard.current = current.id;
       const point = draggedPoint(current, event.clientX, event.clientY);
       if (point.x !== current.origin.x || point.y !== current.origin.y)
         onLayout({ action: "move", id: current.id, ...point });
@@ -307,6 +364,20 @@ export function ProjectCanvas({
       <div className="project-canvas-tools">
         <button type="button" className="button" disabled={!selected} onClick={() => selected && onOpenClaim(selected)}>
           {t("projectCanvas.openProof")}
+        </button>
+        <button
+          id="map-details-toggle"
+          type="button"
+          className="button"
+          disabled={!selected}
+          aria-expanded={detailsOpen}
+          aria-controls="review"
+          onClick={() => {
+            movedCamera.current = true;
+            onToggleDetails();
+          }}
+        >
+          {t("canvasShell.details")}
         </button>
         <button
           type="button"
@@ -373,6 +444,9 @@ export function ProjectCanvas({
             </ul>
           </details>
         )}
+        <button type="button" className="button" aria-pressed={atlasOpen} onClick={onToggleAtlas}>
+          {t("sidebar.atlas")}
+        </button>
       </div>
       <div
         ref={stage}
@@ -383,7 +457,7 @@ export function ProjectCanvas({
         data-panning={panning ? "true" : undefined}
         data-linking={activeSource ? "true" : undefined}
         onPointerDown={(event) => {
-          if (!(event.target as Element).closest("button")) startGesture(event);
+          if (!(event.target as Element).closest("button, .atlas")) startGesture(event);
         }}
         onPointerMove={moveGesture}
         onPointerUp={(event) => finishGesture(event, true)}
@@ -424,7 +498,10 @@ export function ProjectCanvas({
                 aria-keyshortcuts={layoutUnavailable ? undefined : "ArrowLeft ArrowRight ArrowUp ArrowDown"}
                 title={card.title}
                 style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
-                onClick={() => choose(card.id)}
+                onClick={(event) => {
+                  if (event.detail === 0 || draggedCard.current !== card.id) choose(card.id);
+                  draggedCard.current = null;
+                }}
                 onPointerDown={(event) => startGesture(event, card.id)}
                 onKeyDown={(event) => moveByKey(event, card.id, at)}
               >
@@ -439,6 +516,21 @@ export function ProjectCanvas({
           })}
         </div>
         {!cards.length && <p className="project-canvas-empty">{t("notice.noClaims")}</p>}
+        {atlasOpen &&
+          (atlasClaims?.length ? (
+            <AtlasMap
+              claims={atlasClaims}
+              claimId={selected}
+              box={mapBox}
+              stageWidth={size.width}
+              onBox={onAtlasBox}
+              onSelectClaim={reveal}
+            />
+          ) : (
+            <p className="project-canvas-atlas-status" role={atlasError ? "alert" : "status"}>
+              {atlasError ?? t(atlasClaims ? "atlas.empty" : "atlas.loading")}
+            </p>
+          ))}
         <div className="zoom" role="group" aria-label={t("stage.zoom")}>
           <button type="button" aria-label={t("stage.zoomOut")} onClick={() => zoom(1 / 1.2)}>
             <svg viewBox="0 0 14 14" aria-hidden="true">

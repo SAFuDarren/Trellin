@@ -35,6 +35,7 @@ type Props = {
   impact: ImpactPreview | undefined;
   impactLoading: boolean;
   impactError: string;
+  notice?: { text: string; error: boolean };
   onSelect: (id: string) => void;
   onReviewPremise: (id: string) => void;
   onClose: () => void;
@@ -105,7 +106,13 @@ export function ReviewPanel(props: Props) {
         </ul>
       </section>
       <section className="node-detail" id="node-detail" aria-label={t("review.detail")}>
-        <NodeDetail {...props} />
+        {props.notice ? (
+          <p className="notice" role={props.notice.error ? "alert" : "status"} data-error={props.notice.error}>
+            {props.notice.text}
+          </p>
+        ) : (
+          <NodeDetail {...props} />
+        )}
       </section>
     </aside>
   );
