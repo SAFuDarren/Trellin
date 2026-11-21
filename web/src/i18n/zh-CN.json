@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Research Multiplier",
+    "name": "Trellin",
     "language": "语言"
   },
   "palette": {
@@ -1299,58 +1299,45 @@
     "openRuntimes": "查看运行环境与检查"
   },
   "help": {
-    "basics": "使用指南",
-    "intro": "Research Multiplier 把每个课题、它的证明和背后的证据都记录在你的项目里。工作台查看单个课题；其他栏目查看整个项目。",
-    "sections": "栏目",
+    "basics": "使用 Trellin",
+    "intro": "{{name}} 让你在同一项目中查看图谱、证明和 Agent 任务。在图谱中选中课题，保留项目全局的同时查看该课题的详情。",
+    "sections": "工作入口",
     "about": {
-      "workbench": "单个课题的证明图、详情和模型对话。",
-      "review": "等你决定的结果和问题。",
-      "claims": "按状态分组，一览所有课题。",
-      "library": "可以直接复用的定义、假设和定理。",
-      "chat": "与已保存的员工对话、切换任务或查看会话历史。",
-      "team": "模型、运行环境、用量和任务队列。",
-      "progress": "你不在时让工作继续推进的规则。"
+      "workbench": "在项目图谱中排列和关联课题，打开证明可查看证明义务。",
+      "claims": "按状态追踪课题，打开「Agent 任务」可派工和验收。",
+      "library": "查看已记录的陈述、对应来源和使用它们的课题。",
+      "chat": "和 Agent 对话、切换会话或查看证明活动。",
+      "team": "设置 Agent 和模型连接，查看任务队列、用量和运行环境。",
+      "progress": "查看推进证明的规则和运行情况。",
+      "settings": "切换显示语言、重置布局或检查更新。"
     },
-    "canvas": "证明图画布",
-    "keys": {
-      "palette": {
-        "what": "查找课题、证明节点或命令"
+    "controls": "常用操作",
+    "moveCard": "焦点在画布上时，方向键用来平移。要移动卡片，先从卡片菜单选择「移动卡片」，再用方向键预览位置。按 {{confirm}} 保存，或按 {{cancel}} 取消。",
+    "guides": "科研指南",
+    "openMap": "打开工作台",
+    "openAgents": "打开团队 Agent",
+    "openAgentWork": "打开 Agent 任务",
+    "openClaims": "打开课题看板",
+    "openLibrary": "打开定理库",
+    "guide": {
+      "project-map": {
+        "title": "建立项目图谱",
+        "first": "选择「添加定理」，记录自然语言表述和对应的 Lean 陈述。",
+        "second": "在图谱上排列卡片，为需要跟踪的课题建立关联。",
+        "third": "选中卡片查看详情，点「打开证明」查看依赖关系和待证义务。"
       },
-      "drag": {
-        "key": "拖动",
-        "what": "平移画布"
+      "agents": {
+        "title": "协调多个 Agent",
+        "first": "在团队中保存 Agent，选择模型连接，并写明它的职责。",
+        "second": "在「Agent 任务」中选定任务范围，预览 Agent 将收到的内容，再派工。",
+        "third": "打开交付结果进行验收或交接。在任意页面打开 Agent 活动可查看进行中的任务。"
       },
-      "zoom": {
-        "key": "{{shortcut}} + 滚动，或双指捏合",
-        "what": "以指针为中心缩放"
-      },
-      "keys": {
-        "key": "方向键、+ 和 −",
-        "what": "画布获得焦点时平移和缩放"
-      },
-      "move": {
-        "key": "移动卡片（卡片菜单）",
-        "what": "用方向键预览位置，按住 {{shift}} 可加大步长。按 {{confirm}} 保存，或按 {{cancel}} 取消。"
-      },
-      "fit": {
-        "key": "0",
-        "what": "让整张图适合窗口"
-      },
-      "borders": {
-        "key": "拖动边界",
-        "what": "调整面板大小；边界获得焦点时也可用方向键"
-      },
-      "select": {
-        "key": "点击卡片",
-        "what": "查看详情和对话"
+      "proofs": {
+        "title": "核验和复用证明",
+        "first": "打开课题的证明，选中节点查看 Lean 陈述、状态和依赖。",
+        "second": "打开「证明任务」，核对要检查的范围。从 Agent 活动打开等待你决定的结果。",
+        "third": "在定理库中查找结果，查看其陈述、来源和使用它的课题。"
       }
-    },
-    "guides": "docs 目录里的指南",
-    "docs": {
-      "workbench": "proof-workbench.md：工作台，以及给模型发送意见",
-      "quickstart": "quickstart.zh-CN.md：安装和入门",
-      "review": "research-review.md：审阅证据和来源",
-      "progress": "research-progress.md：推进规则和 worker"
     }
   },
   "premise": {

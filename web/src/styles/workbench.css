@@ -2732,12 +2732,13 @@ select:disabled {
 .contents {
   display: contents;
 }
-.help ul {
-  list-style: disc;
-  padding-left: 20px;
+.help ol {
+  list-style: decimal;
+  margin: 0;
+  padding-inline-start: 22px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .page-notice {

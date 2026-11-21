@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Research Multiplier",
+    "name": "Trellin",
     "language": "Language"
   },
   "palette": {
@@ -1299,58 +1299,45 @@
     "openRuntimes": "Open runtimes and checks"
   },
   "help": {
-    "basics": "Getting around",
-    "intro": "Research Multiplier keeps every claim, its proof and the evidence behind it in your project. The workbench shows one claim; the other sections look across the whole project.",
-    "sections": "Sections",
+    "basics": "Using Trellin",
+    "intro": "{{name}} brings your project map, proofs and Agent work together. Select a claim on the map to see its details while keeping the wider project in view.",
+    "sections": "Where to work",
     "about": {
-      "workbench": "One claim's proof graph, details and model conversation.",
-      "review": "Results and questions waiting for your decision.",
-      "claims": "Every claim at a glance, grouped by status.",
-      "library": "Definitions, assumptions and theorems you can build on.",
-      "chat": "Chat with saved agents, switch tasks, or open conversation history.",
-      "team": "Models, runtimes, usage and the job queue.",
-      "progress": "Rules that keep work going while you are away."
+      "workbench": "Arrange and link claims on the project map. Open a claim’s proof to see its obligations.",
+      "claims": "Track claims by status and open Agent work to assign or review tasks.",
+      "library": "Read recorded statements and see the sources and claims that use them.",
+      "chat": "Talk with an Agent, switch conversations or read proof activity.",
+      "team": "Set up Agents and model connections. Check jobs, usage and runtimes.",
+      "progress": "Review the rules that advance proofs and follow their runs.",
+      "settings": "Choose the display language, reset the layout or check for updates."
     },
-    "canvas": "Graph canvas",
-    "keys": {
-      "palette": {
-        "what": "Find a claim, proof node or command"
+    "controls": "Quick controls",
+    "moveCard": "Arrow keys pan when the canvas has focus. To move a card, choose Move card from its menu, then preview with the arrows. Press {{confirm}} to save or {{cancel}} to cancel.",
+    "guides": "Research guides",
+    "openMap": "Open the workbench",
+    "openAgents": "Open Team Agents",
+    "openAgentWork": "Open Agent work",
+    "openClaims": "Open Claims",
+    "openLibrary": "Open Library",
+    "guide": {
+      "project-map": {
+        "title": "Build a project map",
+        "first": "Choose Add theorem to record your claim in words and in Lean.",
+        "second": "Arrange cards on the map and link claims to record relationships you want to revisit.",
+        "third": "Select a card to see its details. Choose Open proof to see its dependencies and open obligations."
       },
-      "drag": {
-        "key": "Drag",
-        "what": "Pan the graph"
+      "agents": {
+        "title": "Coordinate Agents",
+        "first": "In Team, save an Agent and choose its model connection. Record what you want that Agent to do.",
+        "second": "In Agent work, choose a task scope and preview what the Agent will receive before dispatching it.",
+        "third": "Open a delivered result to review it or hand it off. Open Agent activity from any page to follow active work."
       },
-      "zoom": {
-        "key": "{{shortcut}} + scroll, or pinch",
-        "what": "Zoom around the pointer"
-      },
-      "keys": {
-        "key": "Arrow keys, + and −",
-        "what": "Pan and zoom when the canvas is focused"
-      },
-      "move": {
-        "key": "Move card (card menu)",
-        "what": "Preview with the arrows, or hold {{shift}} for larger steps. Press {{confirm}} to save or {{cancel}} to cancel."
-      },
-      "fit": {
-        "key": "0",
-        "what": "Fit the graph to the window"
-      },
-      "borders": {
-        "key": "Drag a border",
-        "what": "Resize panels; arrow keys work when a border is focused"
-      },
-      "select": {
-        "key": "Click a card",
-        "what": "Show its details and conversation"
+      "proofs": {
+        "title": "Check and reuse a proof",
+        "first": "Open a claim’s proof and select a node to read its Lean statement, status and dependencies.",
+        "second": "Open Proof task to review what will be checked. When results need a decision, open them from Agent activity.",
+        "third": "Look up a result in Library to see its statement, source and which claims use it."
       }
-    },
-    "guides": "Guides in the docs folder",
-    "docs": {
-      "workbench": "proof-workbench.md: the workbench and sending notes to models",
-      "quickstart": "quickstart.md: install and first steps",
-      "review": "research-review.md: reviewing evidence and sources",
-      "progress": "research-progress.md: automation rules and workers"
     }
   },
   "premise": {
