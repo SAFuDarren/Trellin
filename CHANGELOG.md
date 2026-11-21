@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.72
+
+- Double-clicking a project map card opens its proof even when the inspector starts closed in a narrow window. A single click highlights the card before the inspector opens.
+
 ## 1.0.71
 
 - Search proof nodes by title from the command palette. The open claim appears first, followed by other recent claims. Menus, tooltips and Help display shortcuts for the current platform.

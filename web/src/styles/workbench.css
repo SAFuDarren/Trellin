@@ -271,6 +271,7 @@ select:disabled {
 @media (max-width: 720px) {
   .app[data-view="project"] {
     position: relative;
+    --map-inspector-overlay: 1;
   }
   .app[data-view="project"] .review {
     position: absolute;

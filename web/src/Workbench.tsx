@@ -600,7 +600,7 @@ export function Workbench({
                   onContextClaim={handleContextClaim}
                   claimActions={claimActions}
                   detailsOpen={showReview}
-                  onToggleDetails={() => (showReview ? closeInspector() : setDetailsOpen(true))}
+                  onDetailsChange={(open) => (open ? setDetailsOpen(true) : closeInspector())}
                   atlasClaims={atlas.data?.claims}
                   atlasOpen={mapAtlasOpen}
                   atlasBox={sizes.atlas}
