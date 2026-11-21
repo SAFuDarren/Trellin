@@ -123,17 +123,8 @@
   }
 }
 
-/* Floating layers appear when their trigger opens them. */
-:where(
-  .popover,
-  .navigation-menu,
-  .chats-actions-list,
-  .employee-chat-task-menu,
-  .agent-dock-options,
-  .composer-popover,
-  .project-canvas-popover,
-  .workbench-actions-items
-) {
+/* Built-in disclosure layers share the menu entrance timing. */
+:where(.popover) {
   box-shadow: var(--elevation-float);
   animation: rm-float-in var(--duration-enter) var(--ease);
 }

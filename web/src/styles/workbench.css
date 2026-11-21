@@ -1340,10 +1340,29 @@ select:disabled {
 .proof-recipient {
   max-width: 100%;
 }
-.proof-recipient select {
-  border-color: var(--edge-soft);
+.proof-recipient-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid var(--edge-soft);
+  border-radius: var(--radius-control);
   background-color: var(--track);
+  color: var(--ink);
+  font-size: var(--type-control-size);
   font-weight: var(--type-medium);
+  text-align: start;
+}
+.proof-recipient-picker::after {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-inline-end: 1px solid currentColor;
+  border-block-end: 1px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  content: "";
 }
 .composer-row .send {
   margin-left: auto;

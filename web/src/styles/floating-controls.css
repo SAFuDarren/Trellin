@@ -1,0 +1,158 @@
+.floating-trigger {
+  min-width: 0;
+}
+
+.floating-trigger .chevron {
+  transform: rotate(90deg);
+}
+
+.floating-popover {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  width: min(248px, calc(100vw - 16px));
+  max-height: min(360px, var(--floating-space, calc(100vh - 16px)));
+  padding: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-card);
+  background: var(--main);
+  color: var(--ink);
+  box-shadow: var(--elevation-float);
+  animation: rm-float-in var(--duration-enter) var(--ease);
+  font-size: var(--type-control-size);
+}
+
+/* A scaled dialog would make its fixed child use dialog coordinates. */
+dialog[open]:has(> .floating-popover) {
+  scale: none !important;
+}
+
+.floating-popover:focus {
+  outline: none;
+}
+
+.floating-group-label {
+  padding: 7px 8px 3px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+
+.floating-separator {
+  height: 1px;
+  margin: 4px 5px;
+  background: var(--hair);
+}
+
+.floating-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.floating-option:hover:not(:disabled),
+.floating-option:focus-visible,
+.floating-option[data-highlighted="true"] {
+  background: var(--state-hover);
+}
+
+.floating-option:focus-visible {
+  outline-offset: -2px;
+}
+
+.floating-option:disabled {
+  cursor: default;
+}
+
+.floating-option[data-destructive="true"] {
+  color: var(--crit);
+}
+
+.floating-option-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-option-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.floating-option-text small,
+.floating-shortcut,
+.floating-count,
+.floating-empty {
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+
+.floating-shortcut,
+.floating-count,
+.floating-check {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+.floating-check {
+  width: 10px;
+  height: 6px;
+  margin-inline-end: 2px;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  rotate: -45deg;
+}
+
+.floating-results .floating-option {
+  scroll-margin-block-start: var(--field-h);
+}
+
+.floating-search {
+  position: sticky;
+  z-index: 1;
+  top: -4px;
+  padding: 3px;
+  background: var(--main);
+}
+
+.floating-search input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 6px 8px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: var(--track);
+  color: var(--ink);
+  font: inherit;
+}
+
+.floating-search input:focus-visible {
+  outline-offset: -2px;
+}
+
+.floating-empty {
+  margin: 8px;
+}
+
+.floating-footer {
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px solid var(--hair);
+}

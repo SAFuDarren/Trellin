@@ -230,6 +230,36 @@ test("an explicitly named launch claim opens proof while keeping the project map
   await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
 });
 
+test("finding a claim with the keyboard focuses its card without completing a pending link", async ({ page }) => {
+  await page.goto("/#session=fixture");
+  const canvas = page.locator(".project-canvas");
+  await mapClaim(page, FIXTURE_CLAIM_TITLE).click();
+  await canvas.getByRole("button", { name: "Link selected claim", exact: true }).click();
+  const cancelLink = canvas.getByRole("button", { name: "Cancel link", exact: true });
+  const findClaim = canvas.getByRole("button", { name: "Find claim", exact: true });
+  const search = page.getByRole("combobox", { name: "Search claims on map", exact: true });
+  await findClaim.press("Enter");
+  await expect(search).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(search).toBeHidden();
+  await expect(findClaim).toBeFocused();
+  await expect(cancelLink).toBeVisible();
+
+  await findClaim.press("Enter");
+  await search.fill(SECOND_TITLE);
+  await expect(page.getByRole("option", { name: SECOND_TITLE, exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(search).toBeHidden();
+  const card = mapClaim(page, SECOND_TITLE);
+  await expect(card).toBeFocused();
+  await expect(card).toHaveAttribute("aria-pressed", "true");
+  await expect(cancelLink).toBeVisible();
+  await expect(canvas.locator("[data-research-link]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(cancelLink).toBeHidden();
+});
+
 test("moving nodes and linking claims are deliberate and remain after reopen", async ({ page, request }) => {
   await page.goto("/#session=fixture");
   const canvas = page.locator(".project-canvas");
@@ -290,8 +320,9 @@ test("moving nodes and linking claims are deliberate and remain after reopen", a
   }));
   expect(restored).toEqual({ x: Math.round(position.x), y: Math.round(position.y) });
   await page.getByRole("button", { name: "Research links", exact: true }).click();
-  await page.getByRole("button", { name: /^Remove link between/ }).click();
+  await page.getByRole("menuitem", { name: /^Remove link between/ }).click();
   await expect(paths).toHaveCount(0);
+  await expect(page.getByRole("application", { name: "Project map", exact: true })).toBeFocused();
   await expect.poll(async () => (await (await request.get("/api/project-canvas")).json()).links).toEqual([]);
   await page.reload();
   await expect(first).toBeVisible();

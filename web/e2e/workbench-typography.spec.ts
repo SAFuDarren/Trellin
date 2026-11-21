@@ -207,7 +207,7 @@ for (const variant of [
     await expect(reply).toContainText(identifier);
     await expectTextRole([main.locator(".page-head h2")], "heading");
     await expectTextRole([main.locator("textarea"), reply, main.locator(".bubble")], "body");
-    await expectTextRole([main.locator('.composer-menu[data-kind="model"] button').first()], "control");
+    await expectTextRole([main.locator(".composer-model-trigger").first()], "control");
     await expectTextRole([main.locator(".speaker").last(), main.locator(".page-head .note")], "metadata");
     await expectWrapped(reply);
     await expect(main.locator("textarea")).toBeInViewport();

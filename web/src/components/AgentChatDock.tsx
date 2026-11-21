@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgentWork } from "../api/agentWork";
 import { ApiError } from "../api/client";
@@ -15,69 +15,11 @@ import { href, type Route } from "../shell/route";
 import { timeText } from "../workbench/text";
 import { ConversationPanel } from "./ConversationPanel";
 import { Chevron, Mark, Spin } from "./Icons";
+import { Picker } from "./FloatingControls";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import "../styles/agent-chat-dock.css";
 
 export type AgentChatAnchor = { anchor: ConversationAnchor; title: string };
-
-function Picker({
-  label,
-  trigger,
-  children,
-  disabled,
-}: {
-  label: string;
-  trigger: ReactNode;
-  children: (choose: () => void) => ReactNode;
-  disabled?: boolean;
-}) {
-  const disclosure = useRef<HTMLDetailsElement>(null);
-  const [open, setOpen] = useState(false);
-
-  function close(focus: boolean) {
-    const element = disclosure.current;
-    if (!element) return;
-    element.open = false;
-    if (focus) element.querySelector("summary")?.focus();
-  }
-
-  useEffect(() => {
-    if (!open) return;
-    disclosure.current?.querySelector("input")?.focus();
-    function dismiss(event: PointerEvent) {
-      if (event.target instanceof Node && !disclosure.current?.contains(event.target)) {
-        if (disclosure.current) disclosure.current.open = false;
-      }
-    }
-    window.addEventListener("pointerdown", dismiss);
-    return () => window.removeEventListener("pointerdown", dismiss);
-  }, [open]);
-
-  return (
-    <details
-      ref={disclosure}
-      className="agent-dock-picker"
-      onToggle={(event) => setOpen(event.currentTarget.open)}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && event.currentTarget.open) {
-          event.preventDefault();
-          event.stopPropagation();
-          close(true);
-        }
-      }}
-    >
-      <summary
-        aria-label={label}
-        aria-disabled={disabled || undefined}
-        onClick={(event) => disabled && event.preventDefault()}
-      >
-        {trigger}
-        <Chevron />
-      </summary>
-      {open && <div className="agent-dock-options">{children(() => close(true))}</div>}
-    </details>
-  );
-}
 
 type AgentDockView = "chat" | "activity";
 
@@ -101,7 +43,6 @@ export function AgentChatDock({
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [directModel, setDirectModel] = useState(false);
-  const [agentQuery, setAgentQuery] = useState("");
   const [title, setTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -151,8 +92,6 @@ export function AgentChatDock({
   const duplicate = Boolean(thread && thread.id === fullChatId);
   const runningCount = activeChats.length + runningWork.length;
   const attentionCount = failedChats.length + attentionWork.length;
-  const agentSearch = agentQuery.trim().toLocaleLowerCase(i18n.language);
-  const visibleAgents = agents.filter(({ name }) => name.toLocaleLowerCase(i18n.language).includes(agentSearch));
 
   if (anchorRequest && anchorRequest !== handledAnchor) {
     setHandledAnchor(anchorRequest);
@@ -209,7 +148,6 @@ export function AgentChatDock({
   }
 
   function chooseAgent(profile: TeamAgent) {
-    setAgentQuery("");
     if (thread && profile.id === agent?.id) return;
     revision.current += 1;
     setAgentId(profile.id);
@@ -227,7 +165,6 @@ export function AgentChatDock({
   }
 
   function chooseModel() {
-    setAgentQuery("");
     if (thread && !thread.agent_id) return;
     if (thread) startNew();
     setAgentId(null);
@@ -269,40 +206,37 @@ export function AgentChatDock({
   const threadPicker = (
     <Picker
       label={t("agentDock.threadPicker")}
-      trigger={<span>{thread?.title ?? t("agentDock.threads")}</span>}
-      disabled={creating}
-    >
-      {(choose) =>
-        threads.length ? (
-          <ul>
-            {threads.map((item) => {
-              const owner = agentsById.get(item.agent_id ?? "")?.name;
-              return (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    aria-current={item.id === thread?.id ? "true" : undefined}
-                    onClick={() => {
-                      choose();
-                      selectThread(item);
-                    }}
-                  >
-                    <span>{item.title}</span>
-                    <small>
-                      {[owner, conversationStatus(item), timeText(i18n.language, item.updated_at, true)]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </small>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p>{t(conversations.isPending ? "common.loading" : "conversations.noConversations")}</p>
-        )
+      searchLabel={t("agentDock.searchThreads")}
+      emptyLabel={t(conversations.isPending ? "common.loading" : "conversations.noConversations")}
+      triggerClassName="agent-dock-picker-trigger"
+      className="agent-dock-picker-panel"
+      placement="top-start"
+      value={thread?.id}
+      trigger={
+        <>
+          <span>{thread?.title ?? t("agentDock.threads")}</span>
+          <Chevron />
+        </>
       }
-    </Picker>
+      disabled={creating}
+      groups={[
+        {
+          options: threads.map((item) => ({
+            id: item.id,
+            label: item.title,
+            detail: [
+              agentsById.get(item.agent_id ?? "")?.name,
+              conversationStatus(item),
+              timeText(i18n.language, item.updated_at, true),
+            ]
+              .filter(Boolean)
+              .join(" · "),
+            current: item.id === thread?.id,
+            onSelect: () => selectThread(item),
+          })),
+        },
+      ]}
+    />
   );
 
   return (
@@ -442,70 +376,56 @@ export function AgentChatDock({
             <div className="agent-dock-recipient">
               <Picker
                 label={t("agentDock.chooseAgent")}
+                searchLabel={t("agentDock.searchAgents")}
+                emptyLabel={t(profiles.isPending ? "common.loading" : "agentDock.noAgents")}
+                triggerClassName="agent-dock-picker-trigger"
+                className="agent-dock-picker-panel"
+                placement="top-start"
+                value={directModel ? "direct-model" : agent?.id}
                 disabled={creating}
                 trigger={
-                  agent ? (
-                    <>
-                      <TeamAgentAvatar avatar={agent.avatar} name={agent.name} />
-                      <span>{agent.name}</span>
-                    </>
-                  ) : (
-                    <span>
-                      {t(
-                        directModel
-                          ? "conversations.chooseModel"
-                          : thread
-                            ? "agentDock.unbound"
-                            : "agentDock.chooseAgent",
-                      )}
-                    </span>
-                  )
-                }
-              >
-                {(choose) => (
                   <>
-                    <input
-                      type="search"
-                      value={agentQuery}
-                      onChange={(event) => setAgentQuery(event.currentTarget.value)}
-                      aria-label={t("agentDock.searchAgents")}
-                      placeholder={t("agentDock.searchAgents")}
-                    />
-                    {!visibleAgents.length && <p>{t(profiles.isPending ? "common.loading" : "agentDock.noAgents")}</p>}
-                    <ul>
-                      {visibleAgents.map((item) => (
-                        <li key={item.id}>
-                          <button
-                            type="button"
-                            aria-current={item.id === agent?.id ? "true" : undefined}
-                            onClick={() => {
-                              choose();
-                              chooseAgent(item);
-                            }}
-                          >
-                            <TeamAgentAvatar avatar={item.avatar} name={item.name} />
-                            <span>{item.name}</span>
-                          </button>
-                        </li>
-                      ))}
-                      {!agentSearch && (
-                        <li>
-                          <button
-                            type="button"
-                            aria-current={directModel ? "true" : undefined}
-                            onClick={() => {
-                              choose();
-                              chooseModel();
-                            }}
-                          >
-                            <span>{t("conversations.chooseModel")}</span>
-                          </button>
-                        </li>
-                      )}
-                    </ul>
+                    {agent ? (
+                      <>
+                        <TeamAgentAvatar avatar={agent.avatar} name={agent.name} />
+                        <span>{agent.name}</span>
+                      </>
+                    ) : (
+                      <span>
+                        {t(
+                          directModel
+                            ? "conversations.chooseModel"
+                            : thread
+                              ? "agentDock.unbound"
+                              : "agentDock.chooseAgent",
+                        )}
+                      </span>
+                    )}
+                    <Chevron />
                   </>
-                )}
-              </Picker>
+                }
+                groups={[
+                  {
+                    options: agents.map((item) => ({
+                      id: item.id,
+                      label: item.name,
+                      icon: <TeamAgentAvatar avatar={item.avatar} name={item.name} />,
+                      current: item.id === agent?.id,
+                      onSelect: () => chooseAgent(item),
+                    })),
+                  },
+                  {
+                    options: [
+                      {
+                        id: "direct-model",
+                        label: t("conversations.chooseModel"),
+                        current: directModel,
+                        onSelect: chooseModel,
+                      },
+                    ],
+                  },
+                ]}
+              />
               {thread && (
                 <a className="conversation-text-action" href={href("chat", thread.id)} onClick={collapse}>
                   {t("agentDock.openChats")}

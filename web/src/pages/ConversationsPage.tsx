@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../api/client";
 import {
@@ -13,6 +13,7 @@ import { useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { ConversationPanel } from "../components/ConversationPanel";
 import { EmployeeChatHeader, EmployeeStatus } from "../components/EmployeeChatHeader";
 import { FeedEntry } from "../components/FeedEntry";
+import { Menu } from "../components/FloatingControls";
 import { Chevron, Clock } from "../components/Icons";
 import { Empty, PageHead } from "../components/SectionLayout";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
@@ -48,7 +49,6 @@ export function ConversationsPage({
   const taskSwitcher = useRef<HTMLButtonElement>(null);
   const refocusTaskSwitcher = useRef(false);
   const createRequests = useRef(new Map<string, { title: string; requestId: string }>());
-  const actionMenu = useRef<HTMLDetailsElement>(null);
   const conversations = direct.data?.threads ?? [];
   const employees = [...(profiles.data?.agents ?? [])].sort((a, b) => a.name.localeCompare(b.name, i18n.language));
   const tasksByEmployee = new Map<string, ConversationSummary[]>(employees.map(({ id }) => [id, []]));
@@ -83,15 +83,6 @@ export function ConversationsPage({
       refocusTaskSwitcher.current = false;
     }
   }, [currentEmployeeId, currentId]);
-
-  useEffect(() => {
-    function closeActions(event: PointerEvent) {
-      const menu = actionMenu.current;
-      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
-    }
-    document.addEventListener("pointerdown", closeActions);
-    return () => document.removeEventListener("pointerdown", closeActions);
-  }, []);
 
   function openEmployee(profile: TeamAgent) {
     if (profile.id === currentEmployeeId && currentId) return href("chat", currentId);
@@ -201,49 +192,52 @@ export function ConversationsPage({
     />
   );
 
-  function conversationActions(thread: ConversationSummary, remove: ReactNode) {
+  function conversationActions(
+    thread: ConversationSummary,
+    remove: () => void,
+    removeDisabled: boolean,
+    triggerRef: Ref<HTMLButtonElement>,
+  ) {
     const { claim_id: claimId, node_id: nodeId } = thread;
     return (
       <>
         {back}
-        <details
-          className="chats-actions"
-          ref={actionMenu}
-          onKeyDown={(event) => {
-            if (event.key !== "Escape" || !event.currentTarget.open) return;
-            event.preventDefault();
-            event.currentTarget.open = false;
-            event.currentTarget.querySelector("summary")?.focus();
-          }}
-        >
-          <summary title={t("conversations.actions")} aria-label={t("conversations.actions")}>
+        <Menu
+          label={t("conversations.actions")}
+          triggerRef={triggerRef}
+          triggerClassName="icon-button chats-actions-trigger"
+          className="chats-actions-menu"
+          placement="bottom-end"
+          trigger={
             <svg viewBox="0 0 18 18" aria-hidden="true">
               <path d="M4 9h.1 M9 9h.1 M14 9h.1" />
             </svg>
-          </summary>
-          <div
-            className="chats-actions-list"
-            onClick={(event) => {
-              if (!(event.target instanceof Element) || !event.target.closest("button")) return;
-              const disclosure = event.currentTarget.closest("details");
-              if (disclosure) {
-                disclosure.open = false;
-                disclosure.querySelector("summary")?.focus();
-              }
-            }}
-          >
-            {claimId && (
-              <button
-                type="button"
-                className="conversation-text-action"
-                onClick={() => onOpen(claimId, nodeId ?? undefined)}
-              >
-                {t("common.openInWorkbench")}
-              </button>
-            )}
-            {remove}
-          </div>
-        </details>
+          }
+          groups={[
+            {
+              options: claimId
+                ? [
+                    {
+                      id: "open-workbench",
+                      label: t("common.openInWorkbench"),
+                      onSelect: () => onOpen(claimId, nodeId ?? undefined),
+                    },
+                  ]
+                : [],
+            },
+            {
+              options: [
+                {
+                  id: "remove-conversation",
+                  label: t("conversations.remove"),
+                  destructive: true,
+                  disabled: removeDisabled,
+                  onSelect: remove,
+                },
+              ],
+            },
+          ]}
+        />
       </>
     );
   }
@@ -351,9 +345,9 @@ export function ConversationsPage({
                 ? href("chat", tasks.find((task) => task.id !== current.id)?.id ?? EMPLOYEE_ROUTE + employee.id)
                 : href("chat", employees.length ? HISTORY_ROUTE : "");
             }}
-            header={(remove) =>
+            header={({ remove, removeDisabled, triggerRef }) =>
               employee ? (
-                employeeHeader(employee, conversationActions(current, remove))
+                employeeHeader(employee, conversationActions(current, remove, removeDisabled, triggerRef))
               ) : (
                 <PageHead
                   title={current.title}
@@ -364,7 +358,7 @@ export function ConversationsPage({
                         ? "conversations.claimScope"
                         : "conversations.projectScope",
                   )}
-                  actions={conversationActions(current, remove)}
+                  actions={conversationActions(current, remove, removeDisabled, triggerRef)}
                 />
               )
             }

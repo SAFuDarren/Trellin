@@ -124,7 +124,7 @@ test("a workbench without the native bridge can find claims on the project map",
   await expect(sidebar.getByRole("region", { name: "Projects" }).getByText("Current project")).toBeVisible();
   await expect(sidebar.getByRole("button", { name: "New project" })).toHaveCount(0);
   await page.getByRole("button", { name: "Find claim", exact: true }).click();
-  const search = page.getByRole("searchbox", { name: "Search claims on map" });
+  const search = page.getByRole("combobox", { name: "Search claims on map" });
   await search.fill("单射");
-  await expect(page.getByRole("button", { name: "单射映射的复合", exact: true })).toHaveCount(2);
+  await expect(page.getByRole("option", { name: "单射映射的复合", exact: true })).toBeVisible();
 });

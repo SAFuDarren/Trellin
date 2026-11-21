@@ -119,8 +119,8 @@ test("a named implementation goes through scope review, exact-result handoff, an
   await page.locator("nav.rail").getByRole("link", { name: /^Team/ }).click();
   await page.locator(".section-nav").getByRole("link", { name: "Agents", exact: true }).click();
   await page.getByRole("link", { name: "Assign task to Implementer" }).click();
-  const agent = page.getByRole("combobox", { name: "Agent", exact: true });
-  await expect(agent).toHaveValue(savedAgents[0]!.id);
+  const agent = page.getByRole("button", { name: "Agent", exact: true });
+  await expect(agent).toHaveText(savedAgents[0]!.name);
   expect(starts).toHaveLength(0);
   await page.getByLabel("Task title").fill("Fix the total");
   await page.getByLabel("Instructions").fill("Include the last item in the total.");
@@ -158,7 +158,10 @@ test("a named implementation goes through scope review, exact-result handoff, an
   await expect(page.getByText("The total now includes the last item.")).toBeVisible();
 
   await page.getByRole("link", { name: "Assign review" }).click();
-  await agent.selectOption(savedAgents[1]!.id);
+  await agent.click();
+  await page.getByRole("option", { name: savedAgents[1]!.name, exact: true }).click();
+  expect(previews).toHaveLength(1);
+  expect(starts).toHaveLength(2);
   await page.getByLabel("Instructions").fill("Review the recorded patch.");
   await page.getByLabel("Acceptance criteria").fill("Check both normal and empty input.");
   await page.getByRole("button", { name: "Preview task" }).click();

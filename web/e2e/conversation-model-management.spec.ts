@@ -78,7 +78,7 @@ for (const surface of ["Workbench", "Chats"] as const) {
       await page.getByRole("button", { name: /^Proof obligation 2/ }).click();
       await page.getByRole("button", { name: "Ask an Agent" }).click();
       await page.getByLabel("Choose an Agent", { exact: true }).click();
-      await page.getByRole("button", { name: "Choose a model", exact: true }).click();
+      await page.getByRole("option", { name: "Choose a model", exact: true }).click();
       await page.getByRole("button", { name: "Open conversation" }).click();
     } else {
       await page
@@ -90,20 +90,19 @@ for (const surface of ["Workbench", "Chats"] as const) {
     const panel = page.locator(".conversation-panel");
     const draft = panel.getByRole("textbox", { name: "Write a message" });
     const picker = panel.getByRole("button", { name: "Conversation model" });
-    const menu = panel.getByRole("menu", { name: "Conversation model" });
+    const menu = page.getByRole("listbox", { name: "Search models" });
     await picker.press("ArrowDown");
-    await menu.getByRole("menuitemradio", { name: /Codex · Default model/ }).click();
+    await menu.getByRole("option", { name: /Codex · Default model/ }).click();
     const text = "Keep this draft while I choose another model.";
     await draft.fill(text);
     const anchor = thread?.node_id;
     expect(anchor).toBe(surface === "Workbench" ? "obligation:55555555-5555-4555-8555-555555555555:2" : null);
     const url = page.url();
 
-    const manage = menu.getByRole("menuitem", { name: "Manage model connections" });
+    const manage = page.getByRole("button", { name: "Manage model connections", exact: true });
     const dialog = page.getByRole("dialog", { name: "Model connections" });
     await picker.press("ArrowDown");
-    await page.keyboard.press("End");
-    await expect(manage).toBeFocused();
+    await manage.focus();
     await page.keyboard.press("Enter");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeFocused();
@@ -125,11 +124,8 @@ for (const surface of ["Workbench", "Chats"] as const) {
     await expect(draft).toHaveValue(text);
 
     await picker.press("ArrowDown");
-    await expect(menu.getByRole("menuitemradio", { name: /Codex · Default model/ })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    await menu.getByRole("menuitemradio", { name: /Codex · gpt-fixture/ }).click();
+    await expect(menu.getByRole("option", { name: /Codex · Default model/ })).toHaveAttribute("aria-selected", "true");
+    await menu.getByRole("option", { name: /Codex · gpt-fixture/ }).click();
     await expect(picker).toHaveText(/Codex · gpt-fixture/);
     await expect(draft).toHaveValue(text);
     expect(sends).toHaveLength(0);

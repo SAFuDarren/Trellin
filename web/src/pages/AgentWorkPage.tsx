@@ -16,6 +16,8 @@ import {
 } from "../api/agentWork";
 import { ApiError } from "../api/client";
 import { useTeamAgents } from "../api/teamAgents";
+import { Picker } from "../components/FloatingControls";
+import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { useDesktopProjectList } from "../components/SidebarProjects";
 import { href } from "../shell/route";
@@ -184,6 +186,9 @@ function NewAgentWork({
   const [notice, setNotice] = useState("");
   const busy = useRef(false);
   const requiresSource = draft.mode === "implement";
+  const chosenAgent = agents.data?.agents.find((agent) => agent.id === draft.agent_id);
+  const chosenDelivery = candidates.find((candidate) => candidate.id === draft.predecessor_id);
+  const selectionIncomplete = !chosenAgent || (draft.mode === "review" && !predecessor && !chosenDelivery);
 
   function update(values: Partial<Draft>) {
     setDraft((current) => ({ ...current, ...values }));
@@ -192,7 +197,7 @@ function NewAgentWork({
 
   async function preview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy.current || !draft.agent_id) return;
+    if (busy.current || selectionIncomplete) return;
     const files = draft.files
       .split("\n")
       .map((path) => path.trim())
@@ -306,17 +311,32 @@ function NewAgentWork({
             </p>
           )}
           <div className="project-entry-columns">
-            <label>
-              {t("agentWork.agent")}
-              <select value={draft.agent_id} onChange={(event) => update({ agent_id: event.target.value })} required>
-                <option value="">{t("agentWork.chooseAgent")}</option>
-                {agents.data.agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="project-entry-field">
+              <label htmlFor="work-agent-picker">{t("agentWork.agent")}</label>
+              <Picker
+                label={t("agentWork.agent")}
+                triggerId="work-agent-picker"
+                triggerClassName="project-entry-picker"
+                trigger={chosenAgent?.name ?? t("agentWork.chooseAgent")}
+                value={draft.agent_id}
+                disabled={pending}
+                searchLabel={t("agentWork.searchAgents")}
+                emptyLabel={t("picker.noMatches")}
+                groups={[
+                  {
+                    options: agents.data.agents.map((agent) => ({
+                      id: agent.id,
+                      label: agent.name,
+                      icon: <TeamAgentAvatar avatar={agent.avatar} name={agent.name} />,
+                      detail: agent.description || undefined,
+                    })),
+                  },
+                ]}
+                onSelect={(agent_id) => {
+                  if (agent_id !== draft.agent_id) update({ agent_id });
+                }}
+              />
+            </div>
             {!predecessor && (
               <label>
                 {t("agentWork.taskType")}
@@ -331,21 +351,33 @@ function NewAgentWork({
             )}
           </div>
           {draft.mode === "review" && !predecessor && (
-            <label>
-              {t("agentWork.inputDelivery")}
-              <select
+            <div className="project-entry-field">
+              <label htmlFor="work-delivery-picker">{t("agentWork.inputDelivery")}</label>
+              <Picker
+                label={t("agentWork.inputDelivery")}
+                triggerId="work-delivery-picker"
+                triggerClassName="project-entry-picker"
+                trigger={
+                  chosenDelivery?.title ?? t(candidates.length ? "agentWork.chooseDelivery" : "agentWork.noDeliveries")
+                }
                 value={draft.predecessor_id}
-                onChange={(event) => update({ predecessor_id: event.target.value })}
-                required
-              >
-                <option value="">{t(candidates.length ? "agentWork.chooseDelivery" : "agentWork.noDeliveries")}</option>
-                {candidates.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+                disabled={pending || !candidates.length}
+                searchLabel={t("agentWork.searchDeliveries")}
+                emptyLabel={t("picker.noMatches")}
+                groups={[
+                  {
+                    options: candidates.map((candidate) => ({
+                      id: candidate.id,
+                      label: candidate.title,
+                      detail: candidate.agent_name,
+                    })),
+                  },
+                ]}
+                onSelect={(predecessor_id) => {
+                  if (predecessor_id !== draft.predecessor_id) update({ predecessor_id });
+                }}
+              />
+            </div>
           )}
           <label>
             {t("agentWork.taskTitle")}
@@ -414,7 +446,7 @@ function NewAgentWork({
             </>
           )}
           <div className="project-entry-buttons">
-            <button type="submit" className="button primary" disabled={pending}>
+            <button type="submit" className="button primary" disabled={pending || selectionIncomplete}>
               {t(pending ? "common.loading" : "agentWork.preview")}
             </button>
           </div>

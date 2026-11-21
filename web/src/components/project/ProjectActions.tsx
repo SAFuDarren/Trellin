@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PremiseReview } from "../../workbench/types";
+import { Menu } from "../FloatingControls";
+import { Chevron } from "../Icons";
 import { ClaimCodesPane } from "./ClaimCodesPane";
 import { IntakePane } from "./IntakePane";
 import { LemmaPlanPane, type LemmaPlanScope } from "./LemmaPlanPane";
@@ -58,69 +60,44 @@ export function ProjectActions({
   const [localMode, setMode] = useState<Exclude<Mode, "premises" | "proof"> | null>(null);
   const mode = premiseDialog ? "premises" : proofDialog ? "proof" : localMode;
   const dialog = useRef<HTMLDialogElement>(null);
-  const actions = useRef<HTMLDetailsElement>(null);
   const title = useId();
 
   useEffect(() => {
     if (mode && dialog.current && !dialog.current.open) dialog.current.showModal();
   }, [mode]);
 
-  useEffect(() => {
-    function outside(event: PointerEvent) {
-      const menu = actions.current;
-      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
-    }
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
-  }, []);
-
-  const closeActions = () => {
-    if (!actions.current?.open) return;
-    actions.current.open = false;
-    actions.current.querySelector("summary")?.focus();
-  };
   const show = (next: Exclude<Mode, "proof">) => {
-    closeActions();
     if (next === "premises") onOpenPremises();
     else setMode(next);
   };
+  const researchActions: Exclude<Mode, "theorem" | "proof">[] = ["intake"];
+  if (lemmaPlanScope) researchActions.push("lemmas");
+  if (premiseReview && (premiseReview.available || premiseReview.proposals.length > 0))
+    researchActions.push("premises");
+  if (claimCode || claimCodesAvailable) researchActions.push("references");
 
   return (
     <div className="project-actions">
       <button className="button" type="button" onClick={() => show("theorem")}>
         {t("projectEntry.addTheorem")}
       </button>
-      <details
-        className="workbench-actions-menu"
-        ref={actions}
-        onKeyDown={(event) => {
-          if (event.key !== "Escape" || !event.currentTarget.open) return;
-          event.preventDefault();
-          closeActions();
-        }}
-      >
-        <summary className="button">{t("canvasShell.researchActions")}</summary>
-        <div className="workbench-actions-items">
-          <button type="button" onClick={() => show("intake")}>
-            {t("projectEntry.organize")}
-          </button>
-          {lemmaPlanScope && (
-            <button type="button" onClick={() => show("lemmas")}>
-              {t("lemmaPlan.title")}
-            </button>
-          )}
-          {premiseReview && (premiseReview.available || premiseReview.proposals.length > 0) && (
-            <button type="button" onClick={() => show("premises")}>
-              {t("premise.title")}
-            </button>
-          )}
-          {(claimCode || claimCodesAvailable) && (
-            <button type="button" onClick={() => show("references")}>
-              {t("claimCodes.title")}
-            </button>
-          )}
-        </div>
-      </details>
+      <Menu
+        label={t("canvasShell.researchActions")}
+        trigger={
+          <>
+            {t("canvasShell.researchActions")}
+            <Chevron />
+          </>
+        }
+        triggerClassName="button workbench-actions-trigger"
+        className="workbench-actions-items"
+        placement="bottom-end"
+        groups={[
+          {
+            options: researchActions.map((id) => ({ id, label: t(captions[id]), onSelect: () => show(id) })),
+          },
+        ]}
+      />
       <dialog
         ref={dialog}
         className="project-entry"
