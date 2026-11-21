@@ -773,10 +773,6 @@ select:disabled {
   stroke-width: 1.3px;
   pointer-events: none;
 }
-.graph-node[data-working="true"]:not([aria-pressed="true"]) {
-  border-color: var(--live);
-  box-shadow: 0 0 0 2px var(--live-soft);
-}
 .graph-node[data-affected="true"]:not([aria-pressed="true"]) {
   border-color: var(--crit);
 }

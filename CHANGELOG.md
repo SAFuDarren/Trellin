@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.80
+
+- Proof nodes show running jobs as a spinner and count inside the card. Selection has a separate outline, and the spinner stays still with reduced motion enabled.
+
 ## 1.0.79
 
 - Contributors can run `python scripts/tasks.py branches` to read branch lifecycle, PR evidence, and worktree status without changing Git references.
