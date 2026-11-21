@@ -1,8 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
+import { formatShortcut } from "../shortcuts";
 
-const KEYS = ["drag", "zoom", "keys", "fit", "borders", "select"] as const;
+const KEYS = ["palette", "drag", "zoom", "keys", "fit", "borders", "select"] as const;
 const GUIDES = ["workbench", "quickstart", "review", "progress"] as const;
 
 export function HelpPage() {
@@ -36,7 +37,11 @@ export function HelpPage() {
             {KEYS.map((key) => (
               <div key={key} className="contents">
                 <dt>
-                  <kbd>{t(`help.keys.${key}.key`)}</kbd>
+                  <kbd>
+                    {key === "palette"
+                      ? formatShortcut("Primary+K")
+                      : t(`help.keys.${key}.key`, { shortcut: formatShortcut("Primary") })}
+                  </kbd>
                 </dt>
                 <dd>{t(`help.keys.${key}.what`)}</dd>
               </div>

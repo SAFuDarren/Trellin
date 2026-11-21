@@ -143,16 +143,17 @@ export function Shell({ session }: { session: string }) {
     go("workbench");
   };
   const claimMetadata = useClaims(session, paletteOpen);
+  const claimId = position?.claimId;
   const paletteResults = usePaletteResults({
     session,
     workspaceId: workspace ?? inbox.data?.review_identity?.workspace_id,
+    claimId,
     query: paletteOpen ? palette.query : "",
     enabled: paletteOpen,
     t,
     open,
     go,
   });
-  const claimId = position?.claimId;
   const actionGroup = {
     label: t("palette.actions"),
     options: [

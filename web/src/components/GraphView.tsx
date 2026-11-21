@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { formatShortcut } from "../shortcuts";
 import {
   CARD,
   clampCardSize,
@@ -65,6 +66,7 @@ type Props = {
 
 export function GraphView(props: Props) {
   const { t } = useTranslation();
+  const resizeHelp = t("stage.resizeHelp", { shortcut: formatShortcut("Shift") });
   const { graph, view, selected, assumption, impact, work } = props;
   const stage = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<string, HTMLButtonElement>());
@@ -340,7 +342,7 @@ export function GraphView(props: Props) {
         tabIndex={0}
         role="application"
         aria-roledescription={t("stage.roleDescription")}
-        aria-label={t("stage.label")}
+        aria-label={t("stage.label", { shortcut: formatShortcut("Primary") })}
         data-proof-view={view}
         data-panning={panning ? "true" : undefined}
         onPointerDown={startPan}
@@ -439,8 +441,8 @@ export function GraphView(props: Props) {
                     className="graph-node-resize"
                     aria-label={t("stage.resizeNode", { title })}
                     aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
-                    aria-description={t("stage.resizeHelp")}
-                    title={t("stage.resizeHelp")}
+                    aria-description={resizeHelp}
+                    title={resizeHelp}
                     onPointerDown={(event) => startResize(event, id)}
                     onPointerMove={moveResize}
                     onPointerUp={(event) => finishResize(event, true)}

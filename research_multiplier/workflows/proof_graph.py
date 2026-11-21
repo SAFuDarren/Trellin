@@ -397,6 +397,20 @@ def claim_index(store):
     return {"claims": claims(store), **({"claim_codes": True} if claim_references.available(store) else {})}
 
 
+def _atlas_node(node):
+    result = {"id": node["id"], "kind": node["kind"], "status": node.get("status")}
+    title = node.get("title")
+    citation = node.get("citation")
+    if citation:
+        if node["kind"] == "library":
+            title = citation
+        else:
+            result["citation"] = citation
+    if title:
+        result["title"] = title
+    return result
+
+
 def atlas(store, limit=40):
     """Summarize the recorded nodes and dependencies of recent claims for the workspace overview."""
     overview = []
@@ -408,9 +422,7 @@ def atlas(store, limit=40):
         nodes = graph["nodes"]
         overview.append({
             "id": claim["id"], "title": claim["title"], "domain": claim["domain"], "status": claim["status"],
-            "nodes": [{"id": node["id"], "kind": node["kind"], "status": node.get("status"),
-                       **({"title": node.get("citation") or node.get("title")} if node["kind"] == "library" else {})}
-                      for node in nodes],
+            "nodes": [_atlas_node(node) for node in nodes],
             "edges": [[edge["source"], edge["target"]] for edge in graph["edges"]],
             "awaiting_review": sum(1 for node in nodes if node["kind"] == "evidence"
                                    and node.get("status") in {"pending", "awaiting_review"}),

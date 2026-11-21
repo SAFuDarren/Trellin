@@ -459,7 +459,8 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
     assert any(claim["id"] == claim_id and claim["title"] == TITLE for claim in claims["claims"])
 
     atlas = _request(server, "GET", "/api/atlas")
-    assert any(claim["id"] == claim_id and claim["nodes"] for claim in atlas["claims"])
+    atlas_claim = next(claim for claim in atlas["claims"] if claim["id"] == claim_id)
+    atlas_nodes = {node["id"]: node for node in atlas_claim["nodes"]}
 
     doctor = _request(server, "GET", "/api/doctor?fresh=1")
     assert any(check["id"] == "workspace" and check["status"] == "ok" for check in doctor["checks"])
@@ -468,6 +469,9 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
     assert graph["claim"]["id"] == claim_id and graph["claim"]["statement_id"] == statement_id
     goal = next(node for node in graph["nodes"] if node["kind"] == "goal")
     premise = next(node for node in graph["nodes"] if node["kind"] == "hypothesis")
+    for node in (goal, premise):
+        assert atlas_nodes[node["id"]]["title"] == node["title"]
+        assert set(atlas_nodes[node["id"]]) == {"id", "kind", "status", "title"}
     premise_id = premise["reference"]["basis_version_id"]
 
     assert claims["claim_codes"] is True

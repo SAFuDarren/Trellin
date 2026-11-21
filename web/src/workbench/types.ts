@@ -125,7 +125,7 @@ export type AtlasClaim = {
   title: string | null;
   domain: string | null;
   status: string;
-  nodes: { id: string; kind: string; status?: string; title?: string }[];
+  nodes: Pick<GraphNode, "id" | "kind" | "status" | "title" | "citation">[];
   edges: [string, string][];
   awaiting_review?: number;
   blocked?: number;

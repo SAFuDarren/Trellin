@@ -7,13 +7,15 @@
     "title": "命令面板",
     "search": "搜索或运行命令",
     "close": "关闭命令面板",
-    "escapeKey": "Esc",
     "loading": "正在搜索…",
     "noResults": "没有匹配的结果",
     "refine": "缩小搜索范围可查看更多结果。",
     "recent": "最近访问",
     "references": "证明引用",
+    "currentProofNodes": "当前课题的证明节点",
+    "otherProofNodes": "其他课题的证明节点",
     "claims": "课题",
+    "claimSearch": "课题和证明节点",
     "library": "文库",
     "conversations": "对话",
     "agents": "Agent",
@@ -168,7 +170,6 @@
     "linkClaim": "连接所选课题",
     "cancelLink": "取消连线",
     "findClaim": "查找课题",
-    "toggleHint": "{{label}}（{{shortcut}}）",
     "searchClaims": "搜索图谱中的课题",
     "noMatches": "没有匹配的课题。",
     "researchLinks": "研究关联",
@@ -190,8 +191,8 @@
   },
   "stage": {
     "resizeNode": "调整节点大小 {{title}}",
-    "resizeHelp": "拖动可缩放。方向键可调整宽度或高度，按住 Shift 可加大步长。",
-    "label": "依赖图。拖动可平移；双指捏合或按住 Ctrl 滚动可缩放；加号、减号缩放，0 适合窗口。",
+    "resizeHelp": "拖动可缩放。方向键可调整宽度或高度，按住 {{shortcut}} 可加大步长。",
+    "label": "依赖图。拖动可平移；双指捏合或按住 {{shortcut}} 滚动可缩放；加号、减号缩放，0 适合窗口。",
     "roleDescription": "可缩放画布",
     "zoom": "缩放",
     "zoomIn": "放大",
@@ -687,6 +688,7 @@
   "common": {
     "cancel": "取消",
     "loading": "正在加载…",
+    "shortcutHint": "{{label}}（{{shortcut}}）",
     "openInWorkbench": "在工作台中打开"
   },
   "navigation": {
@@ -1283,12 +1285,15 @@
     },
     "canvas": "证明图画布",
     "keys": {
+      "palette": {
+        "what": "查找课题、证明节点或命令"
+      },
       "drag": {
         "key": "拖动",
         "what": "平移画布"
       },
       "zoom": {
-        "key": "Ctrl 或 ⌘ + 滚动，或双指捏合",
+        "key": "{{shortcut}} + 滚动，或双指捏合",
         "what": "以指针为中心缩放"
       },
       "keys": {

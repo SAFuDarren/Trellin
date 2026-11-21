@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.71
+
+- Search proof nodes by title from the command palette. The open claim appears first, followed by other recent claims. Menus, tooltips and Help display shortcuts for the current platform.
+
 ## 1.0.70
 
 - Proof graphs open at a readable zoom and can fit all recorded nodes in the window. Node cards wrap titles and show activity counts. The inspector shows complete formulas, Lean statements and recorded work details. Open Edge styles to read the legend.
