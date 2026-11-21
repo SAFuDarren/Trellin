@@ -13,13 +13,27 @@ _MAX_THREAD_EVENTS = 40
 _CONVERSATION_KINDS = {"agent_feedback", "verifier_feedback", "model"}
 
 
+_REVIEW_RESULTS = """
+SELECT evidence.id, coalesce(nullif(checked.body ->> 'source_declaration', ''),
+                             nullif(checked.body ->> 'candidate_theorem', '')) AS declaration,
+       checked.body ->> 'target' AS target
+FROM rm.evidence_foundation_status evidence
+JOIN rm.lean_check_status checked ON checked.id = evidence.lean_check_id
+WHERE evidence.id = ANY(%s::uuid[])
+"""
+
+
 def inbox(store):
-    """Review items with the title of the claim they belong to."""
+    """Review items with their claim and, when recorded, the checked declaration."""
     items = research_review.inbox(store, None, 200)
     titles = {claim["id"]: claim["title"] for claim in proof_graph.claims(store)}
+    evidence_ids = [item["item_id"] for item in items if item["kind"] == "review_evidence"]
+    results = {row["id"]: row for row in store.query("human", _REVIEW_RESULTS, evidence_ids)} if evidence_ids else {}
     for item in items:
         claim = str(item["claim_id"]) if item["claim_id"] else None
         item["claim_title"] = titles.get(claim)
+        if item["kind"] == "review_evidence" and (result := results.get(item["item_id"])):
+            item["detail"] = {**item["detail"], **{key: value for key, value in result.items() if key != "id" and value}}
     identity = workbench_review.capability(store)
     result = {"items": items, **identity, **workspace_events.capability(store),
               **workbench_clarification.capability(store)}

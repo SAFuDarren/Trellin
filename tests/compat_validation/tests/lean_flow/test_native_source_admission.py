@@ -8,7 +8,7 @@ import test_final_local_lemmas as fixtures
 import test_lean_flow as database
 
 from research_multiplier.storage import paths
-from research_multiplier.workflows import runtime
+from research_multiplier.workflows import runtime, workbench_sections
 from research_multiplier.storage.artifacts import Artifacts
 from research_multiplier.storage.postgres import Store
 
@@ -114,6 +114,9 @@ class NativeSourceAdmissionTests(unittest.TestCase):
                     record(report)
 
             evidence = str(record(body))
+            pending = next(item for item in workbench_sections.inbox(store)["items"] if str(item["item_id"]) == evidence)
+            self.assertEqual(pending["detail"]["declaration"], source["declaration"])
+            self.assertEqual(pending["detail"]["target"], "goal")
             actual = store.query("verifier", """
                 SELECT u.version_id FROM rm.verification_basis_use u
                 JOIN rm.evidence e ON e.lean_check_id = u.check_id

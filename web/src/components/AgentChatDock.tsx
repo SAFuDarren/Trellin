@@ -5,7 +5,8 @@ import type { ConversationSummary } from "../api/conversations";
 import { useTeamAgents } from "../api/teamAgents";
 import { useConversationSending } from "../shell/ConversationEditors";
 import { href, type Route } from "../shell/route";
-import type { WorkspaceActivity } from "../shell/workspaceActivity";
+import { reviewItemHref } from "../shell/reviewItems";
+import type { ActivityState, WorkspaceActivity } from "../shell/workspaceActivity";
 import { timeText } from "../workbench/text";
 import { ConversationPanel } from "./ConversationPanel";
 import { Chevron, Mark } from "./Icons";
@@ -48,6 +49,8 @@ export function AgentChatDock({
   const { t, i18n } = useTranslation();
   const sending = useConversationSending(session);
   const [view, setView] = useState<AgentDockView | null>(null);
+  const [activityFilter, setActivityFilter] = useState<ActivityState | "all">("all");
+  const activityOrigin = useRef<HTMLButtonElement | null>(null);
   const [handledRequest, setHandledRequest] = useState<AgentChatRequest | null>(null);
   const [anchor, setAnchor] = useState<AgentChatAnchor | null>(null);
   const [chosenId, setChosenId] = useState<string | null>(null);
@@ -77,6 +80,8 @@ export function AgentChatDock({
   const thread = threads.find(({ id }) => id === chosenId);
   const agent = agentsById.get(thread?.agent_id ?? "");
   const { running, queued, review, attention } = activity.counts;
+  const onlyReview =
+    review === 1 ? activity.rows.find((row) => row.source === "review" && row.state === "review") : undefined;
 
   if (request && request !== handledRequest) {
     const anchored = "anchor" in request ? request : null;
@@ -120,9 +125,22 @@ export function AgentChatDock({
     if (view === "activity") closeControl.current?.focus();
   }, [view]);
 
+  function openActivity(filter: "all" | "review", trigger: HTMLButtonElement) {
+    if (view === "activity" && activityOrigin.current !== trigger) {
+      setActivityFilter(filter);
+      activityOrigin.current = trigger;
+      closeControl.current?.focus();
+      return;
+    }
+    setActivityFilter(filter);
+    activityOrigin.current = trigger;
+    open("activity");
+  }
+
   function collapse() {
     setView(null);
-    (view === "activity" ? activityLauncher.current : launcher.current)?.focus();
+    const origin = view === "activity" ? activityOrigin.current : launcher.current;
+    (origin?.isConnected ? origin : activityLauncher.current)?.focus();
   }
 
   function selectThread(item: ConversationSummary) {
@@ -250,6 +268,8 @@ export function AgentChatDock({
         <WorkspaceActivityList
           activity={activity}
           agents={agentsById}
+          selectedFilter={activityFilter}
+          onFilter={setActivityFilter}
           loading={activityLoading}
           unavailable={activityUnavailable}
           onNavigate={() => setView(null)}
@@ -304,8 +324,8 @@ export function AgentChatDock({
         type="button"
         className="agent-dock-status"
         aria-controls={panelId}
-        aria-expanded={view === "activity"}
-        onClick={() => open("activity")}
+        aria-expanded={view === "activity" && activityOrigin.current === activityLauncher.current}
+        onClick={(event) => openActivity("all", event.currentTarget)}
       >
         <span>{t("agentDock.activity")}</span>
         {running > 0 && (
@@ -320,12 +340,6 @@ export function AgentChatDock({
             {t("agentDock.queued", { count: queued })}
           </span>
         )}
-        {review > 0 && (
-          <span data-tone="pending">
-            <Mark tone="review" />
-            {t("workspaceActivity.toReview", { count: review })}
-          </span>
-        )}
         {attention > 0 && (
           <span>
             <Mark tone="bad" />
@@ -333,6 +347,29 @@ export function AgentChatDock({
           </span>
         )}
       </button>
+      {onlyReview?.source === "review" ? (
+        <a
+          className="agent-dock-status agent-dock-review"
+          href={reviewItemHref(onlyReview.item)}
+          onClick={(event) => {
+            if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) setView(null);
+          }}
+        >
+          <Mark tone="review" />
+          {t("workspaceActivity.toReview", { count: review })}
+        </a>
+      ) : review > 0 ? (
+        <button
+          type="button"
+          className="agent-dock-status agent-dock-review"
+          aria-controls={panelId}
+          aria-expanded={view === "activity" && activityOrigin.current !== activityLauncher.current}
+          onClick={(event) => openActivity("review", event.currentTarget)}
+        >
+          <Mark tone="review" />
+          {t("workspaceActivity.toReview", { count: review })}
+        </button>
+      ) : null}
       <button
         ref={launcher}
         className="agent-dock-launcher"

@@ -658,6 +658,34 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
         reader.close()
 
 
+def test_review_links_to_closed_or_other_project_evidence_cannot_record_a_decision(workbench):
+    server, _, _, evidence = workbench
+    workspace = paths.workspace_id(server.workspace)
+    reason = {"decision": "approve", "reason": REASON}
+    pending = _request(server, "GET", "/api/inbox")["items"]
+    assert any(item["item_id"] == evidence for item in pending)
+
+    def review(path, status):
+        return _request(server, "POST", path, headers={"Idempotency-Key": str(uuid4())}, body=reason, status=status)
+
+    wrong_workspace = review(f"/api/v1/workspaces/{uuid4()}/evidence/{evidence}/reviews", 404)
+    missing_evidence = review(f"/api/v1/workspaces/{workspace}/evidence/{uuid4()}/reviews", 404)
+    assert wrong_workspace["error"]["code"] == missing_evidence["error"]["code"] == "review.not_found"
+    assert _request(server, "GET", "/api/inbox")["items"] == pending
+
+    route = f"/api/v1/workspaces/{workspace}/evidence/{evidence}/reviews"
+    created = review(route, 201)
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        store.promote(evidence, "Promote the accepted fixture result.")
+    assert all(item["item_id"] != evidence for item in _request(server, "GET", "/api/inbox")["items"])
+    assert review(route, 409)["error"]["code"] == "review.not_pending"
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        recorded = store.query("human", """
+            SELECT id::text FROM rm.decisions WHERE evidence_id = %s AND action IN ('approve', 'return')
+        """, evidence)
+    assert recorded == [{"id": created["id"]}]
+
+
 @pytest.mark.parametrize("include_legacy_name", [False, True])
 def test_legacy_review_records_the_session_identity(workbench, include_legacy_name, monkeypatch):
     server, _, _, evidence_id = workbench
@@ -681,6 +709,9 @@ def test_legacy_review_records_the_session_identity(workbench, include_legacy_na
 @pytest.mark.parametrize("workbench", ["0072"], indirect=True)
 def test_legacy_review_keeps_the_original_contract_before_identity(workbench):
     server, _, _, evidence_id = workbench
+    inbox = _request(server, "GET", "/api/inbox")
+    assert "review_identity" not in inbox
+    assert any(item["item_id"] == evidence_id for item in inbox["items"])
     body = {"evidence_id": evidence_id, "action": "approve", "reason": REASON}
     _request(server, "POST", "/api/review", body=body, status=400)
     created = _request(server, "POST", "/api/review", body={**body, "actor": ACTOR})

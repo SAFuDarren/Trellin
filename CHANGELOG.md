@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.82
+
+- Open a verified result directly from its inspector, review queue or bottom-bar review count. Activity and review lists show the result and its claim, and Command/Control+Enter records the chosen decision with its reason. (#215)
+
 ## 1.0.81
 
 - Proof node order and reference codes stay consistent when switching the interface language.

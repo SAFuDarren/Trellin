@@ -123,7 +123,8 @@ IMPACT = {"basis_version_id": H1, "affected": [
 INBOX = {"items": [
     {"kind": "review_evidence", "item_id": "77777777-7777-4777-8777-777777777777", "claim_id": CLAIM,
      "claim_title": "自然数加零的对称性", "waiting_since": at(30), "question": "Approve or return this verified result with a reason.",
-     "detail": {"kind": "lean", "sha256": "9c41e0aa" * 8}, "priority": 2},
+     "detail": {"kind": "lean", "sha256": "9c41e0aa" * 8,
+                "declaration": "FirstProof.reverseZeroAdd", "target": "goal"}, "priority": 2},
     {"kind": "resolve_clarification", "item_id": "88888888-8888-4888-8888-888888888888", "claim_id": "aaaaaaaa-0000-4000-8000-000000000001",
      "claim_title": "单射映射的复合", "waiting_since": at(120), "question": "Which composition order is intended?",
      "detail": {"question_count": 1}, "priority": 1},

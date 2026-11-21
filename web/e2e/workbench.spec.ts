@@ -391,11 +391,12 @@ test("the view menu shows review counts and the rail keeps Team and utilities re
 test("approving a verified result records it and clears it from the inbox", async ({ page }) => {
   await open(page, "Review");
   await expect(page.locator(".page-head h2")).toHaveText("reverseZeroAdd");
-  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByRole("button", { name: "Record decision" }).click();
   await expect(page.getByRole("status")).toHaveText("Add your name and a reason first.");
   await page.getByLabel("Your name").fill("Fixture reviewer");
   await page.getByLabel("Reason").fill("Scope matches; only H1 is used.");
-  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByRole("radio", { name: "Approve" }).check();
+  await page.getByRole("button", { name: "Record decision" }).click();
   await expect(page.locator(".page-notice")).toHaveText("Approved and recorded.");
   const review = (await viewMenu(page)).getByRole("menuitem", { name: /^Review/ });
   await expect(review).toHaveAccessibleName(/1(?: waiting for review)?$/);

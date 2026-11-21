@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { GraphSnapshot } from "../src/workbench/types";
 import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
 
 type Contrast = { foreground: string; background: string };
@@ -109,6 +110,13 @@ for (const colorScheme of ["light", "dark"] as const) {
     page,
   }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+    await page.route("**/api/graph?*", async (route) => {
+      const response = await route.fetch();
+      const graph = (await response.json()) as GraphSnapshot;
+      const reduction = graph.nodes.find((node) => node.kind === "reduction");
+      if (reduction) reduction.status = "needs_recheck";
+      await route.fulfill({ response, json: graph });
+    });
     await page.goto("/#session=fixture");
 
     const selected = mapClaim(page, FIXTURE_CLAIM_TITLE);
@@ -164,7 +172,12 @@ for (const colorScheme of ["light", "dark"] as const) {
     await expectKeyboardRing(page, otherNode, "--canvas");
     await expect(otherNode).toHaveAttribute("aria-pressed", "false");
 
-    const review = page.locator(".queue-item").first();
+    const reviewLink = page.locator("a.queue-item").first();
+    await reviewLink.hover();
+    expect((await stateOf(reviewLink)).ring).toBe("none");
+    await expectKeyboardRing(page, reviewLink, "--side");
+
+    const review = page.locator("button.queue-item").first();
     await review.hover();
     const hoveredRow = await stateOf(review);
     expect(hoveredRow.ring).toBe("none");
