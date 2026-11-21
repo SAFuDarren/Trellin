@@ -1653,9 +1653,6 @@ select:disabled {
     align-items: center;
     gap: 4px;
   }
-  .toolbar .claim-heading h1 {
-    font-size: var(--type-section-size);
-  }
   .toolbar .claim-meta,
   .proof-return-label,
   #proof-details-toggle span {
@@ -1686,6 +1683,11 @@ select:disabled {
     display: block;
     width: 16px;
     height: 16px;
+  }
+}
+@media (width < 720px) {
+  #workbench .toolbar .claim-heading h1 {
+    font-size: var(--type-section-size);
   }
 }
 .main-proof-graph {
