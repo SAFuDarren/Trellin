@@ -151,14 +151,10 @@ export function Shell({ session }: { session: string }) {
             graphAction(t, "proof-task", () => runProjectAction({ id: "proof-task", claimId })),
           ]
         : []),
-      {
-        id: "start-chat",
-        label: t("palette.startChat"),
-        onSelect: () => {
-          if (section === "chat") go("chat", "new");
-          else setChatRequest({ session, value: { newConversation: true } });
-        },
-      },
+      graphAction(t, "start-chat", () => {
+        if (section === "chat") go("chat", "new");
+        else setChatRequest({ session, value: { newConversation: true } });
+      }),
     ],
   };
   const running = team.data?.jobs?.filter((job) => job.state === "running").length ?? 0;
@@ -233,9 +229,11 @@ export function Shell({ session }: { session: string }) {
           <CommandPalette
             open={paletteOpen}
             groups={
-              paletteOpen && !palette.query.trim()
-                ? [...paletteResults.groups.slice(0, 1), actionGroup, ...paletteResults.groups.slice(1)]
-                : [...paletteResults.groups, actionGroup]
+              paletteResults.scoped
+                ? paletteResults.groups
+                : paletteOpen && !palette.query.trim()
+                  ? [...paletteResults.groups.slice(0, 1), actionGroup, ...paletteResults.groups.slice(1)]
+                  : [...paletteResults.groups, actionGroup]
             }
             loading={paletteResults.isLoading}
             onClose={() => setPalette(null)}

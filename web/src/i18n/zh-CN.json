@@ -18,7 +18,11 @@
     "conversations": "对话",
     "agents": "Agent",
     "actions": "操作",
-    "startChat": "发起对话"
+    "startChat": "发起对话",
+    "keyboardHelp": "键盘快捷键",
+    "navigate": "移动选择",
+    "open": "打开",
+    "referenceKeywords": "证明 节点 课题 编号 简码"
   },
   "session": {
     "missing": "请用 `research-multiplier workbench` 打印的链接打开工作台。"

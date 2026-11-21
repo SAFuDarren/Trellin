@@ -18,7 +18,7 @@
 }
 
 .command-palette::backdrop {
-  background: rgb(0 0 0 / 24%);
+  background: rgb(0 0 0 / 34%);
 }
 
 .command-palette .floating-search {
@@ -97,4 +97,37 @@
   border-top: 1px solid var(--hair);
   color: var(--sub);
   font-size: var(--type-meta-size);
+}
+
+.command-palette .floating-footer {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  background: var(--side);
+}
+
+.command-palette-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 15px;
+  padding: 9px 14px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+
+.command-palette-keys span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.command-palette-keys kbd {
+  display: inline-grid;
+  min-width: 17px;
+  min-height: 17px;
+  place-items: center;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  font: inherit;
+  color: var(--ink);
 }

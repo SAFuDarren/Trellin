@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { paletteQuery } from "../shell/paletteQuery";
 import { PickerContent, type FloatingGroup } from "./FloatingControls";
 import "../styles/command-palette.css";
 
@@ -64,6 +65,7 @@ export function CommandPalette({
           searchLabel={t("palette.search")}
           emptyLabel={t(loading ? "palette.loading" : "palette.noResults")}
           limit={{ perGroup: 8, label: t("palette.refine") }}
+          filterText={(query) => paletteQuery(query).text}
           onQueryChange={onQueryChange}
           onChoose={(option) => {
             dismiss();
@@ -80,6 +82,27 @@ export function CommandPalette({
             >
               <kbd>{t("palette.escapeKey")}</kbd>
             </button>
+          }
+          footer={
+            <div className="command-palette-keys" role="group" aria-label={t("palette.keyboardHelp")}>
+              <span>
+                <kbd>↑</kbd>
+                <kbd>↓</kbd>
+                {t("palette.navigate")}
+              </span>
+              <span>
+                <kbd>↵</kbd>
+                {t("palette.open")}
+              </span>
+              <span>
+                <kbd>#</kbd>
+                {t("palette.claims")}
+              </span>
+              <span>
+                <kbd>@</kbd>
+                {t("palette.agents")}
+              </span>
+            </div>
           }
         />
       )}

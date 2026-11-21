@@ -14,6 +14,8 @@ Press **⌘K** (**Ctrl+K** on other platforms) or use the search button in the l
 
 Use **Find claim** on the project map to search and select a card. In **Agent chat**, search for a recipient or conversation from its chooser. In these search controls and the command palette, use arrow keys to move through options, Enter to select, and Escape to return focus.
 
+In the command palette, start with `#` to search claims and their proof references, or `@` to search Agents. The footer lists these prefixes and navigation keys. When a menu or palette result shows an **Alt** shortcut, use **Option** on Mac to invoke that result while the menu or palette is open.
+
 The **Details** and **Global map** icons show when their panels are open. With focus on the project map or its toolbar, press **I** for Details or **M** for Global map. Point at or keyboard-focus an icon to see its shortcut.
 
 Right-click a project map card or proof node for its actions. With the item focused, press **Shift+F10** to open the same menu. **Write proof note** opens the note editor for that node. **Show in Library** lists recorded sources used by the claim.
