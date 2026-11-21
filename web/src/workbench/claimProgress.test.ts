@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { ProjectClaim } from "../api/projectCanvas";
 import type { InboxItem, Job } from "../api/sections";
 import { buildClaimProgress } from "./claimProgress";
-import type { AtlasClaim } from "./types";
 
-function claim(id: string, status = "open", nodes: AtlasClaim["nodes"] = []): AtlasClaim {
-  return { id, title: id, domain: "lean-core", status, nodes, edges: [] };
+function claim(id: string, status = "open", obligations?: ProjectClaim["obligations"]): ProjectClaim {
+  return { id, title: id, domain: "lean-core", status, obligations };
 }
 
 function inbox(claim_id: string | null, kind: string, detail: InboxItem["detail"] = null): InboxItem {
@@ -32,29 +32,22 @@ function job(claim_id: string | null, kind: string, state: string, model_job = f
 }
 
 describe("claim progress", () => {
-  it("counts recorded proof nodes once and never scores an input or stale proof as verified", () => {
-    const atlas = [
-      claim("math", "open", [
-        { id: "g", kind: "goal", status: "open" },
-        { id: "h", kind: "hypothesis", status: "approved" },
-        { id: "f", kind: "library", status: "approved" },
-        { id: "l1", kind: "local_lemma", status: "verified" },
-        { id: "l2", kind: "local_lemma", status: "needs_recheck" },
-        { id: "r", kind: "reduction", status: "goal_checked" },
-        { id: "o", kind: "obligation", status: "open" },
-        { id: "e", kind: "evidence", status: "approved" },
-      ]),
-    ];
-    expect(buildClaimProgress({ atlas }).get("math")).toEqual({ nodes: { done: 3, total: 6 } });
-    expect(buildClaimProgress({}).get("math")).toBeUndefined();
+  it("uses exact project counts and distinguishes zero from unknown", () => {
+    const progress = buildClaimProgress({
+      claims: [
+        claim("math", "open", { verified: 3, total: 6 }),
+        claim("empty", "open", { verified: 0, total: 0 }),
+        claim("missing"),
+      ],
+    });
+    expect(progress.get("math")).toEqual({ obligations: { verified: 3, total: 6 } });
+    expect(progress.get("empty")).toEqual({ obligations: { verified: 0, total: 0 } });
+    expect(progress.has("missing")).toBe(false);
   });
 
-  it("uses actionable review and decision records, ignoring unassigned items and graph placeholders", () => {
+  it("uses actionable review and decision records, ignoring unassigned items", () => {
     const progress = buildClaimProgress({
-      atlas: [
-        { ...claim("history"), blocked: 3, awaiting_review: 2 },
-        claim("interpretation", "awaiting_interpretation_review"),
-      ],
+      claims: [claim("history"), claim("interpretation", "awaiting_interpretation_review")],
       inbox: [
         inbox("evidence", "review_evidence", { kind: "counterexample" }),
         inbox("scope", "confirm_lean_statement"),
@@ -77,7 +70,7 @@ describe("claim progress", () => {
 
   it("prioritizes action and recheck over active work and only names recorded proof work", () => {
     const progress = buildClaimProgress({
-      atlas: [claim("decision", "needs_recheck"), claim("recheck", "needs_recheck")],
+      claims: [claim("decision", "needs_recheck"), claim("recheck", "needs_recheck")],
       inbox: [inbox("decision", "choose_conjecture"), inbox("review", "confirm_formalization")],
       jobs: [
         job("decision", "verify", "running"),

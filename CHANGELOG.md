@@ -2,7 +2,7 @@
 
 ## 1.0.59
 
-- Project map cards, the claim inspector, and Claims show recorded proof progress and the current review, decision or verification state. The count covers proof nodes in the graph summary.
+- Project map cards, the claim inspector, and Claims show the verified and total recorded obligations for the current statement, alongside the current review, decision or verification state.
 
 ## 1.0.58
 

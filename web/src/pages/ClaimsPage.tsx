@@ -185,11 +185,13 @@ export function ClaimsPage({
                         onClick={() => setExpandedClaim(expanded ? null : claim.id)}
                       >
                         <span className="title">{claim.title || t("sidebar.untitled")}</span>
-                        {progress?.nodes && progress.nodes.total > 0 && (
+                        {progress?.obligations && progress.obligations.total > 0 && (
                           <span className="progress" aria-hidden="true">
                             <span
                               className="done"
-                              style={{ width: `${Math.round((progress.nodes.done / progress.nodes.total) * 100)}%` }}
+                              style={{
+                                width: `${Math.round((progress.obligations.verified / progress.obligations.total) * 100)}%`,
+                              }}
                             />
                           </span>
                         )}

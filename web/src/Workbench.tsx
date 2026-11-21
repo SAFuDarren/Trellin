@@ -6,7 +6,7 @@ import { api } from "./api/client";
 import type { ConversationAnchor } from "./api/conversations";
 import { useFallbackInterval } from "./api/liveUpdates";
 import { useProjectCanvas } from "./api/projectCanvas";
-import { type useAtlas, useClaims, useLibrary } from "./api/sections";
+import { useAtlas, useClaims, useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
 import type { FloatingGroup, FloatingOption } from "./components/FloatingControls";
@@ -45,7 +45,6 @@ type Selection = { claimId: string; nodeId?: string; referenced?: boolean };
 
 export function Workbench({
   session,
-  atlas,
   claimProgress,
   focus,
   onFocusHandled,
@@ -57,7 +56,6 @@ export function Workbench({
   onActionHandled,
 }: {
   session: string;
-  atlas: ReturnType<typeof useAtlas>;
   claimProgress: ReadonlyMap<string, ClaimProgress>;
   focus?: Focus | null;
   onFocusHandled: (focus: null) => void;
@@ -98,6 +96,7 @@ export function Workbench({
     t("projects.current");
 
   const claims = useClaims(session);
+  const atlas = useAtlas(session, mapAtlasOpen);
 
   useEffect(() => {
     if (!claims.data || !pendingLaunch.current) return;

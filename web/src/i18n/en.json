@@ -663,7 +663,8 @@
   },
   "claimProgress": {
     "claim": "Claim progress",
-    "nodes": "{{done}} of {{total}} proof nodes verified",
+    "obligations": "{{verified}} of {{total}} obligations verified",
+    "noObligations": "No recorded obligations",
     "states": {
       "review": "Waiting for your review",
       "decision": "Needs a decision",

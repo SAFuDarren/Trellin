@@ -663,7 +663,8 @@
   },
   "claimProgress": {
     "claim": "命题进度",
-    "nodes": "已验证 {{done}} / {{total}} 个证明节点",
+    "obligations": "已验证 {{verified}} / {{total}} 项证明义务",
+    "noObligations": "尚无已记录的证明义务",
     "states": {
       "review": "等你审核",
       "decision": "需要决定",

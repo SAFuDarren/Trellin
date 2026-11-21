@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { Claim } from "../src/api/client";
+import type { ProjectClaim } from "../src/api/projectCanvas";
 import type { InboxItem, Job } from "../src/api/sections";
 import type { AtlasClaim, GraphSnapshot } from "../src/workbench/types";
 import { mapClaim } from "./project-map";
@@ -7,7 +8,10 @@ import { mapClaim } from "./project-map";
 const WORKSPACE = "11111111-2222-4333-8444-555555555555";
 const EVENT_PATH = `/api/v1/workspaces/${WORKSPACE}/events`;
 const WAITING_SINCE = "2026-11-21T00:00:00Z";
-const PARTIAL = "1 of 3 proof nodes verified";
+const PARTIAL = "1 of 2 obligations verified";
+const ZERO = "No recorded obligations";
+const OLDER = "2 of 7 obligations verified";
+const UPDATED = "2 of 2 obligations verified";
 const LONG_TITLE =
   "A long theorem about the behaviour of composed maps between finite ordered sets under repeated restriction and extension";
 type LiveFixtureWindow = Window & { emitFixtureWorkspaceEvent?: (frame: string) => void };
@@ -16,12 +20,21 @@ function claim(index: number, title: string, status = "open"): Claim {
   return { id: `33333333-3333-4333-8333-33333333333${index}`, title, status, domain: "lean-core" };
 }
 
-const review = claim(0, LONG_TITLE);
-const decision = claim(1, "Choose a premise before proving this claim");
-const verification = claim(2, "Check the candidate proof in Lean");
-const recheck = claim(3, "Revisit a proof with a withdrawn premise", "needs_recheck");
-const ready = claim(4, "A frozen statement and confirmed basis");
-const claims = [review, decision, verification, recheck, ready];
+function withoutTotals({ id, title, status, domain }: ProjectClaim): Claim {
+  return { id, title, status, domain };
+}
+
+const partial = { verified: 1, total: 2 };
+const review = { ...claim(0, LONG_TITLE), obligations: partial };
+const decision = { ...claim(1, "Choose a premise before proving this claim"), obligations: partial };
+const verification = { ...claim(2, "Check the candidate proof in Lean"), obligations: partial };
+const recheck = {
+  ...claim(3, "Revisit an older proof with a withdrawn premise", "needs_recheck"),
+  obligations: { verified: 2, total: 7 },
+};
+const ready = { ...claim(4, "A frozen statement and confirmed basis"), obligations: { verified: 0, total: 0 } };
+const missing = claim(5, "A claim from a build without exact obligation totals");
+const claims: ProjectClaim[] = [review, decision, verification, recheck, ready, missing];
 
 function reviewItem(target: Claim, decisionRequired = false): InboxItem {
   return {
@@ -48,8 +61,8 @@ async function fixture(page: Page, displayedClaims = claims, live = false) {
       const obligation = {
         id: `obligation:${target.id}:1`,
         kind: "obligation",
-        status: target.id === verification.id && verificationComplete ? "verified" : "open",
-        title: "Outstanding obligation",
+        status: "verified",
+        title: "Shared obligation",
       };
       nodes.push(lemma, obligation, {
         id: `item:${target.id}`,
@@ -58,10 +71,25 @@ async function fixture(page: Page, displayedClaims = claims, live = false) {
         title: "Confirmed assumption",
       });
       nodes.push({ id: `library:${target.id}`, kind: "library", status: "available", title: "Library premise" });
-      edges.push([lemma.id, goal.id], [obligation.id, lemma.id]);
+      // The graph also shows the verified lemma and evidence discharging the first position.
+      const openObligation = {
+        ...obligation,
+        id: `obligation:${target.id}:2`,
+        status: "open",
+        title: "Outstanding obligation",
+      };
+      const otherLemma = { ...lemma, id: `local-lemma:${target.id}:2`, title: "Alternate checked lemma" };
+      nodes.push(openObligation, otherLemma);
+      nodes.push({ id: `lean:${target.id}`, kind: "evidence", status: "verified", title: "Recorded evidence" });
+      edges.push(
+        [lemma.id, goal.id],
+        [obligation.id, lemma.id],
+        [otherLemma.id, goal.id],
+        [openObligation.id, otherLemma.id],
+      );
     }
     return {
-      ...target,
+      ...withoutTotals(target),
       nodes,
       edges,
       awaiting_review: Number(target.id === review.id || (target.id === verification.id && verificationComplete)),
@@ -69,17 +97,32 @@ async function fixture(page: Page, displayedClaims = claims, live = false) {
     };
   }
 
-  await page.route(/\/api\/(?:claims|project-canvas\/claims)$/, (route) =>
-    route.fulfill({ json: { claims: displayedClaims, claim_id: null } }),
+  await page.route("**/api/claims", (route) =>
+    route.fulfill({ json: { claims: displayedClaims.map(withoutTotals), claim_id: null } }),
+  );
+  await page.route("**/api/project-canvas/claims", (route) =>
+    route.fulfill({
+      json: {
+        claims: displayedClaims.map((target) =>
+          target.id === verification.id && verificationComplete
+            ? { ...target, obligations: { verified: 2, total: 2 } }
+            : target,
+        ),
+        claim_id: null,
+      },
+    }),
   );
   await page.route("**/api/project-canvas", (route) => route.fulfill({ json: { positions: {}, links: [] } }));
-  await page.route("**/api/atlas", (route) => route.fulfill({ json: { claims: displayedClaims.map(atlasClaim) } }));
+  // The project index contains older claims beyond the recent Atlas window.
+  await page.route("**/api/atlas", (route) =>
+    route.fulfill({ json: { claims: displayedClaims.filter((target) => target.id !== recheck.id).map(atlasClaim) } }),
+  );
   await page.route("**/api/graph?*", (route) => {
     const claimId = new URL(route.request().url()).searchParams.get("claim");
     const target = displayedClaims.find((item) => item.id === claimId)!;
     const graph = atlasClaim(target);
     const snapshot: GraphSnapshot = {
-      claim: target,
+      claim: withoutTotals(target),
       focus_id: graph.nodes[0]?.id,
       nodes: graph.nodes,
       edges: graph.edges.map(([source, target]) => ({ source, target, kind: "actual" })),
@@ -157,24 +200,31 @@ async function fixture(page: Page, displayedClaims = claims, live = false) {
   return { proofTaskReads, finishVerification: () => (verificationComplete = true) };
 }
 
-async function expectProgress(surface: Locator, label: string, tone: string, count = PARTIAL) {
+async function expectProgress(surface: Locator, label: string, tone: string, count: string | null = PARTIAL) {
   const state = surface.locator(".claim-progress-state");
   await expect(state).toHaveText(label);
   await expect(state).toHaveAttribute("data-tone", tone);
-  await expect(surface.locator(".claim-progress-count")).toHaveText(count);
+  const renderedCount = surface.locator(".claim-progress-count");
+  if (count === null) await expect(renderedCount).toHaveCount(0);
+  else await expect(renderedCount).toHaveText(count);
 }
 
-test("recorded proof progress and waiting states agree on the map, inspector and Claims page", async ({ page }) => {
+test("exact obligation totals and waiting states agree on the map, inspector and Claims page", async ({ page }) => {
   const { proofTaskReads } = await fixture(page);
   await page.goto("/#session=fixture");
+  const atlasToggle = page.getByRole("button", { name: "Global map", exact: true });
+  await atlasToggle.click();
+  await expect(page.getByRole("img", { name: /^Recent claims in the workspace/ })).toBeVisible();
+  await atlasToggle.click();
   const states = [
-    [review, "Waiting for your review", "review"],
-    [decision, "Needs a decision", "bad"],
-    [verification, "Verification running", "live"],
-    [recheck, "Needs recheck", "bad"],
+    [review, "Waiting for your review", "review", PARTIAL],
+    [decision, "Needs a decision", "bad", PARTIAL],
+    [verification, "Verification running", "live", PARTIAL],
+    [recheck, "Needs recheck", "bad", OLDER],
+    [missing, "In progress", "open", null],
   ] as const;
-  for (const [target, label, tone] of states) {
-    await expectProgress(mapClaim(page, target.title!), label, tone);
+  for (const [target, label, tone, count] of states) {
+    await expectProgress(mapClaim(page, target.title!), label, tone, count);
   }
   // The map initially selects its first claim. It needs no per-card task requests.
   expect(proofTaskReads.filter((id) => id !== review.id)).toEqual([]);
@@ -184,23 +234,22 @@ test("recorded proof progress and waiting states agree on the map, inspector and
   await expect(detail.getByRole("heading", { name: review.title!, exact: true })).toBeVisible();
   await expectProgress(detail, "Waiting for your review", "review");
 
+  await mapClaim(page, recheck.title!).press("Enter");
+  await expectProgress(detail, "Needs recheck", "bad", OLDER);
+  await mapClaim(page, missing.title!).press("Enter");
+  await expectProgress(detail, "In progress", "open", null);
+
   const readyCard = mapClaim(page, ready.title!);
   await readyCard.press("Enter");
-  const readyCount = "0 of 1 proof nodes verified";
-  await expectProgress(readyCard, "Ready to start", "open", readyCount);
-  await expectProgress(detail, "Ready to start", "open", readyCount);
+  await expectProgress(readyCard, "Ready to start", "open", ZERO);
+  await expectProgress(detail, "Ready to start", "open", ZERO);
 
   await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
-  for (const [target, label, tone] of states) {
+  for (const [target, label, tone, count] of states) {
     const card = page.locator(".board-card").filter({ hasText: target.title! });
-    await expectProgress(card, label, tone);
+    await expectProgress(card, label, tone, count);
   }
-  await expectProgress(
-    page.locator(".board-card").filter({ hasText: ready.title! }),
-    "Ready to start",
-    "open",
-    readyCount,
-  );
+  await expectProgress(page.locator(".board-card").filter({ hasText: ready.title! }), "Ready to start", "open", ZERO);
 });
 
 test("a long title leaves status and proof progress legible at the minimum desktop size", async ({ page }) => {
@@ -275,8 +324,8 @@ test("a committed workspace event updates proof progress on the open canvas and 
     if (!emit) throw new Error("The fixture event stream is not open.");
     emit(frame);
   }, frame);
-  await expectProgress(card, "Waiting for your review", "review", "2 of 3 proof nodes verified");
-  await expectProgress(detail, "Waiting for your review", "review", "2 of 3 proof nodes verified");
+  await expectProgress(card, "Waiting for your review", "review", UPDATED);
+  await expectProgress(detail, "Waiting for your review", "review", UPDATED);
   await expect(card).toHaveAttribute("aria-pressed", "true");
   expect(reloads).toBe(0);
 });

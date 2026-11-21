@@ -1,16 +1,13 @@
+import type { ObligationCount, ProjectClaim } from "../api/projectCanvas";
 import type { InboxItem, Job } from "../api/sections";
-import { nodeTone } from "./text";
-import type { AtlasClaim } from "./types";
 
 type State = "review" | "decision" | "verifying" | "running" | "recheck" | "ready" | "queued";
 
 export type ClaimProgress = {
   state?: State;
-  /** Count of recorded proof graph nodes, including the goal. */
-  nodes?: { done: number; total: number };
+  obligations?: ObligationCount;
 };
 
-const PROOF_NODES = new Set(["goal", "obligation", "local_lemma", "reduction", "evidence"]);
 const REVIEW_ITEMS = new Set([
   "confirm_formalization",
   "confirm_goal",
@@ -24,12 +21,12 @@ const DECISION_ITEMS = new Set(["resolve_clarification", "choose_conjecture", "d
 const PRECEDENCE: State[] = ["decision", "review", "recheck", "verifying", "running", "queued", "ready"];
 
 export function buildClaimProgress({
-  atlas = [],
+  claims = [],
   inbox = [],
   jobs = [],
   proofTask,
 }: {
-  atlas?: AtlasClaim[];
+  claims?: ProjectClaim[];
   inbox?: InboxItem[];
   jobs?: Job[];
   proofTask?: { claim_id: string; state: string; blocker?: string | null; can_start?: boolean };
@@ -43,14 +40,8 @@ export function buildClaimProgress({
     }
   }
 
-  for (const claim of atlas) {
-    const nodes = claim.nodes.filter(({ kind }) => PROOF_NODES.has(kind));
-    if (nodes.length) {
-      const done = nodes.filter(
-        (node) => nodeTone(node, false) === "ok" || (node.kind === "reduction" && node.status === "goal_checked"),
-      ).length;
-      result.set(claim.id, { nodes: { done, total: nodes.length } });
-    }
+  for (const claim of claims) {
+    if (claim.obligations) result.set(claim.id, { obligations: claim.obligations });
     if (claim.status === "needs_recheck") addState(claim.id, "recheck");
     if (claim.status === "awaiting_interpretation_review") addState(claim.id, "decision");
   }

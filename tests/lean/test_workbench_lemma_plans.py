@@ -9,7 +9,8 @@ from uuid import uuid4
 
 import pytest
 
-from research_multiplier import general_lean, local_lemma_kernel
+from research_multiplier import general_lean, local_lemma_kernel, local_lemmas
+from research_multiplier.proof import lean_reductions
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import Store, bind_workspace
 from research_multiplier.workbench.server import WorkbenchServer
@@ -57,7 +58,8 @@ def _request(server, route, document=None):
         connection.close()
 
 
-def test_lemma_plan_verifies_only_intermediate_nodes_in_current_scope(tmp_path, monkeypatch):
+@pytest.fixture
+def scoped_workbench(tmp_path, monkeypatch):
     with disposable_project_logins() as logins:
         for name in tuple(os.environ):
             if name.startswith("RM_"):
@@ -73,13 +75,14 @@ def test_lemma_plan_verifies_only_intermediate_nodes_in_current_scope(tmp_path, 
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
-                _check_plan_and_graph(server, scope, monkeypatch)
+                yield server, scope
             finally:
                 server.shutdown()
                 thread.join()
 
 
-def _check_plan_and_graph(server, scope, monkeypatch):
+def test_lemma_plan_verifies_only_intermediate_nodes_in_current_scope(scoped_workbench, monkeypatch):
+    server, scope = scoped_workbench
     route = "/api/lemma-plans"
     graph = f"/api/graph?claim={scope['claim_id']}"
     proof = {"intro": {"count": 1, "body": {"use": 0}}}
@@ -123,3 +126,38 @@ def _check_plan_and_graph(server, scope, monkeypatch):
     assert [node for node in snapshot["nodes"] if node["kind"] == "local_lemma"] == [verified]
     assert snapshot["claim"]["status"] == "open"
     assert snapshot["claim"]["lemma_plan_ready"] is True
+
+
+def test_canvas_counts_each_current_reduction_obligation_and_refreshes_after_retirement(scoped_workbench):
+    server, scope = scoped_workbench
+    statement_id = scope["statement_id"]
+
+    def counts():
+        status, reply = _request(server, "/api/project-canvas/claims")
+        assert status == 200, reply
+        claim, = [item for item in reply["claims"] if item["id"] == scope["claim_id"]]
+        return claim["obligations"]
+
+    assert counts() == {"verified": 0, "total": 0}
+    with paths.use_workspace(server.workspace, strict=True):
+        for obligations, proof in (
+            (["True"], {"and": [{"use": 0}, {"use": 1}]}),
+            (["True", "True ∧ True"], {"use": 2}),
+        ):
+            lean_reductions.reductions(statement_id, document={
+                "format_version": 1, "obligations": obligations,
+                "proof": {"intro": {"count": 1 + len(obligations), "body": proof}},
+            })
+    assert counts() == {"verified": 0, "total": 3}
+
+    with paths.use_workspace(server.workspace, strict=True):
+        first, = local_lemmas.derive(statement_id, {"format_version": 1, "nodes": [{
+            "name": "Truth", "proposition": "True", "proof": {"intro": {"count": 1, "body": {"use": 0}}},
+        }]})["lemmas"]
+    # These are two recorded obligations, even though they discharge from the same verified lemma.
+    assert counts() == {"verified": 2, "total": 3}
+
+    with paths.use_workspace(server.workspace, strict=True), Store() as store:
+        store.query("human", "SELECT rm.retire_verification_input(%s,%s,%s)",
+                    "source", first["body"]["candidate"]["sha256"], "Exercise stale obligation progress.")
+    assert counts() == {"verified": 0, "total": 3}

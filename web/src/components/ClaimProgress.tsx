@@ -18,10 +18,11 @@ export function claimProgressText(t: TFunction, progress: ClaimProgress | undefi
   const recorded = progress?.state;
   const state = status === "needs_recheck" && recorded !== "decision" && recorded !== "review" ? "recheck" : recorded;
   const fallback = { id: "", kind: "goal", status };
+  const count = progress?.obligations;
   return {
     label: state ? t(`claimProgress.states.${state}`) : nodeStatus(t, fallback),
     tone: state ? TONES[state] : nodeTone(fallback, false),
-    count: progress?.nodes && t("claimProgress.nodes", { done: progress.nodes.done, total: progress.nodes.total }),
+    count: count && (count.total ? t("claimProgress.obligations", count) : t("claimProgress.noObligations")),
   };
 }
 

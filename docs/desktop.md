@@ -16,7 +16,7 @@ Use **Find claim** on the project map to search and select a card. In **Agent ch
 
 Right-click a project map card or proof node for its actions. With the item focused, press **Shift+F10** to open the same menu. **Write proof note** opens the note editor for that node. **Show in Library** lists recorded sources used by the claim.
 
-The project map, claim inspector and Claims page show the claim’s recorded review, decision and verification state. Select a claim to load its current proof task. When the project summary has its graph, the count covers the recorded goal, obligations, reductions, lemmas and evidence nodes.
+The project map, claim inspector and Claims page show the claim’s recorded review, decision and verification state. Select a claim to load its current proof task. The count covers obligations recorded in reduction routes for the current Lean statement. An obligation counts as verified while its checked proof remains current. If two routes record the same proposition, each occurrence counts in its route.
 
 Add installed models from [Team → Runtimes](project-intake.md#connect-a-model). For a managed installation with tools outside the standard locations, the Trellin launch environment can supply colon-separated absolute directories through `RM_DESKTOP_TOOL_PATH`.
 

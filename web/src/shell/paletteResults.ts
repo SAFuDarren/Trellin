@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { queryOptions, useQueries, useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { api, type Claim } from "../api/client";
+import { api } from "../api/client";
 import { useConversations } from "../api/conversations";
+import { useProjectCanvasClaims } from "../api/projectCanvas";
 import type { LibraryItem } from "../api/sections";
 import { useTeamAgents } from "../api/teamAgents";
 import { workspaceId as isWorkspaceId } from "../api/workspaceEvents";
@@ -62,12 +63,7 @@ export function usePaletteResults({
     return () => window.clearTimeout(timer);
   }, [enabled, exact]);
 
-  const claims = useQuery({
-    queryKey: ["project-canvas-claims", session],
-    queryFn: ({ signal }) => api<{ claims: Claim[] }>(session, "/api/project-canvas/claims", { signal }),
-    enabled,
-    retry: false,
-  });
+  const claims = useProjectCanvasClaims(session, enabled);
   const library = useQuery({
     queryKey: ["library", session, project],
     queryFn: ({ signal }) => api<{ items: LibraryItem[] }>(session, "/api/library", { signal }),

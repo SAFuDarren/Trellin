@@ -172,7 +172,9 @@ def test_workbench_canvas_links_leave_recorded_proof_dependencies_intact(workben
     assert len(recent_claims) == 100
     assert claim not in {item["id"] for item in recent_claims}
     assert {item["id"] for item in project_claims} >= {claim, other}
-    assert project_claims[:100] == recent_claims
+    assert [{key: value for key, value in item.items() if key != "obligations"}
+            for item in project_claims[:100]] == recent_claims
+    assert all(item["obligations"] == {"verified": 0, "total": 0} for item in project_claims)
     before = _request(server, "GET", f"/api/graph?claim={claim}")
     absent = {"action": "link", "source": claim, "target": str(uuid4())}
     assert _request(server, "POST", endpoint, body=absent, status=409) == {"error": "project_canvas.missing"}

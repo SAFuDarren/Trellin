@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { LiveWorkspaceUpdates, WORKSPACE_WRITES } from "./api/liveUpdates";
 import { useReleaseUpdates } from "./api/releaseUpdates";
+import { useProjectCanvasClaims } from "./api/projectCanvas";
 import { useProofTask } from "./api/proofTask";
 import { useAtlas, useClaims, useInbox, useTeam } from "./api/sections";
 import { workspaceEventCursor, workspaceId } from "./api/workspaceEvents";
@@ -35,7 +36,8 @@ export function Shell({ session }: { session: string }) {
   const [route, go] = useRoute();
   const { section, sub } = route;
   const agentWork = sub === "agent-work" || sub.startsWith("agent-work/");
-  const showsClaimProgress = section === "workbench" || (section === "claims" && !agentWork);
+  const showsClaims = section === "claims" && !agentWork;
+  const showsClaimProgress = section === "workbench" || showsClaims;
   const releaseUpdates = useReleaseUpdates(session);
   const queries = useQueryClient();
   const [connection, setConnection] = useState<WorkspaceConnection | null>(null);
@@ -47,7 +49,8 @@ export function Shell({ session }: { session: string }) {
   const comprehensive = eventFeed?.coverage === WORKSPACE_WRITES;
   const live = comprehensive && sessionConnection?.workspace === workspace && Boolean(sessionConnection?.live);
   const team = useTeam(session, live);
-  const atlas = useAtlas(session, showsClaimProgress);
+  const atlas = useAtlas(session, showsClaims);
+  const projectClaims = useProjectCanvasClaims(session, showsClaimProgress);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [chatRequest, setChatRequest] = useState<{ session: string; value: AgentChatRequest } | null>(null);
   const [palette, setPalette] = useState<{ session: string; query: string } | null>(null);
@@ -59,12 +62,12 @@ export function Shell({ session }: { session: string }) {
   const claimProgress = useMemo(
     () =>
       buildClaimProgress({
-        atlas: atlas.data?.claims,
+        claims: projectClaims.data?.claims,
         inbox: inbox.data?.items,
         jobs: team.data?.jobs,
         proofTask: proofTask.data,
       }),
-    [atlas.data, inbox.data, team.data, proofTask.data],
+    [projectClaims.data, inbox.data, team.data, proofTask.data],
   );
   const paletteOpen = palette?.session === session;
   const openPalette = useCallback(() => setPalette({ session, query: "" }), [session]);
@@ -201,7 +204,6 @@ export function Shell({ session }: { session: string }) {
               <Workbench
                 key={session}
                 session={session}
-                atlas={atlas}
                 claimProgress={claimProgress}
                 focus={focus}
                 onFocusHandled={setFocus}

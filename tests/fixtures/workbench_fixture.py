@@ -221,7 +221,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(PROJECT_CANVAS).encode(), "application/json")
             return
         if route.path == "/api/project-canvas/claims":
-            self.send(json.dumps({"claims": CLAIMS}, ensure_ascii=False).encode(),
+            claims = [{**claim, "obligations": {"verified": int(claim["id"] == CLAIM),
+                                                "total": 2 if claim["id"] == CLAIM else 0}}
+                      for claim in CLAIMS]
+            self.send(json.dumps({"claims": claims}, ensure_ascii=False).encode(),
                       "application/json; charset=utf-8")
             return
         query = parse_qs(route.query)
