@@ -159,9 +159,11 @@ export function useLibrary(session: string, enabled = true) {
   });
 }
 export function useTeam(session: string, streamHealthy = false) {
-  return useQuery({
-    queryKey: ["team"],
-    refetchInterval: useFallbackInterval(LIVE_MS, streamHealthy),
+  const fallback = useFallbackInterval(LIVE_MS, streamHealthy);
+  return useQuery<Team>({
+    queryKey: ["team", session],
+    // A lease can expire without a new workspace event.
+    refetchInterval: (query) => (query.state.data?.jobs?.some((job) => job.state === "running") ? LIVE_MS : fallback),
     queryFn: ({ signal }) => api<Team>(session, "/api/team", { signal }),
   });
 }
@@ -173,7 +175,7 @@ export function useProgress(session: string) {
 }
 export function useThreads(session: string) {
   return useQuery({
-    queryKey: ["threads"],
+    queryKey: ["threads", session],
     refetchInterval: useFallbackInterval(LIVE_MS),
     queryFn: ({ signal }) => api<{ threads: Thread[] }>(session, "/api/threads", { signal }),
   });

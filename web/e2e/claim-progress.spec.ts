@@ -4,9 +4,9 @@ import type { ProjectClaim } from "../src/api/projectCanvas";
 import type { InboxItem, Job } from "../src/api/sections";
 import type { AtlasClaim, GraphSnapshot } from "../src/workbench/types";
 import { mapClaim } from "./project-map";
+import { mockWorkspaceEvents } from "./workspace-events";
 
 const WORKSPACE = "11111111-2222-4333-8444-555555555555";
-const EVENT_PATH = `/api/v1/workspaces/${WORKSPACE}/events`;
 const WAITING_SINCE = "2026-11-21T00:00:00Z";
 const PARTIAL = "1 of 2 obligations verified";
 const ZERO = "No recorded obligations";
@@ -14,7 +14,6 @@ const OLDER = "2 of 7 obligations verified";
 const UPDATED = "2 of 2 obligations verified";
 const LONG_TITLE =
   "A long theorem about the behaviour of composed maps between finite ordered sets under repeated restriction and extension";
-type LiveFixtureWindow = Window & { emitFixtureWorkspaceEvent?: (frame: string) => void };
 
 function claim(index: number, title: string, status = "open"): Claim {
   return { id: `33333333-3333-4333-8333-33333333333${index}`, title, status, domain: "lean-core" };
@@ -258,7 +257,7 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   await expectProgress(detail, "Ready to start", "open", ZERO);
 
   await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
-  for (const [target, label, tone, count] of states.slice(0, 3)) {
+  for (const [target, label, tone, count] of states.slice(1, 3)) {
     const card = page.locator(".board-card").filter({ hasText: target.title! });
     await expectProgress(card, label, tone, count);
   }
@@ -270,7 +269,9 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   const uncounted = page.locator(".board-card").filter({ hasText: missing.title! });
   await expect(uncounted.locator(".claim-progress")).toHaveCount(0);
   const reviewCard = page.locator(".board-card").filter({ hasText: review.title! });
-  await expect(reviewCard.getByText("1 awaiting review", { exact: true })).toHaveCount(0);
+  await expect(reviewCard.getByText("1 awaiting review", { exact: true })).toHaveCount(1);
+  await expect(reviewCard.getByText("Waiting for your review", { exact: true })).toHaveCount(0);
+  await expect(reviewCard.locator(".claim-progress-count")).toHaveText(PARTIAL);
   await expectProgress(page.locator(".board-card").filter({ hasText: ready.title! }), "Ready to start", "open", ZERO);
 });
 
@@ -300,30 +301,13 @@ test("a long title leaves status and proof progress legible at the minimum deskt
 
 test("a committed workspace event updates proof progress on the open canvas and inspector", async ({ page }) => {
   const { finishVerification } = await fixture(page, [verification], true);
-  await page.addInitScript((eventPath) => {
-    const fetch = window.fetch.bind(window);
-    const encoder = new TextEncoder();
-    const browser = window as LiveFixtureWindow;
-    window.fetch = (input, init) => {
-      const url = new URL(input instanceof Request ? input.url : String(input), location.href);
-      if (url.pathname !== eventPath) return fetch(input, init);
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          browser.emitFixtureWorkspaceEvent = (frame) => controller.enqueue(encoder.encode(frame));
-          controller.enqueue(encoder.encode(": connected\n\n"));
-          init?.signal?.addEventListener("abort", () => controller.close(), { once: true });
-        },
-      });
-      return Promise.resolve(new Response(stream, { headers: { "Content-Type": "text/event-stream" } }));
-    };
-  }, EVENT_PATH);
+  const emitEvent = await mockWorkspaceEvents(page, WORKSPACE);
   await page.goto("/#session=fixture");
   const card = mapClaim(page, verification.title!);
   await expectProgress(card, "Verification running", "live");
   await card.click();
   const detail = page.locator("#node-detail");
   await expectProgress(detail, "Verification running", "live");
-  await page.waitForFunction(() => "emitFixtureWorkspaceEvent" in window);
 
   const event = {
     id: "2",
@@ -335,17 +319,12 @@ test("a committed workspace event updates proof progress on the open canvas and 
     subject: { kind: "workspace", id: WORKSPACE },
     data: { area: "proof", claim_id: verification.id },
   };
-  const frame = `id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
   let reloads = 0;
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame()) reloads++;
   });
   finishVerification();
-  await page.evaluate((frame) => {
-    const emit = (window as LiveFixtureWindow).emitFixtureWorkspaceEvent;
-    if (!emit) throw new Error("The fixture event stream is not open.");
-    emit(frame);
-  }, frame);
+  await emitEvent(event);
   await expectProgress(card, "Waiting for your review", "review", UPDATED);
   await expectProgress(detail, "Waiting for your review", "review", UPDATED);
   await expect(card).toHaveAttribute("aria-pressed", "true");

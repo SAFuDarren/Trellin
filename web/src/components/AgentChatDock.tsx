@@ -1,16 +1,17 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAgentWork } from "../api/agentWork";
-import { useConversations, type ConversationSummary } from "../api/conversations";
+import type { ConversationSummary } from "../api/conversations";
 import { useTeamAgents } from "../api/teamAgents";
 import { useConversationSending } from "../shell/ConversationEditors";
 import { href, type Route } from "../shell/route";
+import type { WorkspaceActivity } from "../shell/workspaceActivity";
 import { timeText } from "../workbench/text";
 import { ConversationPanel } from "./ConversationPanel";
 import { Chevron, Mark } from "./Icons";
 import { Picker } from "./FloatingControls";
 import { DIRECT_MODEL } from "./ConversationRecipients";
 import { NewConversation, type DraftAnchor } from "./NewConversation";
+import { WorkspaceActivityList } from "./WorkspaceActivity";
 import "../styles/agent-chat-dock.css";
 
 export type AgentChatAnchor = DraftAnchor;
@@ -22,14 +23,24 @@ export function AgentChatDock({
   session,
   route,
   request,
+  activity,
+  activityLoading,
+  activityUnavailable,
+  conversations: threads,
+  conversationsLoading,
+  onOpenProof,
 }: {
   session: string;
   route: Route;
   request: AgentChatRequest | null;
+  activity: WorkspaceActivity;
+  activityLoading: boolean;
+  activityUnavailable: boolean;
+  conversations: ConversationSummary[];
+  conversationsLoading: boolean;
+  onOpenProof: (claimId: string, nodeId?: string) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const conversations = useConversations(session);
-  const work = useAgentWork(session);
   const sending = useConversationSending(session);
   const [view, setView] = useState<AgentDockView | null>(null);
   const [handledRequest, setHandledRequest] = useState<AgentChatRequest | null>(null);
@@ -43,8 +54,6 @@ export function AgentChatDock({
   const panelId = useId();
   const titleId = useId();
 
-  const threads = conversations.data?.threads ?? [];
-  const tasks = work.data?.tasks ?? [];
   const conversationStatus = (thread: ConversationSummary) =>
     thread.running
       ? t("conversations.working")
@@ -55,23 +64,12 @@ export function AgentChatDock({
           : thread.latest_turn?.status === "answered"
             ? t("conversations.replied")
             : "";
-  const activeChats = threads.filter((thread) => thread.running || sending.has(thread.id));
-  const failedChats = threads.filter(
-    (thread) => !thread.running && !sending.has(thread.id) && thread.latest_turn?.status === "failed",
-  );
-  const queuedWork = tasks.filter((task) => task.status === "queued");
-  const runningWork = tasks.filter((task) => task.status === "running");
-  const activeWork = [...runningWork, ...queuedWork];
-  const attentionWork = tasks.filter(
-    ({ status }) => status === "delivered" || status === "failed" || status === "interrupted" || status === "blocked",
-  );
   const profiles = useTeamAgents(session);
   const agents = profiles.data?.agents ?? [];
   const agentsById = new Map(agents.map((profile) => [profile.id, profile]));
   const thread = threads.find(({ id }) => id === chosenId);
   const agent = agentsById.get(thread?.agent_id ?? "");
-  const runningCount = activeChats.length + runningWork.length;
-  const attentionCount = failedChats.length + attentionWork.length;
+  const { running, queued, review, attention } = activity.counts;
 
   if (request && request !== handledRequest) {
     const anchored = "anchor" in request ? request : null;
@@ -140,7 +138,7 @@ export function AgentChatDock({
     <Picker
       label={t("agentDock.threadPicker")}
       searchLabel={t("agentDock.searchThreads")}
-      emptyLabel={t(conversations.isPending ? "common.loading" : "conversations.noConversations")}
+      emptyLabel={t(conversationsLoading ? "common.loading" : "conversations.noConversations")}
       triggerClassName="agent-dock-picker-trigger"
       className="agent-dock-picker-panel"
       placement="top-start"
@@ -182,22 +180,28 @@ export function AgentChatDock({
         onClick={() => open("activity")}
       >
         <span>{t("agentDock.activity")}</span>
-        {runningCount > 0 && (
+        {running > 0 && (
           <span data-tone="live">
             <Mark tone="ok" />
-            {t("agentDock.running", { count: runningCount })}
+            {t("agentDock.running", { count: running })}
           </span>
         )}
-        {queuedWork.length > 0 && (
+        {queued > 0 && (
           <span>
             <Mark tone="planned" />
-            {t("agentDock.queued", { count: queuedWork.length })}
+            {t("agentDock.queued", { count: queued })}
           </span>
         )}
-        {attentionCount > 0 && (
+        {review > 0 && (
           <span data-tone="pending">
             <Mark tone="review" />
-            {t("agentDock.attention", { count: attentionCount })}
+            {t("workspaceActivity.toReview", { count: review })}
+          </span>
+        )}
+        {attention > 0 && (
+          <span>
+            <Mark tone="bad" />
+            {t("workspaceActivity.attention", { count: attention })}
           </span>
         )}
       </button>
@@ -216,6 +220,7 @@ export function AgentChatDock({
       </button>
       <section
         className="agent-dock-panel"
+        data-view={view ?? undefined}
         id={panelId}
         aria-labelledby={titleId}
         hidden={view === null}
@@ -272,56 +277,15 @@ export function AgentChatDock({
           </button>
         </header>
         {view === "activity" ? (
-          <div className="agent-dock-activity">
-            {(conversations.isError || work.isError) && <p role="status">{t("agentDock.activityUnavailable")}</p>}
-            {runningCount + queuedWork.length + attentionCount === 0 ? (
-              conversations.isPending || work.isPending ? (
-                <p role="status">{t("common.loading")}</p>
-              ) : (
-                !conversations.isError && !work.isError && <p>{t("agentDock.noActivity")}</p>
-              )
-            ) : (
-              <>
-                {[...activeChats, ...failedChats].length > 0 && (
-                  <>
-                    <h3>{t("agentDock.threads")}</h3>
-                    <ul>
-                      {[...activeChats, ...failedChats].map((item) => (
-                        <li key={item.id}>
-                          <button type="button" onClick={() => selectThread(item)}>
-                            <span>{item.title}</span>
-                            <small>
-                              {[agentsById.get(item.agent_id ?? "")?.name, conversationStatus(item)]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </small>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-                {[...activeWork, ...attentionWork].length > 0 && (
-                  <>
-                    <h3>{t("agentWork.title")}</h3>
-                    <ul>
-                      {[...activeWork, ...attentionWork].map((task) => (
-                        <li key={task.id}>
-                          <a href={href("claims", "agent-work/" + task.id)} onClick={collapse}>
-                            <span>{task.title}</span>
-                            <small>
-                              {agentsById.get(task.agent_id ?? "")?.name ?? task.agent_name} ·{" "}
-                              {t(`agentWork.status.${task.status}`)}
-                            </small>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </>
-            )}
-          </div>
+          <WorkspaceActivityList
+            activity={activity}
+            agents={agentsById}
+            loading={activityLoading}
+            unavailable={activityUnavailable}
+            onNavigate={() => setView(null)}
+            onOpenProof={onOpenProof}
+            onOpenThread={selectThread}
+          />
         ) : view === "chat" ? (
           <>
             {thread?.claim_id && (

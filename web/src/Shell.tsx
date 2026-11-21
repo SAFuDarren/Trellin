@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useAgentWork } from "./api/agentWork";
+import { useConversations } from "./api/conversations";
 import { LiveWorkspaceUpdates, WORKSPACE_WRITES } from "./api/liveUpdates";
 import { useReleaseUpdates } from "./api/releaseUpdates";
 import { useProjectCanvasClaims } from "./api/projectCanvas";
@@ -24,6 +26,7 @@ import { ConversationEditors } from "./shell/ConversationEditors";
 import { usePaletteResults } from "./shell/paletteResults";
 import { useRoute } from "./shell/route";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
+import { buildWorkspaceActivity } from "./shell/workspaceActivity";
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
 import { Workbench, type Focus, type WorkbenchPosition } from "./Workbench";
 import { graphAction, type ProjectActionRequest } from "./workbench/actions";
@@ -49,6 +52,19 @@ export function Shell({ session }: { session: string }) {
   const comprehensive = eventFeed?.coverage === WORKSPACE_WRITES;
   const live = comprehensive && sessionConnection?.workspace === workspace && Boolean(sessionConnection?.live);
   const team = useTeam(session, live);
+  const agentWorkList = useAgentWork(session, live);
+  const conversations = useConversations(session, undefined, live);
+  const activity = useMemo(
+    () =>
+      buildWorkspaceActivity({
+        jobs: team.data?.jobs,
+        tasks: agentWorkList.data?.tasks,
+        threads: conversations.data?.threads,
+        items: inbox.data?.items,
+        followups: inbox.data?.clarification_review?.followups,
+      }),
+    [team.data, agentWorkList.data, conversations.data, inbox.data],
+  );
   const atlas = useAtlas(session, showsClaims);
   const projectClaims = useProjectCanvasClaims(session, showsClaimProgress);
   const [focus, setFocus] = useState<Focus | null>(null);
@@ -157,10 +173,7 @@ export function Shell({ session }: { session: string }) {
       }),
     ],
   };
-  const running = team.data?.jobs?.filter((job) => job.state === "running").length ?? 0;
-  const pendingReviews = inbox.data
-    ? (inbox.data.items?.length ?? 0) + (inbox.data.clarification_review?.followups.length ?? 0)
-    : undefined;
+  const pendingReviews = inbox.data ? activity.inboxCount : undefined;
   return (
     <LiveWorkspaceUpdates.Provider value={live}>
       <ConversationEditors key={session} session={session}>
@@ -176,7 +189,11 @@ export function Shell({ session }: { session: string }) {
                 onConnection={setConnection}
               />
             )}
-            <Rail current={section} badges={{ team: { count: running, live: true } }} onSearch={openPalette} />
+            <Rail
+              current={section}
+              badges={{ team: { count: activity.counts.running, live: true } }}
+              onSearch={openPalette}
+            />
             {section === "review" ? (
               <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
             ) : section === "claims" ? (
@@ -189,13 +206,19 @@ export function Shell({ session }: { session: string }) {
                   onOpen={open}
                   claimProgress={claimProgress}
                   atlasClaims={atlas.data?.claims}
-                  jobs={team.data?.jobs}
+                  running={activity.runningByClaim}
+                  review={activity.reviewByClaim}
                 />
               )
             ) : section === "library" ? (
               <LibraryPage session={session} sub={sub} onOpen={open} />
             ) : section === "chat" ? (
-              <ConversationsPage session={session} sub={sub} onOpen={open} />
+              <ConversationsPage
+                session={session}
+                sub={sub}
+                onOpen={open}
+                runningByProofNode={activity.runningByProofNode}
+              />
             ) : section === "team" ? (
               <TeamPage session={session} sub={sub} onOpen={open} />
             ) : section === "progress" ? (
@@ -225,6 +248,12 @@ export function Shell({ session }: { session: string }) {
             session={session}
             route={route}
             request={chatRequest?.session === session ? chatRequest.value : null}
+            activity={activity}
+            activityLoading={team.isPending || agentWorkList.isPending || conversations.isPending || inbox.isPending}
+            activityUnavailable={team.isError || agentWorkList.isError || conversations.isError || inbox.isError}
+            conversations={conversations.data?.threads ?? []}
+            conversationsLoading={conversations.isPending}
+            onOpenProof={(id, nodeId) => open(id, nodeId, true)}
           />
           <CommandPalette
             open={paletteOpen}

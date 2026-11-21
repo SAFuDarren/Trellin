@@ -81,8 +81,8 @@ const key = (session: string) => ["agent-work", session];
 const detailKey = (session: string, id: string) => [...key(session), id];
 const active = (task?: AgentWorkSummary) => task?.status === "queued" || task?.status === "running";
 
-export function useAgentWork(session: string) {
-  const fallback = useFallbackInterval(8000);
+export function useAgentWork(session: string, streamHealthy = false) {
+  const fallback = useFallbackInterval(8000, streamHealthy);
   return useQuery({
     queryKey: key(session),
     queryFn: ({ signal }) => api<{ tasks: AgentWorkSummary[]; available: boolean }>(session, ROOT, { signal }),

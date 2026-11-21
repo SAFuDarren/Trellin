@@ -20,6 +20,7 @@ import { NewConversation } from "../components/NewConversation";
 import { Empty, PageHead } from "../components/SectionLayout";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
 import { href } from "../shell/route";
+import { proofActivityKey } from "../shell/workspaceActivity";
 import { nodeTitle, timeText } from "../workbench/text";
 import "../styles/chats-page.css";
 
@@ -29,17 +30,19 @@ const NEW_ROUTE = "new";
 const DIRECT_ROUTE = "new/model";
 
 function proofKey(thread: Thread) {
-  return thread.claim_id + "|" + thread.node_id;
+  return proofActivityKey(thread.claim_id, thread.node_id);
 }
 
 export function ConversationsPage({
   session,
   sub,
   onOpen,
+  runningByProofNode,
 }: {
   session: string;
   sub: string;
   onOpen: (claimId: string, nodeId?: string) => void;
+  runningByProofNode: ReadonlyMap<string, number>;
 }) {
   const { t, i18n } = useTranslation();
   const proof = useThreads(session);
@@ -197,6 +200,7 @@ export function ConversationsPage({
       renderRow={row}
       proofRows={proofRows}
       selectedProof={selectedProof}
+      runningByProofNode={runningByProofNode}
     />
   );
 
@@ -442,6 +446,7 @@ function History({
   renderRow,
   proofRows,
   selectedProof,
+  runningByProofNode,
 }: {
   rows: ConversationSummary[];
   pending: boolean;
@@ -449,6 +454,7 @@ function History({
   renderRow: (thread: ConversationSummary) => ReactNode;
   proofRows: Thread[];
   selectedProof?: Thread;
+  runningByProofNode: ReadonlyMap<string, number>;
 }) {
   const { t, i18n } = useTranslation();
   return (
@@ -470,28 +476,31 @@ function History({
         <section className="chat-proof-list" aria-label={t("conversations.proofActivity")}>
           <h2>{t("conversations.proofActivity")}</h2>
           <ul>
-            {proofRows.map((thread) => (
-              <li key={proofKey(thread)}>
-                <a
-                  className="chat-list-item"
-                  href={href("chat", proofKey(thread))}
-                  aria-current={thread === selectedProof ? "page" : undefined}
-                >
-                  <span className="chat-list-item-heading">
-                    <strong>{nodeTitle(t, thread.node)}</strong>
-                    {thread.last_at && (
-                      <time dateTime={thread.last_at}>{timeText(i18n.language, thread.last_at, true)}</time>
-                    )}
-                  </span>
-                  {thread.claim_title && <span className="chat-list-preview">{thread.claim_title}</span>}
-                  {thread.live > 0 && (
-                    <span className="chat-list-status" data-state="running">
-                      {t("threads.running", { count: thread.live })}
+            {proofRows.map((thread) => {
+              const running = runningByProofNode.get(proofKey(thread)) ?? 0;
+              return (
+                <li key={proofKey(thread)}>
+                  <a
+                    className="chat-list-item"
+                    href={href("chat", proofKey(thread))}
+                    aria-current={thread === selectedProof ? "page" : undefined}
+                  >
+                    <span className="chat-list-item-heading">
+                      <strong>{nodeTitle(t, thread.node)}</strong>
+                      {thread.last_at && (
+                        <time dateTime={thread.last_at}>{timeText(i18n.language, thread.last_at, true)}</time>
+                      )}
                     </span>
-                  )}
-                </a>
-              </li>
-            ))}
+                    {thread.claim_title && <span className="chat-list-preview">{thread.claim_title}</span>}
+                    {running > 0 && (
+                      <span className="chat-list-status" data-state="running">
+                        {t("threads.running", { count: running })}
+                      </span>
+                    )}
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

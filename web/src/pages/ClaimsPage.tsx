@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
-import { useClaims, type Job } from "../api/sections";
+import { useClaims } from "../api/sections";
 import { ClaimProgressSummary, claimProgressText } from "../components/ClaimProgress";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { Spin } from "../components/Icons";
@@ -68,23 +68,21 @@ export function ClaimsPage({
   onOpen,
   claimProgress,
   atlasClaims,
-  jobs,
+  running,
+  review,
 }: {
   session: string;
   sub: string;
   onOpen: (claimId: string) => void;
   claimProgress: ReadonlyMap<string, ClaimProgress>;
   atlasClaims?: AtlasClaim[];
-  jobs?: Job[];
+  running: ReadonlyMap<string, number>;
+  review: ReadonlyMap<string, number>;
 }) {
   const { t } = useTranslation();
   const [expandedClaim, setExpandedClaim] = useState<string | null>(null);
   const claims = useClaims(session);
   const counts = new Map((atlasClaims ?? []).map((claim) => [claim.id, claim]));
-  const running = new Map<string, number>();
-  for (const job of jobs ?? []) {
-    if (job.state === "running" && job.claim_id) running.set(job.claim_id, (running.get(job.claim_id) ?? 0) + 1);
-  }
   const list = claims.data?.claims ?? [];
   const domains = [...new Set(list.map((claim) => claim.domain || t("sidebar.uncategorized")))].sort();
   const [filter, domain] = sub.startsWith("domain:")
@@ -93,7 +91,7 @@ export function ClaimsPage({
   const shown = list.filter((claim) => {
     const record = counts.get(claim.id);
     if (domain && (claim.domain || t("sidebar.uncategorized")) !== domain) return false;
-    if (filter === "review") return (record?.awaiting_review ?? 0) > 0;
+    if (filter === "review") return (review.get(claim.id) ?? 0) > 0;
     if (filter === "blocked") return (record?.blocked ?? 0) > 0;
     if (filter === "running") return (running.get(claim.id) ?? 0) > 0;
     return true;
@@ -103,7 +101,7 @@ export function ClaimsPage({
       key === "all"
         ? true
         : key === "review"
-          ? (counts.get(claim.id)?.awaiting_review ?? 0) > 0
+          ? (review.get(claim.id) ?? 0) > 0
           : key === "blocked"
             ? (counts.get(claim.id)?.blocked ?? 0) > 0
             : (running.get(claim.id) ?? 0) > 0,
@@ -177,8 +175,11 @@ export function ClaimsPage({
                   const repeatColumn =
                     summary.label === statusText(t, status) ||
                     (status === "awaiting_interpretation_review" && summary.state === "decision");
-                  const showRunning = live > 0 && summary.state !== "running" && summary.state !== "verifying";
-                  const showReview = Boolean(record?.awaiting_review) && summary.state !== "review";
+                  const waiting = review.get(claim.id) ?? 0;
+                  const showRunning = live > 0;
+                  const showReview = waiting > 0;
+                  const repeatCount =
+                    (showReview && summary.state === "review") || (showRunning && summary.state === "running");
                   const showBlocked =
                     Boolean(record?.blocked) && summary.state !== "decision" && summary.state !== "recheck";
                   const expanded = expandedClaim === claim.id;
@@ -203,7 +204,7 @@ export function ClaimsPage({
                             />
                           </span>
                         )}
-                        <ClaimProgressSummary {...summary} showState={!repeatColumn} />
+                        <ClaimProgressSummary {...summary} showState={!repeatColumn && !repeatCount} />
                         <span className="meta">{claim.domain || t("sidebar.uncategorized")}</span>
                         {(showReview || showBlocked || showRunning) && (
                           <span className="tags">
@@ -215,7 +216,7 @@ export function ClaimsPage({
                             )}
                             {showReview && (
                               <span className="tag" data-tone="review">
-                                {t("sidebar.awaitingReview", { count: record!.awaiting_review })}
+                                {t("sidebar.awaitingReview", { count: waiting })}
                               </span>
                             )}
                             {showBlocked && (

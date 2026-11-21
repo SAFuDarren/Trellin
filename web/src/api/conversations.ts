@@ -67,8 +67,8 @@ export function conversationRecipientLabel(t: TFunction, provider: string, model
   return name + " · " + connectionModelLabel(t, { provider, model });
 }
 
-export function useConversations(session: string, claimId?: string) {
-  const fallback = useFallbackInterval(8000);
+export function useConversations(session: string, claimId?: string, streamHealthy = false) {
+  const fallback = useFallbackInterval(8000, streamHealthy);
   return useQuery({
     queryKey: [...conversationKey(session), "list", claimId ?? ""],
     queryFn: ({ signal }) =>
