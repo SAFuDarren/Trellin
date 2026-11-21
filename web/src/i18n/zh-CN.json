@@ -1418,5 +1418,24 @@
   },
   "picker": {
     "noMatches": "没有匹配项"
+  },
+  "graphActions": {
+    "forTarget": "{{title}}的操作",
+    "openDetails": "打开详情",
+    "writeNote": "写证明意见",
+    "copyReference": "复制引用编号",
+    "copyLean": "复制 Lean 陈述",
+    "showLibrary": "在文库中查看",
+    "librarySources": "此课题使用的文库来源",
+    "noLibrary": "此课题暂无已记录的文库来源",
+    "linkUnavailable": "此卡片暂时无法连线",
+    "claimUnavailable": "无法读取课题详情",
+    "noReference": "此项暂无已保存的引用编号",
+    "noLean": "此项暂无 Lean 陈述",
+    "noNote": "证明意见需要对应证明节点",
+    "copied": "已复制到剪贴板",
+    "copyFailed": "无法复制到剪贴板",
+    "dismiss": "关闭提示",
+    "libraryUnavailable": "无法读取文库来源"
   }
 }

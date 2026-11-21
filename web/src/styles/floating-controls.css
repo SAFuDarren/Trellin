@@ -62,7 +62,7 @@ dialog[open]:has(> .floating-popover) {
   cursor: pointer;
 }
 
-.floating-option:hover:not(:disabled),
+.floating-option:hover:not(:disabled, [aria-disabled="true"]),
 .floating-option:focus-visible,
 .floating-option[data-highlighted="true"] {
   background: var(--state-hover);
@@ -72,7 +72,8 @@ dialog[open]:has(> .floating-popover) {
   outline-offset: -2px;
 }
 
-.floating-option:disabled {
+.floating-option:is(:disabled, [aria-disabled="true"]) {
+  color: var(--sub);
   cursor: default;
 }
 

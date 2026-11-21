@@ -16,7 +16,15 @@ import { nodeStatus, nodeTitle, nodeTone } from "../workbench/text";
 import type { AtlasClaim } from "../workbench/types";
 import type { AtlasBox } from "../workbench/useLayout";
 import { AtlasMap, atlasOpening, atlasPlacement } from "./AtlasMap";
-import { Menu, Picker } from "./FloatingControls";
+import {
+  ContextMenu,
+  contextMenuProps,
+  Menu,
+  Picker,
+  type ContextMenuAnchor,
+  type FloatingGroup,
+  type FloatingOption,
+} from "./FloatingControls";
 import { Chevron, Mark } from "./Icons";
 import "../styles/project-canvas.css";
 
@@ -76,6 +84,8 @@ type Props = {
   claims: Claim[];
   selected: string | null;
   onSelect: (id: string) => void;
+  onContextClaim: (id: string | null) => void;
+  claimActions: (id: string, link: FloatingOption) => FloatingGroup[];
   detailsOpen: boolean;
   onToggleDetails: () => void;
   atlasClaims: AtlasClaim[] | undefined;
@@ -94,6 +104,8 @@ export function ProjectCanvas({
   claims,
   selected,
   onSelect,
+  onContextClaim,
+  claimActions,
   detailsOpen,
   onToggleDetails,
   atlasClaims,
@@ -120,6 +132,7 @@ export function ProjectCanvas({
   const unfittedCamera = useRef(camera);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [panning, setPanning] = useState(false);
+  const [contextTarget, setContextTarget] = useState<{ id: string; anchor: ContextMenuAnchor } | null>(null);
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [linkNotice, setLinkNotice] = useState("");
   const [atlasOpeningBox, setAtlasOpeningBox] = useState<AtlasBox | null>(null);
@@ -146,9 +159,19 @@ export function ProjectCanvas({
   const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const visibleLinks = layout.links.filter((link) => byId.has(link.source) && byId.has(link.target));
   const activeSource = linkSource ? byId.get(linkSource) : undefined;
+  const contextCard = contextTarget && byId.get(contextTarget.id);
   const editingDisabled = Boolean(layoutUnavailable || saving);
   const center = { x: size.width / 2, y: size.height / 2 };
   const mapBox = atlasPlacement(atlasBox ?? atlasOpeningBox, size.width, size.height, true);
+
+  const dismissContextMenu = useCallback(() => {
+    setContextTarget(null);
+    onContextClaim(null);
+  }, [onContextClaim]);
+
+  useEffect(() => {
+    if (contextTarget && !contextCard) dismissContextMenu();
+  }, [contextCard, contextTarget, dismissContextMenu]);
 
   useLayoutEffect(() => {
     if (visibleLinks.length || !removingLastLink.current) return;
@@ -217,6 +240,7 @@ export function ProjectCanvas({
     const id = detailsOpen ? selected : null;
     if (inspected.current === id) return;
     inspected.current = id;
+    if (contextTarget?.id === id) return;
     const target = stage.current;
     const point = id ? byId.get(id)?.point : undefined;
     if (!target || !point) return;
@@ -226,7 +250,7 @@ export function ProjectCanvas({
       const y = visibleOffset(current.y, point.y * current.k, HEIGHT * current.k, clientHeight);
       return x === current.x && y === current.y ? current : { ...current, x, y };
     });
-  }, [byId, detailsOpen, selected]);
+  }, [byId, contextTarget, detailsOpen, selected]);
 
   useEffect(() => {
     const target = stage.current;
@@ -251,6 +275,27 @@ export function ProjectCanvas({
   function zoom(factor: number) {
     movedCamera.current = true;
     setCamera((current) => zoomCamera(current, factor, center));
+  }
+
+  function openContextMenu(id: string, anchor: ContextMenuAnchor) {
+    movedCamera.current = true;
+    setContextTarget({ id, anchor });
+    onContextClaim(id);
+  }
+
+  function linkAction(id: string | null): FloatingOption {
+    const disabled = !activeSource && (!id || cards.length < 2 || editingDisabled);
+    return {
+      id: "link-claim",
+      label: t(activeSource ? "projectCanvas.cancelLink" : "projectCanvas.linkClaim"),
+      disabled,
+      detail: disabled ? t("graphActions.linkUnavailable") : undefined,
+      onSelect: () => {
+        if (disabled) return;
+        setLinkSource(activeSource ? null : id);
+        setLinkNotice("");
+      },
+    };
   }
 
   function choose(id: string) {
@@ -286,7 +331,7 @@ export function ProjectCanvas({
   }
 
   function startGesture(event: PointerEvent<HTMLElement>, id?: string) {
-    if (event.button !== 0 || gesture.current) return;
+    if (event.button !== 0 || event.ctrlKey || gesture.current) return;
     draggedCard.current = null;
     const origin = id ? byId.get(id)?.point : camera;
     if (!origin || (id && (activeSource || editingDisabled))) return;
@@ -380,6 +425,8 @@ export function ProjectCanvas({
     return preview?.id === id ? preview.point : byId.get(id)!.point;
   }
 
+  const toolbarLink = linkAction(selected);
+
   return (
     <div className="project-canvas" onKeyDown={onCanvasKey}>
       <div className="project-canvas-tools">
@@ -400,14 +447,13 @@ export function ProjectCanvas({
         <button
           type="button"
           className="button"
-          disabled={!activeSource && (!selected || cards.length < 2 || editingDisabled)}
+          disabled={toolbarLink.disabled}
           onClick={(event) => {
             event.currentTarget.focus();
-            setLinkSource(activeSource ? null : selected);
-            setLinkNotice("");
+            toolbarLink.onSelect?.();
           }}
         >
-          {t(activeSource ? "projectCanvas.cancelLink" : "projectCanvas.linkClaim")}
+          {toolbarLink.label}
         </button>
         <Picker
           label={t("projectCanvas.findClaim")}
@@ -492,8 +538,11 @@ export function ProjectCanvas({
           </svg>
           {cards.map((card) => {
             const at = position(card.id);
+            const menu = contextMenuProps((anchor) => openContextMenu(card.id, anchor));
+            const movingShortcuts = layoutUnavailable ? "" : " ArrowLeft ArrowRight ArrowUp ArrowDown";
             return (
               <button
+                {...menu}
                 key={card.id}
                 ref={(element) => {
                   if (element) nodes.current.set(card.id, element);
@@ -507,15 +556,18 @@ export function ProjectCanvas({
                 aria-pressed={selected === card.id}
                 aria-label={card.title}
                 aria-description={card.status}
-                aria-keyshortcuts={layoutUnavailable ? undefined : "ArrowLeft ArrowRight ArrowUp ArrowDown"}
+                aria-keyshortcuts={menu["aria-keyshortcuts"] + movingShortcuts}
                 title={card.title}
                 style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
                 onClick={(event) => {
-                  if (event.detail === 0 || draggedCard.current !== card.id) choose(card.id);
+                  if (!event.ctrlKey && (event.detail === 0 || draggedCard.current !== card.id)) choose(card.id);
                   draggedCard.current = null;
                 }}
                 onPointerDown={(event) => startGesture(event, card.id)}
-                onKeyDown={(event) => moveByKey(event, card.id, at)}
+                onKeyDown={(event) => {
+                  menu.onKeyDown(event);
+                  if (!event.defaultPrevented) moveByKey(event, card.id, at);
+                }}
               >
                 <span className="project-canvas-title">{card.title}</span>
                 <span className="project-canvas-meta">
@@ -572,6 +624,14 @@ export function ProjectCanvas({
           </button>
         </div>
       </div>
+      {contextTarget && contextCard && (
+        <ContextMenu
+          anchor={contextTarget.anchor}
+          label={t("graphActions.forTarget", { title: contextCard.title })}
+          groups={claimActions(contextCard.id, linkAction(contextCard.id))}
+          onDismiss={dismissContextMenu}
+        />
+      )}
     </div>
   );
 }

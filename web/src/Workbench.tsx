@@ -6,18 +6,22 @@ import { api, type ClaimsResponse } from "./api/client";
 import type { ConversationAnchor } from "./api/conversations";
 import { useFallbackInterval } from "./api/liveUpdates";
 import { useProjectCanvas } from "./api/projectCanvas";
+import { useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
+import type { FloatingGroup, FloatingOption } from "./components/FloatingControls";
 import { ProjectCanvas } from "./components/ProjectCanvas";
 import { ProjectActions } from "./components/project/ProjectActions";
 import { ReviewPanel } from "./components/ReviewPanel";
 import { Sidebar } from "./components/Sidebar";
 import { useDesktopProjectList } from "./components/SidebarProjects";
 import { Splitter } from "./components/Splitter";
+import { href } from "./shell/route";
+import { graphAction, graphCopyActions } from "./workbench/actions";
 import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
-import { buildGraph, liveWork, type View } from "./workbench/graph";
+import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
 import { nodeTitle } from "./workbench/text";
-import type { ActivitySnapshot, Atlas, GraphSnapshot, ImpactPreview } from "./workbench/types";
+import type { ActivitySnapshot, Atlas, GraphNode, GraphSnapshot, ImpactPreview } from "./workbench/types";
 import { clampSize, useLayout } from "./workbench/useLayout";
 
 const ACTIVITY_MS = 4000;
@@ -74,6 +78,9 @@ export function Workbench({
   const [allNodes, setAllNodes] = useState(false);
   const [premiseDialog, setPremiseDialog] = useState<{ id?: string } | null>(null);
   const [proofDialog, setProofDialog] = useState(false);
+  const [contextClaim, setContextClaim] = useState<string | null>(null);
+  const [copyNotice, setCopyNotice] = useState<{ id: number; copied: boolean }>();
+  const copySequence = useRef(0);
   const [live, setLive] = useState<{ side?: number; right?: number }>({});
   const canvas = useProjectCanvas(session, true);
   const projects = useDesktopProjectList();
@@ -123,9 +130,10 @@ export function Workbench({
       : (mapClaims[0]?.id ?? null);
   const claimId = selection?.referenced ? selection.claimId : mapSelection;
   const showReview = detailsOpen && Boolean(claimId);
+  const library = useLibrary(session, Boolean(contextClaim));
   const snapshot = useQuery({
     queryKey: ["graph", claimId],
-    enabled: showReview,
+    enabled: showReview || (claimId !== null && claimId === contextClaim),
     queryFn: ({ signal }) =>
       api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId!), { signal }),
   });
@@ -195,7 +203,13 @@ export function Workbench({
     [t, graph, activity.data, activity.isError],
   );
 
-  const inspectClaim = (id: string) => {
+  useEffect(() => {
+    if (!copyNotice) return;
+    const timer = window.setTimeout(() => setCopyNotice(undefined), 4200);
+    return () => window.clearTimeout(timer);
+  }, [copyNotice]);
+
+  const inspectClaim = (id: string, openDetails = true) => {
     if (claimId !== id) {
       setProofOpen(false);
       setActivityOpen(false);
@@ -204,7 +218,7 @@ export function Workbench({
     }
     setSelection({ claimId: id });
     setRecordedGoal(null);
-    setDetailsOpen(true);
+    if (openDetails) setDetailsOpen(true);
   };
   const selectNode = (id: string) => {
     const next = graph?.nodes.get(id);
@@ -220,6 +234,116 @@ export function Workbench({
     setAssumption(null);
     setRecordedGoal(null);
   };
+  const handleContextClaim = (id: string | null) => {
+    setContextClaim(id);
+    if (id) inspectClaim(id, false);
+  };
+
+  const openProof = (id: string) => {
+    inspectClaim(id);
+    setProofOpen(true);
+  };
+  const openProofTask = (id: string) => {
+    if (id !== claimId) inspectClaim(id);
+    setDetailsOpen(true);
+    setProofDialog(true);
+  };
+
+  const askAgent = (scope: Graph, target: GraphNode) => {
+    onChatAnchor(
+      {
+        claim_id: scope.claim.id,
+        statement_id: scope.statementId ?? undefined,
+        node_id: target.kind === "goal" ? undefined : target.id,
+      },
+      target.kind === "goal" && scope.claim.title ? scope.claim.title : nodeTitle(t, target, { full: true }),
+    );
+  };
+  const writeNote = (id: string) => {
+    selectNode(id);
+    setAllNodes(false);
+    setActivityOpen(true);
+    window.requestAnimationFrame(() => document.getElementById("guidance-text")?.focus());
+  };
+  const openNodeDetails = (id: string) => {
+    selectNode(id);
+    window.requestAnimationFrame(() => document.getElementById("node-detail")?.focus());
+  };
+  const copy = async (text: string) => {
+    const id = ++copySequence.current;
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch {
+      // Keep the menu action local and report browsers' clipboard denials.
+    }
+    if (id === copySequence.current) setCopyNotice({ id, copied });
+  };
+  const copyActions = (target?: GraphNode, unavailable?: string) =>
+    graphCopyActions(t, { reference: target?.code, lean: target?.formalization, unavailable }, (text) => {
+      void copy(text);
+    });
+
+  function claimActions(id: string, link: FloatingOption): FloatingGroup[] {
+    const scope = graph?.claim.id === id ? graph : null;
+    const target = scope ? goal : undefined;
+    const unavailable = target
+      ? undefined
+      : t(scope ? "notice.noNodes" : snapshot.isError ? "graphActions.claimUnavailable" : "notice.loadingClaim");
+    const hasLibrarySources = library.data?.items.some((item) => item.used_by.some((claim) => claim.id === id));
+    const libraryLabel = hasLibrarySources
+      ? t("graphActions.librarySources")
+      : t(
+          library.isError
+            ? "graphActions.libraryUnavailable"
+            : library.isFetching
+              ? "common.loading"
+              : "graphActions.noLibrary",
+        );
+    return [
+      {
+        options: [
+          graphAction(t, "open-proof", () => openProof(id)),
+          graphAction(t, "proof-task", scope && target ? () => openProofTask(id) : undefined, unavailable),
+          graphAction(t, "ask-agent", scope && target ? () => askAgent(scope, target) : undefined, unavailable),
+          link,
+        ],
+      },
+      { options: copyActions(target, unavailable) },
+      {
+        options: [
+          graphAction(
+            t,
+            "show-library",
+            hasLibrarySources ? () => (window.location.hash = href("library", "claim:" + id)) : undefined,
+            libraryLabel,
+          ),
+        ],
+      },
+    ];
+  }
+
+  function nodeActions(id: string): FloatingGroup[] {
+    const target = graph?.nodes.get(id);
+    if (!target) return [];
+    const canWriteNote = target.kind !== "proposed_premise";
+    return [
+      {
+        options: [
+          graphAction(t, "open-details", () => openNodeDetails(id)),
+          graphAction(
+            t,
+            "write-note",
+            canWriteNote ? () => writeNote(id) : undefined,
+            canWriteNote ? undefined : t("graphActions.noNote"),
+          ),
+        ],
+      },
+      { options: copyActions(target) },
+    ];
+  }
+
   const changeView = (next: View) => {
     if (next === "impact" && assumption) selectNode(assumption.id);
     setView(next);
@@ -373,6 +497,8 @@ export function Workbench({
                 claims={mapClaims}
                 selected={mapSelection}
                 onSelect={inspectClaim}
+                onContextClaim={handleContextClaim}
+                claimActions={claimActions}
                 detailsOpen={showReview}
                 onToggleDetails={() => (showReview ? closeInspector() : setDetailsOpen(true))}
                 atlasClaims={atlas.data?.claims}
@@ -389,6 +515,16 @@ export function Workbench({
             </section>
           </>
         )}
+        <div className="workbench-action-feedback" aria-live="polite">
+          {copyNotice && (
+            <div className="workbench-action-toast" key={copyNotice.id}>
+              <span>{t(copyNotice.copied ? "graphActions.copied" : "graphActions.copyFailed")}</span>
+              <button type="button" className="conversation-text-action" onClick={() => setCopyNotice(undefined)}>
+                {t("graphActions.dismiss")}
+              </button>
+            </div>
+          )}
+        </div>
       </main>
       {showReview && (
         <>
@@ -412,31 +548,15 @@ export function Workbench({
             notice={detailsNotice ? { text: detailsNotice, error: snapshot.isError } : undefined}
             actions={
               graph &&
-              node && (
-                <>
-                  <button
-                    type="button"
-                    className="button"
-                    onClick={() =>
-                      onChatAnchor(
-                        {
-                          claim_id: graph.claim.id,
-                          statement_id: graph.statementId ?? undefined,
-                          node_id: node.kind === "goal" ? undefined : node.id,
-                        },
-                        node.kind === "goal" && graph.claim.title
-                          ? graph.claim.title
-                          : nodeTitle(t, node, { full: true }),
-                      )
-                    }
-                  >
-                    {t("projectCanvas.askAgent")}
-                  </button>
-                  <button type="button" className="button" onClick={() => setProofDialog(true)}>
-                    {t("proofTask.title")}
-                  </button>
-                </>
-              )
+              node &&
+              [
+                graphAction(t, "ask-agent", () => askAgent(graph, node)),
+                graphAction(t, "proof-task", () => openProofTask(graph.claim.id)),
+              ].map((action) => (
+                <button key={action.id} type="button" className="button" onClick={action.onSelect}>
+                  {action.label}
+                </button>
+              ))
             }
             onSelect={selectNode}
             onReviewPremise={(id) => setPremiseDialog({ id })}
@@ -504,6 +624,7 @@ export function Workbench({
                           cardSizes={sizes.cards[`${claimId}:${view}`] ?? NO_CARD_SIZES}
                           onResizeCard={(id, size) => layout.resizeCard(`${claimId}:${view}`, id, size)}
                           onSelect={selectNode}
+                          nodeActions={nodeActions}
                         />
                       </section>
                     )}

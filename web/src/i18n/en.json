@@ -1418,5 +1418,24 @@
   },
   "picker": {
     "noMatches": "No matches"
+  },
+  "graphActions": {
+    "forTarget": "{{title}} actions",
+    "openDetails": "Open details",
+    "writeNote": "Write proof note",
+    "copyReference": "Copy reference",
+    "copyLean": "Copy Lean statement",
+    "showLibrary": "Show in Library",
+    "librarySources": "Sources used by this claim",
+    "noLibrary": "No recorded Library sources for this claim",
+    "linkUnavailable": "Linking is unavailable for this card",
+    "claimUnavailable": "Claim details are unavailable",
+    "noReference": "No saved reference for this item",
+    "noLean": "No Lean statement for this item",
+    "noNote": "Proof notes require a proof node",
+    "copied": "Copied to clipboard",
+    "copyFailed": "Could not copy to clipboard",
+    "dismiss": "Dismiss",
+    "libraryUnavailable": "Could not read Library sources"
   }
 }

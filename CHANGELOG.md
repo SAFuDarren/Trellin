@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.57
+
+- Right-click a project map card or proof node to use its research actions, copy a saved reference or Lean statement, and find related Library sources. Shift+F10 also opens the menu.
+
 ## 1.0.56
 
 - Search for claims, Agents, conversation tasks and models from the active page. Workbench menus open beside their controls and support arrow keys, typeahead, Escape and focus return.

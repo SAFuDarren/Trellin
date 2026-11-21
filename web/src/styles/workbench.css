@@ -2709,3 +2709,28 @@ select:disabled {
   margin-inline: auto;
   padding: 18px 28px 24px;
 }
+
+.workbench-action-feedback {
+  position: relative;
+  z-index: 2;
+  flex: none;
+}
+
+.workbench-action-toast {
+  position: absolute;
+  bottom: 52px;
+  inset-inline-start: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 7px 9px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-card);
+  background: var(--main);
+  color: var(--ink);
+  box-shadow: var(--elevation-float);
+  font-size: var(--type-control-size);
+  animation: rm-float-in var(--duration-enter) var(--ease);
+}

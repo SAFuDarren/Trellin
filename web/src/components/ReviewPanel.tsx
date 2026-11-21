@@ -107,7 +107,7 @@ export function ReviewPanel(props: Props) {
             ))}
         </ul>
       </section>
-      <section className="node-detail" id="node-detail" aria-label={t("review.detail")}>
+      <section className="node-detail" id="node-detail" tabIndex={-1} aria-label={t("review.detail")}>
         {props.notice && (
           <p className="notice" role={props.notice.error ? "alert" : "status"} data-error={props.notice.error}>
             {props.notice.text}
