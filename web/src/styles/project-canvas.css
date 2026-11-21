@@ -232,3 +232,76 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.project-canvas-paths .project-canvas-link-hit {
+  cursor: pointer;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-width: 16px;
+  stroke-dasharray: none;
+}
+
+.project-canvas-link:is(:hover, :focus-visible, [aria-pressed="true"]) [data-research-link],
+.project-canvas-paths .project-canvas-link-preview {
+  stroke: var(--accent);
+  stroke-width: 2.5px;
+}
+
+.project-canvas-node[data-link-target="true"] {
+  border: 2px solid var(--accent);
+}
+
+.project-canvas-link-handle {
+  position: absolute;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: crosshair;
+  transform: translate(-50%, -50%) scale(var(--map-inverse-scale, 1));
+  touch-action: none;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.project-canvas-link-handle::before {
+  position: absolute;
+  inset: 4px;
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  background: var(--node);
+  content: "";
+}
+
+.project-canvas-card:is(:hover, :focus-within) .project-canvas-link-handle,
+.project-canvas-node[data-link-source="true"] + .project-canvas-link-handle {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.project-canvas-link-detail {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(200px, calc(100% - 12px));
+  padding: 4px 5px 4px 9px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: var(--main);
+  box-shadow: var(--elevation-float);
+  transform: translate(-50%, calc(-100% - 7px));
+  font-size: var(--type-meta-size);
+}
+
+.project-canvas-link-detail span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
