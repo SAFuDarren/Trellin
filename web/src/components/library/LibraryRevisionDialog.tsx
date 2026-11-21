@@ -183,6 +183,11 @@ export function LibraryRevisionDialog({
     if (element && !element.open) element.showModal();
   }, []);
 
+  function cancel() {
+    dialog.current?.close();
+    onCancel();
+  }
+
   return (
     <dialog
       ref={dialog}
@@ -190,12 +195,12 @@ export function LibraryRevisionDialog({
       aria-labelledby={title}
       onCancel={(event) => {
         event.preventDefault();
-        if (!pending) onCancel();
+        if (!pending) cancel();
       }}
     >
       <header className="project-entry-head">
         <h2 id={title}>{t("libraryEdit.title")}</h2>
-        <button className="button" type="button" disabled={pending} onClick={onCancel}>
+        <button className="button" type="button" disabled={pending} onClick={cancel}>
           {t("libraryEdit.close")}
         </button>
       </header>
@@ -212,7 +217,7 @@ export function LibraryRevisionDialog({
           <RevisionEditor
             item={item.data}
             session={session}
-            onCancel={onCancel}
+            onCancel={cancel}
             onSaved={onSaved}
             onPending={setPending}
           />

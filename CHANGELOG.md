@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.65
+
+- Library rows show an edit icon on hover or keyboard focus. The table and inspector use monospace for Lean declarations and the body font for plain-language names.
+
 ## 1.0.64
 
 - The command palette shows icons and keyboard hints. Use `#` to find claims and their proof references, or `@` to find Agents. Map and proof menus display shortcuts for actions that support them.

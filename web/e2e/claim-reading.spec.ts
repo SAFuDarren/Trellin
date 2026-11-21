@@ -82,3 +82,78 @@ test("Library shows the same state in the list and the inspector", async ({ page
     await expect(surface.getByText("Needs recheck", { exact: true })).toBeVisible();
   }
 });
+
+const LIBRARY_PROSE = "Adding zero on the left leaves a natural number unchanged.";
+const LIBRARY_PROSE_ID = "33333333-3333-4333-8333-333333333333";
+
+for (const { width, height, colorScheme } of [
+  { width: 1280, height: 800, colorScheme: "dark" },
+  { width: 640, height: 460, colorScheme: "light" },
+] as const) {
+  test(`Library name typography and row editing work at ${width}×${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.emulateMedia({ colorScheme });
+    await page.route("**/api/library/item?*", (route) => {
+      const id = new URL(route.request().url()).searchParams.get("version");
+      expect(id).toBe(LIBRARY_PROSE_ID);
+      return route.fulfill({
+        json: {
+          id,
+          version: 1,
+          sha256: "a".repeat(64),
+          natural: LIBRARY_PROSE,
+          lean: "∀ n : Nat, 0 + n = n",
+          mode: "basis",
+          available: true,
+        },
+      });
+    });
+    await page.goto("/#session=fixture");
+    await page.locator("nav.rail").getByRole("link", { name: "Library", exact: true }).click();
+
+    const table = page.getByRole("table");
+    await expect(table.getByRole("columnheader", { name: "Actions", exact: true })).toHaveCount(0);
+    const declaration = "Nat.add_zero";
+    const declarationName = table.getByText(declaration, { exact: true });
+    const identifierFont = await declarationName.evaluate((element) => getComputedStyle(element).fontFamily);
+    const bodyFont = await page.locator("body").evaluate((element) => getComputedStyle(element).fontFamily);
+    expect(identifierFont).not.toBe(bodyFont);
+    expect(identifierFont).toContain("monospace");
+    const declarationInspector = page.getByRole("complementary", { name: declaration, exact: true });
+    await expect(declarationInspector.getByRole("heading", { name: declaration })).toHaveCSS(
+      "font-family",
+      identifierFont,
+    );
+
+    const proseRow = table.getByRole("row").filter({ hasText: LIBRARY_PROSE });
+    const proseName = proseRow.getByText(LIBRARY_PROSE, { exact: true });
+    await expect(proseName).toHaveCSS("font-family", bodyFont);
+    const action = proseRow.getByRole("button", { name: `Edit statement for ${LIBRARY_PROSE}`, exact: true });
+    await expect(action).toHaveCSS("opacity", "0");
+    await proseName.hover();
+    await expect(action).toHaveCSS("opacity", "1");
+    await page.locator("nav.rail").getByRole("link", { name: "Library", exact: true }).hover();
+    await expect(action).toHaveCSS("opacity", "0");
+
+    await proseRow.focus();
+    await page.keyboard.press("Tab");
+    await expect(action).toBeFocused();
+    await expect(action).toHaveCSS("opacity", "1");
+    await expect(action).toHaveText("");
+    await expect(action).toBeInViewport({ ratio: 0.99 });
+    const bounds = (await action.boundingBox())!;
+    expect(bounds.width).toBe(bounds.height);
+    expect(bounds.width).toBeGreaterThanOrEqual(24);
+
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "Revise Library statement", exact: true });
+    await expect(dialog.getByRole("textbox", { name: "Statement", exact: true })).toHaveValue(LIBRARY_PROSE);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(action).toBeFocused();
+
+    const proseInspector = page.getByRole("complementary", { name: LIBRARY_PROSE, exact: true });
+    await expect(proseInspector.getByRole("heading", { name: LIBRARY_PROSE })).toHaveCSS("font-family", bodyFont);
+    await expect(proseInspector.getByRole("button", { name: "Edit statement", exact: true })).toBeVisible();
+  });
+}

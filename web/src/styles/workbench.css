@@ -2219,6 +2219,29 @@ select:disabled {
 .library-item-state .status-dot {
   flex: 0 0 7px;
 }
+.library-name-cell {
+  display: flex;
+  min-width: 160px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.library-name-cell .library-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+.library-row-edit {
+  flex: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .library-table tr:not(:hover):not(:focus-within) .library-row-edit {
+    opacity: 0;
+  }
+}
 .board-card .title {
   font-size: 13.5px;
   font-weight: 600;
@@ -2542,6 +2565,9 @@ select:disabled {
     width: 100%;
     border-left: 0;
     border-top: 1px solid var(--hair);
+  }
+  .library-page > .primary {
+    align-self: stretch;
   }
 }
 

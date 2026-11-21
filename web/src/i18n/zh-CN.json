@@ -827,7 +827,6 @@
     "title": "修订定理库陈述",
     "edit": "编辑陈述",
     "editItem": "编辑「{{name}}」的陈述",
-    "actions": "操作",
     "close": "关闭",
     "discard": "放弃修改",
     "baseVersion": "正在编辑 v{{version}} 的原始内容",
