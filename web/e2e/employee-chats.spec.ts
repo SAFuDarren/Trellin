@@ -298,7 +298,7 @@ test("creating a task binds it to the selected employee and retries the same req
 });
 
 test("the task picker and legacy history are reachable in a narrow window", async ({ page }) => {
-  await page.setViewportSize({ width: 570, height: 760 });
+  await page.setViewportSize({ width: 640, height: 460 });
   const longTitle = "Check every assumption that would be needed to make the comparison hold across all cases";
   const assigned = task("aa000000-0000-4000-8000-000000000005", longTitle, analyst.id, "running");
   const legacy = task("aa000000-0000-4000-8000-000000000006", "Unbound research chat", null, "answered");
@@ -311,7 +311,14 @@ test("the task picker and legacy history are reachable in a narrow window", asyn
   await expect(entry).toBeInViewport({ ratio: 1 });
   await expect(entry).toHaveAttribute("aria-checked", "true");
   await entry.press("Escape");
-  await expect(page.getByRole("button", { name: "New task", exact: true })).toBeInViewport({ ratio: 1 });
+  const newTask = page.getByRole("button", { name: "New task", exact: true });
+  await expect(newTask).toBeInViewport({ ratio: 1 });
+  await expect(page.locator(".direct-composer")).toBeInViewport({ ratio: 1 });
+  await picker.click();
+  await newTask.click();
+  const dialog = page.getByRole("dialog", { name: "New task" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("link", { name: "Back to chats" }).click();
   await page.getByRole("link", { name: "Conversation history" }).click();
   await expect(page.getByRole("heading", { name: "Conversation history" })).toBeVisible();

@@ -1,3 +1,6 @@
+.shell:has(.chats-page) {
+  min-height: 0;
+}
 .chats-page {
   display: grid;
   grid-template-columns: clamp(205px, 24vw, 280px) minmax(0, 1fr);
@@ -270,7 +273,6 @@
   row-gap: 4px;
 }
 .employee-chat-path {
-  position: relative;
   max-width: 100%;
 }
 .employee-chat-path > svg {
@@ -329,7 +331,7 @@
   position: absolute;
   z-index: 5;
   inset-block-start: calc(100% + 5px);
-  inset-inline-start: 0;
+  inset-inline-start: 22px;
   width: min(320px, calc(100vw - 96px));
   max-height: min(270px, 55vh);
   overflow: auto;
@@ -365,9 +367,21 @@
   height: 16px;
   stroke-width: 1.5;
 }
+@media (min-width: 540px) {
+  .employee-chat-head,
+  .employee-chat-actions {
+    flex-wrap: nowrap;
+  }
+  .employee-chat-head .employee-chat-actions {
+    flex: none;
+  }
+}
 @media (min-width: 1000px) {
   .employee-chat-switcher {
     position: relative;
+  }
+  .employee-chat-task-menu {
+    inset-inline-start: 0;
   }
 }
 .employee-chat-status {
