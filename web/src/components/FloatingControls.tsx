@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
   type Ref,
+  type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
 import "../styles/floating-controls.css";
@@ -22,6 +23,7 @@ type FloatingTrigger = {
   triggerClassName?: string;
   className?: string;
   placement?: Placement;
+  keepVisible?: RefObject<HTMLElement | null>;
   triggerId?: string;
   triggerRef?: Ref<HTMLButtonElement>;
   disabled?: boolean;
@@ -49,7 +51,12 @@ export type FloatingGroup = {
   options: FloatingOption[];
 };
 
-function positionPanel(trigger: HTMLElement, panel: HTMLElement, placement: Placement) {
+function positionPanel(
+  trigger: HTMLElement,
+  panel: HTMLElement,
+  placement: Placement,
+  keepVisible: HTMLElement | null | undefined,
+) {
   const margin = 8;
   const gap = 5;
   const viewport = window.visualViewport;
@@ -58,18 +65,21 @@ function positionPanel(trigger: HTMLElement, panel: HTMLElement, placement: Plac
   const right = left + (viewport?.width ?? document.documentElement.clientWidth);
   const bottom = top + (viewport?.height ?? document.documentElement.clientHeight);
   const anchor = trigger.getBoundingClientRect();
-  const above = Math.max(0, anchor.top - top - margin - gap);
-  const below = Math.max(0, bottom - anchor.bottom - margin - gap);
+  const protectedArea = keepVisible?.getBoundingClientRect();
+  const topEdge = Math.min(anchor.top, protectedArea?.top ?? anchor.top);
+  const bottomEdge = Math.max(anchor.bottom, protectedArea?.bottom ?? anchor.bottom);
+  const above = Math.max(0, topEdge - top - margin - gap);
+  const below = Math.max(0, bottom - bottomEdge - margin - gap);
   const prefersTop = placement.startsWith("top");
   const preferred = prefersTop ? above : below;
   const alternative = prefersTop ? below : above;
   const useTop = (panel.scrollHeight <= preferred || preferred >= alternative) === prefersTop;
   panel.style.maxWidth = `${Math.max(0, right - left - 2 * margin)}px`;
-  panel.style.maxHeight = `${useTop ? above : below}px`;
+  panel.style.setProperty("--floating-space", `${useTop ? above : below}px`);
 
   // Layout sizes exclude the entrance animation's translation.
   const x = placement.endsWith("end") ? anchor.right - panel.offsetWidth : anchor.left;
-  const y = useTop ? anchor.top - panel.offsetHeight - gap : anchor.bottom + gap;
+  const y = useTop ? topEdge - panel.offsetHeight - gap : bottomEdge + gap;
   panel.style.left = `${Math.max(left + margin, Math.min(x, right - panel.offsetWidth - margin))}px`;
   panel.style.top = `${Math.max(top + margin, Math.min(y, bottom - panel.offsetHeight - margin))}px`;
 }
@@ -80,6 +90,7 @@ export function Popover({
   triggerClassName,
   className,
   placement = "bottom-start",
+  keepVisible,
   triggerId,
   triggerRef,
   disabled,
@@ -128,11 +139,12 @@ export function Popover({
     const button = anchor.current;
     const floating = panel.current;
     if (!open || !button || !floating) return;
-    const place = () => positionPanel(button, floating, placement);
+    const place = () => positionPanel(button, floating, placement, keepVisible?.current);
     place();
     const resize = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(place);
     resize?.observe(button);
     resize?.observe(floating);
+    if (keepVisible?.current) resize?.observe(keepVisible.current);
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     window.visualViewport?.addEventListener("resize", place);
@@ -147,7 +159,7 @@ export function Popover({
       window.visualViewport?.removeEventListener("scroll", place);
       host?.removeEventListener("animationend", place);
     };
-  }, [host, open, placement]);
+  }, [host, keepVisible, open, placement]);
 
   useEffect(() => {
     const button = anchor.current;

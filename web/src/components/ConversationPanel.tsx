@@ -339,6 +339,7 @@ export function ConversationPanel({
               triggerRef={modelTrigger}
               triggerClassName="composer-menu-trigger composer-model-trigger"
               placement="top-end"
+              keepVisible={textarea}
               value={connection?.id}
               trigger={
                 <>
