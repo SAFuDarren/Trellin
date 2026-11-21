@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { FloatingOption } from "./FloatingControls";
+import { InspectorActions } from "./InspectorActions";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { Claim } from "../api/client";
@@ -42,7 +44,7 @@ type Props = {
   impactLoading: boolean;
   impactError: string;
   notice?: { text: string; error: boolean };
-  actions?: ReactNode;
+  actions?: { primary: FloatingOption; secondary: FloatingOption[] } | null;
   children?: ReactNode;
   onSelect: (id: string) => void;
   onReviewPremise: (id: string) => void;
@@ -221,15 +223,22 @@ function NodeDetail({
           {goalReviews && <ClaimReviewLinks items={goalReviews} />}
           <span>{[graph.codes.get(node.id), kindText(t, node.kind), node.domain].filter(Boolean).join(" · ")}</span>
         </div>
-        {(actions || conditionId) && (
-          <div className="inspector-actions">
-            {actions}
-            {conditionId && (
-              <button type="button" className="button" onClick={() => onReviewPremise(conditionId)}>
-                {t("premise.review")}
-              </button>
-            )}
-          </div>
+        {actions ? (
+          <InspectorActions
+            primary={actions.primary}
+            secondary={[
+              ...actions.secondary,
+              ...(conditionId
+                ? [{ id: "review-premise", label: t("premise.review"), onSelect: () => onReviewPremise(conditionId) }]
+                : []),
+            ]}
+          />
+        ) : (
+          conditionId && (
+            <button type="button" className="button" onClick={() => onReviewPremise(conditionId)}>
+              {t("premise.review")}
+            </button>
+          )
         )}
       </header>
       {blockers.map((blockage, position) => {

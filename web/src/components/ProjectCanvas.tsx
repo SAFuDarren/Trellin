@@ -182,6 +182,7 @@ export function ProjectCanvas({
   const movedCamera = useRef(false);
   const gesture = useRef<Gesture | null>(null);
   const draggedCard = useRef<string | null>(null);
+  const proofClick = useRef<string | null>(null);
   const inspected = useRef<{ id: string; width: number; height: number } | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0, visibleWidth: 0 });
   const { width: viewportWidth, height: viewportHeight } = size;
@@ -328,6 +329,10 @@ export function ProjectCanvas({
       .map((card) => card.point)
       .sort((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y));
     setCamera((current) => {
+      const fitWidth = Math.max(1, width - 16);
+      const fitHeight = Math.max(1, height - 16);
+      const panelResized = previous?.width !== width || previous?.height !== height;
+      let k = Math.min(current.k, fitWidth / WIDTH, fitHeight / HEIGHT);
       let left = point.x;
       let right = point.x + WIDTH;
       let top = point.y;
@@ -337,13 +342,16 @@ export function ProjectCanvas({
         const nextRight = Math.max(right, other.x + WIDTH);
         const nextTop = Math.min(top, other.y);
         const nextBottom = Math.max(bottom, other.y + HEIGHT);
-        if ((nextRight - nextLeft) * current.k > width - 16 || (nextBottom - nextTop) * current.k > height - 16)
-          continue;
+        const fit = Math.min(k, fitWidth / (nextRight - nextLeft), fitHeight / (nextBottom - nextTop));
+        if (fit < k && (!panelResized || fit < Math.min(current.k, 0.6))) continue;
+        k = fit;
         [left, right, top, bottom] = [nextLeft, nextRight, nextTop, nextBottom];
       }
-      const x = visibleOffset(current.x, left * current.k, (right - left) * current.k, width);
-      const y = visibleOffset(current.y, top * current.k, (bottom - top) * current.k, height);
-      return x === current.x && y === current.y ? current : { ...current, x, y };
+      const anchorX = point.x + WIDTH / 2;
+      const anchorY = point.y + HEIGHT / 2;
+      const x = visibleOffset(current.x + anchorX * (current.k - k), left * k, (right - left) * k, width);
+      const y = visibleOffset(current.y + anchorY * (current.k - k), top * k, (bottom - top) * k, height);
+      return x === current.x && y === current.y && k === current.k ? current : { x, y, k };
     });
   }, [active, byId, cards, detailsOpen, selected, size, contextTarget?.id]);
 
@@ -693,12 +701,17 @@ export function ProjectCanvas({
                 ]
                   .filter(Boolean)
                   .join(" · ")}
-                aria-keyshortcuts={menu["aria-keyshortcuts"] + movingShortcuts}
+                aria-keyshortcuts={menu["aria-keyshortcuts"] + (onOpenProof ? " Enter" : "") + movingShortcuts}
                 title={card.title}
                 style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
                 onClick={(event) => {
-                  if (!event.ctrlKey && (event.detail === 0 || draggedCard.current !== card.id)) choose(card.id);
+                  const chooseCard = !event.ctrlKey && (event.detail === 0 || draggedCard.current !== card.id);
+                  const plain = chooseCard && !activeSource && !event.metaKey && !event.altKey && !event.shiftKey;
+                  const open = plain && event.detail === 2 && proofClick.current === card.id && onOpenProof;
+                  proofClick.current = plain && event.detail === 1 ? card.id : null;
                   draggedCard.current = null;
+                  if (open) open(card.id);
+                  else if (chooseCard) choose(card.id);
                 }}
                 onPointerDown={(event) => startGesture(event, card.id)}
                 onKeyDown={(event) => {
@@ -706,7 +719,6 @@ export function ProjectCanvas({
                   if (
                     !event.defaultPrevented &&
                     event.key === "Enter" &&
-                    selected === card.id &&
                     !activeSource &&
                     onOpenProof &&
                     !event.ctrlKey &&

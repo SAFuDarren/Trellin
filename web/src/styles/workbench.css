@@ -280,6 +280,9 @@ select:disabled {
     width: min(var(--right-w), calc(100% - 48px));
     border-inline-start: 1px solid var(--hair);
   }
+  .app[data-view="project"][data-sidebar="open"] .review {
+    width: min(var(--right-w), max(180px, calc(100% - var(--side-w) - 150px)));
+  }
   .app[data-view="project"] .splitter[data-split="right"] {
     display: none;
   }
@@ -1500,9 +1503,32 @@ select:disabled {
   padding: 16px;
 }
 .inspector-actions {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
+}
+.inspector-actions .button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.inspector-action-more {
+  width: var(--control-h);
+  justify-content: center;
+  padding-inline: 0;
+}
+.inspector-actions-measure {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+.inspector-actions-measure > div {
+  display: flex;
+  inline-size: max-content;
+}
+.inspector-actions-measure .button[data-label]::before {
+  content: attr(data-label);
 }
 .inspector-disclosure {
   border-top: 1px solid var(--hair);

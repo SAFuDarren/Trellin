@@ -563,7 +563,12 @@ describe("App", () => {
     fireEvent.click(screen.getByText(en.conversations.proofActivity, { selector: "summary" }));
     expect(await screen.findByText(en.composer.chooseNode)).toBeTruthy();
     const details = within(screen.getByLabelText(en.review.detail));
-    fireEvent.click(details.getByRole("button", { name: en.premise.review }));
+    const reviewPremise = details.queryByRole("button", { name: en.premise.review });
+    if (reviewPremise) fireEvent.click(reviewPremise);
+    else {
+      fireEvent.click(details.getByRole("button", { name: en.review.moreInspectorActions }));
+      fireEvent.click(screen.getByRole("menuitem", { name: en.premise.review }));
+    }
     expect(dialog.getByText("Zero is a left identity.")).toBeTruthy();
     expect(dialog.getByText(/The operands are natural numbers/)).toBeTruthy();
     expect(dialog.getByText(premise.lean)).toBeTruthy();

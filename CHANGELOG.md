@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.69
+
+- Keep the proof task first in the inspector and move secondary actions into a menu when needed. Double-click or press Enter on a project card to open its proof, and keep adjacent cards in view when resizing the inspector (#198).
+
 ## 1.0.68
 
 - The project map, Claims board and inspector explain when no proof obligations are recorded. Proved claims keep their proof status, and result links open the exact records awaiting review.

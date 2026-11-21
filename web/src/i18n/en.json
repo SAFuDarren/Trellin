@@ -288,6 +288,7 @@
     "close": "Collapse review column",
     "empty": "Nothing needs your attention right now.",
     "detail": "Node details",
+    "moreInspectorActions": "More inspector actions",
     "waiting": "Waiting for you · {{count}}",
     "none": "Nothing is waiting.",
     "allDone": "You're all caught up. New items appear here when a check or question needs you.",

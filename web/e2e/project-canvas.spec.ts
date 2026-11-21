@@ -78,7 +78,7 @@ test("project claims open the existing inspector without leaving or moving the c
   expect(await camera()).toEqual(panned);
   await expect(page.locator(".graph-edges")).toHaveCount(0);
 
-  await second.press("Enter");
+  await second.press("Space");
   await expect(second).toHaveAttribute("aria-pressed", "true");
   await expect(second).toHaveCSS("box-shadow", "none");
   await expect(second).toHaveCSS("background-image", "none");
@@ -199,13 +199,17 @@ test("opening the inspector keeps the rightmost card visible in a compact window
   const card = mapClaim(page, "连续自然数之积的奇偶性");
   const zoom = page.getByRole("button", { name: "Zoom to 100%", exact: true });
   await expect(card).toBeInViewport({ ratio: 0.99 });
-  const initialZoom = await zoom.innerText();
+  const initialZoom = Number.parseInt(await zoom.innerText(), 10);
+  const neighbor = mapClaim(page, SECOND_TITLE);
 
   await card.click();
   await expect(page.locator("#review")).toBeVisible();
   await expect(card).toHaveAttribute("aria-pressed", "true");
   await expect(card).toBeInViewport({ ratio: 0.99 });
-  await expect(zoom).toHaveText(initialZoom);
+  await expect(neighbor).toBeInViewport({ ratio: 0.99 });
+  const fittedZoom = Number.parseInt(await zoom.innerText(), 10);
+  expect(fittedZoom).toBeLessThanOrEqual(initialZoom);
+  expect(fittedZoom).toBeGreaterThanOrEqual(60);
 
   await page.getByRole("button", { name: "Global map", exact: true }).click();
   const overview = page.locator(".project-canvas-stage .atlas");
