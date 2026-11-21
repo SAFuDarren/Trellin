@@ -151,7 +151,7 @@ export function ProjectCanvas({
   const normalizedQuery = query.trim().toLocaleLowerCase(i18n.language);
   const matches = cards.filter((card) => card.title.toLocaleLowerCase(i18n.language).includes(normalizedQuery));
   const center = { x: size.width / 2, y: size.height / 2 };
-  const mapBox = atlasPlacement(atlasBox, size.width, size.height);
+  const mapBox = atlasPlacement(atlasBox, size.width, size.height, true);
 
   useEffect(() => {
     const target = stage.current;

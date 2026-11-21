@@ -1018,6 +1018,11 @@ select {
   border: 1px solid var(--hair);
   background: var(--main);
 }
+.atlas[data-interactive="true"] figcaption {
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  white-space: nowrap;
+}
 .atlas[data-interactive="true"] .atlas-keys {
   display: flex;
   gap: 3px;

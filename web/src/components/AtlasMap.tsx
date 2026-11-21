@@ -10,13 +10,17 @@ function atlasMaximumWidth(stageWidth: number) {
   return stageWidth ? Math.max(ATLAS_MIN_WIDTH, Math.min(420, stageWidth - 24)) : 420;
 }
 
-// Until moved, the map sits top-left on a wide canvas and as a small map bottom-left on a narrow one.
-export function atlasPlacement(stored: AtlasBox | null, width: number, height: number): AtlasBox {
+export function atlasPlacement(stored: AtlasBox | null, width: number, height: number, interactive = false): AtlasBox {
+  // Keep the proof overview compact on narrow graphs. The project legend needs room for its controls.
   const base =
-    stored ?? (width && width < 640 ? { x: 12, y: Math.max(56, height - 128), w: 124 } : { x: 18, y: 14, w: 186 });
+    stored ??
+    (!interactive && width && width < 640
+      ? { x: 12, y: Math.max(56, height - 128), w: 124 }
+      : { x: 18, y: 14, w: 186 });
   const w = Math.round(Math.max(ATLAS_MIN_WIDTH, Math.min(atlasMaximumWidth(width), base.w)));
   if (!width || !height) return { ...base, w };
-  const tall = w * 0.95;
+  // The project map keeps the legend visible, including space for a scrollbar and a wrapped caption.
+  const tall = interactive ? (w * 3) / 4 + 76 : w * 0.95;
   return {
     w,
     x: Math.round(Math.max(0, Math.min(width - w, base.x))),

@@ -143,6 +143,14 @@ test("opening the inspector keeps the rightmost card visible in a compact window
   await expect(card).toHaveAttribute("aria-pressed", "true");
   await expect(card).toBeInViewport({ ratio: 0.99 });
   await expect(zoom).toHaveText(initialZoom);
+
+  await page.getByRole("button", { name: "Global map", exact: true }).click();
+  const overview = page.locator(".project-canvas-stage .atlas");
+  await expect(overview).toBeInViewport({ ratio: 0.99 });
+  const legend = overview.getByRole("button", { name: FIXTURE_CLAIM_TITLE, exact: true });
+  await expect(legend).toBeInViewport({ ratio: 0.99 });
+  await legend.click();
+  await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
 });
 
 test("an explicitly named launch claim opens proof and can return to the project map", async ({ page }) => {
