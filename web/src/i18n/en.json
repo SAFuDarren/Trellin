@@ -29,6 +29,22 @@
   "session": {
     "missing": "Open the workbench with the link printed by `research-multiplier workbench`."
   },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "close": "Close keyboard shortcuts",
+    "list": "Shortcut list",
+    "navigation": "Navigation",
+    "focus": "Move between controls",
+    "contextMenu": "Open a card or node menu",
+    "dismiss": "Close a menu or panel",
+    "canvas": "Canvas",
+    "pan": "Pan when the canvas has focus",
+    "openSelected": "Open proof from a focused claim card",
+    "previewMove": "Preview a position in Move card mode",
+    "saveMove": "Save card position",
+    "cancelMove": "Cancel card move",
+    "menuActions": "With a menu or the palette open"
+  },
   "projects": {
     "title": "Projects",
     "switch": "Switch project, {{name}}",
@@ -167,6 +183,8 @@
     }
   },
   "projectCanvas": {
+    "moveCard": "Move card",
+    "moveHint": "Use arrow keys to move. {{confirm}} saves · {{cancel}} cancels.",
     "askAgent": "Ask an Agent",
     "proofDetails": "Proof details",
     "proofEmpty": "No supporting proof nodes are recorded yet.",
@@ -1306,6 +1324,10 @@
       "keys": {
         "key": "Arrow keys, + and −",
         "what": "Pan and zoom when the canvas is focused"
+      },
+      "move": {
+        "key": "Move card (card menu)",
+        "what": "Preview with the arrows, or hold {{shift}} for larger steps. Press {{confirm}} to save or {{cancel}} to cancel."
       },
       "fit": {
         "key": "0",

@@ -13,7 +13,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import { formatShortcut } from "../shortcuts";
+import { formatShortcut, SHORTCUTS } from "../shortcuts";
 import "../styles/floating-controls.css";
 
 type Placement = "bottom-start" | "bottom-end" | "top-start" | "top-end";
@@ -304,7 +304,7 @@ export function Popover({
 export function contextMenuProps(onOpen: (anchor: ContextMenuAnchor) => void) {
   return {
     "aria-haspopup": "menu" as const,
-    "aria-keyshortcuts": "ContextMenu Shift+F10",
+    "aria-keyshortcuts": `${SHORTCUTS.contextMenuKey} ${SHORTCUTS.contextMenu}`,
     onContextMenu(event: MouseEvent<HTMLButtonElement>) {
       if (event.defaultPrevented) return;
       event.preventDefault();
@@ -323,7 +323,7 @@ export function contextMenuProps(onOpen: (anchor: ContextMenuAnchor) => void) {
         event.metaKey ||
         event.nativeEvent.isComposing ||
         event.keyCode === 229 ||
-        !(event.key === "ContextMenu" || (event.shiftKey && event.key === "F10"))
+        !(event.key === SHORTCUTS.contextMenuKey || (event.shiftKey && event.key === SHORTCUTS.contextWithShift))
       ) {
         return;
       }

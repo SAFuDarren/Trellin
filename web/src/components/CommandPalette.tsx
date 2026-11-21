@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { paletteQuery } from "../shell/paletteQuery";
-import { formatShortcut } from "../shortcuts";
+import { formatShortcut, SHORTCUTS } from "../shortcuts";
 import { PickerContent, type FloatingGroup } from "./FloatingControls";
 import "../styles/command-palette.css";
 
@@ -78,10 +78,10 @@ export function CommandPalette({
               type="button"
               className="command-palette-close"
               aria-label={t("palette.close")}
-              aria-keyshortcuts="Escape"
+              aria-keyshortcuts={SHORTCUTS.escape}
               onClick={dismiss}
             >
-              <kbd>{formatShortcut("Escape")}</kbd>
+              <kbd>{formatShortcut(SHORTCUTS.escape)}</kbd>
             </button>
           }
           footer={
@@ -92,7 +92,7 @@ export function CommandPalette({
                 {t("palette.navigate")}
               </span>
               <span>
-                <kbd>{formatShortcut("Enter")}</kbd>
+                <kbd>{formatShortcut(SHORTCUTS.enter)}</kbd>
                 {t("palette.open")}
               </span>
               <span>

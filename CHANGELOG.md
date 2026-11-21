@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.74
+
+- Press **?** to see keyboard shortcuts. Choose **Move card** from a project card’s context menu to preview its new position with the arrows. Enter saves the position and Escape cancels.
+
 ## 1.0.73
 
 - Agent chat opens below the workbench graph and suggests drafts for the selected claim or proof node. A checked history control keeps earlier messages out of the outgoing request while preserving the conversation.

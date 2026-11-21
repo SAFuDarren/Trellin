@@ -29,6 +29,22 @@
   "session": {
     "missing": "请用 `research-multiplier workbench` 打印的链接打开工作台。"
   },
+  "shortcuts": {
+    "title": "键盘快捷键",
+    "close": "关闭键盘快捷键",
+    "list": "快捷键列表",
+    "navigation": "导航",
+    "focus": "在控件之间移动焦点",
+    "contextMenu": "打开卡片或节点菜单",
+    "dismiss": "关闭菜单或面板",
+    "canvas": "画布",
+    "pan": "焦点在画布上时平移",
+    "openSelected": "打开当前聚焦卡片的证明",
+    "previewMove": "在移动卡片模式中预览位置",
+    "saveMove": "保存卡片位置",
+    "cancelMove": "取消卡片移动",
+    "menuActions": "在菜单或命令面板打开时"
+  },
   "projects": {
     "title": "项目",
     "switch": "切换项目，{{name}}",
@@ -167,6 +183,8 @@
     }
   },
   "projectCanvas": {
+    "moveCard": "移动卡片",
+    "moveHint": "用方向键移动。{{confirm}} 保存 · {{cancel}} 取消。",
     "askAgent": "询问 Agent",
     "proofDetails": "证明详情",
     "proofEmpty": "还没有记录支持这条课题的证明节点。",
@@ -1306,6 +1324,10 @@
       "keys": {
         "key": "方向键、+ 和 −",
         "what": "画布获得焦点时平移和缩放"
+      },
+      "move": {
+        "key": "移动卡片（卡片菜单）",
+        "what": "用方向键预览位置，按住 {{shift}} 可加大步长。按 {{confirm}} 保存，或按 {{cancel}} 取消。"
       },
       "fit": {
         "key": "0",

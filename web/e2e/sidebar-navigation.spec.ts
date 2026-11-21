@@ -2,6 +2,61 @@ import { expect, test } from "@playwright/test";
 import { controlledMenu, openMenu } from "./navigation";
 import { mapClaim, openProof } from "./project-map";
 
+test("keyboard shortcuts open from the canvas or Help and return focus", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 460 });
+  await page.goto("/#session=fixture");
+  const card = mapClaim(page, "自然数加零的对称性");
+  await card.focus();
+  await page.keyboard.press("?");
+  const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts", exact: true });
+  await expect(sheet).toBeVisible();
+  const close = sheet.getByRole("button", { name: "Close keyboard shortcuts", exact: true });
+  await expect(close).toBeFocused();
+  const mac = await page.evaluate(() => navigator.platform.startsWith("Mac"));
+  await expect(sheet.getByRole("region", { name: "Navigation", exact: true })).toContainText(mac ? "⌘K" : "Ctrl+K");
+  await expect(sheet.getByRole("region", { name: "Navigation", exact: true })).toContainText(
+    mac ? "⇧F10" : "Shift+F10",
+  );
+  await expect(sheet.getByRole("region", { name: "Canvas", exact: true })).toContainText("Cancel card move");
+  await page.keyboard.press("Tab");
+  await expect(sheet.getByRole("region", { name: "Shortcut list", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await expect(card).toBeFocused();
+
+  await openProof(page);
+  const proof = page.locator(".main-proof-graph");
+  const proofReturn = page.locator(".proof-return");
+  await expect(proofReturn).toBeFocused();
+  await page.keyboard.press("?");
+  await expect(sheet).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(proof).toBeVisible();
+  await expect(proofReturn).toBeFocused();
+
+  await page.keyboard.press("Control+k");
+  const palette = page.getByRole("dialog", { name: "Command palette", exact: true });
+  const search = palette.getByRole("combobox");
+  await search.press("?");
+  await expect(search).toHaveValue("?");
+  await expect(sheet).toBeHidden();
+  await search.press("Escape");
+
+  await page.goto("/#library");
+  const librarySearch = page.getByRole("searchbox", { name: /^Search by name or statement/ });
+  await librarySearch.press("?");
+  await expect(librarySearch).toHaveValue("?");
+  await expect(sheet).toBeHidden();
+
+  await page.goto("/#help");
+  const launcher = page.getByRole("button", { name: "Keyboard shortcuts", exact: true });
+  await launcher.press("Enter");
+  await expect(sheet).toBeVisible();
+  await close.press("Enter");
+  await expect(sheet).toBeHidden();
+  await expect(launcher).toBeFocused();
+});
+
 test("the icon rail keeps names and badges and shows labels by pointer and keyboard", async ({ page }) => {
   await page.goto("/#session=fixture");
   const rail = page.locator("nav.rail");
