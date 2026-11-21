@@ -14,6 +14,8 @@ Press **⌘K** (**Ctrl+K** on other platforms) or use the search button in the l
 
 Use **Find claim** on the project map to search and select a card. In **Agent chat**, search for a recipient or conversation from its chooser. In these search controls and the command palette, use arrow keys to move through options, Enter to select, and Escape to return focus.
 
+The **Details** and **Global map** icons show when their panels are open. With focus on the project map or its toolbar, press **I** for Details or **M** for Global map. Point at or keyboard-focus an icon to see its shortcut.
+
 Right-click a project map card or proof node for its actions. With the item focused, press **Shift+F10** to open the same menu. **Write proof note** opens the note editor for that node. **Show in Library** lists recorded sources used by the claim.
 
 Open **Agent chat** to start typing, or press **@** at the start of a draft to choose a recipient. If the project has one saved Agent, the composer selects it and displays its name. With multiple Agents, choose a recipient and the draft remembers it. Use **Add an Agent** if the project has none. The suggested prompts fill the draft. **Request details** opens the local conversation and shows the outgoing message for review. Send with **Enter** or **Send**. Use **Ask an Agent** on a claim or proof node when you want to attach that context. **Open full conversation** moves the current conversation and its draft to Chats, where the dock remains collapsed.

@@ -98,7 +98,7 @@ export function ClaimCodesPane({
         </label>
         <p className="project-entry-note">{t("claimCodes.lookupHint")}</p>
         <div className="project-entry-buttons">
-          <button className="button" type="submit" disabled={pending}>
+          <button className={claim ? "button" : "button primary"} type="submit" disabled={pending}>
             {t(open.isPending ? "common.loading" : "claimCodes.open")}
           </button>
         </div>

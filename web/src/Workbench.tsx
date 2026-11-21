@@ -745,7 +745,12 @@ export function Workbench({
                 graphAction(t, "ask-agent", () => askAgent(graph, node)),
                 graphAction(t, "proof-task", () => openProofTask(graph.claim.id)),
               ].map((action) => (
-                <button key={action.id} type="button" className="button" onClick={action.onSelect}>
+                <button
+                  key={action.id}
+                  type="button"
+                  className={action.id === "proof-task" ? "button primary" : "button"}
+                  onClick={action.onSelect}
+                >
                   {action.label}
                 </button>
               ))

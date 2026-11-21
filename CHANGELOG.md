@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.63
+
+- Each workbench area gives its main action one filled button. The project map uses icon toggles for Details and Global map, with keyboard shortcuts and visible pressed states. Find claim uses the same outlined style as neighbouring actions.
+
 ## 1.0.62
 
 - Claim details lead with the title, followed by the current state and actions. Cards omit repeated column states and use an empty progress mark when a claim has no recorded obligations. The project map heading uses the registered project name or the opened folder name.

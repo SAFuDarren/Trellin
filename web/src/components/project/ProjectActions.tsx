@@ -78,7 +78,7 @@ export function ProjectActions({
 
   return (
     <div className="project-actions">
-      <button className="button" type="button" onClick={addTheorem.onSelect}>
+      <button className="button primary" type="button" onClick={addTheorem.onSelect}>
         {addTheorem.label}
       </button>
       <Menu

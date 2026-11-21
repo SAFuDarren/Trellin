@@ -41,6 +41,67 @@
   color: var(--ink);
 }
 
+.project-canvas-find {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-view-toggles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+
+.map-view-control {
+  position: relative;
+  display: inline-flex;
+}
+
+.project-canvas-tools .map-view-toggle {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  padding: 0;
+}
+
+.map-view-toggle[aria-pressed="true"] {
+  border-color: var(--edge);
+}
+
+.map-view-toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.map-view-hint {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: calc(100% + 5px);
+  inset-inline-end: 0;
+  visibility: hidden;
+  padding: 4px 7px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: var(--main);
+  box-shadow: var(--elevation-float);
+  color: var(--ink);
+  font-size: var(--type-meta-size);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.map-view-control:hover .map-view-hint,
+.map-view-toggle:focus-visible + .map-view-hint {
+  visibility: visible;
+}
+
 .project-canvas-popover {
   width: min(260px, calc(100vw - 16px));
 }

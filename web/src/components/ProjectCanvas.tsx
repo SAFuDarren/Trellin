@@ -1,12 +1,14 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
@@ -39,6 +41,8 @@ const HEIGHT = 80;
 const COLUMN_STEP = 240;
 const ROW_STEP = 128;
 const BOUND = 1_000_000;
+const DETAILS_KEY = "I";
+const ATLAS_KEY = "M";
 const directions: Record<string, [number, number]> = {
   ArrowLeft: [-1, 0],
   ArrowRight: [1, 0],
@@ -80,6 +84,49 @@ function zoomCamera(camera: Camera, factor: number, center: Point) {
 function visibleOffset(offset: number, start: number, extent: number, available: number) {
   if (extent > available) return (available - extent) / 2 - start;
   return Math.max(-start, Math.min(offset, available - start - extent));
+}
+
+function MapViewToggle({
+  label,
+  shortcut,
+  pressed,
+  onToggle,
+  disabled,
+  details,
+  children,
+}: {
+  label: string;
+  shortcut: string;
+  pressed: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  details?: boolean;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const hint = useId();
+  return (
+    <span className="map-view-control">
+      <button
+        id={details ? "map-details-toggle" : undefined}
+        type="button"
+        className="button map-view-toggle"
+        disabled={disabled}
+        aria-label={label}
+        aria-describedby={hint}
+        aria-keyshortcuts={shortcut}
+        aria-pressed={pressed}
+        aria-expanded={details ? pressed : undefined}
+        aria-controls={details ? "review" : undefined}
+        onClick={onToggle}
+      >
+        {children}
+      </button>
+      <span id={hint} className="map-view-hint" role="tooltip">
+        {t("projectCanvas.toggleHint", { label, shortcut })}
+      </span>
+    </span>
+  );
 }
 
 type Props = {
@@ -447,6 +494,12 @@ export function ProjectCanvas({
     });
   }
 
+  const canToggleDetails = Boolean(selected || detailsOpen);
+  function toggleDetails() {
+    movedCamera.current = true;
+    onToggleDetails();
+  }
+
   function onCanvasKey(event: KeyboardEvent<HTMLDivElement>) {
     if (event.defaultPrevented) return;
     if (event.key === "Escape") {
@@ -455,6 +508,29 @@ export function ProjectCanvas({
         event.preventDefault();
       }
       return;
+    }
+    if (
+      !event.repeat &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing &&
+      event.target instanceof HTMLElement &&
+      event.currentTarget.contains(event.target) &&
+      !event.target.closest("input, select, textarea, [contenteditable]")
+    ) {
+      const key = event.key.toUpperCase();
+      if (key === DETAILS_KEY && canToggleDetails) {
+        event.preventDefault();
+        toggleDetails();
+        return;
+      }
+      if (key === ATLAS_KEY) {
+        event.preventDefault();
+        onToggleAtlas();
+        return;
+      }
     }
     if (event.target !== stage.current) return;
     const delta = directions[event.key];
@@ -478,20 +554,6 @@ export function ProjectCanvas({
     <div className="project-canvas" onKeyDown={onCanvasKey}>
       <div className="project-canvas-tools">
         <button
-          id="map-details-toggle"
-          type="button"
-          className="button"
-          disabled={!selected && !detailsOpen}
-          aria-expanded={detailsOpen}
-          aria-controls="review"
-          onClick={() => {
-            movedCamera.current = true;
-            onToggleDetails();
-          }}
-        >
-          {t("canvasShell.details")}
-        </button>
-        <button
           type="button"
           className="button"
           disabled={toolbarLink.disabled}
@@ -512,7 +574,7 @@ export function ProjectCanvas({
               <Chevron />
             </>
           }
-          triggerClassName="project-canvas-menu-trigger"
+          triggerClassName="button project-canvas-find"
           className="project-canvas-popover"
           groups={[{ options: cards.map(({ id, title }) => ({ id, label: title })) }]}
           value={selected ?? undefined}
@@ -549,9 +611,28 @@ export function ProjectCanvas({
             ]}
           />
         )}
-        <button type="button" className="button" aria-pressed={atlasOpen} onClick={onToggleAtlas}>
-          {t("sidebar.atlas")}
-        </button>
+        <div className="map-view-toggles">
+          <MapViewToggle
+            label={t("canvasShell.details")}
+            shortcut={DETAILS_KEY}
+            pressed={detailsOpen}
+            onToggle={toggleDetails}
+            disabled={!canToggleDetails}
+            details
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+              <path d="M14.5 4.5v15" />
+            </svg>
+          </MapViewToggle>
+          <MapViewToggle label={t("sidebar.atlas")} shortcut={ATLAS_KEY} pressed={atlasOpen} onToggle={onToggleAtlas}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8" />
+              <ellipse cx="12" cy="12" rx="3.6" ry="8" />
+              <path d="M4 12h16" />
+            </svg>
+          </MapViewToggle>
+        </div>
       </div>
       <div
         ref={stage}

@@ -67,7 +67,7 @@ export function LemmaPlanPane({ session, scope }: { session: string; scope: Lemm
       </label>
       <p className="project-entry-note">{t("lemmaPlan.hint")}</p>
       <div className="project-entry-buttons">
-        <button className="button" disabled={!draft.trim() || verification.isPending} type="submit">
+        <button className="button primary" disabled={!draft.trim() || verification.isPending} type="submit">
           {t("lemmaPlan.verify")}
         </button>
       </div>

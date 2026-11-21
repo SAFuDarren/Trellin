@@ -138,6 +138,7 @@
     "linkClaim": "Link selected claim",
     "cancelLink": "Cancel link",
     "findClaim": "Find claim",
+    "toggleHint": "{{label}} ({{shortcut}})",
     "searchClaims": "Search claims on map",
     "noMatches": "No matching claims.",
     "researchLinks": "Research links",

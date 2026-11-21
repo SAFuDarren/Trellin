@@ -180,7 +180,7 @@ export function PremisePane({
             <button className="button" type="button" disabled={pending} onClick={() => show({ kind: "list" })}>
               {t("premise.back")}
             </button>
-            <button className="button" type="submit" disabled={pending || !active}>
+            <button className="button primary" type="submit" disabled={pending || !active}>
               {t(pending ? "common.loading" : "premise.save")}
             </button>
           </div>

@@ -69,6 +69,7 @@
   - 只通过自动生成的客户端调用 API，不手写响应类型。
   - 来自服务端的数据用 TanStack Query 获取和缓存；界面自身的状态留在组件里。
   - 无障碍目标：WCAG 2.1 AA。
+  - 使用 [`foundation.css`](../web/src/styles/foundation.css) 中的交互样式。每个独立可见的操作区最多有一个实底主按钮 `.button.primary`。次要操作用描边按钮 `.button`，辅助操作用低强调的文字或图标。操作区内打开确认步骤后，主按钮随之切换到确认操作。
 - **Lean**
   - 升级 Lean 或 Mathlib 必须单独开一个 PR：
     - 记录新版本号，并运行 `lean` 测试线和发布回归。
