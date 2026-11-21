@@ -30,7 +30,7 @@ Open **Agent chat** to start typing, or press **@** at the start of a draft to c
 
 In Workbench, Agent chat opens below the graph. Suggestions follow the selected claim or proof node. An existing conversation has a **Send without earlier messages** checkbox that keeps previous turns out of each request while it is checked.
 
-Use **Agent activity** in the bottom bar to see recorded proof and model jobs, Agent work, conversations and results waiting for you. Filter by state and open an item to go to its job, proof, conversation or review. The Team badge counts running activity across the project. Claims and Chats show the count for the claim or proof node they display.
+Use **Agent activity** in the bottom bar to see recorded proof and model jobs, Agent work, conversations and results waiting for you. Filter by state and open an item to go to its job, proof, conversation or review. The Team badge counts running activity across the project. Claims and Chats show the count for the claim or proof node they display. An empty panel shows a link to Agent work. A chat without messages opens at the height of its composer and suggestions.
 
 In Library, hover over a row or focus it with the keyboard to reveal its **Edit statement** icon. From a focused row, press **Tab** and then **Enter** to open the revision form. You can also open it from the entry inspector.
 

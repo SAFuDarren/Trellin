@@ -198,7 +198,11 @@ export function NewConversation({
   }
 
   return (
-    <section className="conversation-panel new-conversation" aria-label={t("agentDock.newConversation")}>
+    <section
+      className="conversation-panel new-conversation"
+      data-empty="true"
+      aria-label={t("agentDock.newConversation")}
+    >
       <div className="new-conversation-body">
         {!text && !pending && (
           <ConversationStarters

@@ -42,7 +42,9 @@ export function WorkspaceActivityList({
   onOpenThread: (thread: Extract<ActivityRow, { source: "chat" }>["thread"]) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const [filter, setFilter] = useState<ActivityState | "all">("all");
+  const [selectedFilter, setFilter] = useState<ActivityState | "all">("all");
+  const hasActivity = activity.rows.length > 0;
+  const filter = hasActivity ? selectedFilter : "all";
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const tick = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -112,13 +114,15 @@ export function WorkspaceActivityList({
 
   return (
     <div className="agent-dock-activity">
-      <div className="agent-dock-activity-filters" role="group" aria-label={t("workspaceActivity.filters")}>
-        {FILTERS.map((state) => (
-          <button key={state} type="button" aria-pressed={filter === state} onClick={() => setFilter(state)}>
-            {t(`workspaceActivity.filter.${state}`)}
-          </button>
-        ))}
-      </div>
+      {hasActivity && (
+        <div className="agent-dock-activity-filters" role="group" aria-label={t("workspaceActivity.filters")}>
+          {FILTERS.map((state) => (
+            <button key={state} type="button" aria-pressed={filter === state} onClick={() => setFilter(state)}>
+              {t(`workspaceActivity.filter.${state}`)}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="agent-dock-activity-body">
         {unavailable && <p role="status">{t("agentDock.activityUnavailable")}</p>}
         {rows.length ? (

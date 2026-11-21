@@ -275,6 +275,8 @@ for (const hasAgent of [true, false]) {
     const dock = page.getByRole("region", { name: "Agent chat", exact: true });
     const textbox = page.getByRole("textbox", { name: hasAgent ? "Message Only Agent" : "Write a message" });
     await expect(textbox).toBeVisible();
+    const emptyHeight = (await dock.boundingBox())!.height;
+    expect(emptyHeight).toBeLessThan(340);
     if (hasAgent) await expect(dock.getByLabel("Choose an Agent", { exact: true })).toContainText("Only Agent");
     else {
       await expect(dock.getByRole("link", { name: "Add an Agent" })).toHaveAttribute("href", "#team/agents");
@@ -283,6 +285,7 @@ for (const hasAgent of [true, false]) {
     const starter = "Help me plan a research task.";
     await dock.getByRole("button", { name: starter }).click();
     await expect(textbox).toHaveValue(starter);
+    await expect.poll(async () => (await dock.boundingBox())!.height).toBeLessThan(emptyHeight);
     expect(written).toHaveLength(0);
 
     await page
@@ -357,6 +360,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       inspector.boundingBox(),
       zoom.boundingBox(),
     ]);
+    expect(dockBox!.height).toBeLessThan(310);
     expect(dockBox!.x + dockBox!.width).toBeLessThanOrEqual(inspectorBox!.x);
     expect(zoomBox!.y + zoomBox!.height).toBeLessThanOrEqual(dockBox!.y);
     await zoom.getByRole("button", { name: "Zoom in", exact: true }).click();
@@ -367,3 +371,36 @@ for (const colorScheme of ["light", "dark"] as const) {
     expect(writes).toEqual([]);
   });
 }
+
+test("a saved conversation with no messages stays compact and leaves its draft usable", async ({ page }) => {
+  const when = "2026-11-21T00:00:00Z";
+  const thread: Conversation = {
+    id: "fixture-empty",
+    title: "Saved conversation",
+    claim_id: null,
+    statement_id: null,
+    node_id: null,
+    updated_at: when,
+    created_at: when,
+    running: false,
+    revision: 0,
+    messages: [],
+  };
+  await page.route("**/api/conversations", (route) => route.fulfill({ json: { threads: [thread] } }));
+  await page.route("**/api/conversations/thread?*", (route) => route.fulfill({ json: { thread } }));
+  await page.goto("/#session=fixture");
+  await page.locator("nav.rail").getByRole("link", { name: /^Team/ }).click();
+  await page.getByRole("button", { name: "Agent chat", exact: true }).click();
+  const dock = page.getByRole("region", { name: "Agent chat", exact: true });
+  await dock.getByRole("button", { name: "Choose a conversation", exact: true }).click();
+  await page.getByRole("option", { name: "Saved conversation" }).click();
+
+  const starter = dock.getByRole("button", { name: "Help me plan a research task.", exact: true });
+  const draft = dock.getByRole("textbox", { name: "Write a message", exact: true });
+  await expect(starter).toBeVisible();
+  await expect(draft).toBeInViewport({ ratio: 1 });
+  expect((await dock.boundingBox())!.height).toBeLessThan(300);
+  await starter.click();
+  await expect(draft).toHaveValue("Help me plan a research task.");
+  await expect(draft).toBeFocused();
+});

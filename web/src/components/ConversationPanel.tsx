@@ -76,6 +76,7 @@ export function ConversationPanel({
   const messages = detail.data?.thread.messages ?? [];
   const running = detail.data?.thread.running ?? thread.running;
   const sending = pending === "send";
+  const empty = detail.isSuccess && messages.length === 0 && !sending && !running;
   const latestError = detail.data?.thread.latest_error;
   const latestMessage = messages[messages.length - 1];
   const connection = models.options.find(
@@ -237,7 +238,7 @@ export function ConversationPanel({
     </button>
   );
   return (
-    <section className="conversation-panel" aria-label={thread.title}>
+    <section className="conversation-panel" data-empty={empty || undefined} aria-label={thread.title}>
       {header?.({ remove: () => setRemoving(true), removeDisabled: disabled, triggerRef: archiveTrigger })}
       {detail.isPending ? (
         <p role="status">{t("common.loading")}</p>
@@ -253,7 +254,7 @@ export function ConversationPanel({
             nearEnd.current = currentTarget.scrollHeight - currentTarget.scrollTop - currentTarget.clientHeight < 72;
           }}
         >
-          {messages.length === 0 && !sending && !running && (
+          {empty && (
             <li className="conversation-empty">
               {!text && (
                 <ConversationStarters
