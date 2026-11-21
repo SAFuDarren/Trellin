@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent,
   type PointerEvent,
   type ReactNode,
 } from "react";
@@ -43,6 +44,7 @@ const HEIGHT = 80;
 const COLUMN_STEP = 240;
 const ROW_STEP = 128;
 const BOUND = 1_000_000;
+const DOUBLE_CLICK_MS = 400;
 const DETAILS_KEY = "I";
 const ATLAS_KEY = "M";
 const directions: Record<string, [number, number]> = {
@@ -136,12 +138,12 @@ type Props = {
   active?: boolean;
   claimProgress?: ReadonlyMap<string, ClaimProgress>;
   selected: string | null;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, openDetails?: boolean) => void;
   onOpenProof?: (id: string) => void;
   onContextClaim: (id: string | null) => void;
   claimActions: (id: string, link: FloatingOption) => FloatingGroup[];
   detailsOpen: boolean;
-  onToggleDetails: () => void;
+  onDetailsChange: (open: boolean) => void;
   atlasClaims: AtlasClaim[] | undefined;
   atlasOpen: boolean;
   atlasBox: AtlasBox | null;
@@ -164,7 +166,7 @@ export function ProjectCanvas({
   onContextClaim,
   claimActions,
   detailsOpen,
-  onToggleDetails,
+  onDetailsChange,
   atlasClaims,
   atlasOpen,
   atlasBox,
@@ -184,6 +186,7 @@ export function ProjectCanvas({
   const gesture = useRef<Gesture | null>(null);
   const draggedCard = useRef<string | null>(null);
   const proofClick = useRef<string | null>(null);
+  const pendingDetails = useRef<{ id: string; timer: number } | null>(null);
   const inspected = useRef<{ id: string; width: number; height: number } | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0, visibleWidth: 0 });
   const { width: viewportWidth, height: viewportHeight } = size;
@@ -226,6 +229,25 @@ export function ProjectCanvas({
     setContextTarget(null);
     onContextClaim(null);
   }, [onContextClaim]);
+
+  const cancelPendingDetails = useCallback(() => {
+    if (!pendingDetails.current) return false;
+    window.clearTimeout(pendingDetails.current.timer);
+    pendingDetails.current = null;
+    return true;
+  }, []);
+
+  useEffect(
+    () => () => {
+      cancelPendingDetails();
+    },
+    [cancelPendingDetails],
+  );
+
+  useEffect(() => {
+    const pending = pendingDetails.current;
+    if (pending && (!active || detailsOpen || pending.id !== selected)) cancelPendingDetails();
+  }, [active, cancelPendingDetails, detailsOpen, selected]);
 
   useEffect(() => {
     if (contextTarget && !contextCard) dismissContextMenu();
@@ -382,6 +404,7 @@ export function ProjectCanvas({
   }
 
   function openContextMenu(id: string, anchor: ContextMenuAnchor) {
+    cancelPendingDetails();
     movedCamera.current = true;
     setContextTarget({ id, anchor });
     onContextClaim(id);
@@ -395,6 +418,7 @@ export function ProjectCanvas({
       disabled
         ? undefined
         : () => {
+            cancelPendingDetails();
             setLinkSource(activeSource ? null : id);
             setLinkNotice("");
           },
@@ -402,7 +426,7 @@ export function ProjectCanvas({
     );
   }
 
-  function choose(id: string) {
+  function choose(id: string, openDetails = true) {
     if (activeSource) {
       if (activeSource.id === id || editingDisabled) return;
       const source = activeSource.id;
@@ -416,12 +440,48 @@ export function ProjectCanvas({
       setLinkNotice("");
     }
     movedCamera.current = true;
-    onSelect(id);
+    onSelect(id, openDetails);
+  }
+
+  function clickCard(event: MouseEvent<HTMLButtonElement>, id: string) {
+    const chooseCard = !event.ctrlKey && (event.detail === 0 || draggedCard.current !== id);
+    const plain = chooseCard && !activeSource && !event.metaKey && !event.altKey && !event.shiftKey;
+    const open = plain && event.detail === 2 && proofClick.current === id && onOpenProof;
+    proofClick.current = plain && event.detail === 1 ? id : null;
+    draggedCard.current = null;
+    cancelPendingDetails();
+    if (open) {
+      open(id);
+      return;
+    }
+    if (!chooseCard) return;
+
+    // The compact inspector overlays the map and moves cards into the remaining space.
+    // Highlight immediately and keep the pointer target in place for a second click.
+    if (
+      plain &&
+      event.detail === 1 &&
+      onOpenProof &&
+      !detailsOpen &&
+      getComputedStyle(event.currentTarget).getPropertyValue("--map-inspector-overlay").trim() === "1"
+    ) {
+      choose(id, false);
+      pendingDetails.current = {
+        id,
+        timer: window.setTimeout(() => {
+          pendingDetails.current = null;
+          onDetailsChange(true);
+        }, DOUBLE_CLICK_MS),
+      };
+    } else {
+      choose(id);
+    }
   }
 
   function reveal(id: string) {
     const card = byId.get(id);
     if (!card) return;
+    cancelPendingDetails();
     // Finding a card is navigation. Only a deliberate card activation completes a link.
     movedCamera.current = true;
     setLinkNotice("");
@@ -436,6 +496,7 @@ export function ProjectCanvas({
 
   function startGesture(event: PointerEvent<HTMLElement>, id?: string) {
     if (event.button !== 0 || event.ctrlKey || gesture.current) return;
+    if (pendingDetails.current?.id !== id) cancelPendingDetails();
     draggedCard.current = null;
     const origin = id ? byId.get(id)?.point : camera;
     if (!origin || (id && (activeSource || editingDisabled))) return;
@@ -463,6 +524,7 @@ export function ProjectCanvas({
     const dx = event.clientX - current.start.x;
     const dy = event.clientY - current.start.y;
     if (!current.moved && Math.hypot(dx, dy) < 4) return;
+    if (!current.moved) cancelPendingDetails();
     current.moved = true;
     movedCamera.current = true;
     if (current.id) {
@@ -506,13 +568,18 @@ export function ProjectCanvas({
 
   const canToggleDetails = Boolean(selected || detailsOpen);
   function toggleDetails() {
+    cancelPendingDetails();
     movedCamera.current = true;
-    onToggleDetails();
+    onDetailsChange(!detailsOpen);
   }
 
   function onCanvasKey(event: KeyboardEvent<HTMLDivElement>) {
     if (event.defaultPrevented) return;
     if (event.key === "Escape") {
+      if (cancelPendingDetails()) {
+        proofClick.current = null;
+        event.preventDefault();
+      }
       if (activeSource) {
         setLinkSource(null);
         event.preventDefault();
@@ -705,15 +772,7 @@ export function ProjectCanvas({
                 aria-keyshortcuts={menu["aria-keyshortcuts"] + (onOpenProof ? " Enter" : "") + movingShortcuts}
                 title={card.title}
                 style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
-                onClick={(event) => {
-                  const chooseCard = !event.ctrlKey && (event.detail === 0 || draggedCard.current !== card.id);
-                  const plain = chooseCard && !activeSource && !event.metaKey && !event.altKey && !event.shiftKey;
-                  const open = plain && event.detail === 2 && proofClick.current === card.id && onOpenProof;
-                  proofClick.current = plain && event.detail === 1 ? card.id : null;
-                  draggedCard.current = null;
-                  if (open) open(card.id);
-                  else if (chooseCard) choose(card.id);
-                }}
+                onClick={(event) => clickCard(event, card.id)}
                 onPointerDown={(event) => startGesture(event, card.id)}
                 onKeyDown={(event) => {
                   menu.onKeyDown(event);
@@ -728,6 +787,7 @@ export function ProjectCanvas({
                     !event.shiftKey
                   ) {
                     event.preventDefault();
+                    cancelPendingDetails();
                     onOpenProof(card.id);
                   }
                   if (!event.defaultPrevented) moveByKey(event, card.id, at);

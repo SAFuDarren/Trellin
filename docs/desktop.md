@@ -22,7 +22,7 @@ The **Details** and **Global map** icons show when their panels are open. With f
 
 Open a proof to start at a readable zoom on the main canvas. **Fit to window** shows the whole graph. Select a node to read its full formula and Lean statement in the inspector. Hover over an activity count or check the inspector to see the recorded Agent and model. **Edge styles** opens the legend.
 
-Right-click a project map card or proof node for its actions. With the item focused, press **Shift+F10** to open the same menu. **Write proof note** opens the note editor for that node. **Show in Library** lists recorded sources used by the claim.
+Click a project map card to inspect the claim. Double-click the card or press **Enter** on it to open its proof. Press **Escape** to return to the map. Right-click a card or proof node for its actions, or press **Shift+F10** with the item focused. **Write proof note** opens the note editor for that node. **Show in Library** lists recorded sources used by the claim.
 
 Open **Agent chat** to start typing, or press **@** at the start of a draft to choose a recipient. If the project has one saved Agent, the composer selects it and displays its name. With multiple Agents, choose a recipient and the draft remembers it. Use **Add an Agent** if the project has none. The suggested prompts fill the draft. **Request details** opens the local conversation and shows the outgoing message for review. Send with **Enter** or **Send**. Use **Ask an Agent** on a claim or proof node when you want to attach that context. **Open full conversation** moves the current conversation and its draft to Chats, where the dock remains collapsed.
 
