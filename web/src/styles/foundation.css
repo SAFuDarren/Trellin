@@ -11,13 +11,12 @@
   --duration-panel: 180ms;
 
   --state-hover: var(--track);
-  --state-selected: var(--pick);
-  --state-pressed: color-mix(in srgb, var(--state-selected) 85%, var(--ink));
-
+  --state-selected: var(--accent-wash);
+  --state-pressed: color-mix(in srgb, var(--pick) 85%, var(--ink));
   /* At most one filled .button.primary per action area. Keep secondary .button
      controls outlined and use quiet text or icon controls for tertiary actions. */
-  --action-fill: var(--ink);
-  --action-label: var(--on-ink);
+  --action-fill: var(--accent);
+  --action-label: var(--accent-ink);
 
   /* Radius scale. Glyph shapes (status marks, dots) keep their own geometry. */
   --radius-inline: 4px; /* keycaps, legend keys, tiny badges */
@@ -102,6 +101,15 @@
   &:active:where(:not(:disabled, [aria-disabled="true"])) {
     background-color: var(--state-pressed);
   }
+}
+
+/* A solid indicator accompanies the tint for selected navigation destinations. */
+:is(.rail-link, .nav-item, .chat-list-item, .sidebar-projects-row):is([aria-current="page"], [aria-current="true"]) {
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+:is(.button:where(:not(.primary)), .segmented button)[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 @keyframes rm-float-in {

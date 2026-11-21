@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.66
+
+- Light and dark themes use the Trellin Navy accent for selection, focus, primary actions, and running work. Page, section, and card headings have distinct sizes. Team opens on Agents, and Environment check has its own section under Runtimes.
+
 ## 1.0.65
 
 - Library rows show an edit icon on hover or keyboard focus. The table and inspector use monospace for Lean declarations and the body font for plain-language names.

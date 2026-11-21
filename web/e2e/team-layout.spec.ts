@@ -30,15 +30,21 @@ test("Team groups real data views and keeps both model connection entries", asyn
   await openTeam(page);
   const sidebar = page.locator(".section-nav");
   const main = page.locator(".section-main");
+  await expect(main.getByRole("heading", { name: "Agents", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "Agents", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(sidebar.locator(".nav-group").nth(0).getByRole("link")).toHaveText(["Agents", "Models", /Jobs/]);
   await expect(sidebar.locator(".nav-group").nth(1).getByRole("link")).toHaveText(["Runtimes", "Usage"]);
+  await sidebar.getByRole("link", { name: "Runtimes", exact: true }).click();
   await expect(main.getByRole("rowheader", { name: new RegExp(HOST) })).toBeVisible();
   const connections = main.getByRole("region", { name: "Model connections" });
   const row = connections.getByRole("row", { name: /Research Codex/ });
   await expect(row.getByRole("button", { name: "Test connection" })).toBeEnabled();
   await expect(connections.getByRole("button", { name: "Add connection" })).toBeEnabled();
-  await main.getByRole("button", { name: "Run check" }).click();
-  await expect(main.getByText("All 2 checks passed.")).toBeVisible();
+  const environment = main.getByRole("region", { name: "Environment check", exact: true });
+  await expect(environment.getByRole("heading", { name: "Environment check", exact: true })).toBeVisible();
+  await expect(connections.getByRole("region", { name: "Environment check", exact: true })).toHaveCount(0);
+  await environment.getByRole("button", { name: "Run check" }).click();
+  await expect(environment.getByRole("status")).toHaveText("All 2 checks passed.");
 
   await sidebar.getByRole("link", { name: "Models", exact: true }).click();
   await expect(row).toBeVisible();

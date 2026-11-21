@@ -4,11 +4,11 @@ import type { GraphSnapshot } from "../src/workbench/types";
 import { openProof } from "./project-map";
 
 const roles = {
+  page: ["22px", "600"],
   heading: ["15px", "600"],
   body: ["14px", "400"],
   control: ["13px", "500"],
   metadata: ["12px", "400"],
-  inspector: ["18px", "600"],
 } as const;
 
 async function expectTextRole(elements: Locator[], role: keyof typeof roles) {
@@ -134,10 +134,11 @@ for (const variant of [
     const goalCard = page.locator(`.graph-node[data-node="${goalId}"]`);
     await goalCard.press("Enter");
     await expect(page.locator("#node-detail h2")).toHaveText(variant.title);
-    await expectTextRole([page.locator(".claim-heading h1"), sidebar.locator(".sidebar-projects h2")], "heading");
+    await expectTextRole([page.locator(".claim-heading h1")], "page");
+    await expectTextRole([sidebar.locator(".sidebar-projects h2")], "heading");
 
     const inspector = page.locator(".node-detail");
-    await expectTextRole([inspector.locator("h2")], "inspector");
+    await expectTextRole([inspector.locator("h2")], "page");
     const formula = inspector.locator(".formula");
     const lean = inspector.locator(".lean");
     await expect(formula).toContainText("∀ n, n = 0 + n");
@@ -160,7 +161,7 @@ for (const variant of [
     const beforeZoom = await canvasScale();
     await page.locator(".main-proof-graph").getByRole("button", { name: variant.zoom, exact: true }).click();
     await expect.poll(canvasScale).toBeGreaterThan(beforeZoom);
-    await expectTextRole([page.locator(".claim-heading h1")], "heading");
+    await expectTextRole([page.locator(".claim-heading h1")], "page");
 
     await page.locator(`.graph-node[data-node="${obligationId}"]`).press("Enter");
     const proof = page.locator(".chat");
@@ -199,13 +200,13 @@ for (const variant of [
     const status = row.locator(".chat-list-status");
     await expect(status).toHaveText(variant.replied);
     await expect(status).toBeInViewport();
-    await expectTextRole([chats.locator(".chat-list-head h1")], "heading");
+    await expectTextRole([chats.locator(".chat-list-head h1")], "page");
     await expectTextRole([status], "metadata");
     await row.click();
     const main = chats.locator(".chats-main");
     const reply = main.locator(".message");
     await expect(reply).toContainText(identifier);
-    await expectTextRole([main.locator(".page-head h2")], "heading");
+    await expectTextRole([main.locator(".page-head h2")], "page");
     await expectTextRole([main.locator("textarea"), reply, main.locator(".bubble")], "body");
     await expectTextRole([main.locator(".composer-model-trigger").first()], "control");
     await expectTextRole([main.locator(".speaker").last(), main.locator(".page-head .note")], "metadata");

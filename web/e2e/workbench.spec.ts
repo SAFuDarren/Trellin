@@ -395,6 +395,7 @@ test("a result can be opened from review in the workbench", async ({ page }) => 
 
 test("Team shows model management at the local runtime", async ({ page }) => {
   const errors = await open(page, "Team");
+  await page.getByRole("link", { name: "Runtimes", exact: true }).click();
   const connections = page.getByRole("region", { name: "Model connections" });
   await expect(connections.getByText("Add the models you want to use.")).toBeVisible();
   await expect(connections.getByRole("button", { name: "Add connection" })).toBeEnabled();

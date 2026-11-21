@@ -1,7 +1,7 @@
 /* Layout: sidebar | graph over conversation | review column, each border draggable. */
 :root {
   color-scheme: light;
-  accent-color: var(--live);
+  accent-color: var(--accent);
   --rail: #e8e8e8;
   --side: #efefef;
   --main: #fafafa;
@@ -24,8 +24,13 @@
   --warn-soft: #fdf3dc;
   --crit: #d03b3b;
   --crit-soft: #fbedec;
-  --live: #4b4b4b;
-  --live-soft: #e3e3e3;
+  /* Brand Navy, with the same hue and saturation lightened for the dark theme. */
+  --brand-navy: #16233f;
+  --accent: var(--brand-navy);
+  --accent-wash: color-mix(in srgb, var(--accent) 11%, var(--main));
+  --accent-ink: #ffffff;
+  --live: var(--accent);
+  --live-soft: var(--accent-wash);
   --on-ink: #fafafa;
   --cat-1: #6250d6;
   --cat-2: #eb6834;
@@ -38,6 +43,10 @@
   --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
   --type-title-size: 18px;
   --type-section-size: 15px;
+  /* Headings for work areas, sections within them, and cards within sections. */
+  --type-page-title-size: 22px;
+  --type-section-title-size: 16px;
+  --type-card-title-size: 14px;
   --type-body-size: 14px;
   --type-control-size: 13px;
   --type-meta-size: 12px;
@@ -75,8 +84,9 @@
     --warn-soft: #3a2e12;
     --crit: #e05252;
     --crit-soft: #2c1c1b;
-    --live: #cdcdcd;
-    --live-soft: #353535;
+    --accent: #a4b7df;
+    --accent-wash: color-mix(in srgb, var(--accent) 17%, var(--main));
+    --accent-ink: var(--brand-navy);
     --on-ink: #1e1e1e;
     --cat-1: #9085e9;
     --cat-2: #d95926;
@@ -138,7 +148,7 @@ button:disabled {
   cursor: default;
 }
 :focus-visible {
-  outline: 2px solid var(--live);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .sr-only {
@@ -566,7 +576,8 @@ select:disabled {
 }
 .claim-heading h1 {
   max-width: 100%;
-  font-size: var(--type-section-size);
+  font-size: var(--type-page-title-size);
+  line-height: 1.2;
   font-weight: var(--type-semibold);
   white-space: nowrap;
   overflow: hidden;
@@ -1069,9 +1080,12 @@ select:disabled {
   color: inherit;
   font: inherit;
 }
-.atlas-keys button:hover,
-.atlas-keys button[aria-pressed="true"] {
+.atlas-keys button:hover {
   background: var(--pick);
+  color: var(--ink);
+}
+.atlas-keys button[aria-pressed="true"] {
+  background: var(--state-selected);
   color: var(--ink);
 }
 .atlas-keys button:focus-visible {
@@ -1404,8 +1418,8 @@ select:disabled {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--ink);
-  color: var(--on-ink);
+  background: var(--action-fill);
+  color: var(--action-label);
 }
 .send svg {
   width: 14px;
@@ -1433,7 +1447,7 @@ select:disabled {
   margin-right: auto;
 }
 .queue h2 {
-  font-size: var(--type-section-size);
+  font-size: var(--type-section-title-size);
   font-weight: var(--type-semibold);
 }
 #queue-count {
@@ -1578,7 +1592,7 @@ select:disabled {
   padding-inline-start: 0;
 }
 .node-detail h2 {
-  font-size: var(--type-title-size);
+  font-size: var(--type-page-title-size);
   font-weight: var(--type-semibold);
   line-height: 1.3;
   overflow-wrap: anywhere;
@@ -1949,7 +1963,8 @@ select:disabled {
   min-width: 0;
 }
 .page-head h2 {
-  font-size: var(--type-section-size);
+  font-size: var(--type-page-title-size);
+  line-height: 1.2;
   font-weight: var(--type-semibold);
   white-space: nowrap;
 }
@@ -1997,6 +2012,11 @@ select:disabled {
   flex-direction: column;
   gap: 12px;
 }
+.page-body.split > .aside h3 {
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-semibold);
+  overflow-wrap: anywhere;
+}
 .page-note {
   color: var(--sub);
   max-width: 68ch;
@@ -2023,8 +2043,7 @@ select:disabled {
   color: var(--action-label);
 }
 .button.primary:hover:not(:disabled) {
-  opacity: 0.88;
-  background: var(--action-fill);
+  background: color-mix(in srgb, var(--action-fill) 86%, var(--main));
 }
 .button:disabled {
   opacity: 0.5;
@@ -2166,11 +2185,13 @@ select:disabled {
   align-items: center;
   gap: 8px;
   padding: 0 4px;
-  font-weight: 600;
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-semibold);
 }
 .board-column > header span:last-child {
   color: var(--sub);
-  font-weight: 400;
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-regular);
 }
 .board-card {
   width: 100%;
@@ -2243,8 +2264,8 @@ select:disabled {
   }
 }
 .board-card .title {
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: var(--type-card-title-size);
+  font-weight: var(--type-semibold);
   line-height: 1.35;
 }
 .board-card .meta {
@@ -2345,7 +2366,10 @@ select:disabled {
   background: var(--canvas);
 }
 .table tbody tr[aria-selected="true"] {
-  background: var(--pick);
+  background: var(--state-selected);
+}
+.table tbody tr[aria-selected="true"] > :first-child {
+  box-shadow: inset 2px 0 var(--accent);
 }
 .table .group-row td {
   padding: 9px 12px;
@@ -2577,9 +2601,9 @@ select:disabled {
   gap: 8px;
 }
 .choices .button[aria-pressed="true"] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--on-ink);
+  border-color: var(--accent);
+  background: var(--state-selected);
+  color: var(--ink);
 }
 .settings {
   display: flex;
@@ -2670,7 +2694,7 @@ select:disabled {
   max-width: calc(100vw - 92px);
   margin: 0;
   border-color: var(--hair);
-  border-left-color: var(--live);
+  border-left-color: var(--edge);
   background: var(--main);
 }
 

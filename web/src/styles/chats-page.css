@@ -23,9 +23,13 @@
   min-height: 54px;
   padding: 8px 12px;
 }
-.chat-list-head h1,
+.chat-list-head h1 {
+  font-size: var(--type-page-title-size);
+  line-height: 1.2;
+  font-weight: var(--type-semibold);
+}
 .chat-proof-list h2 {
-  font-size: var(--type-section-size);
+  font-size: var(--type-section-title-size);
   font-weight: var(--type-semibold);
 }
 .chat-list-scroll {
@@ -72,7 +76,7 @@
   white-space: nowrap;
 }
 .chat-list-item-heading strong {
-  font-size: var(--type-body-size);
+  font-size: var(--type-card-title-size);
   font-weight: var(--type-semibold);
 }
 .chat-list-item-heading time,
@@ -87,7 +91,7 @@
   flex: none;
 }
 .chat-list-status[data-state="running"] {
-  color: var(--ink);
+  color: var(--live);
 }
 .chat-list-status[data-state="failed"] {
   color: var(--crit);
@@ -195,7 +199,7 @@
   text-decoration: none;
 }
 .employee-chat-history-link[aria-current="page"] {
-  background: var(--pick);
+  background: var(--state-selected);
   color: var(--ink);
 }
 .chat-history-content {

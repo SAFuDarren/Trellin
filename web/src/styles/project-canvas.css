@@ -36,7 +36,11 @@
   color: var(--sub);
 }
 
-.project-canvas-menu-trigger:is(:hover, [aria-expanded="true"]) {
+.project-canvas-menu-trigger:hover {
+  background: var(--state-hover);
+  color: var(--ink);
+}
+.project-canvas-menu-trigger[aria-expanded="true"] {
   background: var(--state-selected);
   color: var(--ink);
 }
@@ -179,12 +183,12 @@
   cursor: grab;
 }
 
-.project-canvas-node:hover,
-.project-canvas-node[aria-pressed="true"] {
+.project-canvas-node:hover {
   border-color: var(--edge);
 }
 
 .project-canvas-node[aria-pressed="true"] {
+  border-color: var(--accent);
   z-index: 1;
 }
 
@@ -207,7 +211,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   color: var(--ink);
-  font-size: var(--type-body-size);
+  font-size: var(--type-card-title-size);
   font-weight: var(--type-semibold);
   line-height: 1.2;
   overflow-wrap: anywhere;

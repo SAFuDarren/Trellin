@@ -60,7 +60,7 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   await expect(page.locator(".section-main")).toBeInViewport();
 });
 
-test("proof activity opens with the keyboard and dark navigation uses flat gray selection", async ({ page }) => {
+test("proof activity opens with the keyboard and dark navigation uses Navy selection", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/#session=fixture");
   await openProof(page);
@@ -76,10 +76,19 @@ test("proof activity opens with the keyboard and dark navigation uses flat gray 
   const claims = rail.getByRole("link", { name: "Claims", exact: true });
   await claims.click();
   const allClaims = page.locator(".section-nav").getByRole("link", { name: /^All claims/ });
+  const selectedTint = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    probe.hidden = true;
+    probe.style.backgroundColor = "var(--state-selected)";
+    document.body.append(probe);
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return color;
+  });
   for (const selected of [claims, allClaims]) {
     await expect(selected).toHaveAttribute("aria-current", "page");
-    await expect(selected).toHaveCSS("background-color", "rgb(52, 52, 52)");
-    await expect(selected).toHaveCSS("box-shadow", "none");
+    await expect(selected).toHaveCSS("background-color", selectedTint);
+    await expect(selected).toHaveCSS("box-shadow", /rgb\(164, 183, 223\).*inset/);
   }
 });
 
