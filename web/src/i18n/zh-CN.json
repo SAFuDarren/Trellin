@@ -886,6 +886,7 @@
     "noMatches": "没有匹配的员工。",
     "chooseEmployee": "选择员工以查看任务。",
     "switchTask": "切换任务",
+    "switchTaskTitle": "切换任务：{{title}}",
     "chooseTask": "选择任务以打开对话。",
     "noTasks": "新建任务，开始和这位员工对话。",
     "newTask": "新建任务",
@@ -901,9 +902,7 @@
     "failed_one": "{{count}} 项失败",
     "failed_other": "{{count}} 项失败",
     "statusWithFailures": "{{status}} · {{failed}}",
-    "taskWithStatus": "{{title}} · {{status}}",
-    "history": "其他对话",
-    "chooseHistory": "从侧栏选择旧对话或证明活动。"
+    "history": "会话历史"
   },
   "threads": {
     "active": "正在进行",
@@ -1188,7 +1187,7 @@
       "review": "等你决定的结果和问题。",
       "claims": "按状态分组，一览所有课题。",
       "library": "可以直接复用的定义、假设和定理。",
-      "chat": "所有课题里与模型的对话。",
+      "chat": "与已保存的员工对话、切换任务或查看会话历史。",
       "team": "模型、运行环境、用量和任务队列。",
       "progress": "你不在时让工作继续推进的规则。"
     },

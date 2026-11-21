@@ -44,7 +44,9 @@ This copy matches the Research Multiplier version that wrote it. Run
    the recipient and included context. The researcher's send action authorizes
    one request. Use the request details to review exactly what will go out.
    In Chats, the selected employee's saved connection handles each message
-   in that task. Opening or switching tasks does not submit a request.
+   in that task. Select the current task title to switch between the agent's
+   tasks. Earlier unassigned chats are available from Conversation history.
+   Opening or switching tasks does not submit a request.
    Treat suggestions in chat as research notes.
    The project map saves card positions and research links in this device's
    settings. Proof decisions use the recorded statement and evidence.

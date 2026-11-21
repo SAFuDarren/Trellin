@@ -13,7 +13,7 @@ import { useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { ConversationPanel } from "../components/ConversationPanel";
 import { EmployeeChatHeader, EmployeeStatus } from "../components/EmployeeChatHeader";
 import { FeedEntry } from "../components/FeedEntry";
-import { Chevron } from "../components/Icons";
+import { Chevron, Clock } from "../components/Icons";
 import { Empty, PageHead } from "../components/SectionLayout";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
 import { href } from "../shell/route";
@@ -45,8 +45,8 @@ export function ConversationsPage({
   const [createError, setCreateError] = useState<{ route: string; message: string; named: boolean }>();
   const [employeeQuery, setEmployeeQuery] = useState("");
   const lastTask = useRef(new Map<string, string>());
-  const taskSelect = useRef<HTMLSelectElement>(null);
-  const refocusTaskSelect = useRef(false);
+  const taskSwitcher = useRef<HTMLButtonElement>(null);
+  const refocusTaskSwitcher = useRef(false);
   const createRequests = useRef(new Map<string, { title: string; requestId: string }>());
   const actionMenu = useRef<HTMLDetailsElement>(null);
   const conversations = direct.data?.threads ?? [];
@@ -66,21 +66,21 @@ export function ConversationsPage({
   const current = selected ?? (!sub && !profiles.isPending && employees.length === 0 ? conversations[0] : undefined);
   const currentId = current?.id;
   const currentEmployeeId = employee?.id;
-  const showHistory = historyView || showProof || Boolean(selected && !employee);
+  const backToHistory = employees.length > 0 && (showProof || Boolean(selected && !employee));
   const proofRows = proof.data?.threads ?? [];
   const selectedProof = showProof ? proofRows.find((thread) => proofKey(thread) === sub) : undefined;
   const back = (
-    <a href={href("chat", employees.length > 0 && showHistory ? HISTORY_ROUTE : "")} className="chat-back">
+    <a href={href("chat", backToHistory ? HISTORY_ROUTE : "")} className="chat-back">
       <Chevron />
-      {t("conversations.backToList")}
+      {t(backToHistory ? "employeeChats.history" : "conversations.backToList")}
     </a>
   );
 
   useEffect(() => {
     if (currentEmployeeId && currentId) lastTask.current.set(currentEmployeeId, currentId);
-    if (refocusTaskSelect.current) {
-      taskSelect.current?.focus();
-      refocusTaskSelect.current = false;
+    if (refocusTaskSwitcher.current) {
+      taskSwitcher.current?.focus();
+      refocusTaskSwitcher.current = false;
     }
   }, [currentEmployeeId, currentId]);
 
@@ -186,14 +186,14 @@ export function ConversationsPage({
       </svg>
     </button>
   );
-  const narrowDetail = Boolean(sub && !historyView);
+  const narrowDetail = Boolean(sub);
   const search = employeeQuery.trim().toLocaleLowerCase(i18n.language);
   const visibleEmployees = employees.filter((agent) => agent.name.toLocaleLowerCase(i18n.language).includes(search));
   const error = createError?.route === sub ? createError : undefined;
   const historyList = (
     <History
       rows={history}
-      pending={direct.isPending}
+      pending={direct.isPending || profiles.isPending}
       error={direct.isError ? conversationErrorText(t, direct.error) : undefined}
       renderRow={row}
       proofRows={proofRows}
@@ -260,9 +260,9 @@ export function ConversationsPage({
         error={error?.named ? error.message : undefined}
         onShowCreate={() => setCreateError(undefined)}
         onCreate={(title) => create(profile, title)}
-        selectRef={taskSelect}
+        switcherRef={taskSwitcher}
         onSwitch={(threadId) => {
-          refocusTaskSelect.current = true;
+          refocusTaskSwitcher.current = true;
           window.location.hash = href("chat", threadId);
         }}
       />
@@ -274,7 +274,19 @@ export function ConversationsPage({
       <nav className="chats-sidebar" aria-labelledby="section-title">
         <header className="chat-list-head">
           <h1 id="section-title">{t("rail.chat")}</h1>
-          {employees.length === 0 && newConversation}
+          {employees.length > 0 ? (
+            <a
+              className="icon-button employee-chat-history-link"
+              href={href("chat", HISTORY_ROUTE)}
+              aria-current={historyView ? "page" : undefined}
+              aria-label={t("employeeChats.history")}
+              title={t("employeeChats.history")}
+            >
+              <Clock />
+            </a>
+          ) : (
+            !profiles.isPending && newConversation
+          )}
         </header>
         <div className="chat-list-scroll">
           {error && !error.named && (
@@ -314,11 +326,6 @@ export function ConversationsPage({
               ) : (
                 <p className="chat-list-note">{t("employeeChats.noMatches")}</p>
               )}
-              <details className="employee-chat-history" key={String(showHistory)} open={showHistory}>
-                <summary>{t("employeeChats.history")}</summary>
-                <div className="employee-chat-history-actions">{newConversation}</div>
-                {historyList}
-              </details>
             </>
           ) : (
             historyList
@@ -326,7 +333,12 @@ export function ConversationsPage({
         </div>
       </nav>
       <main className="chats-main" tabIndex={-1}>
-        {showProof && selectedProof ? (
+        {historyView ? (
+          <>
+            <PageHead title={t("employeeChats.history")} actions={back} />
+            <div className="chat-history-content">{historyList}</div>
+          </>
+        ) : showProof && selectedProof ? (
           <ProofHistory key={proofKey(selectedProof)} thread={selectedProof} onOpen={onOpen} back={back} />
         ) : !showProof && current ? (
           <ConversationPanel
@@ -380,11 +392,9 @@ export function ConversationsPage({
                     ? t("common.loading")
                     : employeeId && profiles.isError
                       ? t("teamAgents.listFailed")
-                      : historyView
-                        ? t("employeeChats.chooseHistory")
-                        : sub
-                          ? t("conversations.conversationMissing")
-                          : t(employees.length ? "employeeChats.chooseEmployee" : "conversations.emptyProject")}
+                      : sub
+                        ? t("conversations.conversationMissing")
+                        : t(employees.length ? "employeeChats.chooseEmployee" : "conversations.emptyProject")}
             </Empty>
           </>
         )}
