@@ -92,6 +92,7 @@
     "label": "图谱视图",
     "proof": "证明进展",
     "references": "引用关系",
+    "referencesDescription": "实线表示证明中已使用的引用，点线表示允许使用的前提，虚线表示计划中的步骤。",
     "impact": "撤回影响"
   },
   "impact": {

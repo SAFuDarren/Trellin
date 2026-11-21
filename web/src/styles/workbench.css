@@ -728,6 +728,13 @@ select:disabled {
 .graph-edge[data-emphasis="strong"] {
   stroke-width: 1.8;
 }
+[data-proof-view="references"] .graph-edge[data-emphasis="strong"] {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+[data-proof-view="references"] .graph-edge[data-kind="context"] {
+  stroke-linecap: round;
+}
 [data-proof-view="impact"] .graph-edge[data-emphasis="strong"] {
   stroke: var(--crit);
   stroke-width: 2;
@@ -1003,6 +1010,12 @@ select:disabled {
 }
 .graph-edge-legend i[data-kind="context"] {
   border-top: 2px dotted var(--edge);
+}
+.graph-edge-legend [data-edge-view="references"] i:not([data-kind="planned"]) {
+  border-top-color: var(--accent);
+}
+.graph-edge-legend [data-edge-view="references"] i[data-kind="planned"] {
+  border-top-color: var(--edge-soft);
 }
 @container (max-width: 680px) {
   .legend-count-label {
@@ -1688,6 +1701,17 @@ select:disabled {
 @media (width < 720px) {
   #workbench .toolbar .claim-heading h1 {
     font-size: var(--type-section-size);
+  }
+}
+.proof-view-description {
+  margin: 0;
+  padding: 7px 12px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+@media (width < 720px) {
+  .proof-view-description {
+    padding: 4px 8px;
   }
 }
 .main-proof-graph {

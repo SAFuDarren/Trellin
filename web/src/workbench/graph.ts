@@ -241,7 +241,9 @@ export function highlights(
     for (const edge of graph.edges) if (nodes.has(edge.source) && nodes.has(edge.target)) edges.add(edge);
     return { nodes, edges };
   }
-  if (selected) {
+  if (view === "references") {
+    for (const edge of graph.edges) if (edge.drawKind !== "planned") edges.add(edge);
+  } else if (selected) {
     for (const edge of traceEdges(selected, graph.incoming, "source")) edges.add(edge);
     for (const edge of traceEdges(selected, graph.outgoing, "target")) edges.add(edge);
     for (const edge of graph.outgoing.get(selected) ?? []) {
@@ -249,11 +251,6 @@ export function highlights(
         for (const upstream of traceEdges(edge.target, graph.incoming, "source")) edges.add(upstream);
       }
     }
-  }
-  for (const edge of graph.edges) {
-    const a = graph.nodes.get(edge.source)?.domain;
-    const b = graph.nodes.get(edge.target)?.domain;
-    if (view === "references" && edge.kind === "actual" && a && b && a !== b) edges.add(edge);
   }
   for (const edge of edges) {
     nodes.add(edge.source);

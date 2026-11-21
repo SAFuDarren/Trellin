@@ -643,7 +643,12 @@ export function Workbench({
                   {graph && claimId ? (
                     <>
                       <div className="proof-tools">
-                        <div className="segmented proof-lenses" role="group" aria-label={t("views.label")}>
+                        <div
+                          className="segmented proof-lenses"
+                          role="group"
+                          aria-label={t("views.label")}
+                          aria-describedby={view === "references" ? "proof-references-description" : undefined}
+                        >
                           {(["proof", "references", "impact"] as const).map((lens) => (
                             <button
                               key={lens}
@@ -669,6 +674,11 @@ export function Workbench({
                           <span>{t("canvasShell.details")}</span>
                         </button>
                       </div>
+                      {view === "references" && (
+                        <p id="proof-references-description" className="proof-view-description">
+                          {t("views.referencesDescription")}
+                        </p>
+                      )}
                       {view === "impact" && (
                         <div className="impact-bar">
                           {graph.hypotheses.length > 0 && (
