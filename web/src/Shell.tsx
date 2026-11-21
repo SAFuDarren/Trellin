@@ -253,7 +253,7 @@ export function Shell({ session }: { session: string }) {
             ) : section === "settings" ? (
               <SettingsPage onResetLayout={resetLayout} updates={releaseUpdates} />
             ) : section === "help" ? (
-              <HelpPage onShowShortcuts={() => setShortcutSheetOpen(true)} />
+              <HelpPage sub={sub} onShowShortcuts={() => setShortcutSheetOpen(true)} />
             ) : (
               <Workbench
                 key={session}

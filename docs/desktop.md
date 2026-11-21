@@ -18,7 +18,7 @@ Use **Find claim** on the project map to search and select a card. In **Agent ch
 
 In the command palette, start with `#` to search claims, proof nodes and saved references, or `@` to search Agents. The footer lists these prefixes and navigation keys. Press the displayed shortcut, for example **⌥P** on Mac or **Alt+P** elsewhere, while the menu or palette is open.
 
-Press **?** or open **Keyboard shortcuts** from Help to see the shortcuts for your platform. The **Details** and **Global map** icons show when their panels are open. With focus on the project map or its toolbar, press **I** for Details or **M** for Global map. Point at or keyboard-focus an icon to see its shortcut.
+Open **Settings and help → Help** for short guides to the project map, Agent work and proof review. Each guide links to the relevant workbench page. Press **?** or open **Keyboard shortcuts** from Help to see the shortcuts for your platform. The **Details** and **Global map** icons show when their panels are open. With focus on the project map or its toolbar, press **I** for Details or **M** for Global map. Point at or keyboard-focus an icon to see its shortcut.
 
 Arrow keys pan when the canvas has focus. To move a focused card, open its context menu with **⇧F10** (**Shift+F10** on other platforms) and choose **Move card**. Use the arrow keys to preview the new position. Hold **Shift** for larger steps. Press **Enter** to save the position or **Escape** to cancel.
 

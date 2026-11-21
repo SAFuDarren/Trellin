@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.77
+
+- Help includes short guides for the project map, Agent work and proof review. All guide links open real pages inside Trellin, and the window and Help use the Trellin name in both languages.
+
 ## 1.0.76
 
 - Empty Agent chat and activity panels size to their contents. Start with a draft suggestion or open Agent work from the compact panel.

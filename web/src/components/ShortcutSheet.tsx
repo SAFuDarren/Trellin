@@ -1,4 +1,5 @@
 import { useId, useLayoutEffect, useRef } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { formatShortcut, SHORTCUTS } from "../shortcuts";
 import { graphActionLabel, graphActionShortcut } from "../workbench/actions";
@@ -6,6 +7,15 @@ import "../styles/shortcut-sheet.css";
 
 const ACTIONS = ["add-theorem", "open-proof", "proof-task", "ask-agent", "copy-reference", "copy-lean"] as const;
 type Row = { id: string; label: string; keys: readonly string[] };
+
+export function navigationShortcutRows(t: TFunction): readonly Row[] {
+  return [
+    { id: "palette", label: t("palette.title"), keys: [SHORTCUTS.palette] },
+    { id: "tab", label: t("shortcuts.focus"), keys: ["Tab", "Shift+Tab"] },
+    { id: "context", label: t("shortcuts.contextMenu"), keys: [SHORTCUTS.contextMenu] },
+    { id: "close", label: t("shortcuts.dismiss"), keys: [SHORTCUTS.escape] },
+  ];
+}
 
 function ShortcutGroup({ title, rows }: { title: string; rows: readonly Row[] }) {
   const heading = useId();
@@ -74,15 +84,7 @@ export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () =>
         </button>
       </header>
       <div className="shortcut-sheet-body" role="region" tabIndex={0} aria-label={t("shortcuts.list")}>
-        <ShortcutGroup
-          title={t("shortcuts.navigation")}
-          rows={[
-            { id: "palette", label: t("palette.title"), keys: [SHORTCUTS.palette] },
-            { id: "tab", label: t("shortcuts.focus"), keys: ["Tab", "Shift+Tab"] },
-            { id: "context", label: t("shortcuts.contextMenu"), keys: [SHORTCUTS.contextMenu] },
-            { id: "close", label: t("shortcuts.dismiss"), keys: [SHORTCUTS.escape] },
-          ]}
-        />
+        <ShortcutGroup title={t("shortcuts.navigation")} rows={navigationShortcutRows(t)} />
         <ShortcutGroup
           title={t("shortcuts.canvas")}
           rows={[
