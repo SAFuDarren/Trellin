@@ -242,6 +242,7 @@ export function Workbench({
         signal,
       }),
   });
+  const impactPreview = impact.isError ? undefined : impact.data;
   const activity = useQuery({
     queryKey: ["activity", claimId],
     enabled: (proofOpen || activityOpen) && Boolean(graph),
@@ -719,7 +720,7 @@ export function Workbench({
                             view={view}
                             selected={selected}
                             assumption={assumption?.id ?? null}
-                            impact={impact.data}
+                            impact={impactPreview}
                             work={work.byNode}
                             running={work.running}
                             queued={work.queued}
@@ -772,19 +773,20 @@ export function Workbench({
             selected={selected}
             work={selected ? work.byNode.get(selected) : undefined}
             assumption={assumption?.id ?? null}
-            impact={impact.data}
+            impact={impactPreview}
             impactLoading={impact.isFetching}
             impactError={impact.isError ? errorText(t, impact.error) : ""}
             notice={detailsNotice ? { text: detailsNotice, error: snapshot.isError } : undefined}
             actions={
-              graph &&
-              node && {
-                primary: graphAction(t, "proof-task", () => openProofTask(graph.claim.id)),
-                secondary: [
-                  ...(!proofOpen && claimId ? [graphAction(t, "open-proof", () => openProof(claimId))] : []),
-                  graphAction(t, "ask-agent", () => askAgent(graph, node)),
-                ],
-              }
+              view === "impact" || !graph || !node
+                ? null
+                : {
+                    primary: graphAction(t, "proof-task", () => openProofTask(graph.claim.id)),
+                    secondary: [
+                      ...(!proofOpen && claimId ? [graphAction(t, "open-proof", () => openProof(claimId))] : []),
+                      graphAction(t, "ask-agent", () => askAgent(graph, node)),
+                    ],
+                  }
             }
             onSelect={selectNode}
             onReviewPremise={(id) => setPremiseDialog({ id })}

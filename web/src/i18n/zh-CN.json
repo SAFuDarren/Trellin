@@ -96,12 +96,13 @@
     "impact": "撤回影响"
   },
   "impact": {
-    "preview": "撤回",
+    "preview": "预览前提",
     "readOnly": "仅预览，不会改动任何记录",
     "loading": "正在计算哪些记录依赖它…",
     "noPremise": "这个课题还没有可以预览的假设。",
     "explain": "如果撤回这个版本，所有依赖它的记录都需要重新核验。这里只是预览，不会改动任何记录。",
     "previewLabel": "将被撤回",
+    "summary": "{{count}} 项受影响 · 预览 1 项前提",
     "alreadyRecheck": "已经待重验",
     "needsRecheck": "将需要重验",
     "waitingReduction": "归约将需要重验",
@@ -242,10 +243,8 @@
     "edges": "连线样式",
     "review": "待审核",
     "blocked": "阻塞 / 待复核",
-    "affected": "受影响",
     "running": "运行中",
-    "queued": "排队中",
-    "badImpact": "将需重验 / 卡点"
+    "queued": "排队中"
   },
   "tone": {
     "ok": "已核验",
