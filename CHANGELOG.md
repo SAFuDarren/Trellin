@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.45
+
+- Open Chats by employee, switch between their named tasks, and see which tasks are waiting for a reply or need attention. Follow-up messages use the employee's saved connection. Drafts stay with their task while switching in Chats.
+
 ## 1.0.44
 
 - Create and edit named local agent profiles in Team using existing model connections. Profiles reopen in their own project with their saved identity and instructions.

@@ -12,10 +12,10 @@ import {
 import { AGENT_AVATARS, useSaveTeamAgent, useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { Chevron } from "./Icons";
 import { ModelConnections } from "./ModelConnections";
+import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import "../styles/team-agent-profiles.css";
 
 const EMPTY_CONNECTIONS: ModelConnection[] = [];
-const AVATAR_SYMBOLS = { book: "▤", compass: "⌖", spark: "✦" };
 const STARTER_SLOTS = [0, 1, 2] as const;
 
 function runtimeStatus(t: TFunction, connection?: ModelConnection) {
@@ -31,15 +31,6 @@ function RuntimeIdentity({ connection }: { connection: ModelConnection }) {
     <span>
       <strong>{label}</strong>
       {!label.endsWith(` · ${model}`) && <span className="team-secondary">{model}</span>}
-    </span>
-  );
-}
-
-function AgentAvatar({ avatar, name }: Pick<TeamAgent, "avatar" | "name">) {
-  const initials = [...name.trim()].slice(0, 2).join("").toLocaleUpperCase();
-  return (
-    <span className="team-agent-avatar" aria-hidden="true">
-      {avatar === "initials" ? initials : AVATAR_SYMBOLS[avatar]}
     </span>
   );
 }
@@ -133,7 +124,7 @@ export function TeamAgentProfiles({ session }: { session: string }) {
                   <tr key={agent.id}>
                     <th scope="row">
                       <span className="team-agent-identity">
-                        <AgentAvatar avatar={agent.avatar} name={agent.name} />
+                        <TeamAgentAvatar avatar={agent.avatar} name={agent.name} />
                         <span>
                           {agent.name}
                           {agent.description && <span className="team-secondary">{agent.description}</span>}
@@ -287,7 +278,7 @@ function TeamAgentWizard({
           <h2 ref={heading} id={title} tabIndex={-1}>
             {t(step === "runtime" ? "teamAgents.chooseRuntime" : "teamAgents.configure")}
           </h2>
-          {step === "details" && draft.name.trim() && <AgentAvatar avatar={draft.avatar} name={draft.name} />}
+          {step === "details" && draft.name.trim() && <TeamAgentAvatar avatar={draft.avatar} name={draft.name} />}
         </header>
         <form className="project-entry-body project-entry-form" onSubmit={(event) => void submit(event)}>
           {step === "runtime" ? (

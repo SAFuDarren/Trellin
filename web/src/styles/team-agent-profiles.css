@@ -32,21 +32,6 @@
   min-width: 0;
 }
 
-.team-agent-avatar {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  overflow: hidden;
-  border: 1px solid var(--hair);
-  border-radius: 6px;
-  background: var(--track);
-  color: var(--ink);
-  font-size: var(--type-meta-size);
-  font-weight: var(--type-semibold);
-}
-
 .team-agent-table td:last-child {
   width: 1%;
 }

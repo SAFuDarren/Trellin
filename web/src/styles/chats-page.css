@@ -213,3 +213,97 @@
 .chats-actions-list button:hover:not(:disabled) {
   background: var(--track);
 }
+
+.employee-chat-search {
+  margin: 0 6px 8px;
+}
+.employee-chat-search:focus-within {
+  outline: 1px solid var(--ink);
+  outline-offset: 1px;
+}
+.employee-chat-person {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border-bottom: 0;
+}
+.employee-chat-person-label {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+.employee-chat-person-label strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-body-size);
+  font-weight: var(--type-medium);
+}
+.employee-chat-history {
+  margin-block-start: 12px;
+  border-block-start: 1px solid var(--hair);
+}
+.employee-chat-history summary {
+  padding: 9px 8px;
+  color: var(--sub);
+  font-size: var(--type-control-size);
+  cursor: pointer;
+}
+.employee-chat-history-actions {
+  display: flex;
+  justify-content: end;
+  padding-inline: 4px;
+}
+.employee-chat-heading,
+.employee-chat-path,
+.employee-chat-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+.employee-chat-heading {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+.employee-chat-path {
+  max-width: 100%;
+}
+.employee-chat-path > svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--sub);
+  stroke-width: 1.5;
+}
+.chats-main .employee-chat-path h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.employee-chat-task-select {
+  min-width: min(75px, 26vw);
+  max-width: min(300px, 45vw);
+  min-height: 30px;
+  padding: 3px 5px 3px 7px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--main);
+  color: var(--ink);
+  font-size: var(--type-control-size);
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+.employee-chat-status {
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+.employee-chat-actions {
+  flex: 0 1 auto;
+}
+.employee-chat-dialog {
+  width: min(400px, calc(100% - 32px));
+}

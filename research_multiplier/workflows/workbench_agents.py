@@ -28,6 +28,18 @@ _SCHEMA = """
         PRIMARY KEY (workspace_id, id)
     )
 """
+_CONVERSATION_SCHEMA = """
+    CREATE TABLE IF NOT EXISTS team_conversation_bindings (
+        workspace_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        request_id TEXT NOT NULL,
+        thread_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL,
+        request_fingerprint TEXT NOT NULL,
+        PRIMARY KEY (workspace_id, user_id, request_id),
+        UNIQUE (workspace_id, user_id, thread_id)
+    )
+"""
 
 
 class AgentProfileError(ValueError):
@@ -89,6 +101,12 @@ def _available(registry, connection_id):
         raise AgentProfileError("team_agents.connection_unavailable") from None
 
 
+def _has_table(database, name):
+    return database is not None and database.execute(
+        "SELECT 1 FROM sqlite_master WHERE name = ? AND type = 'table'", (name,),
+    ).fetchone() is not None
+
+
 class AgentProfiles:
     """Store one workspace's configuration in this device's private settings."""
 
@@ -134,15 +152,66 @@ class AgentProfiles:
 
     def list(self):
         with self._database() as database:
-            if database is None or database.execute(
-                "SELECT 1 FROM sqlite_master WHERE name = 'team_agents' AND type = 'table'"
-            ).fetchone() is None:
+            if not _has_table(database, "team_agents"):
                 return []
             rows = database.execute("SELECT id, revision, profile FROM team_agents WHERE workspace_id = ?",
                                     (self._workspace_id,))
             profiles = [{**json.loads(profile), "id": identifier, "revision": revision}
                         for identifier, revision, profile in rows]
         return sorted(profiles, key=lambda profile: (profile["name"].casefold(), profile["id"]))
+
+    def conversation_bindings(self, user_id, thread_id=None):
+        with self._database() as database:
+            if not _has_table(database, "team_conversation_bindings"):
+                return {}
+            target = str(thread_id) if thread_id is not None else None
+            return dict(database.execute("""
+                SELECT thread_id, agent_id FROM team_conversation_bindings
+                WHERE workspace_id = ? AND user_id = ? AND (? IS NULL OR thread_id = ?)
+            """, (self._workspace_id, user_id, target, target)))
+
+    def conversation_recipient(self, user_id, thread_id):
+        with self._database() as database:
+            if not _has_table(database, "team_conversation_bindings"):
+                return None
+            row = database.execute("""
+                SELECT binding.agent_id, agent.revision, agent.profile
+                FROM team_conversation_bindings AS binding
+                LEFT JOIN team_agents AS agent
+                    ON agent.workspace_id = binding.workspace_id AND agent.id = binding.agent_id
+                WHERE binding.workspace_id = ? AND binding.user_id = ? AND binding.thread_id = ?
+            """, (self._workspace_id, user_id, str(thread_id))).fetchone()
+            if row is None:
+                return None
+            agent_id, revision, profile = row
+            if profile is None:
+                raise AgentProfileError("team_agents.unavailable")
+            return {"id": agent_id, "revision": revision, "connection_id": json.loads(profile)["connection_id"]}
+
+    def bind_conversation(self, user_id, request_id, agent_id, request_fingerprint, create_thread):
+        """Commit the binding before the caller can publish the new conversation."""
+        with self._database(write=True) as database:
+            database.execute(_CONVERSATION_SCHEMA)
+            key = self._workspace_id, user_id, request_id
+            existing = database.execute("""
+                SELECT thread_id, request_fingerprint FROM team_conversation_bindings
+                WHERE workspace_id = ? AND user_id = ? AND request_id = ?
+            """, key).fetchone()
+            if existing is not None:
+                thread_id, original_fingerprint = existing
+                if original_fingerprint != request_fingerprint:
+                    raise AgentProfileError("team_agents.conflict")
+                return thread_id
+            if database.execute("SELECT 1 FROM team_agents WHERE workspace_id = ? AND id = ?",
+                                (self._workspace_id, agent_id)).fetchone() is None:
+                raise AgentProfileError("team_agents.unavailable")
+            thread_id = str(create_thread())
+            database.execute("""
+                INSERT INTO team_conversation_bindings
+                    (workspace_id, user_id, request_id, thread_id, agent_id, request_fingerprint)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (*key, thread_id, agent_id, request_fingerprint))
+            return thread_id
 
     def save(self, document, registry):
         identifier, revision, profile = _validated(document)

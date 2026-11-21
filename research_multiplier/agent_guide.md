@@ -43,6 +43,8 @@ This copy matches the Research Multiplier version that wrote it. Run
    For an external discussion in Chats or Workbench, the composer identifies
    the recipient and included context. The researcher's send action authorizes
    one request. Use the request details to review exactly what will go out.
+   In Chats, the selected employee's saved connection handles each message
+   in that task. Opening or switching tasks does not submit a request.
    Treat suggestions in chat as research notes.
 3. **Leave the project's records to the program.** Do not edit or delete anything
    under `runs/`, `objects/`, `evaluation/`, `backups/` or `lean-project/`, the
