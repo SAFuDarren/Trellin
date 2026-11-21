@@ -1,3 +1,4 @@
+import { CanvasZoom } from "./CanvasZoom";
 import {
   useCallback,
   useEffect,
@@ -212,7 +213,7 @@ export function ProjectCanvas({
   const proofClick = useRef<string | null>(null);
   const pendingDetails = useRef<{ id: string; timer: number } | null>(null);
   const inspected = useRef<{ id: string; width: number; height: number } | null>(null);
-  const [size, setSize] = useState({ width: 0, height: 0, visibleWidth: 0 });
+  const [size, setSize] = useState({ width: 0, height: 0 });
   const { width: viewportWidth, height: viewportHeight } = size;
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
   const unfittedCamera = useRef(camera);
@@ -302,20 +303,15 @@ export function ProjectCanvas({
   useEffect(() => {
     const target = stage.current;
     if (!active || !target) return;
-    const inspector = detailsOpen ? document.getElementById("review") : null;
-    const observer = new ResizeObserver(() => {
-      const { left, width, height } = target.getBoundingClientRect();
-      const visibleWidth = inspector ? Math.min(width, inspector.getBoundingClientRect().left - left) : width;
-      setSize((current) =>
-        current.width === width && current.height === height && current.visibleWidth === visibleWidth
-          ? current
-          : { width, height, visibleWidth },
-      );
-    });
+    const measure = () => {
+      const { width, height } = target.getBoundingClientRect();
+      setSize((current) => (current.width === width && current.height === height ? current : { width, height }));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
     observer.observe(target);
-    if (inspector) observer.observe(inspector);
     return () => observer.disconnect();
-  }, [active, detailsOpen]);
+  }, [active]);
 
   const fit = useCallback(
     (all: boolean) => {
@@ -381,7 +377,7 @@ export function ProjectCanvas({
       return;
     }
     const point = byId.get(id)?.point;
-    const { visibleWidth: width, height } = size;
+    const { width, height } = size;
     if (!point || width <= 0 || height <= 0) return;
     const previous = inspected.current;
     if (previous?.id === id && previous.width === width && previous.height === height) return;
@@ -389,24 +385,27 @@ export function ProjectCanvas({
     if (previous?.id !== id && contextTarget?.id === id) return;
     const neighbours = cards
       .filter((card) => card.id !== id)
-      .map((card) => card.point)
-      .sort((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y));
+      .map(({ point: neighbour }) => ({
+        point: neighbour,
+        distance: Math.hypot(neighbour.x - point.x, neighbour.y - point.y),
+      }))
+      .sort((a, b) => a.distance - b.distance);
+    // Preserve both sides when the second nearest card has an equally close neighbour.
+    const neighbourhood = neighbours.filter(({ distance }, index) => index < 2 || distance === neighbours[1]?.distance);
     setCamera((current) => {
       const fitWidth = Math.max(1, width - 16);
       const fitHeight = Math.max(1, height - 16);
-      const panelResized = previous?.width !== width || previous?.height !== height;
       let k = Math.min(current.k, fitWidth / WIDTH, fitHeight / HEIGHT);
       let left = point.x;
       let right = point.x + WIDTH;
       let top = point.y;
       let bottom = point.y + HEIGHT;
-      for (const other of neighbours.slice(0, 2)) {
+      for (const { point: other } of neighbourhood) {
         const nextLeft = Math.min(left, other.x);
         const nextRight = Math.max(right, other.x + WIDTH);
         const nextTop = Math.min(top, other.y);
         const nextBottom = Math.max(bottom, other.y + HEIGHT);
         const fit = Math.min(k, fitWidth / (nextRight - nextLeft), fitHeight / (nextBottom - nextTop));
-        if (fit < k && (!panelResized || fit < Math.min(current.k, 0.6))) continue;
         k = fit;
         [left, right, top, bottom] = [nextLeft, nextRight, nextTop, nextBottom];
       }
@@ -484,7 +483,7 @@ export function ProjectCanvas({
       if (!current || !rect) return;
       const x = current.client.x - rect.left;
       const y = current.client.y - rect.top;
-      const width = Math.min(rect.width, size.visibleWidth);
+      const width = Math.min(rect.width, size.width);
       const time = Math.min(32, now - previous);
       previous = now;
       if (x >= 0 && x <= width && y >= 0 && y <= rect.height) {
@@ -496,7 +495,7 @@ export function ProjectCanvas({
     };
     frame = requestAnimationFrame(pan);
     return () => cancelAnimationFrame(frame);
-  }, [drawingLink, size.visibleWidth]);
+  }, [drawingLink, size.width]);
 
   function beginLink(id: string) {
     cancelPendingDetails();
@@ -793,7 +792,7 @@ export function ProjectCanvas({
         movedCamera.current = true;
         setCamera((view) => ({
           ...view,
-          x: visibleOffset(view.x, point.x * view.k, WIDTH * view.k, size.visibleWidth),
+          x: visibleOffset(view.x, point.x * view.k, WIDTH * view.k, size.width),
           y: visibleOffset(view.y, point.y * view.k, HEIGHT * view.k, size.height),
         }));
         nodes.current.get(card.id)?.focus({ preventScroll: true });
@@ -1128,7 +1127,7 @@ export function ProjectCanvas({
           <div
             className="project-canvas-link-detail"
             style={{
-              left: Math.max(100, Math.min(size.visibleWidth - 100, camera.x + midpoint.x * camera.k)),
+              left: Math.max(100, Math.min(size.width - 100, camera.x + midpoint.x * camera.k)),
               top: Math.max(38, Math.min(size.height - 12, camera.y + midpoint.y * camera.k)),
             }}
           >
@@ -1169,32 +1168,9 @@ export function ProjectCanvas({
               {atlasError ?? t(atlasClaims ? "atlas.empty" : "atlas.loading")}
             </p>
           ))}
-        <div className="zoom" role="group" aria-label={t("stage.zoom")}>
-          <button type="button" aria-label={t("stage.zoomOut")} onClick={() => zoom(1 / 1.2)}>
-            <svg viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M3 7h8" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="zoom-level"
-            aria-label={t("stage.zoomReset")}
-            onClick={() => zoom(1 / camera.k)}
-          >
-            {Math.round(camera.k * 100)}%
-          </button>
-          <button type="button" aria-label={t("stage.zoomIn")} onClick={() => zoom(1.2)}>
-            <svg viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M3 7h8M7 3v8" />
-            </svg>
-          </button>
-          <span className="zoom-rule" aria-hidden="true" />
-          <button type="button" aria-label={t("stage.fit")} onClick={() => fit(true)}>
-            <svg viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M2 5V2h3M9 2h3v3M12 9v3H9M5 12H2V9" />
-            </svg>
-          </button>
-        </div>
+      </div>
+      <div className="canvas-footer">
+        <CanvasZoom scale={camera.k} onZoom={zoom} onFit={() => fit(true)} />
       </div>
       {contextTarget && contextCard && (
         <ContextMenu

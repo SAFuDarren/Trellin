@@ -10,6 +10,7 @@ import { useAtlas, useClaimGraph, useClaims, useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
 import type { ConversationStarterScope } from "./components/ConversationRecipients";
 import { GraphView } from "./components/GraphView";
+import { WorkbenchIcon } from "./components/Icons";
 import type { FloatingGroup, FloatingOption } from "./components/FloatingControls";
 import { ProjectCanvas } from "./components/ProjectCanvas";
 import { ProjectActions } from "./components/project/ProjectActions";
@@ -318,9 +319,15 @@ export function Workbench({
       (card || document.getElementById("map-details-toggle"))?.focus({ preventScroll: true });
     });
   }, [claimId]);
+  const closeInspector = useCallback(() => {
+    setDetailsOpen(false);
+    document.getElementById(proofOpen ? "proof-details-toggle" : "map-details-toggle")?.focus({ preventScroll: true });
+  }, [proofOpen]);
   useEffect(() => {
-    if (!proofOpen) return;
-    proofReturn.current?.focus({ preventScroll: true });
+    if (proofOpen) proofReturn.current?.focus({ preventScroll: true });
+  }, [proofOpen]);
+  useEffect(() => {
+    if (!proofOpen && !showReview) return;
     function escape(event: KeyboardEvent) {
       if (
         event.key !== "Escape" ||
@@ -329,12 +336,17 @@ export function Workbench({
         document.querySelector("dialog[open]")
       )
         return;
-      event.preventDefault();
-      closeProof();
+      if (showReview && window.matchMedia("(width < 900px)").matches) {
+        event.preventDefault();
+        closeInspector();
+      } else if (proofOpen) {
+        event.preventDefault();
+        closeProof();
+      }
     }
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
-  }, [proofOpen, closeProof]);
+  }, [proofOpen, showReview, closeInspector, closeProof]);
   const openProofTask = (id: string) => {
     if (id !== claimId) inspectClaim(id);
     openProjectAction("proof-task");
@@ -455,11 +467,6 @@ export function Workbench({
     if (!proofOpen && !showReview) inspectClaim(id);
     setRecordedGoal(id);
   };
-  const closeInspector = () => {
-    setDetailsOpen(false);
-    document.getElementById(proofOpen ? "proof-details-toggle" : "map-details-toggle")?.focus();
-  };
-
   const notice = !session
     ? t("session.missing")
     : claims.isError
@@ -538,11 +545,13 @@ export function Workbench({
               <>
                 <button
                   ref={proofReturn}
+                  aria-label={t("canvasShell.map")}
+                  title={t("canvasShell.map")}
                   type="button"
                   className="conversation-text-action proof-return"
                   onClick={() => closeProof()}
                 >
-                  <span aria-hidden="true">‹</span> {t("canvasShell.map")}
+                  <span aria-hidden="true">‹</span> <span className="proof-return-label">{t("canvasShell.map")}</span>
                 </button>
                 <h1 title={graph?.claim.title ?? undefined}>{graph?.claim.title || t("graph.label")}</h1>
               </>
@@ -650,11 +659,14 @@ export function Workbench({
                           id="proof-details-toggle"
                           type="button"
                           className="button"
+                          aria-label={t("canvasShell.details")}
+                          title={t("canvasShell.details")}
                           aria-expanded={showReview}
                           aria-controls="review"
                           onClick={() => setDetailsOpen(!showReview)}
                         >
-                          {t("canvasShell.details")}
+                          <WorkbenchIcon name="details" />
+                          <span>{t("canvasShell.details")}</span>
                         </button>
                       </div>
                       {view === "impact" && (

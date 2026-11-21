@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { CanvasZoom } from "./CanvasZoom";
 import { formatShortcut } from "../shortcuts";
 import {
   CARD,
@@ -27,7 +28,6 @@ type CameraMode = "readable" | "fit" | "manual";
 const READABLE_SCALE = 0.8;
 const OVERVIEW_SCALE = 0.62;
 const STAGE_INSET = 12;
-const ZOOM_SPACE = 48;
 type ResizePreview = { id: string; anchor: Point; size: CardSize };
 type ResizeDrag = ResizePreview & { pointerId: number; x: number; y: number; zoom: number };
 type NodeMenu = { id: string; claimId: string; view: View; anchor: ContextMenuAnchor };
@@ -93,7 +93,7 @@ export function GraphView(props: Props) {
     [graph, view, selected, assumption, affected],
   );
   const areaWidth = Math.max(1, stageSize.width - STAGE_INSET * 2);
-  const areaHeight = Math.max(1, stageSize.height - STAGE_INSET - ZOOM_SPACE);
+  const areaHeight = Math.max(1, stageSize.height - STAGE_INSET * 2);
   const columns = Math.max(1, ...graph.levels.map((level) => level.length));
   const overviewWidth = Math.floor(
     (areaWidth / OVERVIEW_SCALE - CARD.pad * 2 - CARD.horizontalGap * (columns - 1)) / columns,
@@ -151,7 +151,7 @@ export function GraphView(props: Props) {
       const point = focus ? layout.points.get(focus) : undefined;
       if (mode === "readable" && fitScale < OVERVIEW_SCALE && focus && point) {
         const card = sizes.get(focus) ?? CARD;
-        const k = READABLE_SCALE;
+        const k = Math.min(READABLE_SCALE, areaWidth / card.width, areaHeight / card.height);
         setCamera({
           k,
           x: STAGE_INSET + areaWidth / 2 - (point.x + card.width / 2) * k,
@@ -172,11 +172,23 @@ export function GraphView(props: Props) {
     if (cameraMode.current !== "manual") fit(cameraMode.current);
   }, [fit]);
 
-  const zoomAt = (factor: number, cx = stageSize.width / 2, cy = stageSize.height / 2) => {
+  const zoomAt = (factor: number) => {
     cameraMode.current = "manual";
     setCamera(({ x, y, k }) => {
       const next = Math.max(minimumScale, Math.min(2.5, k * factor));
-      return { k: next, x: cx - ((cx - x) * next) / k, y: cy - ((cy - y) * next) / k };
+      const point = selected ? layout.points.get(selected) : undefined;
+      const card = selected ? sizes.get(selected) : undefined;
+      const cx = stageSize.width / 2;
+      const cy = stageSize.height / 2;
+      let left = cx - ((cx - x) * next) / k;
+      let top = cy - ((cy - y) * next) / k;
+      if (point && card) {
+        const cardX = Math.max(0, stageSize.width - card.width * next);
+        const cardY = Math.max(0, stageSize.height - card.height * next);
+        left = Math.max(0, Math.min(cardX, left + point.x * next)) - point.x * next;
+        top = Math.max(0, Math.min(cardY, top + point.y * next)) - point.y * next;
+      }
+      return { k: next, x: left, y: top };
     });
   };
   const panBy = (dx: number, dy: number) => {
@@ -213,28 +225,26 @@ export function GraphView(props: Props) {
     return () => element.removeEventListener("wheel", onWheel);
   }, [minimumScale]);
 
-  // Selections made by opening a menu already have a visible target.
-  useEffect(() => {
-    if (!selected || currentMenu?.id === selected) return;
+  // Refitting after a panel or window resize must also keep the current selection visible.
+  useLayoutEffect(() => {
+    if (!selected || currentMenu?.id === selected || !stageSize.width || !stageSize.height) return;
     const point = layout.points.get(selected);
-    const { width, height } = stageSize;
     const size = sizes.get(selected);
-    if (!point || !size || !width || !height) return;
+    if (!point || !size) return;
     setCamera((current) => {
+      const k = Math.min(current.k, areaWidth / size.width, areaHeight / size.height);
       const left = current.x + point.x * current.k;
       const top = current.y + point.y * current.k;
       const right = left + size.width * current.k;
       const bottom = top + size.height * current.k;
-      if (left >= 0 && top >= 0 && right <= width && bottom <= height) return current;
+      if (left >= 0 && top >= 0 && right <= stageSize.width && bottom <= stageSize.height) return current;
       return {
-        ...current,
-        x: current.x + width / 2 - (left + right) / 2,
-        y: current.y + height / 2 - (top + bottom) / 2,
+        k,
+        x: STAGE_INSET + (areaWidth - size.width * k) / 2 - point.x * k,
+        y: STAGE_INSET + (areaHeight - size.height * k) / 2 - point.y * k,
       };
     });
-    // Only react to a new selection, not to every layout change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+  }, [selected, currentMenu, layout.points, sizes, stageSize, areaWidth, areaHeight]);
 
   const openNodeMenu = (id: string, anchor: ContextMenuAnchor) => {
     if (drag.current || panning) return;
@@ -459,39 +469,6 @@ export function GraphView(props: Props) {
             })}
           </div>
         </div>
-        <div className="zoom" role="group" aria-label={t("stage.zoom")}>
-          <button type="button" aria-label={t("stage.zoomOut")} onClick={() => zoomAt(1 / 1.2)}>
-            <svg viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M3 7h8" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="zoom-level"
-            aria-label={t("stage.zoomReset")}
-            onClick={() => zoomAt(1 / camera.k)}
-          >
-            {Math.round(camera.k * 100)}%
-          </button>
-          <button type="button" aria-label={t("stage.zoomIn")} onClick={() => zoomAt(1.2)}>
-            <svg viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M3 7h8M7 3v8" />
-            </svg>
-          </button>
-          <span className="zoom-rule" aria-hidden="true" />
-          <button
-            type="button"
-            aria-label={t("stage.fit")}
-            onClick={() => {
-              cameraMode.current = "fit";
-              fit("fit");
-            }}
-          >
-            <svg viewBox="0 0 14 14" aria-hidden="true">
-              <path d="M2 5V2h3M9 2h3v3M12 9v3H9M5 12H2V9" />
-            </svg>
-          </button>
-        </div>
       </div>
       {currentMenu && menuNode && (
         <ContextMenu
@@ -502,14 +479,24 @@ export function GraphView(props: Props) {
           onDismiss={() => setNodeMenu(null)}
         />
       )}
-      <Legend
-        graph={graph}
-        view={view}
-        assumption={assumption}
-        affected={affected}
-        running={props.running}
-        queued={props.queued}
-      />
+      <div className="canvas-footer proof-footer">
+        <Legend
+          graph={graph}
+          view={view}
+          assumption={assumption}
+          affected={affected}
+          running={props.running}
+          queued={props.queued}
+        />
+        <CanvasZoom
+          scale={camera.k}
+          onZoom={zoomAt}
+          onFit={() => {
+            cameraMode.current = "fit";
+            fit("fit");
+          }}
+        />
+      </div>
     </>
   );
 }

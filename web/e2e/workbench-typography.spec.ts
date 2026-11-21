@@ -149,10 +149,15 @@ for (const variant of [
 
     const sideDivider = page.locator('.splitter[data-split="side"]');
     const inspectorDivider = page.locator('.splitter[data-split="right"]');
-    await moveDivider(page, sideDivider, 32);
-    await expect(sideDivider).toHaveAttribute("aria-valuenow", "272");
-    await moveDivider(page, inspectorDivider, 48);
-    await expect(inspectorDivider).toHaveAttribute("aria-valuenow", "292");
+    if (variant.width >= 900) {
+      await moveDivider(page, sideDivider, 32);
+      await expect(sideDivider).toHaveAttribute("aria-valuenow", "272");
+      await moveDivider(page, inspectorDivider, 48);
+      await expect(inspectorDivider).toHaveAttribute("aria-valuenow", "292");
+    } else {
+      await expect(inspectorDivider).toBeHidden();
+      await expect(page.locator("#review")).toHaveCSS("position", "absolute");
+    }
     await expectWrapped(lean);
     await expectWrapped(inspector.locator("h2"));
 

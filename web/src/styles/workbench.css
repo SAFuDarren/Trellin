@@ -235,17 +235,25 @@ select:disabled {
   min-height: 520px;
   overflow: hidden;
 }
-.shell:has(#workbench[data-view="proof"]) {
+.shell:has(#workbench) {
   min-height: 0;
 }
 .app {
+  --canvas-min-width: 270px;
+  --side-effective: var(--side-w);
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   height: 100%;
 }
+.app[data-sidebar="collapsed"] {
+  --side-effective: 56px;
+}
+.app[data-review="open"][data-sidebar="open"] {
+  --side-effective: min(var(--side-w), calc(100% - var(--canvas-min-width) - 284px));
+}
 .sidebar {
-  flex: 0 0 var(--side-w);
+  flex: 0 0 var(--side-effective);
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -262,7 +270,7 @@ select:disabled {
   background: var(--main);
 }
 .review {
-  flex: 0 0 var(--right-w);
+  flex: 0 0 min(var(--right-w), calc(100% - var(--side-effective) - var(--canvas-min-width)));
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -270,23 +278,34 @@ select:disabled {
   overflow: auto;
 }
 
-@media (max-width: 720px) {
-  .app[data-view="project"] {
+@media (width < 900px) {
+  #workbench {
     position: relative;
     --map-inspector-overlay: 1;
+    --drawer-width: min(var(--right-w), clamp(208px, 32vw, 300px));
   }
-  .app[data-view="project"] .review {
+  #workbench[data-review="open"][data-sidebar="open"] {
+    --side-effective: min(var(--side-w), 27%);
+    --drawer-width: min(
+      var(--right-w),
+      clamp(148px, calc(100% - var(--side-effective) - var(--canvas-min-width)), 284px)
+    );
+  }
+  #workbench[data-review="open"] .main {
+    margin-inline-end: var(--drawer-width);
+  }
+  #workbench .review {
     position: absolute;
     z-index: 4;
     inset-block: 0;
     inset-inline-end: 0;
-    width: min(var(--right-w), calc(100% - 48px));
+    width: var(--drawer-width);
     border-inline-start: 1px solid var(--hair);
+    border-start-start-radius: var(--radius-panel);
+    border-end-start-radius: var(--radius-panel);
+    box-shadow: var(--elevation-float);
   }
-  .app[data-view="project"][data-sidebar="open"] .review {
-    width: min(var(--right-w), max(180px, calc(100% - var(--side-w) - 150px)));
-  }
-  .app[data-view="project"] .splitter[data-split="right"] {
+  #workbench .splitter[data-split="right"] {
     display: none;
   }
 }
@@ -910,12 +929,13 @@ select:disabled {
 }
 
 .legend {
+  container-type: inline-size;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 12px;
-  border-top: 1px solid var(--hair);
+  flex: 1;
+  min-width: 0;
   font-size: var(--type-meta-size);
   color: var(--sub);
 }
@@ -1131,10 +1151,25 @@ select:disabled {
   background: var(--c);
 }
 
+.canvas-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--hair);
+}
+@container (max-width: 430px) {
+  .proof-footer {
+    flex-wrap: wrap;
+  }
+  .proof-footer .legend {
+    flex: 0 0 100%;
+  }
+}
 .zoom {
-  position: absolute;
-  right: 14px;
-  bottom: 12px;
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -1589,15 +1624,71 @@ select:disabled {
 }
 .proof-tools {
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
   gap: 6px;
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
   border-bottom: 1px solid var(--hair);
 }
+.proof-lenses {
+  flex: none;
+  white-space: nowrap;
+}
 .proof-lenses button {
-  padding-inline: clamp(5px, 2cqw, 14px);
+  padding-inline: clamp(4px, 1.7cqw, 14px);
+}
+#proof-details-toggle .workbench-icon {
+  display: none;
+}
+@container (max-width: 620px) {
+  .toolbar {
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-height: 42px;
+    padding: 6px 12px;
+  }
+  .toolbar .claim-heading {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .toolbar .claim-meta,
+  .proof-return-label,
+  #proof-details-toggle span {
+    display: none;
+  }
+  .proof-return {
+    flex: none;
+    min-width: 27px;
+    min-height: 27px;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .proof-return span {
+    padding: 0;
+  }
+  .proof-tools {
+    padding: 5px 8px;
+  }
+  #proof-details-toggle {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+  }
+  #proof-details-toggle .workbench-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+  }
+}
+@media (width < 720px) {
+  #workbench .toolbar .claim-heading h1 {
+    font-size: var(--type-section-size);
+  }
 }
 .main-proof-graph {
   min-height: 0;

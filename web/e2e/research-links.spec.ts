@@ -173,14 +173,15 @@ test("a link follows the pointer near the canvas edge and tracks both cards afte
   await page.keyboard.press("Escape");
   await page.mouse.up();
   await expect(map.locator("[data-research-link]")).toHaveCount(0);
-  await map.getByRole("button", { name: "Fit to window" }).click();
+  const zoom = page.locator(".project-canvas").getByRole("group", { name: "Zoom" });
+  await zoom.getByRole("button", { name: "Fit to window" }).click();
 
   await startLinkDrag(page);
   await moveTo(page, target);
   await page.mouse.up();
   const path = map.locator("[data-research-link]");
   await expect(path).toHaveCount(1);
-  await map.getByRole("button", { name: "Zoom in" }).click();
+  await zoom.getByRole("button", { name: "Zoom in" }).click();
   await map.press("ArrowLeft");
   await expect(path).toHaveCount(1);
 

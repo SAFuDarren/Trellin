@@ -13,6 +13,31 @@
   gap: 8px;
 }
 
+.project-actions .workbench-icon {
+  display: none;
+}
+@container (max-width: 620px) {
+  .project-actions {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .project-actions :is(.project-add-theorem, .workbench-actions-trigger) {
+    display: grid;
+    place-items: center;
+    min-width: 30px;
+    height: 30px;
+    padding: 0;
+  }
+  .project-actions :is(.project-add-theorem, .workbench-actions-trigger) :is(span, .chevron) {
+    display: none;
+  }
+  .project-actions .workbench-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+  }
+}
+
 .workbench-actions-items {
   width: min(240px, calc(100vw - 16px));
 }

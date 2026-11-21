@@ -57,9 +57,11 @@ test("project claims open the existing inspector without leaving or moving the c
   await expect(page.locator("#sidebar").getByText(SECOND_TITLE, { exact: true })).toHaveCount(0);
   const plot = canvas.locator(".project-canvas-plot");
   const camera = () => plot.evaluate((element) => getComputedStyle(element).transform);
-  await canvas.getByRole("button", { name: "Zoom in", exact: true }).click();
+  // Keep the selected neighbourhood within the area available beside the inspector.
+  await canvas.getByRole("button", { name: "Zoom out", exact: true }).click({ clickCount: 2 });
   const zoomed = await camera();
-  await stage.press("ArrowLeft");
+  await stage.press("ArrowRight");
+  await stage.press("ArrowRight");
   const panned = await camera();
   expect(panned).not.toEqual(zoomed);
 

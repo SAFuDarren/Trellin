@@ -41,8 +41,7 @@ function overlapArea(a: StageRect, b: StageRect) {
 
 // Where the project map overview opens when the researcher has not placed it yet:
 // the position that covers the least of the visible claim cards, never the
-// selected one if another position avoids it. Corners come first; the bottom
-// right holds the zoom controls. Narrow maps open the compact overview.
+// selected one if another position avoids it. Narrow maps open the compact overview.
 export function atlasOpening(width: number, height: number, cards: StageRect[]): AtlasBox {
   const w = width < 640 ? 124 : 186;
   // The drawing is 4:3. The caption, padding and (above ATLAS_SMALL) the legend add the rest.
@@ -55,6 +54,7 @@ export function atlasOpening(width: number, height: number, cards: StageRect[]):
     { x: ATLAS_MARGIN.x, y: ATLAS_MARGIN.y },
     { x: right, y: ATLAS_MARGIN.y },
     { x: ATLAS_MARGIN.x, y: bottom },
+    { x: right, y: bottom },
     { x: middle, y: ATLAS_MARGIN.y },
     { x: middle, y: bottom },
   ];
