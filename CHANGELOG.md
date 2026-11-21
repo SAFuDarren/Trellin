@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.67
+
+- Open Agent activity to see recorded proof and model jobs, Agent work, conversations and results to review in one list. Filter by state and open the original work from each row. The footer, Team, Claims and Chats share the same activity counts.
+
 ## 1.0.66
 
 - Light and dark themes use the Trellin Navy accent for selection, focus, primary actions, and running work. Page, section, and card headings have distinct sizes. Team opens on Agents, and Environment check has its own section under Runtimes.

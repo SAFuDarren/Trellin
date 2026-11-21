@@ -95,6 +95,32 @@
     "effect": "Impact",
     "none": "Nothing relies on this version right now."
   },
+  "workspaceActivity": {
+    "filters": "Filter activity",
+    "filter": {
+      "all": "All",
+      "running": "Running",
+      "queued": "Queued",
+      "review": "Needs review",
+      "attention": "Needs attention",
+      "completed": "Completed"
+    },
+    "toReview": "{{count}} to review",
+    "attention_one": "{{count}} needs attention",
+    "attention_other": "{{count}} need attention",
+    "proofJob": "Proof job",
+    "obligation": "Proof obligation {{index}}",
+    "noMatches": "No activity with this status.",
+    "showAll": "Show all",
+    "openWork": "Open Agent work",
+    "time": {
+      "started": "Started {{time}}",
+      "queued": "Queued {{time}}",
+      "waiting": "Waiting · {{time}}",
+      "updated": "Updated {{time}}",
+      "finished": "Finished {{time}}"
+    }
+  },
   "agentDock": {
     "title": "Agent chat",
     "activity": "Agent activity",
@@ -702,14 +728,14 @@
       "all": "All claims",
       "review": "Waiting for review",
       "blocked": "Blocked",
-      "running": "Models working"
+      "running": "Running work"
     },
     "domains": "Domains",
     "byStatus": "Grouped by status",
     "none": "No claims match.",
     "verified": "{{done}} of {{total}} verified",
-    "running_one": "{{count}} model working",
-    "running_other": "{{count}} models working"
+    "running_one": "{{count}} running",
+    "running_other": "{{count}} running"
   },
   "agentWork": {
     "title": "Agent work",
