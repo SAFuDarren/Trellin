@@ -213,6 +213,14 @@ test("employee tasks and drafts stay separate when both employees use the same m
   await page.getByRole("link", { name: /Earlier conversation/ }).click();
   await expect(page.getByRole("heading", { name: "Earlier conversation" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Conversation model" })).toBeVisible();
+
+  await analystRow.click();
+  await switcher.selectOption(running.id);
+  await page.reload();
+  await expect(switcher).toHaveValue(running.id);
+  await expect(analystDraft).toBeVisible();
+  await expect(page.getByText("The assumptions are explicit.", { exact: true })).toBeVisible();
+  expect(sends).toHaveLength(1);
 });
 
 test("creating a task binds it to the selected employee and retries the same request", async ({ page }) => {
