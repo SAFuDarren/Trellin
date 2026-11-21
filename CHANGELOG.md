@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.53
+
+- Buttons, cards, list rows and menus ease between states instead of jumping. Menus, the Agent dock and dialogs fade in, and corners and shadows follow one scale. With reduced motion turned on in macOS, nothing moves.
+
 ## 1.0.52
 
 - **Global map** opens in a corner of the project map that leaves the claim cards visible, or at its compact size without covering the selected claim when the window is small. Claims that have no recorded steps yet appear as separate points in the overview.

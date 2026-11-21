@@ -40,7 +40,7 @@
   min-width: min(190px, 70vw);
   padding: 4px;
   border: 1px solid var(--hair);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--side);
 }
 
@@ -48,7 +48,7 @@
   min-height: 32px;
   padding: 6px 9px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--ink);
   text-align: start;
@@ -64,10 +64,10 @@
   max-height: calc(100dvh - 32px);
   padding: 0;
   border: 1px solid var(--node-line);
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   background: var(--main);
   color: var(--ink);
-  box-shadow: 0 16px 65px #0004;
+  box-shadow: var(--elevation-dialog);
 }
 
 .project-entry::backdrop {
@@ -119,7 +119,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--composer-line);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background-color: var(--composer);
   color: var(--ink);
 }
@@ -170,7 +170,7 @@
 .project-entry-status {
   margin-bottom: 12px;
   padding: 8px 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-card);
   background: var(--live-soft);
 }
 
@@ -202,7 +202,7 @@
   min-width: 0;
   padding: 12px;
   border: 1px solid var(--hair);
-  border-radius: 7px;
+  border-radius: var(--radius-card);
 }
 
 .project-entry-item h4 {

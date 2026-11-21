@@ -69,7 +69,10 @@ test("Add theorem selects show their whole option and match the text fields", as
   const [kind] = await expectLegible(dialog);
   if (!kind) throw new Error("No select in Add theorem");
   expect(kind.label).toBe("Theorem to prove");
-  expect(kind.height).toBe(await heightOf(dialog.getByLabel("Title", { exact: true })));
+  // The dialog scales in (#163), so compare once both fields have settled.
+  const title = dialog.getByLabel("Title", { exact: true });
+  const select = dialog.locator("select").first();
+  await expect.poll(async () => Math.abs((await heightOf(select)) - (await heightOf(title)))).toBeLessThan(0.01);
   expect(errors).toEqual([]);
 });
 

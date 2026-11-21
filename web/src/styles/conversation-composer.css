@@ -1,14 +1,14 @@
 .direct-composer {
   --composer-accent: var(--ink);
   --composer-accent-ink: var(--on-ink);
-  --composer-elevation: 0 6px 22px #0000001a;
+  --composer-elevation: var(--elevation-float);
   position: relative;
   padding: 10px 10px 8px;
   gap: 8px;
 }
 @media (prefers-color-scheme: dark) {
   .direct-composer {
-    --composer-elevation: 0 6px 22px #0006;
+    --composer-elevation: var(--elevation-float);
   }
 }
 .direct-composer:focus-within {
@@ -60,7 +60,7 @@
   min-height: 28px;
   padding: 0 6px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--sub);
   font-size: var(--type-control-size);
@@ -99,7 +99,7 @@
   padding: 4px;
   overflow: auto;
   border: 1px solid var(--hair);
-  border-radius: 9px;
+  border-radius: var(--radius-card);
   background: var(--main);
   box-shadow: var(--composer-elevation);
   font-size: var(--type-control-size);
@@ -133,7 +133,7 @@
   width: 100%;
   padding: 6px 8px;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--ink);
   text-align: start;

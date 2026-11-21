@@ -1,0 +1,123 @@
+/*
+ * Interaction foundation (#163): motion, radius and elevation tokens, the
+ * shared state transition, and enter motion for floating layers, panels and
+ * dialogs. Components use these tokens instead of one-off values.
+ */
+:root {
+  /* Motion. One easing; durations by role. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --duration-base: 150ms;
+  --duration-enter: 120ms;
+  --duration-panel: 180ms;
+
+  /* Radius scale. Glyph shapes (status marks, dots) keep their own geometry. */
+  --radius-inline: 4px; /* keycaps, legend keys, tiny badges */
+  --radius-control: 6px; /* buttons, inputs, menu items, list rows */
+  --radius-card: 8px; /* cards, nodes, menus, popovers, code blocks */
+  --radius-panel: 12px; /* dialogs, docked panels, the composer, large callouts */
+  --radius-pill: 999px;
+
+  /* Elevation. Floating layers (menus, popovers) and dialogs or docked panels. */
+  --elevation-float: 0 1px 2px rgb(0 0 0 / 6%), 0 8px 24px rgb(0 0 0 / 12%);
+  --elevation-dialog: 0 2px 6px rgb(0 0 0 / 8%), 0 18px 56px rgb(0 0 0 / 22%);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --elevation-float: 0 1px 2px rgb(0 0 0 / 30%), 0 10px 28px rgb(0 0 0 / 42%);
+    --elevation-dialog: 0 2px 8px rgb(0 0 0 / 36%), 0 20px 64px rgb(0 0 0 / 56%);
+  }
+}
+
+/* State changes ease instead of jumping. Transform is left out so that
+   dragging cards, nodes and the overview stays immediate. :where() keeps the
+   rule at zero specificity so component rules still decide the values. */
+:where(
+  button,
+  a,
+  summary,
+  select,
+  input,
+  textarea,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  .chip,
+  .claim,
+  .graph-node,
+  .project-canvas-node,
+  .board-card,
+  .queue-item,
+  .chat-list-item,
+  .sidebar-projects-row
+) {
+  transition:
+    color var(--duration-base) var(--ease),
+    background-color var(--duration-base) var(--ease),
+    border-color var(--duration-base) var(--ease),
+    box-shadow var(--duration-base) var(--ease),
+    opacity var(--duration-base) var(--ease);
+}
+
+@keyframes rm-float-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+@keyframes rm-panel-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+@keyframes rm-dialog-in {
+  from {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+@keyframes rm-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Floating layers appear when their trigger opens them. */
+:where(
+  .popover,
+  .navigation-menu,
+  .chats-actions-list,
+  .employee-chat-task-menu,
+  .agent-dock-options,
+  .composer-popover,
+  .project-canvas-popover,
+  .workbench-actions-items
+) {
+  animation: rm-float-in var(--duration-enter) var(--ease);
+}
+:where(.agent-dock-panel) {
+  animation: rm-panel-in var(--duration-panel) var(--ease);
+}
+:where(dialog[open]) {
+  animation: rm-dialog-in var(--duration-panel) var(--ease);
+}
+:where(dialog[open])::backdrop {
+  animation: rm-fade-in var(--duration-panel) var(--ease);
+}
+
+/* Reduced motion: no movement. Colour and opacity still change, instantly. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-base: 0ms;
+    --duration-enter: 0ms;
+    --duration-panel: 0ms;
+  }
+  *,
+  *::before,
+  *::after,
+  ::backdrop {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
