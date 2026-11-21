@@ -118,11 +118,26 @@
 .project-entry-form select {
   width: 100%;
   min-width: 0;
-  padding: 8px 9px;
   border: 1px solid var(--composer-line);
   border-radius: 5px;
-  background: var(--composer);
+  background-color: var(--composer);
   color: var(--ink);
+}
+
+.project-entry-form textarea {
+  padding: 8px 9px;
+}
+
+/* Single-line fields share one height. A fixed height with vertical padding
+   leaves no room for the text, so they only take inline padding. */
+.project-entry-form input:not([type="checkbox"], [type="file"]) {
+  height: var(--field-h);
+  padding: 0 9px;
+}
+
+.project-entry-form select {
+  height: var(--field-h);
+  font-size: inherit;
 }
 
 .project-entry-form textarea {

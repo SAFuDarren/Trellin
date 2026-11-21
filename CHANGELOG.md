@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.51
+
+- Dropdowns in forms, filters and the proof note composer show their whole selected option. They share one flat style with a theme-aware arrow, and form dropdowns line up with the text fields beside them.
+
 ## 1.0.50
 
 - In Chats, switch a saved Agent’s tasks from the task title in the header. The menu shows the current task and its recorded state. Reopen earlier unassigned conversations and proof activity from Conversation history.

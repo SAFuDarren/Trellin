@@ -76,13 +76,12 @@ test("the Team wizard preserves drafts, retries the same create, and reopens the
   await add.click();
   await connect();
   await expect(name).toHaveValue("");
-  await expect
-    .poll(() =>
-      wizard
-        .getByRole("combobox", { name: "Avatar", exact: true })
-        .evaluate((element) => element.getBoundingClientRect().height),
-    )
-    .toBeGreaterThanOrEqual(38);
+  // The avatar select shares the form field height and leaves room for its text (#152).
+  const avatarHeight = () =>
+    wizard
+      .getByRole("combobox", { name: "Avatar", exact: true })
+      .evaluate((element) => element.getBoundingClientRect().height);
+  await expect.poll(avatarHeight).toBe(await name.evaluate((element) => element.getBoundingClientRect().height));
   const create = wizard.getByRole("button", { name: "Create agent", exact: true });
   await name.fill("   ");
   await expect(create).toBeDisabled();
