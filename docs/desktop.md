@@ -10,7 +10,9 @@ Trellin opens the Research Multiplier workbench in a native macOS window. This l
 4. Select a graph node and quit with **⌘Q**. On the next open, Trellin restores the last successfully opened project and, when it still exists, the selected node. Existing projects reopen at their registered paths.
 5. If the database service is temporarily unavailable, restart that service and use **Try Again**. The app uses the local PostgreSQL 18 server with pgvector. Defaults are the Unix socket at `/tmp` and port `5432`. For another local setup, set `RM_DESKTOP_PG_SOCKET` and `RM_DESKTOP_PG_PORT`. The [workbench guide](proof-workbench.md) covers database upgrades.
 
-Use **Find claim** on the project map to search and select a card. In **Agent chat**, search for a recipient or conversation from its chooser. Use arrow keys to move through options, Enter to select, and Escape to return to the control.
+Press **⌘K** (**Ctrl+K** on other platforms) or use the search button in the left rail to open the **Command palette** anywhere in the workbench. Search the current project for a claim title, a complete reference such as `FLOW-09`, a Library entry, a conversation or an Agent. Recent results appear first. The palette can also open **Add theorem**, **Organize with AI**, **Research references**, the selected claim’s **Proof task**, or a new chat draft. Review and confirm work in the panel that opens.
+
+Use **Find claim** on the project map to search and select a card. In **Agent chat**, search for a recipient or conversation from its chooser. In these search controls and the command palette, use arrow keys to move through options, Enter to select, and Escape to return focus.
 
 Right-click a project map card or proof node for its actions. With the item focused, press **Shift+F10** to open the same menu. **Write proof note** opens the note editor for that node. **Show in Library** lists recorded sources used by the claim.
 

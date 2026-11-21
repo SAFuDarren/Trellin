@@ -1,0 +1,100 @@
+.command-palette {
+  inset-block: clamp(16px, 14dvh, 120px) auto;
+  margin-block: 0;
+  width: min(540px, calc(100vw - 32px));
+  max-height: min(520px, 74dvh);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--node-line);
+  border-radius: var(--radius-panel);
+  background: var(--main);
+  color: var(--ink);
+  box-shadow: var(--elevation-dialog);
+}
+
+.command-palette[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.command-palette::backdrop {
+  background: rgb(0 0 0 / 24%);
+}
+
+.command-palette .floating-search {
+  position: static;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.command-palette .floating-search input {
+  min-width: 0;
+  min-height: var(--field-h);
+  padding: 6px 10px;
+  border-color: transparent;
+  background: transparent;
+  font-size: var(--type-section-size);
+}
+
+.command-palette .floating-search input::placeholder {
+  color: var(--sub);
+}
+
+.command-palette-close {
+  flex: none;
+  min-height: var(--control-h);
+  padding: 2px 6px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--sub);
+}
+
+.command-palette-close:hover {
+  background: var(--state-hover);
+  color: var(--ink);
+}
+
+.command-palette-close kbd {
+  font-family: var(--mono);
+  font-size: var(--type-meta-size);
+}
+
+.command-palette .floating-results {
+  min-height: 0;
+  padding: 4px 8px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.command-palette .floating-results:empty {
+  padding: 0;
+}
+
+.command-palette .floating-group-label {
+  padding: 9px 10px 4px;
+  font-weight: var(--type-medium);
+}
+
+.command-palette .floating-option {
+  padding: 7px 10px;
+  scroll-margin-block-start: 0;
+}
+
+.command-palette .floating-empty {
+  margin: 0;
+  padding: 20px 22px;
+  font-size: var(--type-control-size);
+}
+
+.command-palette .floating-limit {
+  flex: 0 0 auto;
+  padding: 8px 18px;
+  border-top: 1px solid var(--hair);
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}

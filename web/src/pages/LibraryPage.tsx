@@ -74,7 +74,7 @@ export function LibraryPage({
           value?.toLowerCase().includes(needle),
         )),
   );
-  const selected = shown.find((item) => item.id === selectedId) ?? shown[0];
+  const selected = items.find((item) => item.id === selectedId && matchesFilter(item)) ?? shown[0];
   const link = (filter: string) => href("library", filter);
   const choose = (id: string) => (window.location.hash = link(filterKey + "~" + id));
   const edit = (id: string) => {

@@ -533,28 +533,34 @@ export function ContextMenu({
   );
 }
 
-function PickerContent({
+export function PickerContent({
   groups,
   searchLabel,
+  searchAction,
   emptyLabel,
   value,
   footer,
-  edge,
+  limit,
+  edge = "first",
+  onQueryChange,
   onChoose,
 }: {
   groups: FloatingGroup[];
   searchLabel: string;
+  searchAction?: ReactNode;
   emptyLabel: string;
   value?: string;
   footer?: ReactNode;
-  edge: Edge;
+  limit?: { perGroup: number; label: string };
+  edge?: Edge;
+  onQueryChange?: (query: string) => void;
   onChoose: (option: FloatingOption) => void;
 }) {
   const id = useId();
   const listRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(value);
-  const filtered = useMemo(() => {
+  const matches = useMemo(() => {
     const terms = fold(query.trim()).split(/\s+/);
     return groups
       .map((group) => ({
@@ -566,6 +572,10 @@ function PickerContent({
       }))
       .filter((group) => group.options.length > 0);
   }, [groups, query]);
+  const filtered = limit
+    ? matches.map((group) => ({ ...group, options: group.options.slice(0, limit.perGroup) }))
+    : matches;
+  const hasMore = limit && matches.some((group) => group.options.length > limit.perGroup);
   const options = filtered.flatMap((group) => group.options);
   const enabled = options.filter((option) => !option.disabled);
   const active = enabled.find((option) => option.id === highlight) ?? (edge === "first" ? enabled[0] : enabled.at(-1));
@@ -609,11 +619,14 @@ function PickerContent({
           placeholder={searchLabel}
           value={query}
           onChange={(event) => {
-            setQuery(event.target.value);
+            const nextQuery = event.target.value;
+            setQuery(nextQuery);
             setHighlight(undefined);
+            onQueryChange?.(nextQuery);
           }}
           onKeyDown={handleKey}
         />
+        {searchAction}
       </div>
       <div id={id} ref={listRef} className="floating-results" role="listbox" aria-label={searchLabel}>
         {filtered.map(({ label: groupLabel, options }, groupIndex) => (
@@ -651,6 +664,11 @@ function PickerContent({
       {options.length === 0 && (
         <p className="floating-empty" role="status">
           {emptyLabel}
+        </p>
+      )}
+      {hasMore && (
+        <p className="floating-limit" role="status">
+          {limit.label}
         </p>
       )}
       {footer && <div className="floating-footer">{footer}</div>}

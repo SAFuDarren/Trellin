@@ -119,10 +119,11 @@ export type Doctor = {
 
 const LIVE_MS = 8000;
 
-export function useClaims(session: string) {
+export function useClaims(session: string, enabled = true) {
   return useQuery({
-    queryKey: ["claims"],
+    queryKey: ["claims", session],
     queryFn: ({ signal }) => api<ClaimsResponse>(session, "/api/claims", { signal }),
+    enabled,
   });
 }
 export function useAtlas(session: string) {
