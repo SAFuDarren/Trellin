@@ -24,7 +24,7 @@ Arrow keys pan when the canvas has focus. To move a focused card, open its conte
 
 Open a proof to start at a readable zoom on the main canvas. **Fit to window** shows the whole graph. Select a node to read its full formula and Lean statement in the inspector. Hover over an activity count or check the inspector to see the recorded Agent and model. **Edge styles** opens the legend.
 
-Selected map cards, proof nodes and review rows have a Navy edge and a light tint. Hover adds a neutral highlight, and keyboard focus adds an offset outline.
+Selected map cards, proof nodes and review rows have a Navy edge and a light tint. Hover adds a neutral highlight, and keyboard focus adds an offset outline. A spinner and count inside a proof node show its running jobs.
 
 Click a project map card to inspect the claim. Double-click the card or press **Enter** on it to open its proof. Press **Escape** to return to the map. Right-click a card or proof node for its actions, or press **Shift+F10** with the item focused. **Write proof note** opens the note editor for that node. **Show in Library** lists recorded sources used by the claim.
 
