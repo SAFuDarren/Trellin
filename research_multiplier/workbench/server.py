@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 import json
 import logging
+import os
 import secrets
 import sys
 import threading
@@ -20,7 +21,7 @@ from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
-                                          workbench_activity, workbench_agents, workbench_clarification,
+                                          workbench_activity, workbench_agent_work, workbench_agents, workbench_clarification,
                                           workbench_conversations, workbench_goal_review,
                                           workbench_guidance, workbench_library,
                                           workbench_intake, workbench_lemma_plans, workbench_premises,
@@ -74,6 +75,14 @@ _TEAM_AGENTS_ERRORS = {
     "team_agents.conflict": HTTPStatus.CONFLICT,
     "team_agents.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
     "team_agents.limit": HTTPStatus.CONFLICT,
+}
+_AGENT_WORK_ROUTE = "/api/agent-work"
+_AGENT_WORK_ERRORS = {
+    "agentWork.invalid": HTTPStatus.BAD_REQUEST,
+    "agentWork.identity": HTTPStatus.FORBIDDEN,
+    "agentWork.missing": HTTPStatus.NOT_FOUND,
+    "agentWork.runtimeUnavailable": HTTPStatus.SERVICE_UNAVAILABLE,
+    "agentWork.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
 }
 _PROJECT_CANVAS_ROUTE = "/api/project-canvas"
 _PROJECT_CANVAS_CLAIMS = _PROJECT_CANVAS_ROUTE + "/claims"
@@ -242,6 +251,10 @@ class WorkbenchServer(ThreadingHTTPServer):
         self.project_canvas = workbench_project_canvas.ProjectCanvas(workspace)
         self.public_intake = workbench_intake.PublicIntake(self.connections)
         self.discussions = workbench_conversations.Discussions(self.connections, self.team_agents)
+        self.agent_work = workbench_agent_work.AgentWork(self.connections, self.team_agents)
+        self._agent_work_lock = threading.Lock()
+        self._agent_work_wakeup = threading.Event()
+        self._agent_work_thread = None
         self._proof_task_lock = threading.Lock()
         self._lemma_plan_lock = threading.Lock()
         self.closing = threading.Event()
@@ -259,6 +272,7 @@ class WorkbenchServer(ThreadingHTTPServer):
 
     def server_close(self):
         self.closing.set()
+        self._agent_work_wakeup.set()
         super().server_close()
 
     def read(self, action, *values):
@@ -309,6 +323,46 @@ class WorkbenchServer(ThreadingHTTPServer):
                 self.write(workbench_conversations.interrupted, identifier, request)
                 return self.read(workbench_conversations.thread, self.team_agents, identifier)
         return result
+
+    def agent_work_tasks(self):
+        result = self.read(workbench_agent_work.list_tasks)
+        if result["available"] and any(task["status"] in {"queued", "running"} for task in result["tasks"]):
+            self._wake_agent_work()
+        return result
+
+    def dispatch_agent_work(self, action, document):
+        result = self.write(action, document)
+        if result["task"]["status"] in {"queued", "running"}:
+            self._wake_agent_work()
+        return result
+
+    def _wake_agent_work(self):
+        if self.closing.is_set() or not os.environ.get("RM_SCHEDULER_DSN"):
+            return
+        with self._agent_work_lock:
+            if self._agent_work_thread is None or not self._agent_work_thread.is_alive():
+                self._agent_work_thread = threading.Thread(target=self._run_agent_work, daemon=True)
+                try:
+                    self._agent_work_thread.start()
+                except RuntimeError:
+                    self._agent_work_thread = None
+                    return  # The queued record is available on the next open.
+            self._agent_work_wakeup.set()
+
+    def _run_agent_work(self):
+        worker = uuid4()
+        while not self.closing.is_set():
+            self._agent_work_wakeup.clear()
+            try:
+                with paths.use_workspace(self.workspace, strict=True), Store() as store:
+                    if self.agent_work.work_one(store, worker):
+                        continue
+            except (ValueError, OSError) as error:
+                _LOG.warning("Workbench Agent work polling paused (%s).", type(error).__name__)
+            with self._agent_work_lock:
+                if not self._agent_work_wakeup.is_set():
+                    self._agent_work_thread = None
+                    return
 
     def _work_on_conversation(self, thread_id, request_id):
         try:
@@ -469,6 +523,10 @@ class _Handler(BaseHTTPRequestHandler):
             if route.query:
                 raise _BadRequest("team_agents.invalid")
             return {"agents": self.server.team_agents.list()}
+        if route.path == _AGENT_WORK_ROUTE:
+            if route.query:
+                return self.server.read(workbench_agent_work.task_detail, *_uuid_parameters(route.query, "task"))
+            return self.server.agent_work_tasks()
         if route.path == _PROJECT_CANVAS_ROUTE:
             if route.query:
                 raise _BadRequest("project_canvas.invalid")
@@ -567,6 +625,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(HTTPStatus.SERVICE_UNAVAILABLE, error.code)
         except workbench_agents.AgentProfileError as error:
             self._error(_TEAM_AGENTS_ERRORS[str(error)], str(error))
+        except workbench_agent_work.AgentWorkError as error:
+            self._error(_AGENT_WORK_ERRORS.get(error.code, HTTPStatus.CONFLICT), error.code)
         except workbench_project_canvas.ProjectCanvasError as error:
             self._error(_PROJECT_CANVAS_ERRORS[str(error)], str(error))
         except workbench_conversations.ConversationError as error:
@@ -888,6 +948,20 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.read(self.server.discussions.preview, self._body(64_000)))
             elif self.path == "/api/conversations/send":
                 self._json(HTTPStatus.OK, self.server.send_conversation(self._body(64_000)))
+            elif self.path == _AGENT_WORK_ROUTE + "/preview":
+                self._json(HTTPStatus.OK, self.server.read(
+                    self.server.agent_work.preview, self._body(workbench_agent_work.MAX_REQUEST_BYTES),
+                ))
+            elif self.path == _AGENT_WORK_ROUTE + "/start":
+                self._json(HTTPStatus.OK, self.server.dispatch_agent_work(
+                    self.server.agent_work.start, self._body(workbench_agent_work.MAX_REQUEST_BYTES),
+                ))
+            elif self.path == _AGENT_WORK_ROUTE + "/retry-preview":
+                self._json(HTTPStatus.OK, self.server.read(self.server.agent_work.preview_retry, self._body()))
+            elif self.path == _AGENT_WORK_ROUTE + "/retry":
+                self._json(HTTPStatus.OK, self.server.dispatch_agent_work(self.server.agent_work.retry, self._body()))
+            elif self.path == _AGENT_WORK_ROUTE + "/review":
+                self._json(HTTPStatus.OK, self.server.write(workbench_agent_work.record_review, self._body()))
             elif self.path == "/api/library/preview":
                 self._json(HTTPStatus.OK, self.server.read(workbench_library.preview, self._body(_MAX_PROJECT_BYTES)))
             elif self.path == "/api/library/revise":
@@ -942,6 +1016,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(HTTPStatus.NOT_FOUND, "Page unavailable.")
         except _BadRequest as error:
             self._error(HTTPStatus.BAD_REQUEST, str(error))
+        except workbench_agent_work.AgentWorkError as error:
+            self._error(_AGENT_WORK_ERRORS.get(error.code, HTTPStatus.CONFLICT), error.code)
         except workbench_review.ReviewError as error:
             if str(error) == "review.legacy_name_required":
                 self._error(HTTPStatus.BAD_REQUEST, "Supply the evidence, approve or return, your name and a reason.")

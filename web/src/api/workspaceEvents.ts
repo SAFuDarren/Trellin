@@ -26,7 +26,7 @@ type ChangedArea = (typeof CHANGED_AREAS)[number];
 export type WorkspaceStreamSignal = "connected" | "heartbeat" | "runtime-changed";
 export type WorkspaceRefresh =
   | { kind: "claim" | "basis" | "proof" | "proof-result" | "job" | "evidence"; claimId: string }
-  | { kind: "library" | "basis-item" | "recheck" | "runtime" }
+  | { kind: "library" | "basis-item" | "recheck" | "runtime" | "agent-work" }
   | { kind: "change"; area: ChangedArea; claimId?: string };
 type WorkspaceEvent = { id: string; refresh?: WorkspaceRefresh };
 
@@ -44,6 +44,7 @@ const SUBJECT: Readonly<Record<string, string | undefined>> = {
   "proof_task.started": "proof_task",
   "proof_task.updated": "proof_task",
   "job.status_changed": "job",
+  "agent_work.changed": "agent_work",
   "evidence.recorded": "evidence",
   "evidence.reviewed": "evidence",
   "workspace.changed": "workspace",
@@ -118,6 +119,21 @@ function refreshHint(
   }
   if (type === "basis_item.confirmed") return { kind: "basis-item" };
   if (type === "basis_item.retired") return { kind: "recheck" };
+  if (type === "agent_work.changed") {
+    const validState = [
+      "queued",
+      "running",
+      "blocked",
+      "delivered",
+      "failed",
+      "interrupted",
+      "accepted",
+      "returned",
+    ].some((state) => state === data.state);
+    return validState && typeof data.generation === "number" && Number.isInteger(data.generation) && data.generation > 0
+      ? { kind: "agent-work" }
+      : null;
+  }
   if (type === "workspace.changed") {
     const area = CHANGED_AREAS.find((candidate) => candidate === data.area);
     if (subject.id !== workspace || !area) return null;

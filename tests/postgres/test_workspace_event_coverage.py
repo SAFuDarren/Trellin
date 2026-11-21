@@ -14,6 +14,7 @@ pytestmark = pytest.mark.postgres
 # These writes either support another captured change in the same transaction
 # or belong to project setup/the event mechanism itself.
 SUPPORTING_RELATIONS = {
+    "agent_work_items": "created or advanced together with a captured attempt",
     "claim_evidence_revisions": "evidence freshness fence",
     "claim_node_numbers": "assigned from the captured proof node source",
     "claim_reference_aliases": "captured on the canonical claim code change",

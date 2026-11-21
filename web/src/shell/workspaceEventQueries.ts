@@ -97,6 +97,9 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
       case "runtime":
         runtime();
         break;
+      case "agent-work":
+        add("agent-work", session);
+        break;
       case "change": {
         const claim = event.claimId ? [event.claimId] : [];
         const proofTask = () => add("proof-task", session, ...claim);
@@ -153,6 +156,7 @@ export function workspaceEventQueries(events: readonly WorkspaceRefresh[], sessi
             break;
           case "workspace":
             add("conversations", session);
+            add("agent-work", session);
             goals();
             clarifications();
             intake();

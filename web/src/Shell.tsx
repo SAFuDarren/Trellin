@@ -6,6 +6,7 @@ import { useInbox, useTeam } from "./api/sections";
 import { workspaceEventCursor, workspaceId } from "./api/workspaceEvents";
 import { Rail } from "./components/Rail";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
+import { AgentWorkPage } from "./pages/AgentWorkPage";
 import { ClaimsPage } from "./pages/ClaimsPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
 import { HelpPage } from "./pages/HelpPage";
@@ -89,7 +90,11 @@ export function Shell({ session }: { session: string }) {
         {section === "review" ? (
           <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
         ) : section === "claims" ? (
-          <ClaimsPage session={session} sub={sub} onOpen={open} />
+          sub === "agent-work" || sub.startsWith("agent-work/") ? (
+            <AgentWorkPage session={session} sub={sub} />
+          ) : (
+            <ClaimsPage session={session} sub={sub} onOpen={open} />
+          )
         ) : section === "library" ? (
           <LibraryPage session={session} sub={sub} onOpen={open} />
         ) : section === "chat" ? (
