@@ -21,6 +21,7 @@ const ICONS: Record<string, string> = {
   copy: "M9 9h11v11H9zM15 6V4H4v11h2",
   code: "m8 6-5 6 5 6m8-12 5 6-5 6m-2-14-4 16",
   link: "M10 7l2-2a4 4 0 0 1 6 6l-2 2m-2 4-2 2a4 4 0 0 1-6-6l2-2m1 4 6-6",
+  move: "M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3m12-6 3 3-3 3",
   cancel: "M6 6l12 12M18 6 6 18",
 };
 

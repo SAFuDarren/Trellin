@@ -14,7 +14,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { Claim } from "../api/client";
 import type { ProjectCanvasLayout, ProjectCanvasOperation } from "../api/projectCanvas";
-import { formatShortcut } from "../shortcuts";
+import { formatShortcut, SHORTCUTS } from "../shortcuts";
 import { graphAction } from "../workbench/actions";
 import type { ClaimProgress } from "../workbench/claimProgress";
 import type { Point } from "../workbench/graph";
@@ -38,6 +38,7 @@ import "../styles/project-canvas.css";
 type Camera = Point & { k: number };
 type Gesture = { pointer: number; start: Point; origin: Point; moved: boolean; id?: string };
 type Preview = { id: string; point: Point };
+type KeyboardMove = Preview & { origin: Point };
 
 const WIDTH = 192;
 const HEIGHT = 80;
@@ -45,8 +46,6 @@ const COLUMN_STEP = 240;
 const ROW_STEP = 128;
 const BOUND = 1_000_000;
 const DOUBLE_CLICK_MS = 400;
-const DETAILS_KEY = "I";
-const ATLAS_KEY = "M";
 const directions: Record<string, [number, number]> = {
   ArrowLeft: [-1, 0],
   ArrowRight: [1, 0],
@@ -141,7 +140,7 @@ type Props = {
   onSelect: (id: string, openDetails?: boolean) => void;
   onOpenProof?: (id: string) => void;
   onContextClaim: (id: string | null) => void;
-  claimActions: (id: string, link: FloatingOption) => FloatingGroup[];
+  claimActions: (id: string, link: FloatingOption, move: FloatingOption) => FloatingGroup[];
   detailsOpen: boolean;
   onDetailsChange: (open: boolean) => void;
   atlasClaims: AtlasClaim[] | undefined;
@@ -193,6 +192,7 @@ export function ProjectCanvas({
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
   const unfittedCamera = useRef(camera);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [keyboardMove, setKeyboardMove] = useState<KeyboardMove | null>(null);
   const [panning, setPanning] = useState(false);
   const [contextTarget, setContextTarget] = useState<{ id: string; anchor: ContextMenuAnchor } | null>(null);
   const [linkSource, setLinkSource] = useState<string | null>(null);
@@ -222,6 +222,12 @@ export function ProjectCanvas({
   const activeSource = linkSource ? byId.get(linkSource) : undefined;
   const contextCard = contextTarget && byId.get(contextTarget.id);
   const editingDisabled = Boolean(layoutUnavailable || saving);
+  const movingCard = keyboardMove && byId.get(keyboardMove.id);
+  const moving = active && movingCard && !editingDisabled && !activeSource ? keyboardMove : null;
+  const moveHint = t("projectCanvas.moveHint", {
+    confirm: formatShortcut(SHORTCUTS.enter),
+    cancel: formatShortcut(SHORTCUTS.escape),
+  });
   const center = { x: size.width / 2, y: size.height / 2 };
   const mapBox = atlasPlacement(atlasBox ?? atlasOpeningBox, size.width, size.height, true);
 
@@ -252,6 +258,10 @@ export function ProjectCanvas({
   useEffect(() => {
     if (contextTarget && !contextCard) dismissContextMenu();
   }, [contextCard, contextTarget, dismissContextMenu]);
+
+  useEffect(() => {
+    if (keyboardMove && !moving) setKeyboardMove(null);
+  }, [keyboardMove, moving]);
 
   useLayoutEffect(() => {
     if (visibleLinks.length || !removingLastLink.current) return;
@@ -405,9 +415,24 @@ export function ProjectCanvas({
 
   function openContextMenu(id: string, anchor: ContextMenuAnchor) {
     cancelPendingDetails();
+    setKeyboardMove(null);
     movedCamera.current = true;
     setContextTarget({ id, anchor });
     onContextClaim(id);
+  }
+
+  function moveAction(id: string): FloatingOption {
+    const origin = byId.get(id)?.point;
+    return graphAction(
+      t,
+      "move-card",
+      origin && !editingDisabled && !activeSource
+        ? () => {
+            setKeyboardMove({ id, origin, point: origin });
+            nodes.current.get(id)?.focus({ preventScroll: true });
+          }
+        : undefined,
+    );
   }
 
   function linkAction(id: string | null): FloatingOption {
@@ -495,7 +520,7 @@ export function ProjectCanvas({
   }
 
   function startGesture(event: PointerEvent<HTMLElement>, id?: string) {
-    if (event.button !== 0 || event.ctrlKey || gesture.current) return;
+    if (event.button !== 0 || event.ctrlKey || gesture.current || moving) return;
     if (pendingDetails.current?.id !== id) cancelPendingDetails();
     draggedCard.current = null;
     const origin = id ? byId.get(id)?.point : camera;
@@ -552,17 +577,30 @@ export function ProjectCanvas({
     setPanning(false);
   }
 
-  function moveByKey(event: KeyboardEvent<HTMLButtonElement>, id: string, point: Point) {
+  function moveByKey(event: KeyboardEvent<HTMLButtonElement>, move: KeyboardMove) {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.nativeEvent.isComposing) return;
+    const { id, origin, point } = move;
+    if (event.key === SHORTCUTS.enter || event.key === SHORTCUTS.escape) {
+      event.preventDefault();
+      setKeyboardMove(null);
+      if (event.key === SHORTCUTS.enter && !event.repeat && (point.x !== origin.x || point.y !== origin.y))
+        onLayout({ action: "move", id, ...point });
+      return;
+    }
     const delta = directions[event.key];
-    if (!delta || editingDisabled || activeSource || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!delta) return;
     event.preventDefault();
     const step = event.shiftKey ? 32 : 8;
     movedCamera.current = true;
-    onLayout({
-      action: "move",
-      id,
-      x: coordinate(point.x + delta[0] * step),
-      y: coordinate(point.y + delta[1] * step),
+    setKeyboardMove((current) => {
+      if (!current || current.id !== id) return current;
+      return {
+        ...current,
+        point: {
+          x: coordinate(current.point.x + delta[0] * step),
+          y: coordinate(current.point.y + delta[1] * step),
+        },
+      };
     });
   }
 
@@ -598,12 +636,12 @@ export function ProjectCanvas({
       !event.target.closest("input, select, textarea, [contenteditable]")
     ) {
       const key = event.key.toUpperCase();
-      if (key === DETAILS_KEY && canToggleDetails) {
+      if (key === SHORTCUTS.details && canToggleDetails) {
         event.preventDefault();
         toggleDetails();
         return;
       }
-      if (key === ATLAS_KEY) {
+      if (key === SHORTCUTS.atlas) {
         event.preventDefault();
         onToggleAtlas();
         return;
@@ -616,13 +654,13 @@ export function ProjectCanvas({
       setCamera((current) => ({ ...current, x: current.x - delta[0] * 48, y: current.y - delta[1] * 48 }));
     } else if (event.key === "+" || event.key === "=") zoom(1.2);
     else if (event.key === "-") zoom(1 / 1.2);
-    else if (event.key === "0") fit(true);
+    else if (event.key === SHORTCUTS.fit) fit(true);
     else return;
     event.preventDefault();
   }
 
   function position(id: string) {
-    return preview?.id === id ? preview.point : byId.get(id)!.point;
+    return moving?.id === id ? moving.point : preview?.id === id ? preview.point : byId.get(id)!.point;
   }
 
   const toolbarLink = linkAction(selected);
@@ -691,7 +729,7 @@ export function ProjectCanvas({
         <div className="map-view-toggles">
           <MapViewToggle
             label={t("canvasShell.details")}
-            shortcut={DETAILS_KEY}
+            shortcut={SHORTCUTS.details}
             pressed={detailsOpen}
             onToggle={toggleDetails}
             disabled={!canToggleDetails}
@@ -702,7 +740,12 @@ export function ProjectCanvas({
               <path d="M14.5 4.5v15" />
             </svg>
           </MapViewToggle>
-          <MapViewToggle label={t("sidebar.atlas")} shortcut={ATLAS_KEY} pressed={atlasOpen} onToggle={onToggleAtlas}>
+          <MapViewToggle
+            label={t("sidebar.atlas")}
+            shortcut={SHORTCUTS.atlas}
+            pressed={atlasOpen}
+            onToggle={onToggleAtlas}
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="8" />
               <ellipse cx="12" cy="12" rx="3.6" ry="8" />
@@ -727,9 +770,13 @@ export function ProjectCanvas({
         onPointerCancel={(event) => finishGesture(event, false)}
         onLostPointerCapture={(event) => finishGesture(event, false)}
       >
-        {(activeSource || linkNotice) && (
+        {(moving || activeSource || linkNotice) && (
           <p className="project-canvas-message" role="status">
-            {activeSource ? t("projectCanvas.chooseLinkTarget", { title: activeSource.title }) : linkNotice}
+            {moving
+              ? moveHint
+              : activeSource
+                ? t("projectCanvas.chooseLinkTarget", { title: activeSource.title })
+                : linkNotice}
           </p>
         )}
         <div
@@ -744,7 +791,10 @@ export function ProjectCanvas({
           {cards.map((card) => {
             const at = position(card.id);
             const menu = contextMenuProps((anchor) => openContextMenu(card.id, anchor));
-            const movingShortcuts = layoutUnavailable ? "" : " ArrowLeft ArrowRight ArrowUp ArrowDown";
+            const keyboardMoving = moving?.id === card.id;
+            const movingShortcuts = keyboardMoving
+              ? ` ${[...SHORTCUTS.arrows, SHORTCUTS.enter, SHORTCUTS.escape].join(" ")}`
+              : "";
             const progress = claimProgressText(t, claimProgress?.get(card.id), card.status);
             return (
               <button
@@ -758,7 +808,7 @@ export function ProjectCanvas({
                 className="project-canvas-node"
                 data-claim-id={card.id}
                 data-link-source={activeSource?.id === card.id ? "true" : undefined}
-                data-moving={preview?.id === card.id ? "true" : undefined}
+                data-moving={keyboardMoving || preview?.id === card.id ? "true" : undefined}
                 aria-pressed={selected === card.id}
                 aria-label={card.title}
                 aria-description={[
@@ -766,19 +816,33 @@ export function ProjectCanvas({
                   progress.count ?? progress.emptyCountLabel,
                   progress.emptyCountHint,
                   card.domain,
+                  keyboardMoving && moveHint,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
                 aria-keyshortcuts={menu["aria-keyshortcuts"] + (onOpenProof ? " Enter" : "") + movingShortcuts}
                 title={card.title}
                 style={{ left: at.x, top: at.y, width: WIDTH, height: HEIGHT }}
-                onClick={(event) => clickCard(event, card.id)}
+                onClick={(event) => {
+                  if (!keyboardMoving) clickCard(event, card.id);
+                }}
                 onPointerDown={(event) => startGesture(event, card.id)}
+                onBlur={() => {
+                  if (keyboardMoving) setKeyboardMove(null);
+                }}
                 onKeyDown={(event) => {
+                  if (event.key === SHORTCUTS.enter && event.repeat) {
+                    event.preventDefault();
+                    return;
+                  }
+                  if (keyboardMoving) {
+                    moveByKey(event, moving);
+                    return;
+                  }
                   menu.onKeyDown(event);
                   if (
                     !event.defaultPrevented &&
-                    event.key === "Enter" &&
+                    event.key === SHORTCUTS.enter &&
                     !activeSource &&
                     onOpenProof &&
                     !event.ctrlKey &&
@@ -790,7 +854,6 @@ export function ProjectCanvas({
                     cancelPendingDetails();
                     onOpenProof(card.id);
                   }
-                  if (!event.defaultPrevented) moveByKey(event, card.id, at);
                 }}
               >
                 <span className="project-canvas-title">{card.title}</span>
@@ -848,7 +911,7 @@ export function ProjectCanvas({
         <ContextMenu
           anchor={contextTarget.anchor}
           label={t("graphActions.forTarget", { title: contextCard.title })}
-          groups={claimActions(contextCard.id, linkAction(contextCard.id))}
+          groups={claimActions(contextCard.id, linkAction(contextCard.id), moveAction(contextCard.id))}
           onDismiss={dismissContextMenu}
         />
       )}

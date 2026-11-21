@@ -379,7 +379,7 @@ export function Workbench({
       void copy(text);
     });
 
-  function claimActions(id: string, link: FloatingOption): FloatingGroup[] {
+  function claimActions(id: string, link: FloatingOption, move: FloatingOption): FloatingGroup[] {
     const scope = graph?.claim.id === id ? graph : null;
     const target = scope ? goal : undefined;
     const unavailable = target
@@ -402,6 +402,7 @@ export function Workbench({
           graphAction(t, "proof-task", scope && target ? () => openProofTask(id) : undefined, unavailable),
           graphAction(t, "ask-agent", scope && target ? () => askAgent(scope, target) : undefined, unavailable),
           link,
+          move,
         ],
       },
       { options: copyActions(target, unavailable) },

@@ -24,6 +24,7 @@ const ACTIONS = {
   "show-library": { label: "graphActions.showLibrary", icon: "library" },
   "link-claim": { label: "projectCanvas.linkClaim", icon: "link" },
   "cancel-link": { label: "projectCanvas.cancelLink", icon: "cancel" },
+  "move-card": { label: "projectCanvas.moveCard", icon: "move" },
 } satisfies Record<string, ActionDefinition>;
 
 type ActionId = keyof typeof ACTIONS;
@@ -33,6 +34,11 @@ export type ProjectActionRequest = { id: Exclude<ProjectAction, "proof-task"> } 
 
 export function graphActionLabel(t: TFunction, id: ActionId) {
   return t(ACTIONS[id].label);
+}
+
+export function graphActionShortcut(id: ActionId): string | undefined {
+  const action: ActionDefinition = ACTIONS[id];
+  return action.shortcut;
 }
 
 export function graphAction(t: TFunction, id: ActionId, onSelect: (() => void) | undefined, detail?: string) {

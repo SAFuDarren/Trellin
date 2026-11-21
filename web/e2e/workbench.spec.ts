@@ -347,7 +347,7 @@ test("graph controls and Help retain accessible structure", async ({ page }) => 
   await goToSection(page, "Help");
   const definitions = page.locator(".help dl.keys");
   await expect(definitions).toHaveCount(2);
-  await expect(definitions.locator(":scope > div > dt + dd")).toHaveCount(14);
+  await expect(definitions.locator(":scope > div > dt + dd")).toHaveCount(15);
 });
 
 test("every section opens through the rail or a navigation menu without errors", async ({ page }) => {

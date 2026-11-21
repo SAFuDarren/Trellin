@@ -14,6 +14,7 @@ import type { ConversationStarterScope } from "./components/ConversationRecipien
 import { CommandPalette } from "./components/CommandPalette";
 import { Rail } from "./components/Rail";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
+import { ShortcutSheet } from "./components/ShortcutSheet";
 import { AgentWorkPage } from "./pages/AgentWorkPage";
 import { ClaimsPage } from "./pages/ClaimsPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
@@ -29,6 +30,7 @@ import { useRoute } from "./shell/route";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
 import { buildWorkspaceActivity } from "./shell/workspaceActivity";
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
+import { SHORTCUTS } from "./shortcuts";
 import { Workbench, type Focus, type WorkbenchPosition } from "./Workbench";
 import { graphAction, type ProjectActionRequest } from "./workbench/actions";
 import { buildClaimProgress } from "./workbench/claimProgress";
@@ -77,6 +79,7 @@ export function Shell({ session }: { session: string }) {
     [session],
   );
   const [palette, setPalette] = useState<{ session: string; query: string } | null>(null);
+  const [shortcutSheetOpen, setShortcutSheetOpen] = useState(false);
   const [projectAction, setProjectAction] = useState<{ session: string; request: ProjectActionRequest } | null>(null);
   const [lastWorkbench, setLastWorkbench] = useState<{ session: string; position: WorkbenchPosition } | null>(null);
   const position = lastWorkbench?.session === session ? lastWorkbench.position : undefined;
@@ -98,13 +101,29 @@ export function Shell({ session }: { session: string }) {
 
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
+      if (event.isComposing || event.defaultPrevented) return;
+      if (event.key === SHORTCUTS.sheet) {
+        if (
+          event.repeat ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          document.querySelector("dialog[open]") ||
+          (event.target instanceof HTMLElement &&
+            event.target.closest(
+              "input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]",
+            ))
+        )
+          return;
+        event.preventDefault();
+        setShortcutSheetOpen(true);
+        return;
+      }
       if (
-        event.key.toLowerCase() !== "k" ||
+        event.key.toUpperCase() !== SHORTCUTS.paletteKey ||
         (!event.metaKey && !event.ctrlKey) ||
         event.altKey ||
-        event.shiftKey ||
-        event.isComposing ||
-        event.defaultPrevented
+        event.shiftKey
       )
         return;
       if (document.querySelector("dialog[open]") && !paletteOpen) return;
@@ -234,7 +253,7 @@ export function Shell({ session }: { session: string }) {
             ) : section === "settings" ? (
               <SettingsPage onResetLayout={resetLayout} updates={releaseUpdates} />
             ) : section === "help" ? (
-              <HelpPage />
+              <HelpPage onShowShortcuts={() => setShortcutSheetOpen(true)} />
             ) : (
               <Workbench
                 key={session}
@@ -287,6 +306,7 @@ export function Shell({ session }: { session: string }) {
               setPalette((current) => (current?.session === session ? { session, query } : current))
             }
           />
+          <ShortcutSheet open={shortcutSheetOpen} onClose={() => setShortcutSheetOpen(false)} />
         </div>
       </ConversationEditors>
     </LiveWorkspaceUpdates.Provider>

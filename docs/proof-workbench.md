@@ -23,7 +23,7 @@ Use the left sidebar to open a project. Its **Project map** shows the project's 
 
 Choose **Global map** to show the existing overview of recent claims and their recorded proof dependencies in the current workspace. Move it by its title, resize it from the corner, or choose a claim in the overview to bring its card into view.
 
-Drag cards or focus a card and use the arrow keys to move it. To record a research relationship, select a claim, choose **Link selected claim**, and select the other claim. Escape cancels the link. **Research links** lists saved links and lets you remove them. Positions and research links are saved per project in this device's settings.
+Drag a card to move it. To move it with the keyboard, focus the card, open its context menu and choose **Move card**. The arrow keys preview the move, Enter saves it and Escape cancels it. To record a research relationship, select a claim, choose **Link selected claim**, and select the other claim. Escape cancels the link. **Research links** lists saved links and lets you remove them. Positions and research links are saved per project in this device's settings.
 
 Open **Settings and help** at the bottom of the rail to find settings or the usage guide. Press Escape to close either menu and return focus to its button.
 

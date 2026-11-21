@@ -266,6 +266,56 @@ test("finding a claim with the keyboard focuses its card without completing a pe
   await expect(cancelLink).toBeHidden();
 });
 
+test("keyboard moves preview without writing and save only when confirmed", async ({ page }) => {
+  await page.goto("/#session=fixture");
+  const card = mapClaim(page, FIXTURE_CLAIM_TITLE);
+  const layoutWrites: unknown[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/project-canvas")
+      layoutWrites.push(request.postDataJSON());
+  });
+  const position = () =>
+    card.evaluate((element) => ({ x: parseFloat(element.style.left), y: parseFloat(element.style.top) }));
+  const original = await position();
+  await card.press("ArrowRight");
+  expect(await position()).toEqual(original);
+  expect(layoutWrites).toHaveLength(0);
+
+  const move = page.getByRole("menuitem", { name: "Move card", exact: true });
+  async function begin() {
+    await card.press("Shift+F10");
+    await expect(move).toBeEnabled();
+    await move.press("Enter");
+    await expect(card).toBeFocused();
+    await expect(card).toHaveAttribute("data-moving", "true");
+    await expect(page.getByRole("status").filter({ hasText: "Use arrow keys to move." })).toBeVisible();
+  }
+  await begin();
+  await card.press("ArrowRight");
+  await card.press("Shift+ArrowDown");
+  expect(await position()).toEqual({ x: original.x + 8, y: original.y + 32 });
+  expect(layoutWrites).toHaveLength(0);
+
+  await card.press("Escape");
+  await expect(card).not.toHaveAttribute("data-moving", "true");
+  await expect(card).toBeFocused();
+  expect(await position()).toEqual(original);
+  expect(layoutWrites).toHaveLength(0);
+
+  await begin();
+  await card.press("ArrowRight");
+  const saved = { x: original.x + 8, y: original.y };
+  const response = page.waitForResponse(
+    (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/project-canvas",
+  );
+  await card.press("Enter");
+  expect((await response).ok()).toBe(true);
+  await expect(card).not.toHaveAttribute("data-moving", "true");
+  expect(layoutWrites).toEqual([{ action: "move", id: await card.getAttribute("data-claim-id"), ...saved }]);
+  await page.reload();
+  await expect.poll(position).toEqual(saved);
+});
+
 test("moving nodes and linking claims are deliberate and remain after reopen", async ({ page, request }) => {
   await page.goto("/#session=fixture");
   const canvas = page.locator(".project-canvas");
