@@ -30,10 +30,9 @@ export function ProjectActions({
   claimTitle,
   premiseReview,
   premiseDialog,
-  overview,
-  onToggleOverview,
+  proofDialog,
   onOpenPremises,
-  onClosePremises,
+  onClose,
   onPremiseRecorded,
   onRecorded,
   onGoalRecorded,
@@ -47,18 +46,17 @@ export function ProjectActions({
   claimTitle: string;
   premiseReview?: PremiseReview;
   premiseDialog: { id?: string } | null;
-  overview?: boolean;
-  onToggleOverview: () => void;
+  proofDialog: boolean;
   onOpenPremises: (id?: string) => void;
-  onClosePremises: () => void;
+  onClose: () => void;
   onPremiseRecorded: () => Promise<void>;
   onRecorded: (claimId?: string) => void | Promise<void>;
   onGoalRecorded: (claimId: string) => void | Promise<void>;
   onOpenReference: (claimId: string, nodeId: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const [localMode, setMode] = useState<Exclude<Mode, "premises"> | null>(null);
-  const mode = premiseDialog ? "premises" : localMode;
+  const [localMode, setMode] = useState<Exclude<Mode, "premises" | "proof"> | null>(null);
+  const mode = premiseDialog ? "premises" : proofDialog ? "proof" : localMode;
   const dialog = useRef<HTMLDialogElement>(null);
   const actions = useRef<HTMLDetailsElement>(null);
   const title = useId();
@@ -81,7 +79,7 @@ export function ProjectActions({
     actions.current.open = false;
     actions.current.querySelector("summary")?.focus();
   };
-  const show = (next: Mode) => {
+  const show = (next: Exclude<Mode, "proof">) => {
     closeActions();
     if (next === "premises") onOpenPremises();
     else setMode(next);
@@ -92,11 +90,6 @@ export function ProjectActions({
       <button className="button" type="button" onClick={() => show("theorem")}>
         {t("projectEntry.addTheorem")}
       </button>
-      {claimId && (
-        <button className="button" type="button" onClick={() => show("proof")}>
-          {t("proofTask.title")}
-        </button>
-      )}
       <details
         className="workbench-actions-menu"
         ref={actions}
@@ -126,18 +119,6 @@ export function ProjectActions({
               {t("claimCodes.title")}
             </button>
           )}
-          {overview !== undefined && (
-            <button
-              type="button"
-              aria-pressed={overview}
-              onClick={() => {
-                onToggleOverview();
-                closeActions();
-              }}
-            >
-              {t("canvasShell.proofOverview")}
-            </button>
-          )}
         </div>
       </details>
       <dialog
@@ -146,7 +127,7 @@ export function ProjectActions({
         aria-labelledby={title}
         onClose={() => {
           setMode(null);
-          onClosePremises();
+          onClose();
         }}
       >
         {mode && (

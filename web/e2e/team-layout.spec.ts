@@ -68,7 +68,8 @@ test("Team groups real data views and keeps both model connection entries", asyn
   await expect(jobs.getByText("Running", { exact: true })).toHaveCount(0);
   await expect(jobs.getByText("Queued", { exact: true })).toBeVisible();
   await main.getByRole("button", { name: TITLE }).press("Enter");
-  await expect(page.getByRole("heading", { level: 1, name: TITLE })).toBeVisible();
+  await expect(page.getByRole("application", { name: "Project map", exact: true })).toBeVisible();
+  await expect(page.locator("#node-detail")).toContainText(TITLE);
 });
 
 test("Team limits long text to its table in a compact Chinese window", async ({ page }) => {

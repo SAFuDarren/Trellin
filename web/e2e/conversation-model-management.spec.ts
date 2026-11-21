@@ -76,13 +76,17 @@ for (const surface of ["Workbench", "Chats"] as const) {
     if (surface === "Workbench") {
       await openProof(page);
       await page.getByRole("button", { name: /^Proof obligation 2/ }).click();
+      await page.getByRole("button", { name: "Ask an Agent" }).click();
+      await page.getByLabel("Choose an Agent", { exact: true }).click();
+      await page.getByRole("button", { name: "Choose a model", exact: true }).click();
+      await page.getByRole("button", { name: "Open conversation" }).click();
     } else {
       await page
         .locator("nav.rail")
         .getByRole("link", { name: /^Chats/ })
         .click();
+      await page.getByRole("button", { name: "New conversation" }).click();
     }
-    await page.getByRole("button", { name: "New conversation" }).click();
     const panel = page.locator(".conversation-panel");
     const draft = panel.getByRole("textbox", { name: "Write a message" });
     const picker = panel.getByRole("button", { name: "Conversation model" });

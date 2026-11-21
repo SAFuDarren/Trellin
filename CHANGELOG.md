@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.49
+
+- Keep the project map visible while inspecting Lean proofs, proof tasks, and review. Open Agent Chat from any page or attach the selected proof node explicitly from its details. Use Activity to check saved Agent tasks and their replies.
+
 ## 1.0.48
 
 - Assign project work to a saved Team agent. Preview the approved inputs, hand the recorded delivery to another agent, and accept or return the result from Agent work. Database revision `0083` keeps assignments, attempts, and decisions available after reopening.

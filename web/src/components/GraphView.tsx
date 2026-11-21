@@ -16,9 +16,8 @@ import {
   type View,
 } from "../workbench/graph";
 import { kindText, nodeStatus, nodeSub, nodeTitle, nodeTone, type Tone } from "../workbench/text";
-import type { AtlasClaim, ImpactPreview } from "../workbench/types";
-import type { AtlasBox, CardSizes } from "../workbench/useLayout";
-import { AtlasMap, atlasPlacement } from "./AtlasMap";
+import type { ImpactPreview } from "../workbench/types";
+import type { CardSizes } from "../workbench/useLayout";
 import { Clock, Mark, Spin } from "./Icons";
 
 type Camera = { x: number; y: number; k: number };
@@ -51,15 +50,9 @@ type Props = {
   work: Map<string, NodeWork>;
   running: number;
   queued: number;
-  atlasClaims: AtlasClaim[];
-  claimId: string;
-  atlasOpen: boolean;
-  atlasBox: AtlasBox | null;
-  onAtlasBox: (box: AtlasBox, persist: boolean) => void;
   cardSizes: CardSizes;
   onResizeCard: (id: string, size: CardSize) => void;
   onSelect: (id: string) => void;
-  onView: (view: View) => void;
 };
 
 export function GraphView(props: Props) {
@@ -125,22 +118,16 @@ export function GraphView(props: Props) {
     return () => observer.disconnect();
   }, []);
 
-  const box = atlasPlacement(props.atlasBox, stageSize.width, stageSize.height);
-  const atlasVisible = props.atlasOpen && props.atlasClaims.length > 0;
-
   const fit = useCallback(() => {
     const { width, height } = stageSize;
     if (!width || !height) return;
-    // Leave the overview map uncovered when there is room beside it; otherwise the graph may pass under it.
-    const mapRight = !atlasVisible || box.y > height / 2 ? 0 : box.x + box.w + 12;
-    const inset = mapRight && mapRight < width * 0.4 ? mapRight : 0;
-    const k = Math.max(0.3, Math.min(1.25, (width - inset - 32) / canvasWidth, (height - 56) / canvasHeight));
+    const k = Math.max(0.3, Math.min(1.25, (width - 32) / canvasWidth, (height - 56) / canvasHeight));
     setCamera({
       k,
-      x: inset + (width - inset - canvasWidth * k) / 2,
-      y: Math.max(8, (height - canvasHeight * k) / 2),
+      x: (width - canvasWidth * k) / 2,
+      y: Math.max(8, (height - 32 - canvasHeight * k) / 2),
     });
-  }, [stageSize, canvasWidth, canvasHeight, atlasVisible, box.x, box.y, box.w]);
+  }, [stageSize, canvasWidth, canvasHeight]);
 
   // A new claim gets a fresh view; otherwise the camera stays where the researcher left it.
   useEffect(() => {
@@ -167,9 +154,12 @@ export function GraphView(props: Props) {
     const element = stage.current;
     if (!element) return;
     const onWheel = (event: WheelEvent) => {
+      const zooming = event.ctrlKey || event.metaKey;
+      // Vertical scrolling on the proof graph should still reach the rest of the inspector.
+      if (!zooming && !event.shiftKey && Math.abs(event.deltaY) >= Math.abs(event.deltaX)) return;
       event.preventDefault();
       if (drag.current) return;
-      if (event.ctrlKey || event.metaKey) {
+      if (zooming) {
         const bounds = element.getBoundingClientRect();
         const factor = Math.exp(-event.deltaY * 0.01);
         const cx = event.clientX - bounds.left;
@@ -311,6 +301,7 @@ export function GraphView(props: Props) {
         role="application"
         aria-roledescription={t("stage.roleDescription")}
         aria-label={t("stage.label")}
+        data-proof-view={view}
         data-panning={panning ? "true" : undefined}
         onPointerDown={startPan}
         onKeyDown={onKeyDown}
@@ -432,22 +423,6 @@ export function GraphView(props: Props) {
             })}
           </div>
         </div>
-        <div className="segmented" role="group" aria-label={t("views.label")}>
-          {(["proof", "references", "impact"] as const).map((key) => (
-            <button key={key} type="button" aria-pressed={view === key} onClick={() => props.onView(key)}>
-              {t(`views.${key}`)}
-            </button>
-          ))}
-        </div>
-        {atlasVisible && (
-          <AtlasMap
-            claims={props.atlasClaims}
-            claimId={props.claimId}
-            box={box}
-            stageWidth={stageSize.width}
-            onBox={props.onAtlasBox}
-          />
-        )}
         <div className="zoom" role="group" aria-label={t("stage.zoom")}>
           <button type="button" aria-label={t("stage.zoomOut")} onClick={() => zoomAt(1 / 1.2)}>
             <svg viewBox="0 0 14 14" aria-hidden="true">

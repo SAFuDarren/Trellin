@@ -18,7 +18,7 @@ async function open(page: Page, section?: string) {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/#session=fixture");
   await openProof(page);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("自然数加零的对称性");
+  await expect(page.getByRole("application", { name: "Project map", exact: true })).toBeVisible();
   if (section) await goToSection(page, section);
   return errors;
 }
@@ -65,22 +65,26 @@ test("claims, graph, live work, legend and details load without errors", async (
   await expect(page.locator(".legend")).toContainText("Running");
   // The legend's dividers stay thin lines; a page style once turned them into cards.
   expect((await page.locator(".legend .rule").first().boundingBox())?.width ?? 99).toBeLessThan(4);
-  await expect(page.locator(".atlas")).toBeVisible();
-  await expect(page.locator(".node-detail h2")).toHaveText("reverseZeroAdd");
+  await expect(page.locator(".node-detail h2")).toHaveText("自然数加零的对称性");
   expect(errors).toEqual([]);
 });
 
 test("selecting a node shows its details and conversation", async ({ page }) => {
   await open(page);
   await card(page, /^Proof obligation 2$/).click();
-  await page.getByRole("button", { name: "Proof activity" }).click();
+  await page
+    .locator("summary")
+    .filter({ hasText: /^Proof activity$/ })
+    .click();
   await expect(page.locator(".node-detail h2")).toHaveText("Proof obligation 2");
   await expect(page.locator(".node-detail")).toContainText("Blocked:");
-  await expect(page.locator("#chat-target")).toHaveText("Proof obligation 2");
+  await expect(page.getByRole("region", { name: "Proof activity" }).getByRole("heading")).toContainText(
+    "Proof obligation 2",
+  );
   await expect(page.locator(".chat-feed .live")).toHaveCount(2);
   await expect(page.locator("#guidance-audience option").first()).toHaveText(/^[A-Z0-9]+-\d\d · Local$/);
   await page.getByRole("button", { name: "All nodes" }).click();
-  await expect(page.locator("#chat-target")).toHaveText("Whole claim");
+  await expect(page.getByRole("region", { name: "Proof activity" }).getByRole("heading")).toHaveText("Whole claim");
 });
 
 test("the impact view previews what withdrawing an assumption affects", async ({ page }) => {
@@ -111,7 +115,10 @@ test("queues a Codex proof note with one action, retaining a failed note and sho
 
   await open(page);
   await card(page, /^Proof obligation 2$/).click();
-  await page.getByRole("button", { name: "Proof activity" }).click();
+  await page
+    .locator("summary")
+    .filter({ hasText: /^Proof activity$/ })
+    .click();
   await page.locator("#guidance-audience").selectOption("codex");
   const firstLine = "先检查陈述。";
   const secondLine = "Try the reduction route first.";
@@ -173,7 +180,10 @@ test("queues a Codex proof note with one action, retaining a failed note and sho
   await page.reload();
   await openProof(page);
   await card(page, /^Proof obligation 2$/).click();
-  await page.getByRole("button", { name: "Proof activity" }).click();
+  await page
+    .locator("summary")
+    .filter({ hasText: /^Proof activity$/ })
+    .click();
   await expect(status).toContainText("Included in a Codex proof attempt");
   await expect(status).not.toContainText("Open Proof task");
 });
@@ -215,7 +225,10 @@ test("a blocked proof node keeps a private draft across reopen", async ({ page }
 
   const select = async () => {
     await card(page, /^Proof obligation 2$/).click();
-    await page.getByRole("button", { name: "Proof activity" }).click();
+    await page
+      .locator("summary")
+      .filter({ hasText: /^Proof activity$/ })
+      .click();
   };
   await open(page);
   await select();
@@ -241,9 +254,10 @@ test("a blocked proof node keeps a private draft across reopen", async ({ page }
 
 test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   await open(page);
-  const level = page.locator(".zoom-level");
+  const canvas = page.getByRole("application", { name: "Project map", exact: true });
+  const level = canvas.locator(".zoom-level");
   const before = await level.textContent();
-  await page.getByRole("button", { name: "Zoom in" }).click();
+  await canvas.getByRole("button", { name: "Zoom in" }).click();
   await expect(level).not.toHaveText(before ?? "");
   const splitter = page.locator('.splitter[data-split="side"]');
   await splitter.focus();
@@ -256,8 +270,9 @@ test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   await expect(page.locator('.splitter[data-split="side"]')).toHaveAttribute("aria-valuenow", "272");
 });
 
-test("the proof overview can be moved and resized", async ({ page }) => {
+test("the global map can be moved and resized", async ({ page }) => {
   await open(page);
+  await page.getByRole("button", { name: "Global map", exact: true }).click();
   const caption = page.locator(".atlas figcaption");
   const start = await caption.boundingBox();
   if (!start) throw new Error("atlas not visible");
@@ -280,10 +295,11 @@ test("graph controls and Help retain accessible structure", async ({ page }) => 
   const nodes = page.locator('.graph-node[aria-controls="node-detail"]');
   await expect(nodes).toHaveCount(7);
   await expect(inspect).toBeVisible();
-  await page.getByRole("button", { name: "Collapse review column" }).click();
+  const map = page.getByRole("application", { name: "Project map", exact: true });
+  await page.getByRole("button", { name: "Close details" }).click();
   await expect(inspect).toBeHidden();
-  await expect(inspect).toBeAttached();
-  await expect(nodes).toHaveCount(7);
+  await expect(map).toBeVisible();
+  await page.getByRole("button", { name: "Global map", exact: true }).click();
 
   const resize = page.getByRole("separator", { name: "Drag to resize the overview" });
   const width = () => page.locator(".atlas").evaluate((map) => Math.round(map.getBoundingClientRect().width));
@@ -298,7 +314,7 @@ test("graph controls and Help retain accessible structure", async ({ page }) => 
   await page.setViewportSize({ width: 360, height: 560 });
   await expect
     .poll(async () => {
-      const stageWidth = await page.locator(".stage").evaluate((stage) => stage.clientWidth);
+      const stageWidth = await map.evaluate((stage) => stage.clientWidth);
       const maximumWidth = Number(await resize.getAttribute("aria-valuemax"));
       return maximumWidth < 420 && maximumWidth === Math.max(110, stageWidth - 24);
     })
@@ -330,6 +346,7 @@ test("every section opens through the rail or a navigation menu without errors",
     await expect(page.locator("#section-title")).toHaveText(heading);
   }
   await railLink(page, "Home").click();
+  await openProof(page);
   await expect(page.locator(".graph-node")).toHaveCount(7);
   expect(errors).toEqual([]);
 });
@@ -657,7 +674,10 @@ test("Workbench retries one anchored local conversation message by Enter without
   await open(page);
   const node = card(page, /^Proof obligation 2$/);
   await node.click();
-  await page.getByRole("button", { name: "New conversation" }).click();
+  await page.getByRole("button", { name: "Ask an Agent" }).click();
+  await page.getByLabel("Choose an Agent", { exact: true }).click();
+  await page.getByRole("button", { name: "Choose a model", exact: true }).click();
+  await page.getByRole("button", { name: "Open conversation" }).click();
   const picker = page.getByRole("button", { name: "Conversation model" });
   const pickerMenu = page.getByRole("menu", { name: "Conversation model" });
   await picker.click();

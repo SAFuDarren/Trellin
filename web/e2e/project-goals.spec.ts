@@ -56,7 +56,7 @@ test("adding a project goal keeps the current proof open and draws no dependency
 
   await page.goto("/#session=fixture");
   await openProof(page);
-  const heading = page.getByRole("heading", { level: 1 });
+  const heading = page.locator("#node-detail").getByRole("heading", { level: 2 });
   await expect(heading).toHaveText("自然数加零的对称性");
   const originalProof = page.locator(".graph-nodes");
   const originalGoal = originalProof.locator('[data-node="goal:' + ORIGINAL_CLAIM + '"]');
@@ -65,7 +65,7 @@ test("adding a project goal keeps the current proof open and draws no dependency
   await expect(edges).toHaveCount(7);
   const oldPaths = await edges.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")));
   await originalNode.click();
-  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await page.locator("#review").getByRole("button", { name: "Zoom in", exact: true }).click();
 
   await page.getByRole("button", { name: "Add theorem" }).click();
   const dialog = page.getByRole("dialog");
@@ -80,15 +80,16 @@ test("adding a project goal keeps the current proof open and draws no dependency
 
   const newClaim = mapClaim(page, NEW_GOAL.title);
   await expect(dialog).toBeHidden();
-  await expect(heading).toHaveText("自然数加零的对称性");
+  await expect(heading).toHaveText("Proof obligation 2");
+  await expect(newClaim).toBeVisible();
   await expect(originalNode).toHaveAttribute("aria-pressed", "true");
   await expect(originalGoal).toBeVisible();
   await expect(edges).toHaveCount(7);
   expect(await edges.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")))).toEqual(oldPaths);
   expect(requestedGraphs).not.toContain(NEW_GOAL.id);
 
-  await page.getByRole("button", { name: "Project map", exact: true }).click();
-  await expect(newClaim).toBeVisible();
+  await page.getByRole("button", { name: "View on project map", exact: true }).click();
+  await expect(newClaim).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#node-detail").getByRole("heading", { name: NEW_GOAL.title })).toBeVisible();
   await expect(originalProof).toHaveCount(0);
 
@@ -101,10 +102,11 @@ test("adding a project goal keeps the current proof open and draws no dependency
   expect(await edges.evaluateAll((paths) => paths.map((path) => path.getAttribute("d")))).toEqual(oldPaths);
   expect(requestedGraphs).not.toContain(NEW_GOAL.id);
 
-  await page.getByRole("button", { name: "Project map", exact: true }).click();
   await openProof(page, NEW_GOAL.title);
   await expect(heading).toHaveText(NEW_GOAL.title);
   await expect(originalProof.locator('[data-node="goal:' + NEW_GOAL.id + '"]')).toBeVisible();
   await expect(edges).toHaveCount(0);
+  await expect(page.getByText("No supporting proof nodes are recorded yet.")).toBeVisible();
+  await expect(page.locator(".project-canvas-node")).toHaveCount(6);
   expect(requestedGraphs).toContain(NEW_GOAL.id);
 });

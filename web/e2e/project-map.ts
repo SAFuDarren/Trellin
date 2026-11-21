@@ -6,7 +6,10 @@ export function mapClaim(page: Page, title: string) {
   return page.locator(".project-canvas-plot").getByRole("button", { name: title, exact: true });
 }
 
-export async function openProof(page: Page, title = FIXTURE_CLAIM_TITLE, label = /^(Open proof|打开证明)$/) {
+export async function openProof(page: Page, title = FIXTURE_CLAIM_TITLE, label = /^(Proof details|证明详情)$/) {
   await mapClaim(page, title).click();
-  await page.getByRole("button", { name: label }).click();
+  const summary = page.locator("summary").filter({ hasText: label });
+  if (!(await summary.evaluate((element) => (element.parentElement as HTMLDetailsElement).open))) {
+    await summary.click();
+  }
 }

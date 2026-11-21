@@ -4,6 +4,7 @@ import { LiveWorkspaceUpdates, WORKSPACE_WRITES } from "./api/liveUpdates";
 import { useReleaseUpdates } from "./api/releaseUpdates";
 import { useInbox, useTeam } from "./api/sections";
 import { workspaceEventCursor, workspaceId } from "./api/workspaceEvents";
+import { AgentChatDock, type AgentChatAnchor } from "./components/AgentChatDock";
 import { Rail } from "./components/Rail";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
 import { AgentWorkPage } from "./pages/AgentWorkPage";
@@ -15,6 +16,7 @@ import { ProgressPage } from "./pages/ProgressPage";
 import { ReviewPage } from "./pages/ReviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TeamPage } from "./pages/TeamPage";
+import { ConversationEditors } from "./shell/ConversationEditors";
 import { useRoute } from "./shell/route";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
@@ -36,6 +38,7 @@ export function Shell({ session }: { session: string }) {
   const live = comprehensive && sessionConnection?.workspace === workspace && Boolean(sessionConnection?.live);
   const team = useTeam(session, live);
   const [focus, setFocus] = useState<Focus | null>(null);
+  const [chatAnchor, setChatAnchor] = useState<{ session: string; value: AgentChatAnchor } | null>(null);
   const [lastWorkbench, setLastWorkbench] = useState<{ session: string; position: WorkbenchPosition } | null>(null);
   const saveWorkbench = useCallback(
     (position: WorkbenchPosition) => {
@@ -75,51 +78,61 @@ export function Shell({ session }: { session: string }) {
   const { section, sub } = route;
   return (
     <LiveWorkspaceUpdates.Provider value={live}>
-      <div className="shell">
-        {eventFeed && (
-          <WorkspaceEventFeed
-            key={`${session}:${eventFeed.workspace_id}:${comprehensive}`}
+      <ConversationEditors key={session} session={session}>
+        <div className="workbench-frame">
+          <div className="shell">
+            {eventFeed && (
+              <WorkspaceEventFeed
+                key={`${session}:${eventFeed.workspace_id}:${comprehensive}`}
+                session={session}
+                workspace={eventFeed.workspace_id}
+                bootstrapCursor={eventFeed.cursor}
+                comprehensive={comprehensive}
+                onConnection={setConnection}
+              />
+            )}
+            <Rail current={section} badges={{ team: { count: running, live: true } }} />
+            {section === "review" ? (
+              <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
+            ) : section === "claims" ? (
+              sub === "agent-work" || sub.startsWith("agent-work/") ? (
+                <AgentWorkPage session={session} sub={sub} />
+              ) : (
+                <ClaimsPage session={session} sub={sub} onOpen={open} />
+              )
+            ) : section === "library" ? (
+              <LibraryPage session={session} sub={sub} onOpen={open} />
+            ) : section === "chat" ? (
+              <ConversationsPage session={session} sub={sub} onOpen={open} />
+            ) : section === "team" ? (
+              <TeamPage session={session} sub={sub} onOpen={open} />
+            ) : section === "progress" ? (
+              <ProgressPage session={session} sub={sub} onOpen={open} />
+            ) : section === "settings" ? (
+              <SettingsPage onResetLayout={resetLayout} updates={releaseUpdates} />
+            ) : section === "help" ? (
+              <HelpPage />
+            ) : (
+              <Workbench
+                key={session}
+                session={session}
+                focus={focus}
+                onFocusHandled={setFocus}
+                pendingReviews={pendingReviews}
+                returnTo={lastWorkbench?.session === session ? lastWorkbench.position : undefined}
+                onPositionChange={saveWorkbench}
+                onChatAnchor={(anchor, title) => setChatAnchor({ session, value: { anchor, title } })}
+              />
+            )}
+            <ReleaseUpdateNotice updates={releaseUpdates} />
+          </div>
+          <AgentChatDock
             session={session}
-            workspace={eventFeed.workspace_id}
-            bootstrapCursor={eventFeed.cursor}
-            comprehensive={comprehensive}
-            onConnection={setConnection}
+            route={route}
+            anchorRequest={chatAnchor?.session === session ? chatAnchor.value : null}
           />
-        )}
-        <Rail current={section} badges={{ team: { count: running, live: true } }} />
-        {section === "review" ? (
-          <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
-        ) : section === "claims" ? (
-          sub === "agent-work" || sub.startsWith("agent-work/") ? (
-            <AgentWorkPage session={session} sub={sub} />
-          ) : (
-            <ClaimsPage session={session} sub={sub} onOpen={open} />
-          )
-        ) : section === "library" ? (
-          <LibraryPage session={session} sub={sub} onOpen={open} />
-        ) : section === "chat" ? (
-          <ConversationsPage session={session} sub={sub} onOpen={open} />
-        ) : section === "team" ? (
-          <TeamPage session={session} sub={sub} onOpen={open} />
-        ) : section === "progress" ? (
-          <ProgressPage session={session} sub={sub} onOpen={open} />
-        ) : section === "settings" ? (
-          <SettingsPage onResetLayout={resetLayout} updates={releaseUpdates} />
-        ) : section === "help" ? (
-          <HelpPage />
-        ) : (
-          <Workbench
-            key={session}
-            session={session}
-            focus={focus}
-            onFocusHandled={setFocus}
-            pendingReviews={pendingReviews}
-            returnTo={lastWorkbench?.session === session ? lastWorkbench.position : undefined}
-            onPositionChange={saveWorkbench}
-          />
-        )}
-        <ReleaseUpdateNotice updates={releaseUpdates} />
-      </div>
+        </div>
+      </ConversationEditors>
     </LiveWorkspaceUpdates.Provider>
   );
 }

@@ -36,6 +36,8 @@ type Props = {
   impactLoading: boolean;
   impactError: string;
   notice?: { text: string; error: boolean };
+  actions?: ReactNode;
+  children?: ReactNode;
   onSelect: (id: string) => void;
   onReviewPremise: (id: string) => void;
   onClose: () => void;
@@ -106,14 +108,14 @@ export function ReviewPanel(props: Props) {
         </ul>
       </section>
       <section className="node-detail" id="node-detail" aria-label={t("review.detail")}>
-        {props.notice ? (
+        {props.notice && (
           <p className="notice" role={props.notice.error ? "alert" : "status"} data-error={props.notice.error}>
             {props.notice.text}
           </p>
-        ) : (
-          <NodeDetail {...props} />
         )}
+        <NodeDetail {...props} />
       </section>
+      {props.children}
     </aside>
   );
 }
@@ -138,6 +140,7 @@ function NodeDetail({
   impact,
   impactLoading,
   impactError,
+  actions,
   onSelect,
   onReviewPremise,
 }: Props) {
@@ -198,7 +201,8 @@ function NodeDetail({
           {stateLabel}
         </span>
       </div>
-      <h2>{nodeTitle(t, node)}</h2>
+      <h2>{node.kind === "goal" && graph.claim.title ? graph.claim.title : nodeTitle(t, node)}</h2>
+      {actions && <div className="inspector-actions">{actions}</div>}
       {conditionId && (
         <button type="button" className="button" onClick={() => onReviewPremise(conditionId)}>
           {t("premise.review")}

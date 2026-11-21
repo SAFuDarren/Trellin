@@ -19,7 +19,7 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 Use **Home** in the rail to return to Workbench. In the Workbench or Review sidebar header, **Switch view** shows the number of items awaiting review. Open **Review** there and return with **Workbench** or **Home**. Your graph keeps its selected claim and node while you switch.
 
-Use the left sidebar to open a project. Its **Project map** shows the project's claims on one canvas. Click a card or choose **Find claim** to select it and read its statement, Lean text, and review items in the right-hand details panel. Use **Details** to toggle the panel. Choose **Open proof** to read the selected proof and **Project map** in the proof header to return.
+Use the left sidebar to open a project. Its **Project map** shows the project's claims on one canvas. Click a card or choose **Find claim** to select it and read its statement, Lean text, and review items in the right-hand details panel. Use **Details** to toggle the panel. Expand **Proof details** to read the selected proof alongside the project map, or choose a proof node to inspect it.
 
 Choose **Global map** to show the existing overview of recent claims and their recorded proof dependencies in the current workspace. Move it by its title, resize it from the corner, or choose a claim in the overview to bring its card into view.
 
@@ -29,7 +29,7 @@ Open **Settings and help** at the bottom of the rail to find settings or the usa
 
 ## Start a proof task
 
-Select a claim, choose **Open proof**, and open **Proof task**. The panel shows the confirmed Lean proposition, its basis, and any decision that blocks work. If the Lean statement still needs preparation or review, follow [the Lean scope review](lean-core.md) before starting.
+Select a claim on the map and open **Proof task** from its inspector. The panel shows the confirmed Lean proposition, its basis, and any decision that blocks work. If the Lean statement still needs preparation or review, follow [the Lean scope review](lean-core.md) before starting.
 
 When the scope is ready, confirm it in the panel and record your reason to start. The worker runs deterministic checks and proof reuse first. The default allows zero model rounds. For restricted research, the panel can authorize a bounded number of rounds with the exact configured private Lean model once that route is available. For a public goal with a released scope, [add a connection](project-intake.md#connect-a-model) in **Team → Runtimes**. Select it in **Proof task**, set the maximum model rounds, and check the theorem and released basis before allowing the send. The authorization covers that connection, scope and cap. A changed scope or connection needs a new authorization.
 
@@ -37,7 +37,7 @@ The panel shows the proof task state, selected model, reported model usage, open
 
 ## Verify local lemmas
 
-Open a proof with a confirmed Lean statement and choose **Research actions → Local lemmas**. The panel shows the exact destination and statement version. Paste a version 1 [structured lemma plan](lean-core.md#derive-and-reuse-local-lemmas) containing intermediate nodes, then choose **Verify lemma plan**. Use the same local Lean runtime and project database configuration as `lean derive`. The proof graph shows each verified lemma, including any that passed before a later node failed.
+Select a claim with a confirmed Lean statement and choose **Research actions → Local lemmas**. The panel shows the exact destination and statement version. Paste a version 1 [structured lemma plan](lean-core.md#derive-and-reuse-local-lemmas) containing intermediate nodes, then choose **Verify lemma plan**. Use the same local Lean runtime and project database configuration as `lean derive`. The proof graph shows each verified lemma, including any that passed before a later node failed.
 
 For example, if the frozen scope assumes `True` and has the original goal `True ∧ True`, this plan derives an intermediate lemma directly from the premise.
 
@@ -86,9 +86,9 @@ returns. Older databases keep the earlier refresh behavior. Agent text and
 clarification answers remain in the workspace and are fetched through the
 existing authorized views.
 
-The left column lists registered projects. When a proof is open, the centre shows the selected claim's graph, with the conversation for the selected node below it. The right column lists records awaiting your review, or the records affected in **If withdrawn**, above the details of the selected node. Drag any border between areas to resize it, or focus a border and use the arrow keys. The sizes are remembered in this browser; **Settings** can reset them. The interface is in English by default; choose **简体中文** in **Settings** to switch to Chinese, and the choice is remembered too. The proof overview can be dragged by its title and resized from its corner.
+The left column lists registered projects. The centre shows the project map. The right column lists records awaiting review, with the selected claim or proof node and its **Proof details** below. Choose **If withdrawn** to see affected records. Drag the borders to resize the columns, or focus a border and use the arrow keys. The sizes are remembered in this browser and **Settings** can reset them. Choose **简体中文** in **Settings** to switch the interface language.
 
-Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. Drag the corner of a node to adjust its width and height. With that handle focused, the arrow keys resize the node. **Research actions → Show proof overview** toggles a small map in the corner. It shows the recorded nodes of recent claims, with a dashed circle at the current claim.
+Drag the graph to pan it. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. The buttons in the corner zoom, return to 100% and fit the graph to the window; with the canvas focused, the arrow keys pan, + and − zoom and 0 fits. Drag the corner of a node to adjust its width and height. With that handle focused, the arrow keys resize the node.
 
 ## Assign project work
 
@@ -109,9 +109,7 @@ you switch in the open Chats page. A waiting turn shows its elapsed time from
 acceptance. The employee and task link are stored with this project's settings
 on this device.
 
-In **Workbench**, select a claim or node and open **Conversation**. Open the
-model menu to choose an available on-device model or a connection you added in
-Team. Both composers identify the destination and any included context,
+Open **Agent chat** from the bottom of any page and choose a saved Agent or model. In **Workbench**, use **Ask an Agent** from the selected claim or proof node's inspector to attach that context. Choose a recipient and open the conversation. Collapse the panel to return to it later, or choose **Open full conversation** to continue in Chats. **Agent activity** shows queued and running work and results to review or retry. The composer identifies the destination and included context,
 including recent turns and, when selected, a node excerpt.
 Open the + menu and choose **Request details** to inspect the exact contents.
 The send button authorizes and submits that request in one step. Project files
@@ -119,7 +117,7 @@ are outside that payload.
 The conversation and attribution are saved with the project. Removing a
 conversation hides it from the active list and preserves its history.
 
-Open **Proof activity**, select a proof node and use **Save draft** to keep a
+Expand **Proof details → Proof activity**, select a proof node and use **Save draft** to keep a
 private note in the project. Saving works while proof guidance is blocked,
 including before the Lean statement is confirmed. Reopen the same node to
 continue editing the saved draft or discard it. To make a draft available to an
@@ -131,7 +129,7 @@ On database revision `0072` or later, a node reference such as `FLT-09` uses a s
 
 A node whose recorded job is running shows the agent and the number of parallel jobs. The workbench also displays reasoning effort when the model attempt records it, for example `GPT-6.2 Sol xhigh`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
 
-The conversation under the graph shows your notes, the models' recorded methods and reasons, and the Lean results for the selected node. Choose **All nodes** to see the whole claim, with a link from each entry back to its node.
+**Proof activity** shows your notes, the models' recorded methods and reasons, and the Lean results for the selected node. Choose **All nodes** to see the whole claim, with a link from each entry back to its node.
 
 Select a node, write a short method or focus suggestion, choose the recipient, then select **Queue proof note**. This attaches the note to the selected claim and exact confirmed Lean statement. For a private claim, the next otherwise eligible request from a signed private-local model policy can read up to three pending notes. The ordinary [advance worker](research-progress.md#advance-a-confirmed-lean-statement) still governs scheduling, budget, and proof verification. If no eligible call runs, the message remains pending. A recorded model attempt acknowledges the note. Existing graphs remain usable on `0069` and local-model guidance remains usable on `0070`.
 
@@ -163,6 +161,6 @@ export RESEARCH_MULTIPLIER_LEAN_AUTHOR_MODEL=YOUR_CODEX_MODEL
 research-multiplier --workspace "/path/to/my-research" advance worker --policy POLICY_UUID --watch 5
 ```
 
-In the workbench, select a node, choose the **Codex** recipient (for example `FLT-09 · Codex · GPT-6.2 Sol xhigh`) and queue the note. This action releases the displayed note for Codex use with the released scope. The next eligible Codex request reads it within the signed budget. The note stays bound to the selected Lean version. The running job names the model and links to the selected node. A recorded response appears in the conversation alongside the separate Lean verification result.
+In the workbench, select a node, choose the **Codex** recipient (for example `FLT-09 · Codex · GPT-6.2 Sol xhigh`) and queue the note. This action releases the displayed note for Codex use with the released scope. The next eligible Codex request reads it within the signed budget. The note stays bound to the selected Lean version. The running job names the model and links to the selected node. A recorded response appears in **Proof activity** alongside the Lean verification result.
 
 Private claims expose only the local guidance channel. Codex requests require public authorization for the exact statement, existing proof context and individual note. The same worker still governs scheduled retries and verifies candidates through Lean.

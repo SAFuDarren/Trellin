@@ -9,7 +9,6 @@ import { isCodex, modelName, nodeTitle } from "../workbench/text";
 import type { ActivityRecord, ActivitySnapshot, ProofDraft } from "../workbench/types";
 import { FeedEntry } from "./FeedEntry";
 import { Chevron, Spin } from "./Icons";
-import { WorkbenchConversations } from "./WorkbenchConversations";
 
 type DraftOperation = "loading" | "saving" | "discarding";
 type DraftError = "loadFailed" | "saveFailed" | "discardFailed" | "conflict";
@@ -45,56 +44,39 @@ function guidanceBlockerText(t: TFunction, activity: ActivitySnapshot, fallback:
     : reason;
 }
 
-export function ChatPanel({
+export function ProofActivity({
   session,
   graph,
   claimId,
   selected,
-  proofSelected,
   activity,
   activityError,
-  scopeReady,
   running,
   queued,
-  open,
+  active,
   allNodes,
-  onToggle,
   onAllNodes,
   onSelect,
   onSent,
 }: {
   session: string;
-  graph: Graph | null;
-  claimId: string | null;
+  graph: Graph;
+  claimId: string;
   selected: string | null;
-  proofSelected: string | null;
   activity: ActivitySnapshot | undefined;
   activityError: string;
-  scopeReady: boolean;
   running: number;
   queued: number;
-  open: boolean;
+  active: boolean;
   allNodes: boolean;
-  onToggle: () => void;
   onAllNodes: () => void;
   onSelect: (id: string) => void;
   onSent: () => void;
 }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<"chat" | "proof">("chat");
   const feed = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
-  const chatTarget = graph && selected ? graph.nodes.get(selected) : undefined;
-  const proofTarget = graph && proofSelected ? graph.nodes.get(proofSelected) : undefined;
-  const target = tab === "proof" ? proofTarget : chatTarget;
-  const anchor = {
-    ...(claimId ? { claim_id: claimId } : {}),
-    ...(graph?.statementId ? { statement_id: graph.statementId } : {}),
-    ...(!allNodes && chatTarget ? { node_id: chatTarget.id } : {}),
-  };
-  const anchorKey = [session, anchor.claim_id, anchor.statement_id, anchor.node_id].join("/");
-  const conversationTitle =
-    !allNodes && chatTarget ? nodeTitle(t, chatTarget) : graph?.claim.title || t("conversations.defaultTitle");
+  const target = selected ? graph.nodes.get(selected) : undefined;
 
   const summary = activityError
     ? activityError
@@ -114,7 +96,7 @@ export function ChatPanel({
   const time = (entry: Entry) => Date.parse(entry.at || entry.created_at || "") || 0;
   const live = (entry: Entry) => (entry.state === "running" ? 1 : 0);
   const shown = [...rows, ...guidance]
-    .filter((record) => allNodes || (proofSelected && activityNode(graph, record) === proofSelected))
+    .filter((record) => allNodes || (selected && activityNode(graph, record) === selected))
     .sort((a, b) => live(a) - live(b) || time(a) - time(b));
 
   const latestGuidance = guidance[0]?.id;
@@ -125,7 +107,7 @@ export function ChatPanel({
   useLayoutEffect(() => {
     const element = feed.current;
     if (element && nearBottom.current) element.scrollTop = element.scrollHeight;
-  }, [shown.length, latestGuidance, proofSelected, allNodes, tab]);
+  }, [shown.length, latestGuidance, selected, allNodes, active]);
 
   const relation = (id: string) => {
     const node = graph?.nodes.get(id);
@@ -157,14 +139,13 @@ export function ChatPanel({
   };
 
   return (
-    <section className="chat" aria-labelledby="activity-title" data-collapsed={String(!open)}>
+    <section className="chat" aria-label={t("conversations.proofActivity")}>
       <header className="chat-head">
-        <h2 id="activity-title" tabIndex={-1}>
-          {t("chat.title")}
-          {!allNodes && target && graph?.codes.get(target.id) && (
+        <h2>
+          {!allNodes && target && graph.codes.get(target.id) && (
             <span className="chat-code">{graph.codes.get(target.id)}</span>
           )}
-          <span id="chat-target">{allNodes ? t("chat.wholeClaim") : target ? nodeTitle(t, target) : ""}</span>
+          {allNodes ? t("chat.wholeClaim") : target ? nodeTitle(t, target) : t("chat.wholeClaim")}
         </h2>
         <span className="chat-state" role="status" data-error={String(Boolean(activityError))}>
           {running > 0 && !activityError && <Spin />}
@@ -173,57 +154,31 @@ export function ChatPanel({
         <button type="button" className="chip" aria-pressed={allNodes} onClick={onAllNodes}>
           {t("chat.allNodes")}
         </button>
-        <button
-          id="toggle-chat"
-          type="button"
-          className="icon-button"
-          aria-expanded={open}
-          aria-controls="chat-body"
-          aria-label={open ? t("chat.collapse") : t("chat.expand")}
-          onClick={onToggle}
-        >
-          <svg viewBox="0 0 12 12" aria-hidden="true">
-            <path d="m2.5 4.5 3.5 3.5 3.5-3.5" />
-          </svg>
-        </button>
       </header>
-      <div id="chat-body" className="chat-body" hidden={!open}>
-        <div className="conversation-tabs" role="group" aria-label={t("conversations.views")}>
-          <button type="button" className="chip" aria-pressed={tab === "chat"} onClick={() => setTab("chat")}>
-            {t("rail.chat")}
-          </button>
-          <button type="button" className="chip" aria-pressed={tab === "proof"} onClick={() => setTab("proof")}>
-            {t("conversations.proofActivity")}
-          </button>
-        </div>
-        {tab === "chat" && scopeReady && (
-          <WorkbenchConversations key={anchorKey} session={session} anchor={anchor} title={conversationTitle} />
-        )}
-        <div className="chat-body" hidden={tab !== "proof"}>
-          <ol ref={feed} className="chat-feed" aria-label={t("chat.feed")} onScroll={onScroll}>
-            {shown.length ? (
-              shown.map(entry)
-            ) : (
-              <li className="chat-empty">
-                {!activity ? t("chat.waiting") : allNodes ? t("chat.emptyClaim") : t("chat.emptyNode")}
-              </li>
-            )}
-          </ol>
-          <Composer
-            session={session}
-            graph={graph}
-            claimId={claimId}
-            selected={proofSelected}
-            active={open && tab === "proof"}
-            allNodes={allNodes}
-            activity={activity}
-            activityError={activityError}
-            onQueue={() => {
-              nearBottom.current = true;
-            }}
-            onSent={onSent}
-          />
-        </div>
+      <div className="chat-body">
+        <ol ref={feed} className="chat-feed" aria-label={t("chat.feed")} onScroll={onScroll}>
+          {shown.length ? (
+            shown.map(entry)
+          ) : (
+            <li className="chat-empty">
+              {!activity ? t("chat.waiting") : allNodes ? t("chat.emptyClaim") : t("chat.emptyNode")}
+            </li>
+          )}
+        </ol>
+        <Composer
+          session={session}
+          graph={graph}
+          claimId={claimId}
+          selected={selected}
+          active={active}
+          allNodes={allNodes}
+          activity={activity}
+          activityError={activityError}
+          onQueue={() => {
+            nearBottom.current = true;
+          }}
+          onSent={onSent}
+        />
       </div>
     </section>
   );

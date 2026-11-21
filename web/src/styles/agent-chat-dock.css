@@ -1,0 +1,321 @@
+.workbench-frame {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.workbench-frame > .shell {
+  height: 100%;
+  min-height: 0;
+}
+
+.workbench-frame .release-update-notice {
+  bottom: 56px;
+}
+
+.agent-dock {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--hair);
+  background: var(--rail);
+}
+
+.agent-dock-status,
+.agent-dock-launcher {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+
+.agent-dock-launcher {
+  padding-inline: 10px;
+  border-color: var(--hair);
+  background: var(--main);
+  color: var(--ink);
+  font-size: var(--type-control-size);
+  font-weight: var(--type-medium);
+  white-space: nowrap;
+}
+
+.agent-dock-status:hover,
+.agent-dock-launcher:hover,
+.agent-dock [aria-expanded="true"] {
+  background: var(--pick);
+  color: var(--ink);
+}
+
+.agent-dock-status > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.agent-dock-status > span[data-tone="live"] {
+  color: var(--good);
+}
+
+.agent-dock-status > span[data-tone="pending"] {
+  color: var(--ink);
+}
+
+.agent-dock svg {
+  flex-shrink: 0;
+}
+
+.agent-dock-launcher svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.agent-dock-panel {
+  position: absolute;
+  z-index: 20;
+  right: 12px;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  width: min(432px, calc(100vw - 24px));
+  height: min(540px, calc(100vh - 75px));
+  height: min(540px, calc(100dvh - 75px));
+  border: 1px solid var(--node-line);
+  border-radius: 12px;
+  background: var(--main);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 20%);
+}
+
+.agent-dock-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 46px;
+  padding: 8px 12px 8px 14px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.agent-dock-heading h2,
+.agent-dock-activity h3 {
+  margin: 0;
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
+}
+
+.agent-dock-toolbar,
+.agent-dock-recipient {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 3px 8px;
+  padding: 5px 12px;
+}
+
+.agent-dock-toolbar {
+  background: var(--side);
+}
+
+.agent-dock-recipient {
+  border-bottom: 1px solid var(--hair);
+}
+
+.agent-dock-scope {
+  padding: 4px 14px;
+  border-bottom: 1px solid var(--hair);
+  color: var(--sub);
+  overflow-wrap: anywhere;
+}
+
+.agent-dock-panel .conversation-panel {
+  padding: 10px 12px 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.agent-dock-panel .chat-feed {
+  min-height: 80px;
+}
+
+.agent-dock-picker {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.agent-dock-picker > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: var(--type-medium);
+}
+
+.agent-dock-picker > summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-dock-picker > summary > span:last-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-picker > summary > .chevron {
+  transform: rotate(90deg);
+}
+
+.agent-dock-picker > summary[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.agent-dock-picker[open] > summary,
+.agent-dock-picker > summary:hover {
+  background: var(--track);
+}
+
+.agent-dock-options {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 4px);
+  left: 0;
+  width: min(330px, calc(100vw - 52px));
+  max-height: min(252px, 40vh);
+  padding: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--node-line);
+  border-radius: 8px;
+  background: var(--main);
+  box-shadow: 0 7px 20px rgb(0 0 0 / 16%);
+}
+
+.agent-dock-options > input,
+.agent-dock-draft input {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  background: var(--side);
+  color: var(--ink);
+}
+
+.agent-dock-options p {
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--sub);
+}
+
+.agent-dock-options ul,
+.agent-dock-activity ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.agent-dock-options button,
+.agent-dock-activity li > :is(a, button) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  text-decoration: none;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.agent-dock-options button:hover,
+.agent-dock-options button[aria-current="true"],
+.agent-dock-activity li > :is(a, button):hover {
+  background: var(--track);
+}
+
+.agent-dock-options button > small,
+.agent-dock-activity li small {
+  flex-basis: 100%;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+
+.agent-dock-picker .team-agent-avatar {
+  width: 20px;
+  height: 20px;
+}
+
+.agent-dock-draft,
+.agent-dock-activity {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  overflow: auto;
+}
+
+.agent-dock-draft form,
+.agent-dock-draft label {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+  min-width: 0;
+}
+
+.agent-dock-draft p,
+.agent-dock-activity p,
+.agent-dock-empty {
+  margin: 0;
+  color: var(--sub);
+}
+
+.agent-dock-draft p[role="alert"] {
+  color: var(--crit);
+}
+
+.agent-dock-empty {
+  padding: 14px;
+}
+
+.agent-dock-anchor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--side);
+  overflow-wrap: anywhere;
+}

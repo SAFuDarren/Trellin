@@ -3,19 +3,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { api, type ClaimsResponse } from "./api/client";
+import type { ConversationAnchor } from "./api/conversations";
 import { useFallbackInterval } from "./api/liveUpdates";
 import { useProjectCanvas } from "./api/projectCanvas";
-import { ChatPanel } from "./components/ChatPanel";
+import { ProofActivity } from "./components/ChatPanel";
 import { GraphView } from "./components/GraphView";
 import { ProjectCanvas } from "./components/ProjectCanvas";
 import { ProjectActions } from "./components/project/ProjectActions";
-import { queueEntries, ReviewPanel } from "./components/ReviewPanel";
+import { ReviewPanel } from "./components/ReviewPanel";
 import { Sidebar } from "./components/Sidebar";
 import { useDesktopProjectList } from "./components/SidebarProjects";
 import { Splitter } from "./components/Splitter";
 import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type View } from "./workbench/graph";
-import { nodeTitle, statusText } from "./workbench/text";
+import { nodeTitle } from "./workbench/text";
 import type { ActivitySnapshot, Atlas, GraphSnapshot, ImpactPreview } from "./workbench/types";
 import { clampSize, useLayout } from "./workbench/useLayout";
 
@@ -29,11 +30,13 @@ function errorText(t: TFunction, error: unknown): string {
 
 export type Focus = { claimId: string; nodeId?: string; nonce: number };
 export type WorkbenchPosition = DesktopPosition & {
-  view: View | "project";
-  mapClaimId?: string;
+  view: View;
+  detailsOpen: boolean;
+  proofOpen: boolean;
   assumption: string | null;
   referenced: boolean;
 };
+type Selection = { claimId: string; nodeId?: string; referenced?: boolean };
 
 export function Workbench({
   session,
@@ -42,6 +45,7 @@ export function Workbench({
   pendingReviews,
   returnTo,
   onPositionChange,
+  onChatAnchor,
 }: {
   session: string;
   focus?: Focus | null;
@@ -49,36 +53,29 @@ export function Workbench({
   pendingReviews: number | undefined;
   returnTo?: WorkbenchPosition;
   onPositionChange: (position: WorkbenchPosition) => void;
+  onChatAnchor: (anchor: ConversationAnchor, title: string) => void;
 }) {
   const { t } = useTranslation();
   const queries = useQueryClient();
   const layout = useLayout();
   const { sizes, clamped } = layout;
-  const [initial] = useState(() => ({
-    position: focus ?? returnTo ?? desktopPosition(),
-    restore: focus ? undefined : returnTo,
-  }));
-  const [claimId, setClaimId] = useState<string | null>(initial.position?.claimId ?? null);
-  const pendingLaunch = useRef(!initial.position);
-  const pendingNode = useRef(initial.position?.nodeId);
-  const [referencedClaim, setReferencedClaim] = useState<string | null>(
-    initial.restore?.referenced ? initial.restore.claimId : null,
+  const [desktop] = useState(() => desktopPosition());
+  const [selection, setSelection] = useState<Selection | undefined>(
+    focus ? { ...focus, referenced: true } : (returnTo ?? (desktop && { ...desktop, referenced: true })),
   );
-  const [missingReferenceNode, setMissingReferenceNode] = useState(false);
-  const [view, setView] = useState<View | "project">(focus ? "proof" : (initial.restore?.view ?? "project"));
-  const [mapClaimId, setMapClaimId] = useState(initial.restore?.mapClaimId ?? initial.position?.claimId ?? null);
+  const pendingLaunch = useRef(!focus && !returnTo && !desktop);
+  const [detailsOpen, setDetailsOpen] = useState(Boolean(focus || (returnTo?.detailsOpen ?? desktop)));
+  const [proofOpen, setProofOpen] = useState(Boolean(focus?.nodeId || (returnTo?.proofOpen ?? desktop)));
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [view, setView] = useState<View>(returnTo?.view ?? "proof");
+  const [assumptionId, setAssumption] = useState<string | null>(returnTo?.assumption ?? null);
   const [mapAtlasOpen, setMapAtlasOpen] = useState(false);
-  const [mapDetailsOpen, setMapDetailsOpen] = useState(false);
-  const [mapDetailNode, setMapDetailNode] = useState<{ claimId: string; nodeId: string } | null>(null);
   const [recordedGoal, setRecordedGoal] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [assumption, setAssumption] = useState<string | null>(initial.restore?.assumption ?? null);
   const [allNodes, setAllNodes] = useState(false);
-  const [premiseDialog, setPremiseDialog] = useState<{ id?: string; mapClaimId?: string } | null>(null);
-  const [premiseChatAnchor, setPremiseChatAnchor] = useState<string | null>(null);
-  const [live, setLive] = useState<{ side?: number; right?: number; chat?: number }>({});
-  const inMap = view === "project";
-  const canvas = useProjectCanvas(session, inMap);
+  const [premiseDialog, setPremiseDialog] = useState<{ id?: string } | null>(null);
+  const [proofDialog, setProofDialog] = useState(false);
+  const [live, setLive] = useState<{ side?: number; right?: number }>({});
+  const canvas = useProjectCanvas(session, true);
   const projects = useDesktopProjectList();
   const projectName =
     projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name ||
@@ -91,124 +88,98 @@ export function Workbench({
   const atlas = useQuery({
     queryKey: ["atlas"],
     queryFn: ({ signal }) => api<Atlas>(session, "/api/atlas", { signal }),
-    enabled: inMap ? mapAtlasOpen : sizes.atlasOpen,
+    enabled: mapAtlasOpen,
     retry: false,
   });
 
-  // Choose the launch claim, or keep the current one if it still exists.
   useEffect(() => {
-    const list = claims.data?.claims;
-    if (!list) return;
-    if (pendingLaunch.current) {
-      pendingLaunch.current = false;
-      // The CLI may name an exact claim when starting this workbench.
-      const requested = claims.data?.claim_id;
-      if (requested) {
-        setClaimId(requested);
-        setMapClaimId(requested);
-        setReferencedClaim(requested);
-        setView("proof");
-        return;
-      }
+    if (!claims.data || !pendingLaunch.current) return;
+    pendingLaunch.current = false;
+    if (claims.data.claim_id) {
+      setSelection({ claimId: claims.data.claim_id, referenced: true });
+      setDetailsOpen(true);
+      setProofOpen(true);
     }
-    if (claimId && (claimId === referencedClaim || list.some((claim) => claim.id === claimId))) return;
-    setClaimId(list[0]?.id ?? null);
-  }, [claims.data, claimId, referencedClaim]);
+  }, [claims.data]);
 
-  const mapClaims = canvas.claims ?? claims.data?.claims ?? [];
-  const mapSelection = mapClaims.some(({ id }) => id === mapClaimId) ? mapClaimId : (mapClaims[0]?.id ?? null);
-  const graphClaimId = inMap ? (mapDetailsOpen ? mapSelection : null) : claimId;
-
-  const snapshot = useQuery({
-    queryKey: ["graph", graphClaimId],
-    enabled: Boolean(
-      graphClaimId &&
-        (inMap || graphClaimId === referencedClaim || claims.data?.claims.some((claim) => claim.id === graphClaimId)),
-    ),
-    queryFn: ({ signal }) =>
-      api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(graphClaimId!), { signal }),
-  });
-  const selectedGraph = useMemo(
-    () => (snapshot.data && snapshot.data.claim.id === graphClaimId ? buildGraph(t, snapshot.data) : null),
-    [graphClaimId, snapshot.data, t],
-  );
-  const graph = inMap ? null : selectedGraph;
-  const mapGraph = inMap ? selectedGraph : null;
-  const mapNode =
-    mapDetailNode?.claimId === mapSelection && mapGraph?.nodes.has(mapDetailNode.nodeId)
-      ? mapDetailNode.nodeId
-      : (mapGraph?.order.find((id) => mapGraph.nodes.get(id)?.kind === "goal") ?? mapGraph?.order[0] ?? null);
-
-  // Another page asked to open a claim (and maybe a node).
   useEffect(() => {
     if (!focus) return;
     pendingLaunch.current = false;
-    setClaimId(focus.claimId);
-    setMapClaimId(focus.claimId);
+    setSelection({ claimId: focus.claimId, nodeId: focus.nodeId, referenced: true });
+    setDetailsOpen(true);
+    setProofOpen(Boolean(focus.nodeId));
     setView("proof");
-    pendingNode.current = focus.nodeId;
-    setReferencedClaim(focus.claimId);
-    setPremiseChatAnchor(null);
-    setMissingReferenceNode(false);
+    setAssumption(null);
+    setRecordedGoal(null);
     onFocusHandled(null);
   }, [focus, onFocusHandled]);
 
-  // A newly loaded claim starts at its focus (or goal) and its first assumption; a reload keeps the selection.
+  const mapClaims = canvas.claims ?? claims.data?.claims ?? [];
+  const requestedClaim = selection?.claimId;
+  const mapSelection = mapClaims.some(({ id }) => id === requestedClaim)
+    ? requestedClaim!
+    : selection?.referenced
+      ? null
+      : (mapClaims[0]?.id ?? null);
+  const claimId = selection?.referenced ? selection.claimId : mapSelection;
+  const showReview = detailsOpen && Boolean(claimId);
+  const snapshot = useQuery({
+    queryKey: ["graph", claimId],
+    enabled: showReview,
+    queryFn: ({ signal }) =>
+      api<GraphSnapshot>(session, "/api/graph?claim=" + encodeURIComponent(claimId!), { signal }),
+  });
+  const graph = useMemo(
+    () => (snapshot.data && snapshot.data.claim.id === claimId ? buildGraph(t, snapshot.data) : null),
+    [claimId, snapshot.data, t],
+  );
+  const goal =
+    graph?.nodes.get(`goal:${claimId}`) ??
+    graph?.nodes.get(graph.order.find((id) => graph.nodes.get(id)?.kind === "goal") ?? "");
+  const target = selection?.claimId === claimId ? selection?.nodeId : undefined;
+  const selected = target && graph?.nodes.has(target) ? target : (goal?.id ?? graph?.order[0] ?? null);
+  const node = selected ? graph?.nodes.get(selected) : undefined;
+  const assumption = graph?.hypotheses.find(({ id }) => id === assumptionId) ?? graph?.hypotheses[0];
+  const basis = assumption?.reference?.basis_version_id;
+
   useEffect(() => {
-    if (!graph || graph.claim.id !== claimId) return;
-    const wanted = pendingNode.current;
-    pendingNode.current = undefined;
-    if (wanted && claimId === referencedClaim) setMissingReferenceNode(!graph.nodes.has(wanted));
-    setSelected((current) => {
-      if (wanted && graph.nodes.has(wanted)) return wanted;
-      if (current && graph.nodes.has(current)) return current;
-      const focus = graph.focusId && graph.nodes.has(graph.focusId) ? graph.focusId : null;
-      return focus ?? [...graph.nodes.values()].find((node) => node.kind === "goal")?.id ?? graph.order[0] ?? null;
+    if (!claimId) return;
+    onPositionChange({
+      claimId,
+      nodeId: selected ?? target ?? `goal:${claimId}`,
+      view,
+      detailsOpen,
+      proofOpen,
+      assumption: assumption?.id ?? null,
+      referenced: Boolean(selection?.referenced),
     });
-    setAssumption((current) =>
-      current && graph.hypotheses.some((node) => node.id === current) ? current : (graph.hypotheses[0]?.id ?? null),
-    );
-  }, [graph, claimId, referencedClaim]);
+  }, [
+    claimId,
+    selected,
+    target,
+    view,
+    detailsOpen,
+    proofOpen,
+    assumption?.id,
+    selection?.referenced,
+    onPositionChange,
+  ]);
 
   useEffect(() => {
-    if (view === "project") {
-      if (mapSelection) {
-        const id = claimId ?? mapSelection;
-        onPositionChange({
-          claimId: id,
-          nodeId: selected ?? pendingNode.current ?? `goal:${id}`,
-          view,
-          mapClaimId: mapSelection,
-          assumption,
-          referenced: id === referencedClaim,
-        });
-      }
-    } else if (claimId && selected && graph?.claim.id === claimId && graph.nodes.has(selected)) {
-      const position = { claimId, nodeId: selected };
-      onPositionChange({
-        ...position,
-        view,
-        mapClaimId: mapSelection ?? undefined,
-        assumption,
-        referenced: claimId === referencedClaim,
-      });
-      saveDesktopPosition(position);
-    }
-  }, [claimId, graph, selected, view, mapSelection, assumption, referencedClaim, onPositionChange]);
+    if (showReview && claimId && selected) saveDesktopPosition({ claimId, nodeId: selected });
+  }, [showReview, claimId, selected]);
 
-  const basis = assumption ? graph?.nodes.get(assumption)?.reference?.basis_version_id : undefined;
   const impact = useQuery({
     queryKey: ["impact", claimId, basis],
-    enabled: view === "impact" && Boolean(claimId && basis),
+    enabled: showReview && proofOpen && view === "impact" && Boolean(basis),
     queryFn: ({ signal }) =>
       api<ImpactPreview>(session, "/api/impact?" + new URLSearchParams({ claim: claimId!, basis: String(basis) }), {
         signal,
       }),
   });
-
   const activity = useQuery({
     queryKey: ["activity", claimId],
-    enabled: !inMap && Boolean(graph),
+    enabled: showReview && proofOpen && Boolean(graph),
     refetchInterval: useFallbackInterval(ACTIVITY_MS),
     queryFn: async ({ signal }) => {
       const reply = await api<ActivitySnapshot>(session, "/api/activity?claim=" + encodeURIComponent(claimId!), {
@@ -224,164 +195,98 @@ export function Workbench({
     [t, graph, activity.data, activity.isError],
   );
 
-  const selectClaim = (id: string) => {
-    setRecordedGoal(null);
-    setMapClaimId(id);
-    setView("proof");
-    if (inMap && id === claimId) return;
-    setClaimId(id);
-    setSelected(null);
-    setPremiseChatAnchor(null);
-    setAssumption(null);
-    setReferencedClaim(claims.data?.claims.some((claim) => claim.id === id) ? null : id);
-    setMissingReferenceNode(false);
-    pendingNode.current = undefined;
-  };
   const inspectClaim = (id: string) => {
-    setMapClaimId(id);
-    setMapDetailNode(null);
-    setMapDetailsOpen(true);
+    if (claimId !== id) {
+      setProofOpen(false);
+      setActivityOpen(false);
+      setView("proof");
+      setAssumption(null);
+    }
+    setSelection({ claimId: id });
+    setRecordedGoal(null);
+    setDetailsOpen(true);
   };
   const selectNode = (id: string) => {
-    const node = graph?.nodes.get(id);
-    if (!node) return;
-    if (node.kind === "proposed_premise" && selected && graph?.nodes.get(selected)?.kind !== "proposed_premise")
-      setPremiseChatAnchor(selected);
-    setSelected(id);
-    setMissingReferenceNode(false);
-    if (node.kind === "hypothesis" && node.reference?.basis_version_id) setAssumption(id);
+    const next = graph?.nodes.get(id);
+    if (!claimId || !next) return;
+    setSelection({ claimId, nodeId: id, referenced: selection?.referenced });
+    if (next.kind === "hypothesis" && next.reference?.basis_version_id) setAssumption(id);
   };
   const openReference = (id: string, nodeId: string | null) => {
-    setMapClaimId(id);
+    setSelection({ claimId: id, nodeId: nodeId ?? undefined, referenced: true });
+    setDetailsOpen(true);
+    setProofOpen(Boolean(nodeId));
     setView("proof");
-    if (graph?.claim.id === id && claimId === id) {
-      if (nodeId && graph.nodes.has(nodeId)) {
-        selectNode(nodeId);
-      } else {
-        setSelected(graph.order.find((id) => graph.nodes.get(id)?.kind === "goal") ?? null);
-        setMissingReferenceNode(Boolean(nodeId));
-      }
-    } else {
-      selectClaim(id);
-      setReferencedClaim(id);
-      pendingNode.current = nodeId ?? undefined;
-    }
+    setAssumption(null);
+    setRecordedGoal(null);
   };
   const changeView = (next: View) => {
-    if (next === "impact" && graph) {
-      const current = graph.hypotheses.find(({ id }) => id === selected);
-      const chosen = current?.id ?? assumption;
-      if (chosen) {
-        setAssumption(chosen);
-        setSelected(chosen);
-      }
-    }
+    if (next === "impact" && assumption) selectNode(assumption.id);
     setView(next);
   };
   const refresh = () => {
     void queries.invalidateQueries();
   };
-  const openRecorded = async (claimId?: string) => {
+  const openRecorded = async (id?: string) => {
     await queries.invalidateQueries();
-    if (claimId) {
-      if (inMap) setMapClaimId(claimId);
-      else selectClaim(claimId);
-    }
+    if (id) inspectClaim(id);
   };
-  const openPremises = (id?: string) => {
-    setReferencedClaim(claimId);
-    setPremiseDialog({ id });
+  const showRecordedGoal = async (id: string) => {
+    await queries.invalidateQueries();
+    if (!showReview) inspectClaim(id);
+    setRecordedGoal(id);
   };
-  const reviewMapPremise = (id: string) => {
-    if (mapGraph) setPremiseDialog({ id, mapClaimId: mapGraph.claim.id });
-  };
-  const showRecordedGoal = (id: string) => {
-    setMapClaimId(id);
-    if (!inMap) {
-      setReferencedClaim(claimId);
-      setRecordedGoal(id);
-    }
-    return queries.invalidateQueries();
+  const closeInspector = () => {
+    setDetailsOpen(false);
+    document.getElementById("map-details-toggle")?.focus();
   };
 
   const notice = !session
     ? t("session.missing")
     : claims.isError
       ? errorText(t, claims.error)
-      : claims.isPending
+      : claims.isPending || canvas.loadingClaims
         ? t("notice.loadingProject")
-        : inMap
-          ? canvas.loadingClaims
-            ? t("notice.loadingProject")
-            : ""
-          : claims.data.claims.length === 0 && !referencedClaim
-            ? t("notice.noClaims")
-            : snapshot.isError
-              ? errorText(t, snapshot.error)
-              : !graph
-                ? t("notice.loadingClaim")
-                : graph.order.length === 0
-                  ? t("notice.noNodes")
-                  : "";
-  const noticeIsError = claims.isError || (!inMap && snapshot.isError);
-  const mapDetailsNotice = snapshot.isError
-    ? errorText(t, snapshot.error)
-    : !mapGraph
-      ? t("notice.loadingClaim")
-      : !mapNode
-        ? t("notice.noNodes")
         : "";
+  const detailsNotice = snapshot.isError
+    ? errorText(t, snapshot.error)
+    : !graph
+      ? t("notice.loadingClaim")
+      : !node
+        ? t("notice.noNodes")
+        : target && !graph.nodes.has(target)
+          ? t("claimCodes.nodeAbsent")
+          : "";
   const workspaceState = claims.isError
     ? t("sidebar.readFailed")
     : claims.data
       ? t("sidebar.connected", { count: mapClaims.length })
       : t("sidebar.connecting");
-  const reviewCount = inMap || view === "impact" ? 0 : queueEntries(t, graph, view, assumption, impact.data).length;
-  const goal = graph?.claim.id === claimId && claimId ? graph.nodes.get(`goal:${claimId}`) : undefined;
-  // A premise under review can keep the previous conversation, but is not a proof-note target.
-  const reviewingPremise = Boolean(selected && graph?.nodes.get(selected)?.kind === "proposed_premise");
-  const chatSelected = reviewingPremise
-    ? premiseChatAnchor && graph?.nodes.has(premiseChatAnchor)
-      ? premiseChatAnchor
-      : (goal?.id ?? null)
-    : selected;
-  const claimTitle =
-    graph?.claim.title || claims.data?.claims.find((claim) => claim.id === claimId)?.title || t("toolbar.defaultTitle");
-  const meta = graph
-    ? [graph.claim.code, statusText(t, graph.claim.status), graph.claim.domain].filter(Boolean).join(" · ")
-    : "";
-  const showGraph = !inMap && Boolean(graph && graph.order.length);
-  const showReview = inMap ? mapDetailsOpen && Boolean(mapSelection) : layout.reviewOpen;
-  const mapPremiseClaim = premiseDialog?.mapClaimId;
-  const actionsClaim = mapPremiseClaim && mapGraph?.claim.id === mapPremiseClaim ? mapGraph.claim : graph?.claim;
-
-  const side = live.side ?? clamped.side;
-  const right = live.right ?? clamped.right;
-  const chat = live.chat ?? clamped.chat;
-  const commit = (key: "side" | "right" | "chat", value: number) => {
-    setLive((current) => ({ ...current, [key]: undefined }));
-    layout.update({ [key]: clampSize(key, value, layout.windowHeight) });
-  };
-  const resize = (key: "side" | "right" | "chat", value: number) =>
-    setLive((current) => ({ ...current, [key]: clampSize(key, value, layout.windowHeight) }));
-
+  const actionsClaim = showReview ? graph?.claim : undefined;
   const lean = goal?.reference;
   const lemmaPlanScope =
-    claimId &&
-    graph?.claim.lemma_plan_ready &&
+    actionsClaim?.lemma_plan_ready &&
     goal?.formalization &&
     typeof lean?.statement_id === "string" &&
     typeof lean.statement_version === "number" &&
     typeof lean.statement_sha256 === "string"
       ? {
-          claimId,
-          title: claimTitle,
+          claimId: actionsClaim.id,
+          title: actionsClaim.title || nodeTitle(t, goal),
           statementId: lean.statement_id,
           version: lean.statement_version,
           checksum: lean.statement_sha256,
           statement: goal.formalization,
         }
       : null;
+  const side = live.side ?? clamped.side;
+  const right = live.right ?? clamped.right;
+  const resize = (key: "side" | "right", value: number) =>
+    setLive((current) => ({ ...current, [key]: clampSize(key, value, layout.windowHeight) }));
+  const commit = (key: "side" | "right", value: number) => {
+    setLive((current) => ({ ...current, [key]: undefined }));
+    layout.update({ [key]: clampSize(key, value, layout.windowHeight) });
+  };
 
   return (
     <div
@@ -389,8 +294,8 @@ export function Workbench({
       id="workbench"
       data-sidebar={layout.sidebarOpen ? "open" : "collapsed"}
       data-review={showReview ? "open" : "collapsed"}
-      data-view={view}
-      style={{ "--side-w": `${side}px`, "--right-w": `${right}px`, "--chat-h": `${chat}px` } as React.CSSProperties}
+      data-view="project"
+      style={{ "--side-w": `${side}px`, "--right-w": `${right}px` } as React.CSSProperties}
     >
       <Sidebar
         pendingReviews={pendingReviews}
@@ -410,14 +315,8 @@ export function Workbench({
       <main className="main">
         <header className="toolbar">
           <div className="claim-heading">
-            {!inMap && (
-              <button type="button" className="workbench-map-return" onClick={() => setView("project")}>
-                {t("canvasShell.map")}
-              </button>
-            )}
-            <h1 title={inMap ? projectName : claimTitle}>{inMap ? projectName : claimTitle}</h1>
-            {inMap && <span className="claim-meta">{t("canvasShell.map")}</span>}
-            {!inMap && meta && <span className="claim-meta">{meta}</span>}
+            <h1 title={projectName}>{projectName}</h1>
+            <span className="claim-meta">{t("canvasShell.map")}</span>
           </div>
           <div className="project-toolbar-actions">
             <ProjectActions
@@ -425,74 +324,39 @@ export function Workbench({
               claimId={actionsClaim?.id ?? null}
               claimCode={actionsClaim?.code}
               claimCodesAvailable={Boolean(claims.data?.claim_codes)}
-              lemmaPlanScope={inMap ? null : lemmaPlanScope}
-              claimTitle={actionsClaim?.title || claimTitle}
+              lemmaPlanScope={lemmaPlanScope}
+              claimTitle={actionsClaim?.title ?? ""}
               premiseReview={actionsClaim?.premise_review}
               premiseDialog={premiseDialog}
-              overview={inMap ? undefined : sizes.atlasOpen}
-              onToggleOverview={() => layout.update({ atlasOpen: !sizes.atlasOpen })}
-              onOpenPremises={openPremises}
-              onClosePremises={() => setPremiseDialog(null)}
+              proofDialog={proofDialog}
+              onOpenPremises={(id) => setPremiseDialog({ id })}
+              onClose={() => {
+                setPremiseDialog(null);
+                setProofDialog(false);
+              }}
               onPremiseRecorded={openRecorded}
               onRecorded={openRecorded}
               onGoalRecorded={showRecordedGoal}
               onOpenReference={openReference}
             />
-            {!inMap && !layout.reviewOpen && graph && (
-              <button
-                type="button"
-                className="chip"
-                aria-controls="review"
-                onClick={() => layout.update({ reviewOpen: true })}
-              >
-                {reviewCount ? t("toolbar.openReviewCount", { count: reviewCount }) : t("toolbar.openReview")}
-              </button>
-            )}
           </div>
         </header>
-        {view === "impact" && graph && (
-          <div className="impact-bar">
-            {graph.hypotheses.length > 0 && (
-              <>
-                <label htmlFor="premise-select">{t("impact.preview")}</label>
-                <select
-                  id="premise-select"
-                  value={assumption ?? ""}
-                  onChange={(event) => selectNode(event.target.value)}
-                >
-                  {graph.hypotheses.map((node) => (
-                    <option key={node.id} value={node.id}>
-                      {nodeTitle(t, node)}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-            <span role="status">
-              {impact.isFetching
-                ? t("impact.loading")
-                : impact.isError
-                  ? errorText(t, impact.error)
-                  : graph.hypotheses.length
-                    ? t("impact.readOnly")
-                    : t("impact.noPremise")}
-            </span>
-          </div>
-        )}
         {notice && (
-          <p className="notice" role="status" data-error={String(noticeIsError)}>
+          <p className="notice" role="status" data-error={String(claims.isError)}>
             {notice}
           </p>
         )}
-        {!inMap && recordedGoal && (
+        {recordedGoal && (
           <div className="workbench-map-status" role="status">
             {t("canvasShell.goalAdded")}
-            <button type="button" className="conversation-text-action" onClick={() => setView("project")}>
-              {t("canvasShell.viewOnMap")}
-            </button>
+            {claimId !== recordedGoal && (
+              <button type="button" className="conversation-text-action" onClick={() => inspectClaim(recordedGoal)}>
+                {t("canvasShell.viewOnMap")}
+              </button>
+            )}
           </div>
         )}
-        {inMap && claims.data && !canvas.loadingClaims && (
+        {claims.data && !canvas.loadingClaims && (
           <>
             {(canvas.loadError || canvas.saveError || canvas.indexError) && (
               <div className="workbench-map-status" role="alert">
@@ -509,9 +373,8 @@ export function Workbench({
                 claims={mapClaims}
                 selected={mapSelection}
                 onSelect={inspectClaim}
-                onOpenClaim={selectClaim}
                 detailsOpen={showReview}
-                onToggleDetails={() => setMapDetailsOpen((open) => !open)}
+                onToggleDetails={() => (showReview ? closeInspector() : setDetailsOpen(true))}
                 atlasClaims={atlas.data?.claims}
                 atlasOpen={mapAtlasOpen}
                 atlasBox={sizes.atlas}
@@ -526,104 +389,152 @@ export function Workbench({
             </section>
           </>
         )}
-        {!inMap && missingReferenceNode && (
-          <p className="notice" role="status">
-            {t("claimCodes.nodeAbsent")}
-          </p>
-        )}
-        {showGraph && graph && claimId && (
-          <section className="graph-area" aria-label={t("graph.label")}>
-            <GraphView
-              graph={graph}
-              view={inMap ? "proof" : view}
-              selected={selected}
-              assumption={assumption}
-              impact={impact.data}
-              work={work.byNode}
-              running={work.running}
-              queued={work.queued}
-              atlasClaims={atlas.data?.claims ?? []}
-              claimId={claimId}
-              atlasOpen={sizes.atlasOpen}
-              atlasBox={sizes.atlas}
-              onAtlasBox={(box, persist) => layout.update({ atlas: box }, persist)}
-              cardSizes={sizes.cards[`${claimId}:${view}`] ?? NO_CARD_SIZES}
-              onResizeCard={(id, size) => layout.resizeCard(`${claimId}:${view}`, id, size)}
-              onSelect={selectNode}
-              onView={changeView}
-            />
-          </section>
-        )}
-        {!inMap && (
-          <Splitter
-            name="chat"
-            value={chat}
-            label={t("splitter.chat")}
-            hidden={!sizes.chatOpen}
-            onResize={(value) => resize("chat", value)}
-            onCommit={(value) => commit("chat", value)}
-          />
-        )}
-        {!inMap && (
-          <ChatPanel
-            session={session}
-            graph={graph}
-            claimId={claimId}
-            selected={chatSelected}
-            proofSelected={reviewingPremise ? null : selected}
-            activity={activity.data}
-            activityError={activityError}
-            scopeReady={
-              claimId
-                ? graph?.claim.id === claimId &&
-                  (allNodes || Boolean(chatSelected && graph.nodes.has(chatSelected)) || !graph.nodes.size)
-                : claims.data?.claims.length === 0
-            }
-            running={work.running}
-            queued={work.queued}
-            open={sizes.chatOpen}
-            allNodes={allNodes}
-            onToggle={() => layout.update({ chatOpen: !sizes.chatOpen })}
-            onAllNodes={() => setAllNodes(!allNodes)}
-            onSelect={selectNode}
-            onSent={() => void queries.invalidateQueries({ queryKey: ["activity", claimId] })}
-          />
-        )}
       </main>
       {showReview && (
-        <Splitter
-          name="right"
-          value={right}
-          label={t("splitter.right")}
-          onResize={(value) => resize("right", value)}
-          onCommit={(value) => commit("right", value)}
-        />
-      )}
-      {(!inMap || showReview) && (
-        <ReviewPanel
-          graph={selectedGraph}
-          claims={inMap ? mapClaims : (claims.data?.claims ?? [])}
-          claimId={inMap ? mapSelection : claimId}
-          view={inMap ? "proof" : view}
-          selected={inMap ? mapNode : selected}
-          assumption={inMap ? null : assumption}
-          impact={inMap ? undefined : impact.data}
-          impactLoading={!inMap && impact.isFetching}
-          impactError={!inMap && impact.isError ? errorText(t, impact.error) : ""}
-          notice={inMap && mapDetailsNotice ? { text: mapDetailsNotice, error: snapshot.isError } : undefined}
-          onSelect={
-            inMap ? (nodeId) => mapSelection && setMapDetailNode({ claimId: mapSelection, nodeId }) : selectNode
-          }
-          onReviewPremise={inMap ? reviewMapPremise : openPremises}
-          onClose={
-            inMap
-              ? () => {
-                  setMapDetailsOpen(false);
-                  document.getElementById("map-details-toggle")?.focus();
-                }
-              : () => layout.update({ reviewOpen: false })
-          }
-        />
+        <>
+          <Splitter
+            name="right"
+            value={right}
+            label={t("splitter.right")}
+            onResize={(value) => resize("right", value)}
+            onCommit={(value) => commit("right", value)}
+          />
+          <ReviewPanel
+            graph={graph}
+            claims={mapClaims}
+            claimId={claimId}
+            view={view}
+            selected={selected}
+            assumption={assumption?.id ?? null}
+            impact={impact.data}
+            impactLoading={impact.isFetching}
+            impactError={impact.isError ? errorText(t, impact.error) : ""}
+            notice={detailsNotice ? { text: detailsNotice, error: snapshot.isError } : undefined}
+            actions={
+              graph &&
+              node && (
+                <>
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() =>
+                      onChatAnchor(
+                        {
+                          claim_id: graph.claim.id,
+                          statement_id: graph.statementId ?? undefined,
+                          node_id: node.kind === "goal" ? undefined : node.id,
+                        },
+                        node.kind === "goal" && graph.claim.title
+                          ? graph.claim.title
+                          : nodeTitle(t, node, { full: true }),
+                      )
+                    }
+                  >
+                    {t("projectCanvas.askAgent")}
+                  </button>
+                  <button type="button" className="button" onClick={() => setProofDialog(true)}>
+                    {t("proofTask.title")}
+                  </button>
+                </>
+              )
+            }
+            onSelect={selectNode}
+            onReviewPremise={(id) => setPremiseDialog({ id })}
+            onClose={closeInspector}
+          >
+            {graph && claimId && (
+              <details
+                className="inspector-disclosure"
+                open={proofOpen}
+                onToggle={(event) => setProofOpen(event.currentTarget.open)}
+              >
+                <summary>{t("projectCanvas.proofDetails")}</summary>
+                {proofOpen && (
+                  <>
+                    <div className="segmented inspector-lenses" role="group" aria-label={t("views.label")}>
+                      {(["proof", "references", "impact"] as const).map((lens) => (
+                        <button key={lens} type="button" aria-pressed={view === lens} onClick={() => changeView(lens)}>
+                          {t(`views.${lens}`)}
+                        </button>
+                      ))}
+                    </div>
+                    {view === "impact" && (
+                      <div className="impact-bar">
+                        {graph.hypotheses.length > 0 && (
+                          <>
+                            <label htmlFor="premise-select">{t("impact.preview")}</label>
+                            <select
+                              id="premise-select"
+                              value={assumption?.id ?? ""}
+                              onChange={(event) => selectNode(event.target.value)}
+                            >
+                              {graph.hypotheses.map((premise) => (
+                                <option key={premise.id} value={premise.id}>
+                                  {nodeTitle(t, premise)}
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        )}
+                        <span role="status">
+                          {impact.isFetching
+                            ? t("impact.loading")
+                            : impact.isError
+                              ? errorText(t, impact.error)
+                              : graph.hypotheses.length
+                                ? t("impact.readOnly")
+                                : t("impact.noPremise")}
+                        </span>
+                      </div>
+                    )}
+                    {graph.order.length === 1 && goal && view === "proof" && (
+                      <p className="inspector-proof-empty">{t("projectCanvas.proofEmpty")}</p>
+                    )}
+                    {graph.order.length > 0 && (
+                      <section className="graph-area inspector-graph" aria-label={t("graph.label")}>
+                        <GraphView
+                          graph={graph}
+                          view={view}
+                          selected={selected}
+                          assumption={assumption?.id ?? null}
+                          impact={impact.data}
+                          work={work.byNode}
+                          running={work.running}
+                          queued={work.queued}
+                          cardSizes={sizes.cards[`${claimId}:${view}`] ?? NO_CARD_SIZES}
+                          onResizeCard={(id, size) => layout.resizeCard(`${claimId}:${view}`, id, size)}
+                          onSelect={selectNode}
+                        />
+                      </section>
+                    )}
+                    <details
+                      className="inspector-disclosure inspector-activity"
+                      open={activityOpen}
+                      onToggle={(event) => setActivityOpen(event.currentTarget.open)}
+                    >
+                      <summary>{t("conversations.proofActivity")}</summary>
+                      <ProofActivity
+                        session={session}
+                        graph={graph}
+                        claimId={claimId}
+                        selected={node?.kind === "proposed_premise" ? null : selected}
+                        activity={activity.data}
+                        activityError={activityError}
+                        running={work.running}
+                        queued={work.queued}
+                        active={activityOpen}
+                        allNodes={allNodes}
+                        onAllNodes={() => setAllNodes(!allNodes)}
+                        onSelect={selectNode}
+                        onSent={() => void queries.invalidateQueries({ queryKey: ["activity", claimId] })}
+                      />
+                    </details>
+                  </>
+                )}
+              </details>
+            )}
+          </ReviewPanel>
+        </>
       )}
     </div>
   );

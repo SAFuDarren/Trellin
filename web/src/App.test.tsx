@@ -235,7 +235,7 @@ describe("App", () => {
     expect(requests).toHaveLength(0);
     fireEvent.change(screen.getByRole("textbox", { name: en.review.reason }), { target: { value: reason } });
     fireEvent.click(confirm);
-    expect(await screen.findByRole("heading", { level: 1, name: "Left zero" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: "Left zero" })).toBeTruthy();
     expect(requests).toEqual([
       { goal_id: goal, frame_sha256: frameDigest, candidate_id: second, candidate_sha256: candidateDigest, reason },
     ]);
@@ -404,7 +404,7 @@ describe("App", () => {
       vi.fn(async (input: string) => new Response(JSON.stringify(responses[input.split("?")[0]!] ?? {}))),
     );
     renderApp("token");
-    expect(await screen.findByRole("heading", { level: 1, name: "Left zero" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: "Left zero" })).toBeTruthy();
     const node = await screen.findByRole("button", { name: /^Original claim/ });
     expect(node.getAttribute("aria-pressed")).toBe("true");
     const detail = screen.getByLabelText(en.review.detail);
@@ -558,7 +558,8 @@ describe("App", () => {
     expect(graph.getByRole("button", { name: /^Original claim/ }).getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelectorAll(".graph-edge[data-kind='actual']")).toHaveLength(1);
     fireEvent.click(node);
-    expect(container.querySelector("#chat-target")?.textContent).toBe("Original claim");
+    fireEvent.click(screen.getByText(en.conversations.proofActivity, { selector: "summary" }));
+    expect(await screen.findByText(en.composer.chooseNode)).toBeTruthy();
     const details = within(screen.getByLabelText(en.review.detail));
     fireEvent.click(details.getByRole("button", { name: en.premise.review }));
     expect(dialog.getByText("Zero is a left identity.")).toBeTruthy();
@@ -579,12 +580,12 @@ describe("App", () => {
       decision: "revise",
       reason,
     });
-    expect(screen.getByRole("heading", { level: 1, name: "Left zero" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Left zero" })).toBeTruthy();
     expect(container.querySelectorAll(".graph-edge[data-kind='actual']")).toHaveLength(1);
     expect(graph.queryByRole("button", { name: /^Addition commutes/ })).toBeNull();
     fireEvent.click(dialog.getByRole("button", { name: en.premise.openRevised }));
-    expect(await screen.findByRole("heading", { level: 1, name: revised.title })).toBeTruthy();
-    expect(await screen.findByRole("button", { name: /^Revised result/ })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: revised.title })).toBeTruthy();
+    expect(screen.getByRole("application", { name: en.projectCanvas.label })).toBeTruthy();
   });
 
   it("checks for releases by request, opens official notes, and remembers the dismissed notice", async () => {
@@ -1209,13 +1210,13 @@ describe("App", () => {
     const request = fetch.mock.calls.find(([path]) => path === EVENT_PATH)?.[1];
     expect(new Headers(request?.headers).get("Last-Event-ID")).toBe("7");
     streams[0]!.enqueue(new TextEncoder().encode(": connected\n\n"));
-    expect(await screen.findByRole("heading", { level: 1, name: "Committed before the cursor" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: "Committed before the cursor" })).toBeTruthy();
     expect(graphReads).toHaveLength(2);
     expect(graphReads[0]?.aborted).toBe(true);
     await act(async () => {
       resolveOldGraph(Response.json(graph("Obsolete initial result")));
     });
-    expect(screen.queryByRole("heading", { level: 1, name: "Obsolete initial result" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "Obsolete initial result" })).toBeNull();
   });
 
   it("restores the desktop node and reports subsequent workbench selections", async () => {
@@ -1228,7 +1229,6 @@ describe("App", () => {
     );
     renderApp("token");
     expect(await screen.findByRole("application", { name: en.projectCanvas.label })).toBeTruthy();
-    fireEvent.click(await screen.findByRole("button", { name: en.projectCanvas.openProof }));
     const lemma = await screen.findByRole("button", { name: /^A helper lemma/ });
     expect(lemma.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: /^Original claim/ }));
@@ -1293,7 +1293,7 @@ describe("App", () => {
     expect(modal.queryByLabelText(en.claimCodes.claim)).toBeNull();
     fireEvent.change(modal.getByLabelText(en.claimCodes.reference), { target: { value: "OLD-19" } });
     fireEvent.click(modal.getByRole("button", { name: en.claimCodes.open }));
-    expect(await screen.findByRole("heading", { level: 1, name: "Archived theorem" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: "Archived theorem" })).toBeTruthy();
     expect(await screen.findByText(en.claimCodes.nodeAbsent)).toBeTruthy();
     expect(screen.queryByText(en.notice.noClaims)).toBeNull();
   });
