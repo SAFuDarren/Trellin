@@ -827,7 +827,6 @@
     "title": "Revise Library statement",
     "edit": "Edit statement",
     "editItem": "Edit statement for {{name}}",
-    "actions": "Actions",
     "close": "Close",
     "discard": "Discard",
     "baseVersion": "Editing exact version v{{version}}",

@@ -10,7 +10,8 @@ import { summarize, timeText } from "../workbench/text";
 
 export function itemName(t: TFunction, item: LibraryItem): string {
   if (item.declaration) return item.declaration;
-  if (item.natural) return summarize(item.natural.split("\n")[0] ?? "", 48);
+  const firstLine = item.natural?.split("\n", 1)[0]?.trim();
+  if (firstLine) return firstLine;
   return t(`library.kinds.${item.kind ?? "item"}`, { defaultValue: item.kind ?? item.logical_key });
 }
 
@@ -75,6 +76,7 @@ export function LibraryPage({
         )),
   );
   const selected = items.find((item) => item.id === selectedId && matchesFilter(item)) ?? shown[0];
+  const selectedName = selected && itemName(t, selected);
   const link = (filter: string) => href("library", filter);
   const choose = (id: string) => (window.location.hash = link(filterKey + "~" + id));
   const edit = (id: string) => {
@@ -130,7 +132,7 @@ export function LibraryPage({
       ]}
     >
       <PageHead title={t("rail.library")} note={t("library.count", { count: shown.length })} />
-      <div className="page-body split">
+      <div className="page-body split library-page">
         <div className="primary">
           <label className="search-field">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -151,7 +153,7 @@ export function LibraryPage({
             <Empty>{library.isPending ? t("common.loading") : t("library.none")}</Empty>
           ) : (
             <div className="table-wrap">
-              <table className="table">
+              <table className="table library-table">
                 <thead>
                   <tr>
                     <th scope="col">{t("library.name")}</th>
@@ -161,53 +163,60 @@ export function LibraryPage({
                       {t("library.usedBy")}
                     </th>
                     <th scope="col">{t("library.source")}</th>
-                    <th scope="col">{t("libraryEdit.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map((item) => (
-                    <tr
-                      key={item.id}
-                      data-row="true"
-                      aria-selected={item === selected}
-                      tabIndex={0}
-                      onClick={() => choose(item.id)}
-                      onKeyDown={(event) => {
-                        if (event.target === event.currentTarget && event.key === "Enter") choose(item.id);
-                      }}
-                    >
-                      <td>
-                        <div className="stack">
-                          <span className="mono">{itemName(t, item)}</span>
-                          <LibraryItemState t={t} item={item} />
-                        </div>
-                      </td>
-                      <td className="math">{summarize(item.lean ?? item.formula ?? "", 60)}</td>
-                      <td className="muted">{"v" + (item.statement_revision ?? item.version)}</td>
-                      <td className="num">{item.used_by.length}</td>
-                      <td className="muted">{t(`library.origins.${item.origin}`, { defaultValue: item.origin })}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="relation"
-                          aria-label={t("libraryEdit.editItem", { name: itemName(t, item) })}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            edit(item.id);
-                          }}
-                        >
-                          {t("libraryEdit.edit")}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {shown.map((item) => {
+                    const name = itemName(t, item);
+                    return (
+                      <tr
+                        key={item.id}
+                        data-row="true"
+                        aria-selected={item === selected}
+                        tabIndex={0}
+                        onClick={() => choose(item.id)}
+                        onKeyDown={(event) => {
+                          if (event.target === event.currentTarget && event.key === "Enter") choose(item.id);
+                        }}
+                      >
+                        <td>
+                          <div className="library-name-cell">
+                            <div className="stack">
+                              <span className={item.declaration ? "library-name mono" : "library-name"} title={name}>
+                                {name}
+                              </span>
+                              <LibraryItemState t={t} item={item} />
+                            </div>
+                            <button
+                              type="button"
+                              className="icon-button library-row-edit"
+                              aria-label={t("libraryEdit.editItem", { name })}
+                              title={t("libraryEdit.edit")}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                edit(item.id);
+                              }}
+                            >
+                              <svg viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="M10.7 3.1 12.9 5.3M3 13l.6-3.2 7.1-7.1a1.6 1.6 0 0 1 2.3 2.3l-7.1 7.1L3 13Z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                        <td className="math">{summarize(item.lean ?? item.formula ?? "", 60)}</td>
+                        <td className="muted">{"v" + (item.statement_revision ?? item.version)}</td>
+                        <td className="num">{item.used_by.length}</td>
+                        <td className="muted">{t(`library.origins.${item.origin}`, { defaultValue: item.origin })}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
         {selected && (
-          <aside className="aside" aria-label={itemName(t, selected)}>
+          <aside className="aside" aria-label={selectedName}>
             <span className="field-label">
               {[
                 t(`library.kinds.${selected.kind ?? "item"}`, { defaultValue: selected.kind ?? "" }),
@@ -215,12 +224,12 @@ export function LibraryPage({
               ].join(" · ")}
             </span>
             <div className="title-row">
-              <h3 className="mono">{itemName(t, selected)}</h3>
+              <h3 className={selected.declaration ? "mono" : undefined}>{selectedName}</h3>
               <button className="button" type="button" onClick={() => edit(selected.id)}>
                 {t("libraryEdit.edit")}
               </button>
             </div>
-            {selected.natural && <p>{selected.natural}</p>}
+            {selected.natural && selected.natural.trim() !== selectedName && <p>{selected.natural}</p>}
             {selected.formula && <p className="formula">{selected.formula}</p>}
             {selected.lean && <pre className="code-block">{selected.lean}</pre>}
             <dl className="facts">
