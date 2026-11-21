@@ -90,6 +90,7 @@
   },
   "canvasShell": {
     "map": "项目图谱",
+    "details": "详情",
     "researchActions": "研究操作",
     "proofOverview": "显示证明概览",
     "reload": "重新加载图谱",
@@ -110,8 +111,10 @@
   },
   "atlas": {
     "title": "全局概览",
+    "loading": "正在加载全局图…",
+    "empty": "没有可显示的课题。",
     "nodes": "{{count}} 个节点",
-    "label": "工作区里所有课题的依赖树，虚线圈标出当前课题。",
+    "label": "当前工作区近期课题的依赖树，虚线圈标出所选课题。",
     "move": "拖动可移动概览图",
     "resize": "拖动可调整概览图大小",
     "untitled": "未命名"

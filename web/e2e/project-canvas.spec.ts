@@ -1,7 +1,10 @@
 import { expect, test, type Locator } from "@playwright/test";
+import type { GraphSnapshot } from "../src/workbench/types";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
 
 const SECOND_TITLE = "单射映射的复合";
+const FIRST_STATEMENT = "For each natural number, adding zero on the left returns that number.";
+const SECOND_LEAN = "Function.Injective f → Function.Injective g → Function.Injective (g ∘ f)";
 
 async function centerOf(locator: Locator) {
   await expect(locator).toBeInViewport();
@@ -13,7 +16,7 @@ test.beforeEach(async ({ request }) => {
   await request.post("/__reset", { data: {} });
 });
 
-test("the project map is the workbench entry and node selection keeps its camera", async ({ page }) => {
+test("project claims open the existing inspector without leaving or moving the canvas", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   // The older claim is still in the project even after falling out of the recent list.
   await page.route("**/api/claims", async (route) => {
@@ -22,10 +25,27 @@ test("the project map is the workbench entry and node selection keeps its camera
     const claims = project.claims.filter((claim: { title: string }) => claim.title !== SECOND_TITLE);
     await route.fulfill({ response, json: { ...project, claims } });
   });
-  const proofRequests: string[] = [];
-  page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (url.pathname === "/api/graph") proofRequests.push(url.searchParams.get("claim") ?? "");
+  await page.route("**/api/graph?*", async (route) => {
+    const response = await route.fetch();
+    const graph = (await response.json()) as GraphSnapshot;
+    const goal = graph.nodes.find((node) => node.kind === "goal")!;
+    if (graph.claim.title === "Other claim") {
+      // The fixture shares a proof graph across claims. Give this goal its own record.
+      const oldGoalId = goal.id;
+      goal.id = `goal:${graph.claim.id}`;
+      goal.title = SECOND_TITLE;
+      goal.formula = undefined;
+      goal.formalization = SECOND_LEAN;
+      graph.claim.title = SECOND_TITLE;
+      for (const edge of graph.edges) {
+        if (edge.source === oldGoalId) edge.source = goal.id;
+        if (edge.target === oldGoalId) edge.target = goal.id;
+      }
+    } else {
+      goal.formula = undefined;
+      goal.statement = FIRST_STATEMENT;
+    }
+    await route.fulfill({ response, json: graph });
   });
   await page.goto("/#session=fixture");
   const canvas = page.locator(".project-canvas");
@@ -45,19 +65,92 @@ test("the project map is the workbench entry and node selection keeps its camera
 
   await first.click();
   await expect(first).toHaveAttribute("aria-pressed", "true");
+  const inspector = page.locator("#review");
+  const detail = inspector.locator("#node-detail");
+  await expect(detail.getByText(FIRST_STATEMENT, { exact: true })).toBeVisible();
+  await expect(detail.getByText("∀ n : Nat, n = 0 + n", { exact: true })).toBeVisible();
+  await expect(detail.getByText("In progress", { exact: true })).toBeVisible();
+  await detail.getByText("Sources and versions", { exact: true }).click();
+  await expect(detail.getByText("Lean statement ID", { exact: true })).toBeVisible();
+  await expect(
+    inspector.getByRole("button", { name: "reverseZeroAdd Awaiting your review", exact: true }),
+  ).toBeVisible();
+  expect(await camera()).toEqual(panned);
+  await expect(page.locator(".graph-edges")).toHaveCount(0);
+
   await second.press("Enter");
   await expect(second).toHaveAttribute("aria-pressed", "true");
   await expect(second).toHaveCSS("box-shadow", "none");
   await expect(second).toHaveCSS("background-image", "none");
   await expect(first).toHaveAttribute("aria-pressed", "false");
-  const secondId = await second.getAttribute("data-claim-id");
+  await expect(detail.getByRole("heading", { name: SECOND_TITLE, exact: true })).toBeVisible();
+  await expect(detail.getByText(SECOND_LEAN, { exact: true })).toBeVisible();
+  await expect(detail.getByText(FIRST_STATEMENT, { exact: true })).toHaveCount(0);
+  const detailsToggle = canvas.getByRole("button", { name: "Details", exact: true });
+  await expect(detailsToggle).toHaveAttribute("aria-expanded", "true");
+  await inspector.getByRole("button", { name: "Collapse review column", exact: true }).click();
+  await expect(inspector).toBeHidden();
+  await expect(detailsToggle).toBeFocused();
+  await expect(detailsToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(second).toHaveAttribute("aria-pressed", "true");
+  await second.press("Enter");
+  await expect(detail.getByText(SECOND_LEAN, { exact: true })).toBeVisible();
   expect(await camera()).toEqual(panned);
-  expect(proofRequests).toEqual([]);
   await expect(page.locator(".graph-edges")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Open proof", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(SECOND_TITLE);
   await expect(page.locator(".graph-edge")).toHaveCount(7);
-  expect(proofRequests).toEqual([secondId]);
+});
+
+test("the global map is available from the project canvas", async ({ page }) => {
+  await page.goto("/#session=fixture");
+  const canvas = page.locator(".project-canvas");
+  const toggle = canvas.getByRole("button", { name: "Global map", exact: true });
+  const overview = canvas.locator(".atlas");
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(overview.getByRole("img", { name: /^Recent claims in the workspace/ })).toBeVisible();
+  const resize = overview.getByRole("separator", { name: "Drag to resize the overview" });
+  const width = Number(await resize.getAttribute("aria-valuenow"));
+  await resize.press("ArrowRight");
+  await expect(resize).toHaveAttribute("aria-valuenow", String(width + 16));
+  await mapClaim(page, FIXTURE_CLAIM_TITLE).click();
+  await canvas.getByRole("button", { name: "Link selected claim", exact: true }).click();
+  await overview.getByRole("button", { name: SECOND_TITLE, exact: true }).press("Enter");
+  await expect(mapClaim(page, SECOND_TITLE)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#review")).toBeVisible();
+  await expect(page.locator(".graph-edges")).toHaveCount(0);
+  await expect(canvas.locator("[data-research-link]")).toHaveCount(0);
+  await canvas.getByRole("button", { name: "Cancel link", exact: true }).click();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(overview).toBeHidden();
+  await expect(mapClaim(page, SECOND_TITLE)).toHaveAttribute("aria-pressed", "true");
+});
+
+test("opening the inspector keeps the rightmost card visible in a compact window", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto("/#session=fixture");
+  const card = mapClaim(page, "连续自然数之积的奇偶性");
+  const zoom = page.getByRole("button", { name: "Zoom to 100%", exact: true });
+  await expect(card).toBeInViewport({ ratio: 0.99 });
+  const initialZoom = await zoom.innerText();
+
+  await card.click();
+  await expect(page.locator("#review")).toBeVisible();
+  await expect(card).toHaveAttribute("aria-pressed", "true");
+  await expect(card).toBeInViewport({ ratio: 0.99 });
+  await expect(zoom).toHaveText(initialZoom);
+
+  await page.getByRole("button", { name: "Global map", exact: true }).click();
+  const overview = page.locator(".project-canvas-stage .atlas");
+  await expect(overview).toBeInViewport({ ratio: 0.99 });
+  const legend = overview.getByRole("button", { name: FIXTURE_CLAIM_TITLE, exact: true });
+  await expect(legend).toBeInViewport({ ratio: 0.99 });
+  await legend.click();
+  await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
 });
 
 test("an explicitly named launch claim opens proof and can return to the project map", async ({ page }) => {
@@ -90,6 +183,7 @@ test("moving nodes and linking claims are deliberate and remain after reopen", a
   const moved = await centerOf(first);
   expect(moved.x).toBeGreaterThan(moveFrom.x + 40);
   expect(moved.y).toBeGreaterThan(moveFrom.y + 24);
+  await expect(page.locator("#review")).toBeHidden();
   await expect
     .poll(async () => (await (await request.get("/api/project-canvas")).json()).positions[firstId])
     .toEqual({ x: expect.any(Number), y: expect.any(Number) });
@@ -110,6 +204,16 @@ test("moving nodes and linking claims are deliberate and remain after reopen", a
     .poll(async () => (await (await request.get("/api/project-canvas")).json()).links)
     .toEqual([{ source, target }]);
   const position = (await (await request.get("/api/project-canvas")).json()).positions[firstId];
+
+  const toggle = canvas.getByRole("button", { name: "Global map", exact: true });
+  await toggle.click();
+  await expect(canvas.locator(".atlas")).toBeVisible();
+  await toggle.click();
+  await expect(paths).toHaveCount(1);
+  await canvas.getByRole("button", { name: "Open proof", exact: true }).click();
+  await expect(page.locator(".graph-edge")).toHaveCount(7);
+  await page.getByRole("button", { name: "Project map", exact: true }).click();
+  await expect(paths).toHaveCount(1);
 
   await page.reload();
   await expect(paths).toHaveCount(1);

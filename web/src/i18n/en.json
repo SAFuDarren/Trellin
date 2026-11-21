@@ -90,6 +90,7 @@
   },
   "canvasShell": {
     "map": "Project map",
+    "details": "Details",
     "researchActions": "Research actions",
     "proofOverview": "Show proof overview",
     "reload": "Reload map",
@@ -110,8 +111,10 @@
   },
   "atlas": {
     "title": "Overview",
+    "loading": "Loading global map…",
+    "empty": "No claims to show.",
     "nodes": "{{count}} nodes",
-    "label": "Every claim in the workspace as a tree; the dashed circle marks this claim.",
+    "label": "Recent claims in the workspace as trees. The dashed circle marks the selected claim.",
     "move": "Drag to move the overview",
     "resize": "Drag to resize the overview",
     "untitled": "Untitled"

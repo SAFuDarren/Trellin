@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.47
+
+- Select a claim on the project map to read its details and review queue alongside the canvas. Open **Global map** to explore the existing overview of recent claims and proof relationships.
+
 ## 1.0.46
 
 - Open Workbench on a project map with a project-only sidebar. Select claims in place, drag them to arrange the map, save research links, and open the selected proof with a separate action. Related research commands share one menu.
