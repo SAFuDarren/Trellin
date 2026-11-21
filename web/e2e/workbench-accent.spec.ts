@@ -142,7 +142,7 @@ for (const colorScheme of ["light", "dark"] as const) {
 
     const canvas = page.getByRole("application", { name: "Project map", exact: true });
     if (colorScheme === "light") {
-      const zoom = canvas.getByRole("button", { name: "Zoom to 100%" });
+      const zoom = page.locator(".project-canvas").getByRole("button", { name: "Zoom to 100%" });
       await zoom.click();
       await expect(zoom).toHaveText("100%");
       await expect(canvas).toHaveCSS("background-image", /radial-gradient/);

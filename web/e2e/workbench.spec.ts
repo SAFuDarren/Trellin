@@ -273,10 +273,10 @@ test("a blocked proof node keeps a private draft across reopen", async ({ page }
 test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   await open(page);
   await page.locator(".proof-return").click();
-  const canvas = page.getByRole("application", { name: "Project map", exact: true });
-  const level = canvas.locator(".zoom-level");
+  const zoom = page.locator(".project-canvas").getByRole("group", { name: "Zoom" });
+  const level = zoom.getByRole("button", { name: "Zoom to 100%" });
   const before = await level.textContent();
-  await canvas.getByRole("button", { name: "Zoom in" }).click();
+  await zoom.getByRole("button", { name: "Zoom in" }).click();
   await expect(level).not.toHaveText(before ?? "");
   const splitter = page.locator('.splitter[data-split="side"]');
   await splitter.focus();

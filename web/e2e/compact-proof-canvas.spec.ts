@@ -67,6 +67,8 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await expect.poll(() => inside(selected, stage)).toBe(true);
     await expect.poll(() => disjoint(stage, zoom)).toBe(true);
+    const counts = proof.getByRole("status", { name: "Proof status counts" });
+    expect(await counts.evaluate((row) => row.scrollWidth <= row.clientWidth)).toBe(true);
     await expect.poll(() => disjoint(lenses, details)).toBe(true);
     await expect.poll(() => disjoint(lenses, review)).toBe(true);
     await expect.poll(() => disjoint(zoom, review)).toBe(true);

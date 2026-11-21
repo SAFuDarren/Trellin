@@ -929,6 +929,7 @@ select:disabled {
 }
 
 .legend {
+  container-type: inline-size;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1158,6 +1159,14 @@ select:disabled {
   gap: 6px;
   padding: 4px 12px;
   border-top: 1px solid var(--hair);
+}
+@container (max-width: 430px) {
+  .proof-footer {
+    flex-wrap: wrap;
+  }
+  .proof-footer .legend {
+    flex: 0 0 100%;
+  }
 }
 .zoom {
   flex: none;
