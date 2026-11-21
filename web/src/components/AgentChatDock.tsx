@@ -1,25 +1,19 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAgentWork } from "../api/agentWork";
-import { ApiError } from "../api/client";
-import {
-  conversationErrorText,
-  useConversationActions,
-  useConversations,
-  type ConversationAnchor,
-  type ConversationSummary,
-} from "../api/conversations";
-import { useTeamAgents, type TeamAgent } from "../api/teamAgents";
+import { useConversations, type ConversationSummary } from "../api/conversations";
+import { useTeamAgents } from "../api/teamAgents";
 import { useConversationSending } from "../shell/ConversationEditors";
 import { href, type Route } from "../shell/route";
 import { timeText } from "../workbench/text";
 import { ConversationPanel } from "./ConversationPanel";
-import { Chevron, Mark, Spin } from "./Icons";
+import { Chevron, Mark } from "./Icons";
 import { Picker } from "./FloatingControls";
-import { TeamAgentAvatar } from "./TeamAgentAvatar";
+import { DIRECT_MODEL } from "./ConversationRecipients";
+import { NewConversation, type DraftAnchor } from "./NewConversation";
 import "../styles/agent-chat-dock.css";
 
-export type AgentChatAnchor = { anchor: ConversationAnchor; title: string };
+export type AgentChatAnchor = DraftAnchor;
 export type AgentChatRequest = AgentChatAnchor | { newConversation: true };
 
 type AgentDockView = "chat" | "activity";
@@ -36,23 +30,13 @@ export function AgentChatDock({
   const { t, i18n } = useTranslation();
   const conversations = useConversations(session);
   const work = useAgentWork(session);
-  const actions = useConversationActions(session);
   const sending = useConversationSending(session);
   const [view, setView] = useState<AgentDockView | null>(null);
   const [handledRequest, setHandledRequest] = useState<AgentChatRequest | null>(null);
   const [anchor, setAnchor] = useState<AgentChatAnchor | null>(null);
   const [chosenId, setChosenId] = useState<string | null>(null);
-  const [agentId, setAgentId] = useState<string | null>(null);
-  const [directModel, setDirectModel] = useState(false);
-  const [title, setTitle] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState("");
+  const [initialRecipient, setInitialRecipient] = useState<string>();
   const [focusComposer, setFocusComposer] = useState(false);
-  const [recovering, setRecovering] = useState(false);
-  const latestRequest = useRef(request);
-  const createRequest = useRef<{ key: string; id: string } | null>(null);
-  const revision = useRef(0);
-  const busy = useRef(false);
   const launcher = useRef<HTMLButtonElement>(null);
   const activityLauncher = useRef<HTMLButtonElement>(null);
   const closeControl = useRef<HTMLButtonElement>(null);
@@ -85,12 +69,7 @@ export function AgentChatDock({
   const agents = profiles.data?.agents ?? [];
   const agentsById = new Map(agents.map((profile) => [profile.id, profile]));
   const thread = threads.find(({ id }) => id === chosenId);
-  const agent = agentsById.get((thread ? thread.agent_id : agentId) ?? "");
-  const fullChatId =
-    route.section === "chat"
-      ? route.sub || (!profiles.isPending && !agents.length ? threads[0]?.id : undefined)
-      : undefined;
-  const duplicate = Boolean(thread && thread.id === fullChatId);
+  const agent = agentsById.get(thread?.agent_id ?? "");
   const runningCount = activeChats.length + runningWork.length;
   const attentionCount = failedChats.length + attentionWork.length;
 
@@ -99,32 +78,31 @@ export function AgentChatDock({
     setHandledRequest(request);
     setAnchor(anchored);
     setChosenId(null);
-    setTitle(anchored?.title.slice(0, 200) ?? "");
-    if (!anchored) {
-      setAgentId(null);
-      setDirectModel(false);
-    }
-    setError("");
-    setRecovering(false);
-    setFocusComposer(false);
-    setView("chat");
+    setInitialRecipient(undefined);
+    setFocusComposer(true);
+    if (route.section !== "chat") setView("chat");
   }
+  if (route.section === "chat" && view === "chat") setView(null);
 
   function open(kind: AgentDockView) {
+    if (kind === "chat" && route.section === "chat") {
+      setView(null);
+      const input = document.querySelector<HTMLTextAreaElement>(".chats-main .direct-composer textarea:not(:disabled)");
+      if (input) input.focus();
+      else window.location.hash = href("chat", "new");
+      return;
+    }
     if (view === kind) {
       setView(null);
       return;
     }
+    setFocusComposer(kind === "chat");
     setView(kind);
   }
 
   useLayoutEffect(() => {
-    if (view !== null) closeControl.current?.focus();
-  }, [view, request]);
-
-  useLayoutEffect(() => {
-    latestRequest.current = request;
-  }, [request]);
+    if (view === "activity") closeControl.current?.focus();
+  }, [view]);
 
   function collapse() {
     setView(null);
@@ -132,81 +110,30 @@ export function AgentChatDock({
   }
 
   function selectThread(item: ConversationSummary) {
-    revision.current += 1;
     setChosenId(item.id);
-    setAgentId(item.agent_id ?? null);
-    setDirectModel(!item.agent_id);
+    setInitialRecipient(undefined);
     setAnchor(null);
-    setError("");
-    setRecovering(false);
-    setFocusComposer(false);
-    setView("chat");
+    setFocusComposer(true);
+    if (route.section === "chat") {
+      setView(null);
+      window.location.hash = href("chat", item.id);
+    } else {
+      setView("chat");
+    }
   }
 
-  function startNew() {
-    revision.current += 1;
+  function startNew(recipient?: string) {
     setChosenId(null);
     setAnchor(null);
-    setTitle("");
-    setError("");
-    setRecovering(false);
-    setFocusComposer(false);
+    setInitialRecipient(recipient);
+    setFocusComposer(true);
   }
 
-  function chooseAgent(profile: TeamAgent) {
-    if (thread && profile.id === agent?.id) return;
-    revision.current += 1;
-    setAgentId(profile.id);
-    setDirectModel(false);
-    setError("");
-    setRecovering(false);
-    setFocusComposer(false);
-    // Choosing another recipient opens their own conversation or a new draft, never retargeting the current one.
-    if (thread) {
-      const existing = threads.find(({ agent_id, claim_id }) => agent_id === profile.id && !claim_id);
-      setChosenId(existing?.id ?? null);
-      setAnchor(null);
-      setTitle("");
-    }
-  }
-
-  function chooseModel() {
-    if (thread && !thread.agent_id) return;
-    if (thread) startNew();
-    setAgentId(null);
-    setDirectModel(true);
-  }
-
-  async function create() {
-    if ((!agent && !directModel) || busy.current) return;
-    busy.current = true;
-    const selected = revision.current;
-    const startingRequest = request;
-    const name = title.trim() || t("conversations.defaultTitle");
-    const scope = anchor?.anchor ?? {};
-    const key = JSON.stringify([agent?.id, scope, name]);
-    const id = createRequest.current?.key === key ? createRequest.current.id : crypto.randomUUID();
-    createRequest.current = { key, id };
-    setCreating(true);
-    setError("");
-    try {
-      const next = await actions.create(name, scope, agent?.id, id);
-      createRequest.current = null;
-      if (selected !== revision.current || latestRequest.current !== startingRequest) return;
-      setChosenId(next.id);
-      setFocusComposer(true);
-      setRecovering(false);
-    } catch (cause) {
-      if (selected !== revision.current || latestRequest.current !== startingRequest) return;
-      if (cause instanceof ApiError && (cause.code ?? cause.message) === "conversation.stale") {
-        createRequest.current = null;
-      }
-      setError(conversationErrorText(t, cause));
-      setRecovering(true);
-    } finally {
-      busy.current = false;
-      setCreating(false);
-    }
+  function switchRecipient(id: string) {
+    if (id === (thread?.agent_id ?? DIRECT_MODEL)) return;
+    const existing = threads.find(({ agent_id, claim_id }) => agent_id === id && !claim_id);
+    if (existing) selectThread(existing);
+    else startNew(id);
   }
 
   const threadPicker = (
@@ -220,11 +147,10 @@ export function AgentChatDock({
       value={thread?.id}
       trigger={
         <>
-          <span>{thread?.title ?? t("agentDock.threads")}</span>
+          <span>{thread?.title ?? t("agentDock.newConversation")}</span>
           <Chevron />
         </>
       }
-      disabled={creating}
       groups={[
         {
           options: threads.map((item) => ({
@@ -306,7 +232,32 @@ export function AgentChatDock({
         }}
       >
         <header className="agent-dock-heading">
-          <h2 id={titleId}>{t(view === "activity" ? "agentDock.activity" : "agentDock.title")}</h2>
+          <h2 id={titleId} className={view === "chat" ? "sr-only" : undefined}>
+            {t(view === "activity" ? "agentDock.activity" : "agentDock.title")}
+          </h2>
+          {view === "chat" && (
+            <>
+              {threadPicker}
+              <div className="agent-dock-heading-actions">
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label={t("agentDock.newConversation")}
+                  title={t("agentDock.newConversation")}
+                  onClick={() => startNew()}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M3.5 8h9 M8 3.5v9" />
+                  </svg>
+                </button>
+                {thread && (
+                  <a className="conversation-text-action" href={href("chat", thread.id)}>
+                    {t("agentDock.openChats")}
+                  </a>
+                )}
+              </div>
+            </>
+          )}
           <button
             className="icon-button"
             ref={closeControl}
@@ -373,71 +324,6 @@ export function AgentChatDock({
           </div>
         ) : view === "chat" ? (
           <>
-            <div className="agent-dock-toolbar">
-              {threadPicker}
-              <button className="conversation-text-action" type="button" onClick={startNew} disabled={creating}>
-                {t("agentDock.newConversation")}
-              </button>
-            </div>
-            <div className="agent-dock-recipient">
-              <Picker
-                label={t("agentDock.chooseAgent")}
-                searchLabel={t("agentDock.searchAgents")}
-                emptyLabel={t(profiles.isPending ? "common.loading" : "agentDock.noAgents")}
-                triggerClassName="agent-dock-picker-trigger"
-                className="agent-dock-picker-panel"
-                placement="top-start"
-                value={directModel ? "direct-model" : agent?.id}
-                disabled={creating}
-                trigger={
-                  <>
-                    {agent ? (
-                      <>
-                        <TeamAgentAvatar avatar={agent.avatar} name={agent.name} />
-                        <span>{agent.name}</span>
-                      </>
-                    ) : (
-                      <span>
-                        {t(
-                          directModel
-                            ? "conversations.chooseModel"
-                            : thread
-                              ? "agentDock.unbound"
-                              : "agentDock.chooseAgent",
-                        )}
-                      </span>
-                    )}
-                    <Chevron />
-                  </>
-                }
-                groups={[
-                  {
-                    options: agents.map((item) => ({
-                      id: item.id,
-                      label: item.name,
-                      icon: <TeamAgentAvatar avatar={item.avatar} name={item.name} />,
-                      current: item.id === agent?.id,
-                      onSelect: () => chooseAgent(item),
-                    })),
-                  },
-                  {
-                    options: [
-                      {
-                        id: "direct-model",
-                        label: t("conversations.chooseModel"),
-                        current: directModel,
-                        onSelect: chooseModel,
-                      },
-                    ],
-                  },
-                ]}
-              />
-              {thread && (
-                <a className="conversation-text-action" href={href("chat", thread.id)} onClick={collapse}>
-                  {t("agentDock.openChats")}
-                </a>
-              )}
-            </div>
             {thread?.claim_id && (
               <div className="agent-dock-scope">
                 {anchor
@@ -446,65 +332,30 @@ export function AgentChatDock({
               </div>
             )}
             {thread ? (
-              duplicate ? (
-                <p className="agent-dock-empty">{t("agentDock.alreadyOpen")}</p>
-              ) : (
-                <ConversationPanel
-                  key={thread.id}
-                  session={session}
-                  thread={thread}
-                  employee={agent}
-                  focusComposer={focusComposer && view === "chat"}
-                  onRemove={startNew}
-                />
-              )
+              <ConversationPanel
+                key={thread.id}
+                session={session}
+                thread={thread}
+                employee={agent}
+                recipientChoice={{ agents, pending: profiles.isPending, onSelect: switchRecipient }}
+                focusComposer={focusComposer}
+                onRemove={() => startNew()}
+              />
             ) : (
-              <div className="agent-dock-draft">
-                {anchor ? (
-                  <div className="agent-dock-anchor">
-                    <span>{t("agentDock.anchor", { title: anchor.title })}</span>
-                    <button
-                      className="conversation-text-action"
-                      type="button"
-                      disabled={creating}
-                      onClick={() => setAnchor(null)}
-                    >
-                      {t("agentDock.detach")}
-                    </button>
-                  </div>
-                ) : (
-                  <p>{t("agentDock.contextNone")}</p>
-                )}
-                {(agent || directModel) && (
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void create();
-                    }}
-                  >
-                    <label>
-                      <span>{t("employeeChats.taskName")}</span>
-                      <input
-                        value={title}
-                        onChange={(event) => setTitle(event.currentTarget.value)}
-                        maxLength={200}
-                        disabled={creating}
-                      />
-                    </label>
-                    <button type="submit" className="button primary" disabled={creating}>
-                      {creating && <Spin />}
-                      {t(
-                        creating
-                          ? "agentDock.creating"
-                          : recovering
-                            ? "agentWork.retry"
-                            : "agentDock.startConversation",
-                      )}
-                    </button>
-                  </form>
-                )}
-                {error && <p role="alert">{error}</p>}
-              </div>
+              <NewConversation
+                session={session}
+                agents={agents}
+                agentsPending={profiles.isPending}
+                agentsError={profiles.isError}
+                anchor={anchor}
+                onDetach={() => setAnchor(null)}
+                initialRecipient={initialRecipient}
+                onCreated={(item) => {
+                  setChosenId(item.id);
+                  setFocusComposer(true);
+                }}
+                focusComposer={focusComposer}
+              />
             )}
           </>
         ) : null}

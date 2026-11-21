@@ -120,3 +120,66 @@
 .direct-composer .send .spin {
   stroke-width: 1.5;
 }
+
+.composer-recipient-trigger {
+  min-width: 0;
+  background: var(--side);
+  color: var(--ink);
+}
+
+.composer-recipient-trigger > span:not(.team-agent-avatar) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-recipient-trigger .team-agent-avatar {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  font-size: var(--type-meta-size);
+}
+
+.direct-composer:has(.composer-recipient-trigger) .composer-context-trigger {
+  margin-inline-end: 0;
+}
+
+.direct-composer .composer-recipient-trigger {
+  margin-inline-end: auto;
+}
+
+.new-conversation-body {
+  display: flex;
+  flex: 1;
+  align-items: end;
+  min-height: 0;
+  overflow: auto;
+}
+
+.conversation-starters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.conversation-starter {
+  min-height: var(--control-h);
+  padding: 4px 9px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--sub);
+  text-align: start;
+}
+
+.conversation-starter:hover {
+  border-color: var(--edge);
+  background: var(--state-hover);
+  color: var(--ink);
+}
+
+.new-conversation .composer-status a {
+  color: var(--ink);
+}

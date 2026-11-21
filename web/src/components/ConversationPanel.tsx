@@ -10,21 +10,20 @@ import {
   type ConversationRequest,
   type ConversationSummary,
 } from "../api/conversations";
-import {
-  connectionChoiceLabel,
-  connectionModelLabel,
-  dispatchableConnection,
-  useModelConnections,
-} from "../api/modelConnections";
-import { useLocalTextModels } from "../api/localModels";
 import { useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { useComposerKeyboard } from "../hooks/useComposerKeyboard";
 import { useConversationEditor } from "../shell/ConversationEditors";
-import { harnessName, timeText } from "../workbench/text";
-import { Chevron, SendArrow, Spin } from "./Icons";
-import { Menu, Picker } from "./FloatingControls";
+import { timeText } from "../workbench/text";
+import { SendArrow, Spin } from "./Icons";
+import { Menu } from "./FloatingControls";
 import { ModelConnections } from "./ModelConnections";
-import { TeamAgentAvatar } from "./TeamAgentAvatar";
+import { ConversationModelPicker, useConversationModels, previewMatchesModel } from "./ConversationModels";
+import {
+  ConversationRecipient,
+  ConversationStarters,
+  DIRECT_MODEL,
+  type RecipientChoice,
+} from "./ConversationRecipients";
 import "../styles/conversation-composer.css";
 
 export function ConversationPanel({
@@ -33,6 +32,7 @@ export function ConversationPanel({
   onRemove,
   header,
   employee,
+  recipientChoice,
   focusComposer = false,
 }: {
   session: string;
@@ -40,6 +40,7 @@ export function ConversationPanel({
   onRemove: () => void;
   header?: (actions: { remove: () => void; removeDisabled: boolean; triggerRef: Ref<HTMLButtonElement> }) => ReactNode;
   employee?: Pick<TeamAgent, "id" | "name" | "connection_id" | "revision">;
+  recipientChoice?: RecipientChoice;
   focusComposer?: boolean;
 }) {
   const { t, i18n } = useTranslation();
@@ -50,40 +51,24 @@ export function ConversationPanel({
     employee?.id === employeeId ? employee : profiles.data?.agents.find((profile) => profile.id === employeeId);
   const employeeScoped = Boolean(employeeId);
   const actions = useConversationActions(session);
-  const models = useModelConnections(session);
-  const local = useLocalTextModels(session);
-  const options = [
-    ...(local.data?.models ?? []).map((name) => ({
-      id: "local:" + name,
-      label: t("conversations.localModel", { name }),
-      provider: "ollama-native",
-      model: name + ":local",
-      fingerprint: null,
-      local: true,
-      description: null,
-    })),
-    ...(models.data?.connections ?? []).filter(dispatchableConnection).map((connection) => {
-      const choice = connectionChoiceLabel(t, connection);
-      const model = connectionModelLabel(t, connection);
-      const label = choice.endsWith(" · " + model) ? choice : choice + " · " + model;
-      const provider = t(`team.providers.${connection.provider}`, { defaultValue: connection.provider });
-      const description =
-        connection.label && ![provider, connection.model].includes(connection.label) ? connection.label : null;
-      return { ...connection, label, description, local: false };
-    }),
-  ];
+  const models = useConversationModels(session, { discoverLocal: !employeeScoped });
   const { editor, update, reserve, release, keepsRequest } = useConversationEditor(session, thread.id);
   const { text, selectedModel, pending, error } = editor;
   const [removing, setRemoving] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(Boolean(editor.preview));
   const [managingModels, setManagingModels] = useState(false);
   const modelTrigger = useRef<HTMLButtonElement>(null);
   const archiveTrigger = useRef<HTMLButtonElement>(null);
   const restoreArchiveFocus = useRef(false);
-  const [prepared, setPrepared] = useState<{ scope: string; preview: ConversationPreview } | null>(null);
+  const prepared = editor.preview;
   const currentScope = useRef<string | null>(null);
-  const composerKeyboard = useComposerKeyboard();
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const recipientTrigger = useRef<HTMLButtonElement>(null);
+  const composerKeyboard = useComposerKeyboard(() => {
+    if (!recipientTrigger.current || recipientTrigger.current.disabled) return false;
+    recipientTrigger.current.click();
+    return true;
+  });
   const initialFocus = useRef(focusComposer);
   const formId = useId();
   const feed = useRef<HTMLOListElement>(null);
@@ -93,7 +78,9 @@ export function ConversationPanel({
   const sending = pending === "send";
   const latestError = detail.data?.thread.latest_error;
   const latestMessage = messages[messages.length - 1];
-  const connection = options.find((option) => option.id === (employeeScoped ? agent?.connection_id : selectedModel));
+  const connection = models.options.find(
+    (option) => option.id === (employeeScoped ? agent?.connection_id : selectedModel),
+  );
   const startedAt = running && latestMessage?.role === "user" ? latestMessage.at : undefined;
   const messageLabel = agent ? t("employeeChats.messageEmployee", { name: agent.name }) : t("conversations.message");
   const waiting = agent ? t("conversations.awaitingEmployee", { name: agent.name }) : t("conversations.awaitingReply");
@@ -107,7 +94,7 @@ export function ConversationPanel({
     connection?.id,
     connection?.fingerprint,
   ]);
-  const details = prepared?.scope === scope ? prepared.preview : null;
+  const details = prepared?.scope === scope ? prepared.payload : null;
   const hasHistory = messages.some((message) => message.role === "assistant");
   const context = [
     thread.node_id && t("conversations.includesNode"),
@@ -145,14 +132,17 @@ export function ConversationPanel({
   }
 
   function changeDraft(change: { text?: string; selectedModel?: string }) {
-    update((state) => ({ ...state, ...change, request: null, error: "" }));
-    setPrepared(null);
+    update((state) => ({ ...state, ...change, request: null, preview: undefined, error: "" }));
+  }
+
+  function setPrepared(preview?: ConversationPreview) {
+    update((state) => ({ ...state, preview: preview ? { scope, payload: preview } : undefined }));
   }
 
   async function prepare(send: boolean) {
     if (!canPrepare || !connection) return;
     if (send && prepared && !details) {
-      setPrepared(null);
+      setPrepared();
       update((state) => ({ ...state, error: t("errors.conversation.stale") }));
       return;
     }
@@ -177,24 +167,22 @@ export function ConversationPanel({
       if (currentScope.current === null && !(send && keepsRequest())) return;
       if (
         (currentScope.current !== null && currentScope.current !== scope) ||
-        preview.external !== !connection.local ||
-        preview.provider !== connection.provider ||
-        preview.model !== connection.model
+        !previewMatchesModel(preview, connection)
       ) {
-        setPrepared(null);
+        setPrepared();
         update((state) => ({ ...state, error: t("errors.conversation.stale") }));
         return;
       }
       if (send) {
         await actions.send(body, preview.token, preview.external);
         update((state) => ({ ...state, text: state.text.trim() === textToSend ? "" : state.text, request: null }));
-        setPrepared(null);
+        setPrepared();
         setShowDetails(false);
       } else {
-        setPrepared({ scope, preview });
+        setPrepared(preview);
       }
     } catch (cause) {
-      setPrepared(null);
+      setPrepared();
       update((state) => ({ ...state, error: conversationErrorText(t, cause) }));
     } finally {
       release();
@@ -261,7 +249,17 @@ export function ConversationPanel({
           }}
         >
           {messages.length === 0 && !sending && !running && (
-            <li className="chat-empty">{t("conversations.emptyThread")}</li>
+            <li className="conversation-empty">
+              {!text && (
+                <ConversationStarters
+                  anchor={{ claim_id: thread.claim_id ?? undefined, node_id: thread.node_id ?? undefined }}
+                  onSelect={(value) => {
+                    changeDraft({ text: value });
+                    textarea.current?.focus();
+                  }}
+                />
+              )}
+            </li>
           )}
           {messages.map((message) => (
             <li key={message.id} data-from={message.role === "user" ? "you" : "model"}>
@@ -327,6 +325,21 @@ export function ConversationPanel({
               },
             ]}
           />
+          {recipientChoice && (
+            <ConversationRecipient
+              choice={{
+                ...recipientChoice,
+                onSelect: (id) => {
+                  recipientChoice.onSelect(id);
+                  textarea.current?.focus();
+                },
+              }}
+              selected={employeeId ?? DIRECT_MODEL}
+              disabled={removing}
+              triggerRef={recipientTrigger}
+              textarea={textarea}
+            />
+          )}
           {employeeScoped ? (
             connection && (
               <span className="composer-fixed-recipient" title={connection.label}>
@@ -334,49 +347,16 @@ export function ConversationPanel({
               </span>
             )
           ) : (
-            <Picker
-              label={t("conversations.model")}
-              triggerRef={modelTrigger}
-              triggerClassName="composer-menu-trigger composer-model-trigger"
-              placement="top-end"
-              keepVisible={textarea}
-              value={connection?.id}
-              trigger={
-                <>
-                  <span className="composer-model-label">{connection?.label ?? t("conversations.chooseModel")}</span>
-                  <Chevron />
-                </>
-              }
+            <ConversationModelPicker
+              models={models}
+              value={selectedModel}
               disabled={disabled}
-              groups={[
-                { label: t("conversations.onDevice"), matches: options.filter((model) => model.local) },
-                { label: t("conversations.connectedModels"), matches: options.filter((model) => !model.local) },
-              ].map(({ label, matches }) => ({
-                label,
-                options: matches.map((model) => ({
-                  id: model.id,
-                  label: model.description ? recipient(model.provider, model.model) : model.label,
-                  detail: model.description ?? undefined,
-                  icon: <TeamAgentAvatar avatar="initials" name={harnessName(model.provider)} />,
-                })),
-              }))}
-              searchLabel={t("conversations.searchModels")}
-              emptyLabel={t(models.isPending || local.isPending ? "common.loading" : "picker.noMatches")}
-              onSelect={(selectedModel) => {
-                if (selectedModel !== editor.selectedModel) changeDraft({ selectedModel });
+              textarea={textarea}
+              triggerRef={modelTrigger}
+              onSelect={(model) => {
+                if (model !== editor.selectedModel) changeDraft({ selectedModel: model });
               }}
-              footer={(dismiss) => (
-                <button
-                  type="button"
-                  className="composer-model-settings"
-                  onClick={() => {
-                    dismiss();
-                    setManagingModels(true);
-                  }}
-                >
-                  {t(options.length ? "conversations.manageModels" : "conversations.connect")}
-                </button>
-              )}
+              onManage={() => setManagingModels(true)}
             />
           )}
           <button
@@ -390,8 +370,8 @@ export function ConversationPanel({
             {pending === "send" || running ? <Spin /> : <SendArrow />}
           </button>
         </div>
-        {models.isError && <p role="alert">{t("modelConnections.failed")}</p>}
-        {employeeScoped && !connection && !models.isPending && !(profiles.isPending && !employee) && (
+        {models.error && <p role="alert">{t("modelConnections.failed")}</p>}
+        {employeeScoped && !connection && !models.pending && !(profiles.isPending && !employee) && (
           <p className="composer-status" role="status">
             {t("conversations.employeeConnectionUnavailable")}
           </p>
@@ -481,7 +461,7 @@ function ReplyElapsed({ start, locale }: { start: string; locale: string }) {
   );
 }
 
-function ContextIcon() {
+export function ContextIcon() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <path d="M3.5 8h9 M8 3.5v9" />

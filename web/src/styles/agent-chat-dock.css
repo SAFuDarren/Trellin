@@ -108,6 +108,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  column-gap: 4px;
   min-height: 46px;
   padding: 8px 12px 8px 14px;
   border-bottom: 1px solid var(--hair);
@@ -120,22 +121,16 @@
   font-weight: var(--type-semibold);
 }
 
-.agent-dock-toolbar,
-.agent-dock-recipient {
+.agent-dock-heading-actions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
   align-items: center;
-  gap: 3px 8px;
-  padding: 5px 12px;
+  gap: 6px;
+  margin-inline-start: auto;
+  white-space: nowrap;
 }
-
-.agent-dock-toolbar {
-  background: var(--side);
-}
-
-.agent-dock-recipient {
-  border-bottom: 1px solid var(--hair);
+.agent-dock-heading > .icon-button {
+  flex-shrink: 0;
+  margin-inline-start: 4px;
 }
 
 .agent-dock-scope {
@@ -186,22 +181,8 @@
 .agent-dock-picker-trigger:disabled {
   opacity: 0.55;
 }
-.agent-dock-picker-trigger .team-agent-avatar,
-.agent-dock-picker-panel .team-agent-avatar {
-  width: 20px;
-  height: 20px;
-}
 .agent-dock-picker-panel {
   width: min(330px, calc(100vw - 16px));
-}
-.agent-dock-draft input {
-  width: 100%;
-  min-height: 32px;
-  padding: 6px 9px;
-  border: 1px solid var(--hair);
-  border-radius: var(--radius-control);
-  background: var(--side);
-  color: var(--ink);
 }
 .agent-dock-activity ul {
   display: grid;
@@ -234,7 +215,6 @@
   font-size: var(--type-meta-size);
 }
 
-.agent-dock-draft,
 .agent-dock-activity {
   display: grid;
   align-content: start;
@@ -243,37 +223,7 @@
   overflow: auto;
 }
 
-.agent-dock-draft form,
-.agent-dock-draft label {
-  display: grid;
-  justify-items: start;
-  gap: 7px;
-  min-width: 0;
-}
-
-.agent-dock-draft p,
-.agent-dock-activity p,
-.agent-dock-empty {
+.agent-dock-activity p {
   margin: 0;
   color: var(--sub);
-}
-
-.agent-dock-draft p[role="alert"] {
-  color: var(--crit);
-}
-
-.agent-dock-empty {
-  padding: 14px;
-}
-
-.agent-dock-anchor {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px 8px;
-  padding: 5px 8px;
-  border: 1px solid var(--hair);
-  border-radius: var(--radius-control);
-  background: var(--side);
-  overflow-wrap: anywhere;
 }

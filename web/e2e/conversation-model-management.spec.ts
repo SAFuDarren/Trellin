@@ -77,9 +77,6 @@ for (const surface of ["Workbench", "Chats"] as const) {
       await openProof(page);
       await page.getByRole("button", { name: /^Proof obligation 2/ }).click();
       await page.getByRole("button", { name: "Ask an Agent" }).click();
-      await page.getByLabel("Choose an Agent", { exact: true }).click();
-      await page.getByRole("option", { name: "Choose a model", exact: true }).click();
-      await page.getByRole("button", { name: "Open conversation" }).click();
     } else {
       await page
         .locator("nav.rail")
@@ -88,6 +85,8 @@ for (const surface of ["Workbench", "Chats"] as const) {
       await page.getByRole("button", { name: "New conversation" }).click();
     }
     const panel = page.locator(".conversation-panel");
+    await panel.getByLabel("Choose an Agent", { exact: true }).click();
+    await page.getByRole("option", { name: "Use a model directly", exact: true }).click();
     const draft = panel.getByRole("textbox", { name: "Write a message" });
     const picker = panel.getByRole("button", { name: "Conversation model" });
     const menu = page.getByRole("listbox", { name: "Search models" });
@@ -95,8 +94,10 @@ for (const surface of ["Workbench", "Chats"] as const) {
     await menu.getByRole("option", { name: /Codex · Default model/ }).click();
     const text = "Keep this draft while I choose another model.";
     await draft.fill(text);
-    const anchor = thread?.node_id;
-    expect(anchor).toBe(surface === "Workbench" ? "obligation:55555555-5555-4555-8555-555555555555:2" : null);
+    expect(thread).toBeUndefined();
+    await expect(panel.locator(".conversation-context")).toContainText(
+      surface === "Workbench" ? "Context · Proof obligation 2" : "This message only",
+    );
     const url = page.url();
 
     const manage = page.getByRole("button", { name: "Manage model connections", exact: true });

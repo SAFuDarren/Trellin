@@ -1,12 +1,15 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { ConversationRequest } from "../api/conversations";
+import type { ConversationPreview, ConversationRequest } from "../api/conversations";
 
 type Editor = {
   text: string;
   selectedModel: string;
+  recipientId?: string;
+  creation?: { scope: string; id: string };
   pending: "preview" | "send" | "archive" | null;
   error: string;
   request: ConversationRequest | null;
+  preview?: { scope: string; payload: ConversationPreview };
 };
 
 const EMPTY_EDITOR: Editor = { text: "", selectedModel: "", pending: null, error: "", request: null };
@@ -63,6 +66,7 @@ export function useConversationEditor(session: string, id: string) {
   return {
     editor: workspace ? (workspace.values[id] ?? EMPTY_EDITOR) : local,
     update: (change: Change) => (workspace ? workspace.update(id, change) : setLocal(change)),
+    updateThread: (threadId: string, change: Change) => workspace?.update(threadId, change),
     keepsRequest: () => Boolean(workspace?.active()),
     reserve: () => {
       if (workspace) return workspace.reserve(id);
