@@ -15,7 +15,7 @@ import type { Point } from "../workbench/graph";
 import { nodeStatus, nodeTitle, nodeTone } from "../workbench/text";
 import type { AtlasClaim } from "../workbench/types";
 import type { AtlasBox } from "../workbench/useLayout";
-import { AtlasMap, atlasPlacement } from "./AtlasMap";
+import { AtlasMap, atlasOpening, atlasPlacement } from "./AtlasMap";
 import { Mark } from "./Icons";
 import "../styles/project-canvas.css";
 
@@ -117,11 +117,13 @@ export function ProjectCanvas({
   const inspected = useRef<string | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, k: 1 });
+  const unfittedCamera = useRef(camera);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [panning, setPanning] = useState(false);
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [linkNotice, setLinkNotice] = useState("");
   const [query, setQuery] = useState("");
+  const [atlasOpeningBox, setAtlasOpeningBox] = useState<AtlasBox | null>(null);
 
   const cards = useMemo(() => {
     // Titles may change. A stable claim identifier keeps the fallback placement deterministic.
@@ -149,7 +151,7 @@ export function ProjectCanvas({
   const normalizedQuery = query.trim().toLocaleLowerCase(i18n.language);
   const matches = cards.filter((card) => card.title.toLocaleLowerCase(i18n.language).includes(normalizedQuery));
   const center = { x: size.width / 2, y: size.height / 2 };
-  const mapBox = atlasPlacement(atlasBox, size.width, size.height, true);
+  const mapBox = atlasPlacement(atlasBox ?? atlasOpeningBox, size.width, size.height, true);
 
   useEffect(() => {
     const target = stage.current;
@@ -182,6 +184,31 @@ export function ProjectCanvas({
   useEffect(() => {
     if (!movedCamera.current) fit(false);
   }, [fit]);
+
+  useLayoutEffect(() => {
+    // Choose the overview's opening corner once per opening, after the map has
+    // been fitted, so that it stays put while the map is panned. A saved
+    // position wins (#154).
+    if (!atlasOpen) {
+      setAtlasOpeningBox(null);
+      return;
+    }
+    if (atlasBox || atlasOpeningBox || !size.width || !size.height) return;
+    if (cards.length && camera === unfittedCamera.current) return;
+    setAtlasOpeningBox(
+      atlasOpening(
+        size.width,
+        size.height,
+        cards.map(({ id, point }) => ({
+          x: camera.x + point.x * camera.k,
+          y: camera.y + point.y * camera.k,
+          w: WIDTH * camera.k,
+          h: HEIGHT * camera.k,
+          selected: id === selected,
+        })),
+      ),
+    );
+  }, [atlasBox, atlasOpen, atlasOpeningBox, camera, cards, selected, size.height, size.width]);
 
   useLayoutEffect(() => {
     const id = detailsOpen ? selected : null;
@@ -513,14 +540,16 @@ export function ProjectCanvas({
         {!cards.length && <p className="project-canvas-empty">{t("notice.noClaims")}</p>}
         {atlasOpen &&
           (atlasClaims?.length ? (
-            <AtlasMap
-              claims={atlasClaims}
-              claimId={selected}
-              box={mapBox}
-              stageWidth={size.width}
-              onBox={onAtlasBox}
-              onSelectClaim={reveal}
-            />
+            (atlasBox || atlasOpeningBox) && (
+              <AtlasMap
+                claims={atlasClaims}
+                claimId={selected}
+                box={mapBox}
+                stageWidth={size.width}
+                onBox={onAtlasBox}
+                onSelectClaim={reveal}
+              />
+            )
           ) : (
             <p className="project-canvas-atlas-status" role={atlasError ? "alert" : "status"}>
               {atlasError ?? t(atlasClaims ? "atlas.empty" : "atlas.loading")}

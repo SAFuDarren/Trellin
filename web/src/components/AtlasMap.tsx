@@ -28,6 +28,51 @@ export function atlasPlacement(stored: AtlasBox | null, width: number, height: n
   };
 }
 
+export type StageRect = { x: number; y: number; w: number; h: number; selected?: boolean };
+
+const ATLAS_MARGIN = { x: 18, y: 14 };
+const ATLAS_SMALL = 160;
+
+function overlapArea(a: StageRect, b: StageRect) {
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+
+// Where the project map overview opens when the researcher has not placed it yet:
+// the position that covers the least of the visible claim cards, never the
+// selected one if another position avoids it. Corners come first; the bottom
+// right holds the zoom controls. Narrow maps open the compact overview.
+export function atlasOpening(width: number, height: number, cards: StageRect[]): AtlasBox {
+  const w = width < 640 ? 124 : 186;
+  // The drawing is 4:3. The caption, padding and (above ATLAS_SMALL) the legend add the rest.
+  const drawn = (w * 3) / 4 + (w < ATLAS_SMALL ? 30 : 48);
+  // atlasPlacement keeps this much room below an interactive overview.
+  const bottom = height - ((w * 3) / 4 + 76);
+  const right = width - w - ATLAS_MARGIN.x;
+  const middle = (width - w) / 2;
+  const positions = [
+    { x: ATLAS_MARGIN.x, y: ATLAS_MARGIN.y },
+    { x: right, y: ATLAS_MARGIN.y },
+    { x: ATLAS_MARGIN.x, y: bottom },
+    { x: middle, y: ATLAS_MARGIN.y },
+    { x: middle, y: bottom },
+  ];
+  let best = positions[0]!;
+  let least = Infinity;
+  for (const position of positions) {
+    const area = cards.reduce(
+      (sum, card) => sum + overlapArea({ ...position, w, h: drawn }, card) * (card.selected ? 100 : 1),
+      0,
+    );
+    if (area < least) {
+      best = position;
+      least = area;
+    }
+  }
+  return atlasPlacement({ ...best, w }, width, height, true);
+}
+
 export function AtlasMap({
   claims,
   claimId,
