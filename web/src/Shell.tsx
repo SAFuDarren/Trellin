@@ -154,7 +154,10 @@ export function Shell({ session }: { session: string }) {
       {
         id: "start-chat",
         label: t("palette.startChat"),
-        onSelect: () => setChatRequest({ session, value: { newConversation: true } }),
+        onSelect: () => {
+          if (section === "chat") go("chat", "new");
+          else setChatRequest({ session, value: { newConversation: true } });
+        },
       },
     ],
   };

@@ -533,9 +533,11 @@ for (const inspect of [false, true]) {
     await page.goto("/#session=fixture");
     await railLink(page, "Chats").click();
     await page.getByRole("button", { name: "New conversation" }).click();
+    await page.getByLabel("Choose an Agent", { exact: true }).click();
+    await page.getByRole("option", { name: "Use a model directly", exact: true }).click();
     const picker = page.getByRole("button", { name: "Conversation model" });
     await expect(picker).toHaveText("Choose a model");
-    expect(created).toEqual([{ title: story.title }]);
+    expect(created).toHaveLength(0);
     if (inspect) await page.setViewportSize({ width: 820, height: 720 });
     await picker.press("ArrowDown");
     const pickerMenu = page.getByRole("listbox", { name: "Search models" });
@@ -560,7 +562,7 @@ for (const inspect of [false, true]) {
     const input = page.getByRole("textbox", { name: "Write a message" });
     await input.fill("What structure is missing?");
     const send = page.getByRole("button", { name: "Send message" });
-    await expect(send).toHaveAccessibleDescription("External model");
+    await expect(send).toHaveAccessibleDescription("External model · This message only");
     expect(sent).toHaveLength(0);
     expect(previews).toHaveLength(0);
     if (inspect) {
@@ -606,6 +608,7 @@ for (const inspect of [false, true]) {
       await send.click();
     }
     await expect(page.getByText("Check closure.")).toBeVisible();
+    expect(created).toEqual([{ title: story.title }]);
     expect(previews).toHaveLength(inspect ? 1 : 2);
     expect(sent).toEqual([{ ...previews.at(-1), token: "approved-context", confirm_external: true }]);
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -617,7 +620,7 @@ for (const inspect of [false, true]) {
     await expect(remove.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
     expect(archived).toHaveLength(0);
     await remove.getByRole("button", { name: "Confirm removal" }).click();
-    await expect(page.getByText("Start a conversation to discuss a research question.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Help me plan a research task.", exact: true })).toBeVisible();
     expect(archived).toEqual([{ thread_id: id }]);
   });
 }
@@ -681,8 +684,7 @@ test("Workbench retries one anchored local conversation message by Enter without
   await node.click();
   await page.getByRole("button", { name: "Ask an Agent" }).click();
   await page.getByLabel("Choose an Agent", { exact: true }).click();
-  await page.getByRole("option", { name: "Choose a model", exact: true }).click();
-  await page.getByRole("button", { name: "Open conversation" }).click();
+  await page.getByRole("option", { name: "Use a model directly", exact: true }).click();
   const picker = page.getByRole("button", { name: "Conversation model" });
   const pickerMenu = page.getByRole("listbox", { name: "Search models" });
   await picker.click();
@@ -690,6 +692,18 @@ test("Workbench retries one anchored local conversation message by Enter without
   await expect(pickerMenu).toBeHidden();
   await picker.click();
   await pickerMenu.getByRole("option", { name: "Local · local-research" }).click();
+  expect(created).toHaveLength(0);
+  const input = page.getByRole("textbox", { name: "Write a message" });
+  const question = "Can this obligation be reduced?";
+  await input.fill(question);
+  const send = page.getByRole("button", { name: "Send message" });
+  await expect(send).toHaveAccessibleDescription("On this device · Context · Proof obligation 2");
+  await input.press("Enter");
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(input).toHaveValue(question);
+  await input.press("Enter");
+  await expect(page.getByText("Local reply.")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(created).toEqual([
     {
       title: "Proof obligation 2",
@@ -698,17 +712,6 @@ test("Workbench retries one anchored local conversation message by Enter without
       node_id: await node.getAttribute("data-node"),
     },
   ]);
-  const input = page.getByRole("textbox", { name: "Write a message" });
-  const question = "Can this obligation be reduced?";
-  await input.fill(question);
-  const send = page.getByRole("button", { name: "Send message" });
-  await expect(send).toHaveAccessibleDescription("On this device · Includes selected node");
-  await input.press("Enter");
-  await expect(page.getByRole("alert")).toBeVisible();
-  await expect(input).toHaveValue(question);
-  await input.press("Enter");
-  await expect(page.getByText("Local reply.")).toBeVisible();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(sent[0]).toEqual({
     thread_id: "anchored-thread",
     connection_id: "local:local-research",

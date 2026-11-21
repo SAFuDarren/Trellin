@@ -100,11 +100,7 @@
     "noAgents": "No matching Agents.",
     "threads": "Conversations",
     "openChats": "Open full conversation",
-    "alreadyOpen": "This conversation is open in Chats.",
     "newConversation": "New conversation",
-    "startConversation": "Open conversation",
-    "creating": "Opening conversation…",
-    "unbound": "Project conversations",
     "anchor": "Context · {{title}}",
     "detach": "Clear context",
     "running": "{{count}} running",
@@ -113,8 +109,25 @@
     "noActivity": "No active work or results to review.",
     "threadPicker": "Choose a conversation",
     "activityUnavailable": "Some activity could not be loaded.",
-    "contextNone": "Message and conversation history",
-    "searchThreads": "Search conversations"
+    "searchThreads": "Search conversations",
+    "directModel": "Use a model directly",
+    "addAgent": "Add an Agent",
+    "addAgentHint": "Save an Agent in Team to send this draft.",
+    "starters": "Message starters",
+    "prompts": {
+      "project": {
+        "explain": "Help me plan a research task.",
+        "next": "Help me organize my next steps."
+      },
+      "claim": {
+        "explain": "Explain this claim and its assumptions.",
+        "next": "What should I verify next for this claim?"
+      },
+      "node": {
+        "explain": "Explain this proof step.",
+        "next": "What needs to be checked for this node?"
+      }
+    }
   },
   "projectCanvas": {
     "askAgent": "Ask an Agent",

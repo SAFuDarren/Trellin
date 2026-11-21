@@ -100,11 +100,7 @@
     "noAgents": "没有匹配的 Agent。",
     "threads": "对话",
     "openChats": "打开完整对话",
-    "alreadyOpen": "这条对话已在 Chats 中打开。",
     "newConversation": "新建对话",
-    "startConversation": "打开对话",
-    "creating": "正在打开对话…",
-    "unbound": "项目对话",
     "anchor": "上下文 · {{title}}",
     "detach": "清除上下文",
     "running": "{{count}} 项运行中",
@@ -113,8 +109,25 @@
     "noActivity": "暂无运行中的工作或待审阅结果。",
     "threadPicker": "选择对话",
     "activityUnavailable": "部分活动无法加载。",
-    "contextNone": "消息和这条对话的历史",
-    "searchThreads": "搜索对话"
+    "searchThreads": "搜索对话",
+    "directModel": "直接使用模型",
+    "addAgent": "添加 Agent",
+    "addAgentHint": "在团队中保存 Agent 后即可发送草稿。",
+    "starters": "对话建议",
+    "prompts": {
+      "project": {
+        "explain": "帮我规划一项科研任务。",
+        "next": "帮我梳理接下来的步骤。"
+      },
+      "claim": {
+        "explain": "解释这条命题及其假设。",
+        "next": "这条命题接下来应验证什么？"
+      },
+      "node": {
+        "explain": "解释这个证明步骤。",
+        "next": "这个节点还有哪些内容需要检查？"
+      }
+    }
   },
   "projectCanvas": {
     "askAgent": "询问 Agent",

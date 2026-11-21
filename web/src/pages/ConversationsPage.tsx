@@ -11,10 +11,12 @@ import {
 import { useThreads, type Thread } from "../api/sections";
 import { useTeamAgents, type TeamAgent } from "../api/teamAgents";
 import { ConversationPanel } from "../components/ConversationPanel";
+import { DIRECT_MODEL } from "../components/ConversationRecipients";
 import { EmployeeChatHeader, EmployeeStatus } from "../components/EmployeeChatHeader";
 import { FeedEntry } from "../components/FeedEntry";
 import { Menu } from "../components/FloatingControls";
 import { Chevron, Clock } from "../components/Icons";
+import { NewConversation } from "../components/NewConversation";
 import { Empty, PageHead } from "../components/SectionLayout";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
 import { href } from "../shell/route";
@@ -23,6 +25,8 @@ import "../styles/chats-page.css";
 
 const EMPLOYEE_ROUTE = "employee/";
 const HISTORY_ROUTE = "history";
+const NEW_ROUTE = "new";
+const DIRECT_ROUTE = "new/model";
 
 function proofKey(thread: Thread) {
   return thread.claim_id + "|" + thread.node_id;
@@ -59,6 +63,7 @@ export function ConversationsPage({
   }
   const employeeId = sub.startsWith(EMPLOYEE_ROUTE) ? sub.slice(EMPLOYEE_ROUTE.length) : undefined;
   const historyView = sub === HISTORY_ROUTE;
+  const newView = sub === NEW_ROUTE || sub === DIRECT_ROUTE;
   const showProof = sub.includes("|");
   const selected = sub ? conversations.find((item) => item.id === sub) : undefined;
   const employee = employees.find((item) => item.id === (selected?.agent_id ?? employeeId));
@@ -66,6 +71,7 @@ export function ConversationsPage({
   const current = selected ?? (!sub && !profiles.isPending && employees.length === 0 ? conversations[0] : undefined);
   const currentId = current?.id;
   const currentEmployeeId = employee?.id;
+  const currentHash = window.location.hash;
   const backToHistory = employees.length > 0 && (showProof || Boolean(selected && !employee));
   const proofRows = proof.data?.threads ?? [];
   const selectedProof = showProof ? proofRows.find((thread) => proofKey(thread) === sub) : undefined;
@@ -167,10 +173,12 @@ export function ConversationsPage({
     <button
       type="button"
       className="icon-button"
-      disabled={creating || direct.isPending || direct.isError}
+      disabled={creating}
       aria-label={t("conversations.new")}
       title={t("conversations.new")}
-      onClick={() => void create()}
+      onClick={() => {
+        window.location.hash = href("chat", NEW_ROUTE);
+      }}
     >
       <svg viewBox="0 0 16 16" aria-hidden="true">
         <path d="M3.5 8h9 M8 3.5v9" />
@@ -191,6 +199,22 @@ export function ConversationsPage({
       selectedProof={selectedProof}
     />
   );
+
+  function compose(initialRecipient?: string) {
+    return (
+      <NewConversation
+        session={session}
+        agents={employees}
+        agentsPending={profiles.isPending}
+        agentsError={profiles.isError}
+        initialRecipient={initialRecipient}
+        focusComposer={newView}
+        onCreated={(thread) => {
+          if (window.location.hash === currentHash) window.location.hash = href("chat", thread.id);
+        }}
+      />
+    );
+  }
 
   function conversationActions(
     thread: ConversationSummary,
@@ -340,6 +364,16 @@ export function ConversationsPage({
             session={session}
             thread={current}
             employee={employee}
+            recipientChoice={{
+              agents: employees,
+              pending: profiles.isPending,
+              onSelect: (id) => {
+                if (id === (current.agent_id ?? DIRECT_MODEL)) return;
+                const recipient = employees.find((profile) => profile.id === id);
+                if (recipient) window.location.hash = openEmployee(recipient);
+                else if (id === DIRECT_MODEL) window.location.hash = href("chat", DIRECT_ROUTE);
+              },
+            }}
             onRemove={() => {
               window.location.hash = employee
                 ? href("chat", tasks.find((task) => task.id !== current.id)?.id ?? EMPLOYEE_ROUTE + employee.id)
@@ -366,13 +400,17 @@ export function ConversationsPage({
         ) : employee ? (
           <>
             {employeeHeader(employee, back)}
-            <Empty>
-              {direct.isError
-                ? conversationErrorText(t, direct.error)
-                : direct.isPending
-                  ? t("common.loading")
-                  : t(tasks.length ? "employeeChats.chooseTask" : "employeeChats.noTasks")}
-            </Empty>
+            {direct.isError && <Empty>{conversationErrorText(t, direct.error)}</Empty>}
+            {compose(employee.id)}
+          </>
+        ) : !sub || newView ? (
+          <>
+            <PageHead
+              title={t(newView ? "agentDock.newConversation" : "rail.chat")}
+              actions={newView ? back : undefined}
+            />
+            {direct.isError && <Empty>{conversationErrorText(t, direct.error)}</Empty>}
+            {compose(sub === DIRECT_ROUTE ? DIRECT_MODEL : undefined)}
           </>
         ) : (
           <>

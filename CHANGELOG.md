@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.61
+
+- Start typing in Agent chat or Chats immediately. Choose a recipient in the composer with @, use a starter to fill a draft, and carry the same thread draft between the dock and Chats.
+
 ## 1.0.60
 
 - Open a claim’s proof in the main canvas from its details, context menu, or the command palette. Return to the same project map and camera with Escape. On Mac, a library with one project starts with the project sidebar folded.
