@@ -224,3 +224,71 @@ def test_named_conversation_create_rollback_keeps_request_reserved(workbench, mo
     assert _request(server, "POST", base + "/create", body=draft, status=409) == {"error": "conversation.stale"}
     fresh = _request(server, "POST", base + "/create", body={**draft, "request_id": str(uuid4())})["thread"]
     assert fresh["agent_id"] == agent["id"]
+
+
+def test_workbench_conversation_omits_history_from_the_signed_dispatch(workbench, monkeypatch):
+    server, claim, statement_id, _ = workbench
+    identity = {"id": str(uuid4()), "provider": "codex-cli", "model": "gpt-fixture", "fingerprint": "b" * 64}
+    config = ModelConfig("codex-cli", identity["model"], "openai", "", binary="/usr/bin/true")
+    monkeypatch.setattr(server.discussions.registry, "resolve", lambda _: (config, identity))
+    monkeypatch.setattr(server.discussions.registry, "use", lambda _: nullcontext((config, identity)))
+    sent = []
+
+    def reply(selected, service, system, user, cap, timeout):
+        sent.append({"system": system, "user": user})
+        metadata = {"provider": selected.provider, "id": selected.model,
+                    "parameters": {"requested_model": selected.model, "model_id_reported": True}}
+        return SimpleNamespace(output={"reply": "Fixture reply."}, metadata=metadata)
+
+    monkeypatch.setattr(workbench_conversations, "complete_structured", reply)
+    graph = _request(server, "GET", "/api/graph?claim=" + claim)
+    node = next(item for item in graph["nodes"] if item["kind"] == "goal")
+    base = "/api/conversations"
+    thread = _request(server, "POST", base + "/create", body={
+        "title": "Scoped history", "claim_id": claim, "statement_id": statement_id, "node_id": node["id"],
+    })["thread"]
+    thread_url = base + "/thread?thread_id=" + thread["id"]
+
+    def settled():
+        until = monotonic() + 5
+        while monotonic() < until:
+            result = _request(server, "GET", thread_url)["thread"]
+            if not result["running"]:
+                return result
+            sleep(.02)
+        pytest.fail("Fixture conversation did not finish")
+
+    first = {"thread_id": thread["id"], "connection_id": identity["id"], "request_id": str(uuid4()),
+             "text": "Earlier fixture message."}
+    preview = _request(server, "POST", base + "/preview", body=first)
+    _request(server, "POST", base + "/send", body={**first, "token": preview["token"], "confirm_external": True})
+    assert settled()["messages"][-1]["text"] == "Fixture reply."
+
+    next_request = {**first, "request_id": str(uuid4()), "text": "Only the next question."}
+    legacy = _request(server, "POST", base + "/preview", body=next_request)
+    assert json.loads(legacy["outgoing"])["user"]["previous_turns"] == [
+        {"text": first["text"], "reply": "Fixture reply."}
+    ]
+    narrowed = {**next_request, "include_history": False}
+    assert _request(server, "POST", base + "/preview", body={**narrowed, "include_history": 0}, status=400) == {
+        "error": "conversation.invalid"
+    }
+    assert _request(server, "POST", base + "/send",
+                    body={**narrowed, "token": legacy["token"], "confirm_external": True}, status=409) == {
+        "error": "conversation.stale"
+    }
+    current = _request(server, "POST", base + "/preview", body=narrowed)
+    outgoing = json.loads(current["outgoing"])
+    assert "previous_turns" not in outgoing["user"]
+    assert outgoing["user"]["selected_node"]["formalization"] == node["formalization"]
+    accepted = {**narrowed, "token": current["token"], "confirm_external": True}
+    _request(server, "POST", base + "/send", body=accepted)
+    assert [message["text"] for message in settled()["messages"]] == [
+        first["text"], "Fixture reply.", next_request["text"], "Fixture reply.",
+    ]
+    assert sent[-1] == outgoing
+    _request(server, "POST", base + "/send", body=accepted)
+    assert len(sent) == 2
+    assert _request(server, "POST", base + "/send", body={**accepted, "include_history": True}, status=409) == {
+        "error": "conversation.stale"
+    }

@@ -183,3 +183,16 @@
 .new-conversation .composer-status a {
   color: var(--ink);
 }
+
+.conversation-history-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-height: 24px;
+}
+
+.conversation-history-toggle input {
+  flex: none;
+  margin: 0;
+}

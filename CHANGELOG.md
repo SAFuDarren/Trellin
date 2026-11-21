@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.73
+
+- Agent chat opens below the workbench graph and suggests drafts for the selected claim or proof node. A checked history control keeps earlier messages out of the outgoing request while preserving the conversation.
+
 ## 1.0.72
 
 - Double-clicking a project map card opens its proof even when the inspector starts closed in a narrow window. A single click highlights the card before the inspector opens.

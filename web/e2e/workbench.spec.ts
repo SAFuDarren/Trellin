@@ -580,7 +580,7 @@ for (const inspect of [false, true]) {
     const input = page.getByRole("textbox", { name: "Write a message" });
     await input.fill("What structure is missing?");
     const send = page.getByRole("button", { name: "Send message" });
-    await expect(send).toHaveAccessibleDescription("External model · This message only");
+    await expect(send).toHaveAccessibleDescription("External model · Only this draft will be sent");
     expect(sent).toHaveLength(0);
     expect(previews).toHaveLength(0);
     if (inspect) {
@@ -591,7 +591,7 @@ for (const inspect of [false, true]) {
       const context = page.getByRole("button", { name: "Message context" });
       await context.press("Enter");
       const contextMenu = page.getByRole("menu", { name: "Message context" });
-      await expect(page.locator(".floating-popover").getByText("This message only")).toBeVisible();
+      await expect(page.locator(".floating-popover").getByText("Only this draft will be sent")).toBeVisible();
       const detailsItem = contextMenu.getByRole("menuitem", { name: "Request details" });
       await expect(detailsItem).toBeFocused();
       await page.keyboard.press("Enter");

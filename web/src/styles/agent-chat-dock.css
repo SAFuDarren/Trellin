@@ -304,3 +304,45 @@
   text-decoration: underline;
   text-underline-offset: 0.13em;
 }
+
+.workbench-agent-chat-slot:empty {
+  display: none;
+}
+
+.workbench-agent-chat-slot {
+  flex: 0 0 clamp(180px, 41dvh, 365px);
+  min-height: 0;
+  border-top: 1px solid var(--hair);
+  background: var(--main);
+}
+
+.workbench-agent-chat-slot .agent-dock-panel {
+  position: static;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.workbench-agent-chat-slot .chat-feed {
+  min-height: 0;
+}
+
+@media (max-height: 560px) {
+  .workbench-agent-chat-slot .agent-dock-heading {
+    min-height: 38px;
+    padding-block: 4px;
+  }
+
+  .workbench-agent-chat-slot .conversation-panel {
+    gap: 6px;
+    padding-block: 6px;
+  }
+}
+
+.agent-dock-panel-host,
+.agent-dock-panel-host > div,
+.workbench-agent-chat-slot > div {
+  display: contents;
+}

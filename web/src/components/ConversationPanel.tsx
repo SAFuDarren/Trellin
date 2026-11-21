@@ -53,7 +53,7 @@ export function ConversationPanel({
   const actions = useConversationActions(session);
   const models = useConversationModels(session, { discoverLocal: !employeeScoped });
   const { editor, update, reserve, release, keepsRequest } = useConversationEditor(session, thread.id);
-  const { text, selectedModel, pending, error } = editor;
+  const { text, selectedModel, pending, error, omitHistory } = editor;
   const [removing, setRemoving] = useState(false);
   const [showDetails, setShowDetails] = useState(Boolean(editor.preview));
   const [managingModels, setManagingModels] = useState(false);
@@ -93,12 +93,14 @@ export function ConversationPanel({
     agent?.revision,
     connection?.id,
     connection?.fingerprint,
+    omitHistory ? "without-history" : "with-history",
   ]);
   const details = prepared?.scope === scope ? prepared.payload : null;
-  const hasHistory = messages.some((message) => message.role === "assistant");
+  const hasEarlierMessages = (detail.data?.thread.revision ?? thread.revision) > 0 || messages.length > 0;
+  const nodeContext = thread.node_id && t("conversations.includesNode");
   const context = [
-    thread.node_id && t("conversations.includesNode"),
-    hasHistory && t("conversations.includesRecent"),
+    nodeContext,
+    hasEarlierMessages && t(omitHistory ? "conversations.withoutEarlier" : "conversations.includesRecent"),
   ].filter(Boolean);
   const taskScope = employeeScoped && t("employeeChats.taskScope", { title: thread.title });
   const destination = connection && t(connection.local ? "conversations.onDevice" : "conversations.external");
@@ -131,7 +133,7 @@ export function ConversationPanel({
     return t(`errors.${code}`, { defaultValue: t("conversations.failed") });
   }
 
-  function changeDraft(change: { text?: string; selectedModel?: string }) {
+  function changeDraft(change: { text?: string; selectedModel?: string; omitHistory?: boolean }) {
     update((state) => ({ ...state, ...change, request: null, preview: undefined, error: "" }));
   }
 
@@ -150,13 +152,16 @@ export function ConversationPanel({
     const textToSend = text.trim();
     const previous = editor.request;
     const body: ConversationRequest =
-      previous?.text === textToSend && previous.connection_id === connection.id
+      previous?.text === textToSend &&
+      previous.connection_id === connection.id &&
+      (previous.include_history !== false) === !omitHistory
         ? previous
         : {
             thread_id: thread.id,
             connection_id: connection.id,
             text: textToSend,
             request_id: crypto.randomUUID(),
+            ...(omitHistory ? { include_history: false } : {}),
           };
     if (send) nearEnd.current = true;
     update((state) => ({ ...state, request: body, error: "", pending: send ? "send" : "preview" }));
@@ -395,7 +400,23 @@ export function ConversationPanel({
         )}
       </form>
       <div className="conversation-context">
-        <p id={formId + "-scope"}>{[taskScope, destination, ...context].filter(Boolean).join(" · ")}</p>
+        <p id={formId + "-scope"}>
+          {[taskScope, destination, nodeContext, !hasEarlierMessages && !nodeContext && t("conversations.messageOnly")]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        {hasEarlierMessages && (
+          <label className="conversation-history-toggle" title={t("conversations.withoutEarlierHint")}>
+            <input
+              type="checkbox"
+              checked={Boolean(omitHistory)}
+              disabled={disabled}
+              aria-description={t("conversations.withoutEarlierHint")}
+              onChange={(event) => changeDraft({ omitHistory: event.target.checked })}
+            />
+            {t("conversations.withoutEarlier")}
+          </label>
+        )}
         {!header && <div className="conversation-secondary">{remove}</div>}
       </div>
       <div className="conversation-request" id={formId + "-request"} hidden={!showDetails}>

@@ -72,18 +72,23 @@ export function ConversationRecipient({
   );
 }
 
+export type ConversationStarterScope = "project" | "claim" | "node" | "blockedObligation";
+
 export function ConversationStarters({
   anchor,
+  scope,
   onSelect,
 }: {
   anchor?: ConversationAnchor;
+  scope?: ConversationStarterScope;
   onSelect: (text: string) => void;
 }) {
   const { t } = useTranslation();
-  const level = anchor?.node_id ? "node" : anchor?.claim_id ? "claim" : "project";
+  const level = scope ?? (anchor?.node_id ? "node" : anchor?.claim_id ? "claim" : "project");
+  const prompts = level === "blockedObligation" ? ["explain", "references", "next"] : ["explain", "next"];
   return (
     <div className="conversation-starters" role="group" aria-label={t("agentDock.starters")}>
-      {["explain", "next"].map((suggestion) => {
+      {prompts.map((suggestion) => {
         const text = t(`agentDock.prompts.${level}.${suggestion}`);
         return (
           <button type="button" className="conversation-starter" key={suggestion} onClick={() => onSelect(text)}>

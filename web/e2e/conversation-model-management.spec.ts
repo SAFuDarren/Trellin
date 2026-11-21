@@ -96,7 +96,7 @@ for (const surface of ["Workbench", "Chats"] as const) {
     await draft.fill(text);
     expect(thread).toBeUndefined();
     await expect(panel.locator(".conversation-context")).toContainText(
-      surface === "Workbench" ? "Context · Proof obligation 2" : "This message only",
+      surface === "Workbench" ? "Context · Proof obligation 2" : "Only this draft will be sent",
     );
     const url = page.url();
 

@@ -118,7 +118,8 @@ to a proof node still shows its link to the node.
 
 Open **Agent chat** from the bottom of any page and choose a saved Agent or model. In **Workbench**, use **Ask an Agent** from the selected claim or proof node's inspector to attach that context. Choose a recipient and open the conversation. Collapse the panel to return to it later, or choose **Open full conversation** to continue in Chats. **Agent activity** shows queued and running work and results to review or retry. The composer identifies the destination and included context,
 including recent turns and, when selected, a node excerpt.
-Open the + menu and choose **Request details** to inspect the exact contents.
+Check **Send without earlier messages** to exclude prior turns while keeping the conversation and any attached node.
+Open **Message context → Request details** to inspect the exact contents.
 The send button authorizes and submits that request in one step. Project files
 are outside that payload.
 The conversation and attribution are saved with the project. Removing a
