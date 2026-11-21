@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.79
+
+- Contributors can run `python scripts/tasks.py branches` to read branch lifecycle, PR evidence, and worktree status without changing Git references.
+
 ## 1.0.78
 
 - Selected map cards, proof nodes and review rows use a Navy outline and tint, with separate hover and keyboard-focus states. The light project map has a more visible dotted grid.

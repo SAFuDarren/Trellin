@@ -7,6 +7,7 @@ the tool reads the issue back: if an earlier claim by another agent exists, it w
 so two simultaneous claims end with exactly one holder.
 
     python scripts/tasks.py board
+    python scripts/tasks.py branches [--json]
     python scripts/tasks.py claim 14 --agent claude-web --branch feat/14-rail-sections
     python scripts/tasks.py release 14 --agent claude-web --reason "handed back"
     python scripts/tasks.py check-pr 19          # used by CI
@@ -23,6 +24,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 LABEL = "status:in-progress"
 BLOCKING_LABELS = {"needs-decision"}
@@ -197,6 +199,43 @@ def cmd_board(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_branches(args: argparse.Namespace) -> int:
+    from branch_inventory import git, inventory, print_inventory
+
+    root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
+    repo = json.loads(gh("repo", "view", "--json", "nameWithOwner,defaultBranchRef"))
+    repository = repo["nameWithOwner"]
+    origin = git(root, "remote", "get-url", "origin").strip().rstrip("/").removesuffix(".git").lower()
+    if not origin.endswith(("/" + repository.lower(), ":" + repository.lower())):
+        raise SystemExit("GitHub repository and Git origin do not match.")
+
+    def records(path):
+        pages = json.loads(gh("api", "--method", "GET", "--paginate", "--slurp", f"repos/{repository}/{path}"))
+        return [record for page in pages for record in page]
+
+    pulls = records("pulls?state=all&per_page=100")
+    issues = records("issues?state=open&labels=status%3Ain-progress&per_page=100")
+    claims = {}
+    for item in issues:
+        if "pull_request" in item:
+            continue
+        number = item["number"]
+        current = holder([
+            {"createdAt": comment["created_at"], "body": comment["body"]}
+            for comment in records(f"issues/{number}/comments?per_page=100")
+        ])
+        if current and current.branch and current.at:
+            claims[current.branch] = {"issue": number, "agent": current.agent, "at": current.at}
+
+    result = inventory(root, repository, repo["defaultBranchRef"]["name"], pulls, claims,
+                       datetime.now(timezone.utc), STALE_HOURS)
+    if args.json:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        print_inventory(result)
+    return 0
+
+
 def cmd_check_pr(args: argparse.Namespace) -> int:
     pull = json.loads(gh("pr", "view", str(args.pr), "--json", "number,headRefName,body,labels"))
     if "no-issue" in label_names(pull):
@@ -232,6 +271,8 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     board = commands.add_parser("board", help="Show open issues in urgency and pickup order.")
     board.add_argument("--mine", metavar="AGENT", help="Only the issues this agent holds.")
+    branches = commands.add_parser("branches", help="Read branch and worktree lifecycle inventory.")
+    branches.add_argument("--json", action="store_true", help="Emit machine-readable inventory.")
     claim = commands.add_parser("claim", help="Claim an issue for an agent and branch.")
     claim.add_argument("issue", type=int)
     claim.add_argument("--agent", required=True)
@@ -244,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
     check = commands.add_parser("check-pr", help="Check that a PR links an issue its branch holds.")
     check.add_argument("pr", type=int)
     args = parser.parse_args(argv)
-    handlers = {"board": cmd_board, "claim": cmd_claim, "release": cmd_release, "check-pr": cmd_check_pr}
+    handlers = {"board": cmd_board, "branches": cmd_branches, "claim": cmd_claim, "release": cmd_release, "check-pr": cmd_check_pr}
     return handlers[args.command](args)
 
 
