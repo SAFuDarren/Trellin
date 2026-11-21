@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.81
+
+- Proof node order and reference codes stay consistent when switching the interface language.
+
 ## 1.0.80
 
 - Proof nodes show running jobs as a spinner and count inside the card. Selection has a separate outline, and the spinner stays still with reduced motion enabled.

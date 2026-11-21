@@ -43,7 +43,7 @@ const snapshot: GraphSnapshot = {
 };
 
 describe("graph model", () => {
-  const graph = buildGraph(t, snapshot);
+  const graph = buildGraph(snapshot);
 
   it("drops self-loops and ranks dependencies below what uses them", () => {
     expect(graph.edges).toHaveLength(6);
@@ -87,6 +87,45 @@ describe("graph model", () => {
     expect(nodeTitle(t, graph.nodes.get("obligation:r:1")!)).toBe("Proof obligation 1");
     expect(nodeTitle(i18n.getFixedT("zh-CN"), graph.nodes.get("obligation:r:1")!)).toBe("证明义务 1");
     expect(nodeTitle(t, graph.nodes.get("lean:e")!)).toBe("reverseZeroAdd");
+  });
+
+  it("keeps the same layout and codes when the visible titles change language", () => {
+    const obligation = "obligation:r:1";
+    const evidence = "lean:e";
+    const siblingSnapshot: GraphSnapshot = {
+      ...snapshot,
+      nodes: [
+        { ...snapshot.nodes[0]!, code: "ZS-12" },
+        snapshot.nodes.find(({ id }) => id === obligation)!,
+        snapshot.nodes.find(({ id }) => id === evidence)!,
+      ],
+      edges: [
+        { source: obligation, target: "goal:c", kind: "planned" },
+        { source: evidence, target: "goal:c", kind: "actual" },
+      ],
+    };
+    const sizes = new Map([[obligation, { width: 300, height: 96 }]]);
+    const describeGraph = (language: "en" | "zh-CN") => {
+      const translate = i18n.getFixedT(language);
+      const graph = buildGraph(siblingSnapshot);
+      return {
+        title: nodeTitle(translate, graph.nodes.get(obligation)!),
+        order: graph.order,
+        layout: layoutGraph(graph, sizes),
+        codes: graph.codes,
+      };
+    };
+    const en = describeGraph("en");
+    const zh = describeGraph("zh-CN");
+
+    expect(en.title).toBe("Proof obligation 1");
+    expect(zh.title).toBe("证明义务 1");
+    expect(zh.order).toEqual(en.order);
+    expect(zh.layout).toEqual(en.layout);
+    expect(zh.codes).toEqual(en.codes);
+    expect(en.codes.get("goal:c")).toBe("ZS-12");
+    expect(en.codes.get(obligation)).toBe("ZS-02");
+    expect(en.codes.get(evidence)).toBe("ZS-03");
   });
 
   it("gives tones that match the review states", () => {
@@ -238,13 +277,13 @@ describe("atlas", () => {
 
 describe("codes and agent names", () => {
   it("numbers nodes from the claim down, with the claim's initials", () => {
-    const graph = buildGraph(t, snapshot);
+    const graph = buildGraph(snapshot);
     expect(graph.codes.get("goal:c")).toBe("ZS-01");
     expect(new Set(graph.codes.values()).size).toBe(snapshot.nodes.length);
   });
 
   it("uses only durable node codes when the claim has a server code", () => {
-    const graph = buildGraph(t, {
+    const graph = buildGraph({
       ...snapshot,
       claim: { ...snapshot.claim, code: "FLT" },
       nodes: snapshot.nodes.map((node) => (node.id === "goal:c" ? { ...node, code: "FLT-00" } : node)),
