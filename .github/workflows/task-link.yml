@@ -14,9 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # Use merged claim validation code. The program only reads PR and issue metadata.
+          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
       - name: Check the linked issue and its claim
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: python3 scripts/tasks.py check-pr ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python3 scripts/tasks.py check-pr "$PR_NUMBER"

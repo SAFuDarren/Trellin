@@ -96,8 +96,8 @@ Rules by language:
    - Types: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`.
    - The scope is a layer or area, for example `kernel`, `lean`, `web` or `migrations`.
    - Keep each commit to one purpose.
-4. **Pull request.** Fill in the template, including the change checklist below. CI must pass. Merge only after at least one approving review from a code owner of the touched area.
-5. **Merge.** Squash-merge and keep the Conventional Commit title; the changelog is drafted from these titles.
+4. **Pull request.** Fill in the template and the change checklist. The owner reviews submissions from other contributors and checks the evidence for their own PRs.
+5. **Merge.** Only the GitHub repository owner squash-merges upstream PRs, including their own, after every required check passes. Keep the Conventional Commit title for the changelog.
 6. **Decisions.** If a change needs a new architectural decision, or a change to a settled one, update `architecture.md` and `architecture.zh-CN.md` in the same pull request.
    - Give the decision the next number in its section.
    - When replacing a decision, mark the old one "superseded by X" instead of deleting it.
@@ -130,7 +130,7 @@ All tasks, bugs and milestones are tracked in **GitHub Issues** and a **GitHub P
 - **Milestones** use the names of roadmap phases. A roadmap task becomes one issue or an epic with sub-issues. Keep existing roadmap task numbers, such as `P1.3`, for references.
 - **Labels by scope and type** include `layer:kernel`, `layer:plugin`, `layer:collab`, `layer:ai`, `layer:entry`, `area:web`, `area:migrations`, `area:lean`, `area:docs`, `type:bug`, `type:feature`, `type:refactor`, `type:docs`, `type:chore` and `type:incident`. Use `needs-decision` for work blocked on an open question. Use `good first issue` and `help wanted` to invite contributions.
 - **Priority.** Give each open issue one urgency label and pick up actionable work in this order: `priority:p0` for critical blockers that need immediate attention, `priority:p1` for urgent work in the current batch, `priority:p2` for work after higher priorities, and `priority:p3` for the lower-urgency backlog. At each priority, review and record existing results first, then claim the oldest eligible issue. Record a blocker and its dependency on the issue before moving to the next actionable item. Record the reason when changing an issue's priority. See the [GitHub queues](https://github.com/SAFuDarren/Trellin/issues/112#github-queues).
-- **Board columns** progress from Triage to Ready, In progress, In review and Done. Use `status:triage` when scope, a dependency or a decision still needs clarification. Use `status:ready` when acceptance criteria and dependencies are clear. The claim comment and `status:in-progress` track ownership. Add `status:in-review` when a reviewable PR is open and retain any active claim. See [parallel work](#parallel-work).
+- **Board columns** progress from Triage to Ready, In progress, In review and Done. Use `status:triage` when scope, a dependency or a decision still needs clarification. Use `status:ready` when acceptance criteria, dependencies and [model and environment fit](#difficulty-and-model-fit) are clear. The claim comment and `status:in-progress` track ownership. Add `status:in-review` when a reviewable PR is open and retain any active claim. See [parallel work](#parallel-work).
 - **Triage:** the maintainer reviews new issues weekly, applies labels, assigns a milestone or closes them, and links any decision that blocks them.
 - **Roadmap upkeep:** when a task is added, split or reordered, update `roadmap.md` and `roadmap.zh-CN.md` together with the issues. Progress is tracked in the issues, not the roadmap; see [keeping status and records current](#keeping-status-and-records-current).
 
@@ -187,14 +187,21 @@ At the end of every roadmap phase, run the engineering maturity audit with the m
 Several people and coding agents may work on the repository at once. The rules below keep their work from colliding; `AGENTS.md` carries the short version that every agent reads.
 
 **Assigning work**
-- Every task is a GitHub issue for a roadmap task. Workers claim and release issues with `scripts/tasks.py`. All agents act through one GitHub account, so a claim is a comment with a hidden marker naming the agent and branch, plus the `status:in-progress` label. After claiming, the tool reads the issue back and withdraws if an earlier claim exists, so only one worker holds an issue even when two claim at once.
-- `python scripts/tasks.py board` lists every open issue with its holder, branch, claim age (flagged after 48 hours as possibly stale) and linked PRs. The maintainer releases stale claims.
-- The **Task link** CI check requires each PR to link its issue (`Closes #N` or `Refs #N`) and fails if another branch holds that issue. A trivial PR without a task carries the `no-issue` label.
-- The maintainer starts parallel tasks only when their areas do not overlap, for example backend tests (P0.2) and the web interface (P1.4). Tasks that touch the same files run one after the other.
-- Limit work in progress to one task per worker.
+- Use your own GitHub identity. Contributors push to their own forks and open PRs against upstream `main`. Keep owner credentials out of Agent runtimes. The owner holds upstream write access and applies the same required checks to owner-authored and contributor PRs. See the [live GitHub rules](https://github.com/SAFuDarren/Trellin/rules).
+- Request a claim on an open issue. Include GitHub login, fork repository, head branch, expected paths, model and effort or human-only work, and the tools needed for verification. The owner confirms the source and fit in the issue before work starts. Keep one active issue per person or Agent.
+
+  From an upstream checkout, the owner records the confirmed fork request and scope.
+
+  ```sh
+  python scripts/tasks.py claim 123 --agent contributor-web --branch fix/123-short-topic \
+    --repository contributor/Trellin --contributor contributor --scope web/src
+  ```
+- Use `python scripts/tasks.py board` in an upstream checkout for holders, branches and linked PRs. Claims older than 48 hours need a progress review. The owner records releases and resolves conflicting requests.
+- Link the issue in the PR using `Closes #N` when complete and `Refs #N` for partial work. Task link verifies the PR author, source repository and branch against the owner-confirmed fork claim. A trivial PR without a task uses the owner-assigned `no-issue` label.
+- Keep the claim through review. For a handoff, post the tested SHA, evidence, remaining work and next verification command. Record scope or model changes and obtain confirmation before continuing. Split overlapping work by a reviewable dependency boundary.
 
 **Isolation**
-- One task, one branch from `origin/main`, one git worktree. Nobody edits another worker's branch or worktree.
+- One task, one branch from upstream `main`, one git worktree. Nobody edits another worker's branch or worktree.
 - Local resources are per worker:
   - each test database gets a unique name;
   - servers start on `--port 0` or a checked free port;
@@ -208,13 +215,40 @@ Several people and coding agents may work on the repository at once. The rules b
 | Built interface `research_multiplier/workbench/app/` | Regenerate after every rebase; never merge by hand | Web CI job (the committed build must match the source) |
 | Generated API types (after P1.2) | Regenerate after every rebase | CI diff check (P1.2) |
 | Translation catalogs | Keep both sides' keys on conflict | Catalog parity test |
-| Architecture decisions, interface contracts, schemas | Changed only in their own PR, approved by the maintainer | CODEOWNERS; branch protection once the repository is public |
+| Architecture decisions, interface contracts, schemas | Changed only in their own PR, approved by the maintainer | CODEOWNERS review routing and the owner's merge decision |
 
 **Integration**
-- Fetch the latest main and rebase on `origin/main` before review and before merging. Run `python scripts/check_package_version.py` on the committed candidate after rebasing and rerun the required checks. For a maintainer-approved increment, pass `--bump minor` or `--bump major`. If main advanced, choose the version from the new base and update both version files before checking again.
+- Fetch and rebase on the latest upstream `main` before review and before merging. Run `python scripts/check_package_version.py` on the committed candidate and rerun required checks. If the upstream remote is named `upstream`, pass `--base upstream/main`. For a maintainer-approved increment, pass `--bump minor` or `--bump major`. If main advanced, choose the version from the new base and update both version files before checking again.
 - Keep each PR to one task.
 - Squash-merge with a Conventional Commit title.
 - Issues found outside the task become new issues, not extra changes in the branch.
+
+### Difficulty and model fit
+
+Before marking an issue ready, record the baseline SHA, scope, prerequisites, reproduction, acceptance criteria and required verification environment. Score each dimension from 0 to 3 independently of urgency.
+
+| Dimension | 0 | 1 | 2 | 3 |
+| --- | --- | --- | --- | --- |
+| Scope | Local doc or test | One component | Several related components | Cross-layer or release boundary |
+| Uncertainty | Known fix | Clear reproducer | Several plausible fixes | Open contract or unclear problem |
+| Impact | Trivial rollback | Local behavior | Persisted state or compatibility | Access, migration or proof integrity |
+| Verification | One deterministic check | One lane | Multiple lanes or services | Native device, exact replay or migration rehearsal |
+| Dependencies | None | One prerequisite | Coordinated changes | Sequenced rollout or independent approval |
+
+Use the [model registry](../.github/agent-models.json) to apply the initial floors in the [Artificial Analysis Coding Agent Index v2.1](https://artificialanalysis.ai/agents/coding-agents/comparisons/codex-vs-claude-code#models). Compare the published Agent, model and effort together. Run `python scripts/model_routing.py D2` for the current eligible configurations, replacing D2 with the issue level. Keep the benchmark version and date with the fit decision.
+
+| Level | Issue points | Approximate index floor | First Codex recommendation |
+| --- | ---: | ---: | --- |
+| D1 | 0–3 | 30 | GPT-6.2 Sol low, 37 |
+| D2 | 4–7 | 45 | GPT-6.2 Sol medium, 45 |
+| D3 | 8–11 | 50 | GPT-6.2 Sol xhigh, 50, or GPT-6.2 Astra high, 52 |
+| D4 | 12–15 | 52 | GPT-6.2 Astra high, 52, with independent verification |
+
+Cross-layer persistent-state design, native Mac acceptance and Lean replay are at least D3. Merge authority, CI trust, protected migrations and irreversible research evidence are D4. The floors guide routing. D3/D4 still require owner confirmation of scope and evidence, and D4 requires a separate verification step.
+
+Choose the lowest-cost eligible configuration with the required skills and tools. Match Web work to React/TypeScript, keyboard checks and Playwright. Use the [offline, PostgreSQL and pinned Lean test lanes](../tests/README.md) for backend and proof changes, and the [desktop guide](desktop.md) for macOS acceptance. Review access policy against GitHub Rulesets, fork permissions and signed commits. If a configuration is unlisted, request an owner exception with task-relevant evidence. If a required tool is unavailable, hand off acceptance to someone with that environment or take a separately scoped reproduction or review. Verification evidence remains mandatory.
+
+The [Model catalog workflow](../.github/workflows/model-catalog.yml) checks the OpenAI, Anthropic and Google catalogs daily and opens a pending score issue for each new supported ID. For a release or snapshot missing from the tracked catalogs, use the [Model score update form](https://github.com/SAFuDarren/Trellin/issues/new?template=model_score.yml) to register it. Use the title `Model score update — Provider / exact-model-id` so the catalog workflow can recognize the same request. Submit a registry PR with the model and effort, benchmark version, date, score and source. Use the existing registry until the owner merges the refreshed values. Revisit recommendations when the benchmark version changes or a configuration retires.
 
 ### Branch lifecycle and weekly inventory
 

@@ -53,13 +53,13 @@ For a periodic maturity audit, use the rubric provided by the maintainer outside
 
 Several agents and people may work on this repository at the same time. Follow these rules so their work does not collide. Details are in [engineering](docs/engineering.md#parallel-work).
 
-1. **Claim before you start, with the claim tool.** Every agent uses the same GitHub account, so pick a short name for this session (for example `claude-web` or `codex-backend-1`) and use it for every claim.
-   - See who holds what: `python scripts/tasks.py board`.
-   - Claim: `python scripts/tasks.py claim <issue> --agent <name> --branch <type>/<issue>-<topic> --scope <paths>`. The tool refuses issues that someone else holds or that need a decision. If two agents claim at the same moment, the later one withdraws automatically: start work only when the tool says `Claimed`.
-   - Keep the claim while you own review follow-up. When you hand off or relinquish follow-up, record the branch and remaining work in the issue, then release with `python scripts/tasks.py release <issue> --agent <name> --reason "..."`.
+1. **Get a recorded claim before implementation.** Use your own GitHub identity. Contributors work in a fork, and only the repository owner merges upstream PRs. Keep the owner's credentials out of Agent runtimes.
+   - See who holds what with `python scripts/tasks.py board` from an upstream checkout.
+   - Request a claim in the issue with your fork repository and branch, expected files, model configuration and required verification environment. Start after the owner confirms the request. The upstream claim tool uses write access and remains available to the owner.
+   - Follow the [difficulty and model guidance](docs/engineering.md#difficulty-and-model-fit). Record the tested commit and remaining work before handing off to the next confirmed worker.
    - Work only on an open issue. If no issue exists for what you were asked to do, ask the maintainer instead of starting.
-   - Link the claimed issue in the PR with `Closes #N` when all criteria are met, or `Refs #N` for a partial change. CI checks the linked task and branch.
-2. **One task, one branch, one worktree:** `git worktree add ../rm-<issue>-<topic> -b <type>/<issue>-<topic> origin/main`. Use the exact branch name from your claim. Never edit another agent's worktree or branch.
+   - Link the claimed issue in the PR with `Closes #N` when all criteria are met, or `Refs #N` for a partial change. The Task link check verifies the fork source against the owner-confirmed claim.
+2. **One task, one branch, one worktree.** Branch from upstream `main` using the exact branch name from your claim. Never edit another agent's worktree or branch.
 3. **Stay inside your scope.** List the files you expect to change in the issue. If you need a file that another open PR changes (`gh pr list`, then check its files), stop and coordinate in the issues instead of editing it.
 4. **Shared hot spots:**
    - **Migrations**: need the maintainer's approval. Take the next number only when you open the PR. If `main` gains a migration first, renumber yours and update `down_revision`; CI rejects duplicate revisions and multiple heads.
@@ -71,7 +71,7 @@ Several agents and people may work on this repository at the same time. Follow t
    - Start servers with `--port 0` or a port you checked is free.
    - Put case copies, logs and build output in a temporary location outside the source tree. See [file placement](docs/engineering.md#repository-layout).
    - Never stop a process you did not start.
-6. **Integrate small and often.** Rebase on `origin/main` before asking for review and again before merging. Assign the candidate version and update its compatibility marker using the [versioning rules](docs/engineering.md#versioning-and-compatibility), then run the version preflight. Keep each PR to one task.
+6. **Integrate small and often.** Rebase on the latest upstream `main` before asking for review and again before merging. Assign the candidate version and update its compatibility marker using the [versioning rules](docs/engineering.md#versioning-and-compatibility), then run the version preflight. Keep each PR to one task.
 7. **Finish cleanly.** Put the review link, tested revision, verification and remaining acceptance work in the original issue. See [result handoff](docs/engineering.md#hand-off-a-result). Write `Closes #N` in the PR only when it meets every acceptance criterion, otherwise `Refs #N`. After the merge, check that the issue is closed and `status:in-progress` is removed, and close any other issue the merge resolved, with a comment naming the PR. Never close an issue with an unmet criterion; see [closing issues](docs/engineering.md#closing-issues). In the same PR, update every record the change affects: the `CHANGELOG.md` line, user guides in both languages, tracking-issue checkboxes, decisions. The table in [keeping status and records current](docs/engineering.md#keeping-status-and-records-current) lists where each record lives. Never edit the roadmap to mark progress. Report problems outside your task as new issues; do not fix them in your branch.
 8. **Retire only your own branch and worktree.** Follow [branch retirement](docs/engineering.md#retire-a-branch-and-worktree) after review and integration. Check for unpublished commits, local files and dependent PRs before removing anything.
 
@@ -134,5 +134,5 @@ research-multiplier --workspace /path/to/test-project workbench
 
 - Conventional Commits: `type(scope): summary`, one purpose per commit.
 - Sign off every commit with `git commit -s` (Developer Certificate of Origin, E9).
-- Branch from `origin/main` using the name recorded in your issue claim. Do not commit to `main` directly, and do not push or open a PR unless asked.
+- Branch from upstream `main` using the name recorded in your issue claim. Do not commit to `main` directly, and do not push or open a PR unless asked.
 - Commands, decisions, model or network use that researchers will see also need updates to `research_multiplier/agent_guide.md`, both quickstarts, and `CHANGELOG.md`.
