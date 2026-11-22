@@ -77,7 +77,7 @@ struct WorkbenchReadiness: Decodable {
     }
 }
 
-enum WorkbenchStartFailure: String {
+enum WorkbenchStartFailure: String, CaseIterable {
     case workspace, unbound, postgres, schema, install, startup
     case loginMissing = "login-missing"
     case loginInvalid = "login-invalid"

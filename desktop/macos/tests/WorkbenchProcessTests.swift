@@ -15,7 +15,48 @@ struct WorkbenchProcessTests {
         try projectPositions()
         environment()
         releaseNotesLinks()
-        print("12 Trellin native boundary checks passed.")
+        try statusScreens()
+        print("13 Trellin native boundary checks passed.")
+    }
+
+    /// #286: every status screen uses one component, and each problem offers an action that leads out of it.
+    private static func statusScreens() throws {
+        let catalog = { (language: String) throws -> [String: String] in
+            let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .appendingPathComponent("../Resources/\(language).lproj/Localizable.strings")
+            let data = try Data(contentsOf: url)
+            return try PropertyListSerialization.propertyList(from: data, format: nil) as! [String: String]
+        }
+        let english = try catalog("en"), chinese = try catalog("zh-Hans")
+        precondition(Set(english.keys) == Set(chinese.keys))
+        let keys = WorkbenchStartFailure.allCases.map(\.rawValue) + ["workspace"] + StatusPresentation.progressKeys
+        for key in keys {
+            for strings in [english, chinese] {
+                precondition(strings["\(key).title"] != nil && strings["\(key).detail"] != nil, "missing text for \(key)")
+            }
+            let failure = WorkbenchStartFailure(rawValue: key)
+            let presentation = StatusPresentation.of(key, canRetry: failure?.canRetry ?? false)
+            if StatusPresentation.progressKeys.contains(key) {
+                precondition(presentation.kind == .progress && presentation.actions.isEmpty)
+                continue
+            }
+            precondition(presentation.symbol != nil, "\(key) has no symbol")
+            precondition((1...2).contains(presentation.actions.count), "\(key) needs one primary action and at most one other")
+            precondition(Set(presentation.actions).count == presentation.actions.count)
+            // A problem that can be retried leads with Try Again; one that cannot never offers it.
+            if failure?.canRetry == true { precondition(presentation.actions.first == .retry, "\(key) should lead with retry") }
+            else { precondition(!presentation.actions.contains(.retry), "\(key) cannot be retried") }
+        }
+        precondition(StatusPresentation.of("install", canRetry: false).actions == [.quit])
+        // Opening a folder is advanced: only the folder flow itself offers it (#286 review).
+        precondition(StatusPresentation.of("project", canRetry: false).actions == [.openLibrary])
+        precondition(StatusPresentation.of("postgres", canRetry: true).actions == [.retry])
+        precondition(StatusPresentation.of("workspace-occupied", canRetry: false).actions.first == .chooseFolder)
+        for strings in [english, chinese] {
+            for key in ["library.open", "details.show", "details.hide", "details.copy", "details.code", "retry", "choose", "quit"] {
+                precondition(strings[key] != nil, "missing \(key)")
+            }
+        }
     }
 
     private static func startFailures() throws {

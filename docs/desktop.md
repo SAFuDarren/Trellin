@@ -89,6 +89,15 @@ python -m pytest -m offline
 desktop/macos/tests/run-swift-tests.sh
 ```
 
+The screens shown before the workbench opens (opening, choosing a folder, and problems such as an unavailable database) share one native component that uses the workbench's colours, type and button styles. Each problem offers one primary action that leads to a fix. Problems with a project lead back to **Open Library**, and only the folder flow offers **Open Folder…**. Each screen keeps the path and error code behind **Show Details**. To review every screen in light and dark, render them into an existing folder outside the checkout:
+
+```sh
+desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders en
+desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
+```
+
+Reference renders are in [images/desktop-status](images/desktop-status/).
+
 ## Validate the signed build
 
 Use a fresh virtual environment outside the checkout and the app for the [installed-wheel compatibility suite](../tests/compat_validation/README.md). Install the wheel with the exact version declared in `tests/compat_validation/PACKAGE_VERSION` and keep test projects, databases and logs in disposable locations. The runner rejects a Python interpreter or package installed inside a macOS app before it starts the tests.
