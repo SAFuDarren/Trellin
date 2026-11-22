@@ -249,6 +249,8 @@
   },
   "legend": {
     "label": "证明状态计数",
+    "status": "状态",
+    "statusItem": "{{label}} {{count}}",
     "edges": "连线样式",
     "review": "待审核",
     "blocked": "阻塞 / 待复核",

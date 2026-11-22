@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { CanvasZoom } from "./CanvasZoom";
 import { formatShortcut } from "../shortcuts";
@@ -506,6 +506,8 @@ export function GraphView(props: Props) {
   );
 }
 
+type LegendStatus = { key: string; label: string; fullLabel?: string; count?: number; icon: ReactNode };
+
 function Legend({
   graph,
   view,
@@ -523,6 +525,10 @@ function Legend({
 }) {
   const { t } = useTranslation();
   const edgeId = useId();
+  const statusId = useId();
+  const statusList = useRef<HTMLUListElement>(null);
+  const [compact, setCompact] = useState(false);
+  const statusLabel = t(view === "impact" ? "review.affected" : "legend.label");
   const kinds = new Set(Array.from(edges, (edge) => edge.drawKind));
   const counts = new Map<Tone, number>();
   if (view !== "impact") {
@@ -533,43 +539,70 @@ function Legend({
   }
   const lines = (["actual", "context", "planned"] as const).filter((kind) => kinds.has(kind));
   const tones = (["ok", "review", "bad", "open", "planned"] as const).filter((tone) => counts.get(tone));
+  const entries: LegendStatus[] = tones.map((tone) => {
+    const fullLabel = t(`tone.${tone}`);
+    const label = tone === "review" ? t("legend.review") : tone === "bad" ? t("legend.blocked") : fullLabel;
+    return { key: tone, label, fullLabel, count: counts.get(tone), icon: <Mark tone={tone} /> };
+  });
+  if (affectedCount !== undefined) {
+    entries.push({ key: "affected", label: t("impact.summary", { count: affectedCount }), icon: <Mark tone="bad" /> });
+  }
+  if (running > 0) entries.push({ key: "running", label: t("legend.running"), count: running, icon: <Spin /> });
+  if (queued > 0) entries.push({ key: "queued", label: t("legend.queued"), count: queued, icon: <Clock /> });
+  const statusItems = entries.map(({ key, label, fullLabel = label, count, icon }) => (
+    <li
+      key={key}
+      title={fullLabel}
+      aria-label={count === undefined ? fullLabel : t("legend.statusItem", { label: fullLabel, count })}
+    >
+      {icon}
+      <span className="legend-count-label">{label}</span>
+      {count !== undefined && <b>{count}</b>}
+    </li>
+  ));
+
+  useLayoutEffect(() => {
+    const list = statusList.current!;
+    const measure = () => {
+      const rows = new Set(Array.from(list.children, (item) => (item as HTMLElement).offsetTop));
+      setCompact(rows.size > 2 || list.scrollWidth > list.clientWidth);
+    };
+    // The hidden list keeps the available width, so it can be measured while the popover is active.
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [graph, view, affectedCount, running, queued, t]);
+
   return (
     <div className="legend">
-      <div
-        className="legend-counts"
-        role="status"
-        aria-label={t(view === "impact" ? "review.affected" : "legend.label")}
-      >
-        {affectedCount !== undefined && (
-          <span>
-            <Mark tone="bad" />
-            {t("impact.summary", { count: affectedCount })}
-          </span>
-        )}
-        {tones.map((tone) => {
-          const label = t(`tone.${tone}`);
-          const compactLabel = tone === "review" ? t("legend.review") : tone === "bad" ? t("legend.blocked") : label;
-          return (
-            <span key={tone} title={label}>
-              <Mark tone={tone} />
-              <span className="legend-count-label">{compactLabel}</span>
-              <b>{counts.get(tone)}</b>
-            </span>
-          );
-        })}
-        {running > 0 && (
-          <span title={t("legend.running")}>
-            <Spin />
-            <span className="legend-count-label">{t("legend.running")}</span>
-            <b>{running}</b>
-          </span>
-        )}
-        {queued > 0 && (
-          <span title={t("legend.queued")}>
-            <Clock />
-            <span className="legend-count-label">{t("legend.queued")}</span>
-            <b>{queued}</b>
-          </span>
+      <div className="legend-status" data-compact={compact || undefined}>
+        <div className="legend-counts" role="status" aria-label={statusLabel} aria-hidden={compact || undefined}>
+          <ul ref={statusList} className="legend-count-list" role="list">
+            {statusItems}
+          </ul>
+        </div>
+        {compact && entries.length > 0 && (
+          <Popover
+            label={statusLabel}
+            panelId={statusId}
+            popup="dialog"
+            placement="top-start"
+            className="legend-status-popover"
+            triggerClassName="legend-status-toggle"
+            trigger={
+              <>
+                {t("legend.status")}
+                <Chevron />
+              </>
+            }
+          >
+            {() => (
+              <ul className="legend-count-list" role="list">
+                {statusItems}
+              </ul>
+            )}
+          </Popover>
         )}
       </div>
       {lines.length > 0 && (

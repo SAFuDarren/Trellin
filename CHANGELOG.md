@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.90
+
+- The proof graph keeps status names and counts readable across window sizes. When the graph is too narrow for the labels, open them from the Status button.
+
 ## 1.0.89
 
 - Agent chat opens in the same lower-right floating panel across work areas, clear of the inspector and canvas controls. Resize its edges or corner, use the keyboard, or maximize and restore. Trellin remembers your preferred size.

@@ -22,7 +22,7 @@ Open **Settings and help → Help** for short guides to the project map, Agent w
 
 Arrow keys pan when the canvas has focus. To move a focused card, open its context menu with **⇧F10** (**Shift+F10** on other platforms) and choose **Move card**. Use the arrow keys to preview the new position. Hold **Shift** for larger steps. Press **Enter** to save the position or **Escape** to cancel.
 
-Open a proof to start at a readable zoom on the main canvas. **Fit to window** shows the whole graph. Select a node to read its full formula and Lean statement in the inspector. Hover over an activity count or check the inspector to see the recorded Agent and model. **Edge styles** opens the legend for the current view. Switch to **References** to see recorded uses, allowed premises and planned steps distinguished by line style.
+Open a proof to start at a readable zoom on the main canvas. **Fit to window** shows the whole graph. Select a node to read its full formula and Lean statement in the inspector. Hover over an activity count or check the inspector to see the recorded Agent and model. The footer shows labelled proof counts. In a narrow window, **Status** opens the full list when the labels run out of space. **Edge styles** opens the legend for the current view. Switch to **References** to see recorded uses, allowed premises and planned steps distinguished by line style.
 
 Changing the interface language keeps proof nodes in the same order and preserves their references and saved card sizes.
 
