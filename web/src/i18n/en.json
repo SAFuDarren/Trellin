@@ -249,6 +249,8 @@
   },
   "legend": {
     "label": "Proof status counts",
+    "status": "Status",
+    "statusItem": "{{label}} {{count}}",
     "edges": "Edge styles",
     "review": "Needs review",
     "blocked": "Blocked / recheck",

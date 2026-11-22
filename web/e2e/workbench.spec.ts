@@ -76,9 +76,9 @@ test("claims, graph, live work, legend and details load without errors", async (
   await expect(counts).toBeVisible();
   expect(
     await counts
-      .locator(":scope > span")
+      .getByRole("listitem")
       .evaluateAll((labels) => new Set(labels.map((label) => label.getBoundingClientRect().y)).size),
-  ).toBe(1);
+  ).toBeLessThanOrEqual(2);
   await page.keyboard.press("Escape");
   await expect(edgeLegend).toBeHidden();
   await expect(edgeStyles).toBeFocused();

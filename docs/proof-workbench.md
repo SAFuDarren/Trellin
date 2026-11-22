@@ -90,7 +90,7 @@ The left column lists registered projects. The centre shows the project map. The
 
 Opening a proof fits small graphs and starts large graphs at a readable zoom around the selected node. Use **Fit to window** in the corner to see the entire graph. Drag to pan. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. With the canvas focused, the arrow keys pan, + and − zoom and 0 fits.
 
-Select a node to read its full formula and Lean statement in the inspector. Running jobs appear as a spinner and count inside the node. With reduced motion enabled, the spinner stays still. The card outline marks selection. Hover over the activity badge or check the inspector for the recorded Agent and model. Open **Edge styles** to look up connection types. The status counts stay in the footer. Hover, focus or select a node to reveal its resize handle. Drag the handle or focus it and use the arrow keys.
+Select a node to read its full formula and Lean statement in the inspector. Running jobs appear as a spinner and count inside the node. With reduced motion enabled, the spinner stays still. The card outline marks selection. Hover over the activity badge or check the inspector for the recorded Agent and model. Open **Edge styles** to look up connection types. The footer shows labelled status counts. When the labels need more than two rows, open **Status** to read every count. Hover, focus or select a node to reveal its resize handle. Drag the handle or focus it and use the arrow keys.
 
 ## Assign project work
 
