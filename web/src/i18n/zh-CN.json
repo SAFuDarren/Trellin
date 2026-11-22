@@ -734,6 +734,7 @@
     "openInWorkbench": "在工作台中打开"
   },
   "navigation": {
+    "resourcePath": "当前位置",
     "home": "主页",
     "switchView": "切换视图",
     "utilities": "设置与帮助"

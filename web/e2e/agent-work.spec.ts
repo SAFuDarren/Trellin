@@ -179,7 +179,10 @@ test("a named implementation goes through scope review, exact-result handoff, an
   await expect(page.getByRole("status")).toHaveText("Returned");
   expect(decisions[0]).toMatchObject({ delivery_sha256: REVIEW, decision: "return", task_id: starts[2]?.task_id });
 
-  await page.getByRole("link", { name: "Open the original delivery" }).click();
+  const path = page.getByRole("navigation", { name: "Current location" });
+  await expect(path.locator('[aria-current="page"]')).toBeVisible();
+  await path.getByRole("link", { name: "Fix the total", exact: true }).click();
+  await expect(path.locator('[aria-current="page"]')).toHaveText("Fix the total");
   await page.getByLabel("Review reason").fill("Code change confirmed.");
   await page.getByRole("button", { name: "Accept delivery" }).click();
   await expect(page.getByRole("status")).toHaveText("Accepted");

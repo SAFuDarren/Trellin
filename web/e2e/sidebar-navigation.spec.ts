@@ -154,7 +154,6 @@ test("the view switcher and Home restore the selected claim and proof node", asy
 
   const home = page.locator("nav.rail").getByRole("link", { name: "Home", exact: true });
   const switchView = page.getByRole("button", { name: "Switch view", exact: true });
-  const title = page.getByRole("heading", { level: 1 });
   await openProof(page, "单射映射的复合");
   const proof = page.locator(".main-proof-graph");
   await expect(proof).toBeVisible();
@@ -175,7 +174,7 @@ test("the view switcher and Home restore the selected claim and proof node", asy
   await expect(switchView).toBeFocused();
 
   menu = await openMenu(switchView);
-  await title.click();
+  await page.locator(".proof-path .resource-path-current").click();
   await expect(menu).toBeHidden();
   await expect(switchView).toHaveAttribute("aria-expanded", "false");
   await expect(switchView).toBeFocused();
