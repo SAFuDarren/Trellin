@@ -108,7 +108,9 @@ for (const viewport of [
     await expect.poll(() => size(dock)).toEqual(chosen);
 
     await rail.getByRole("link", { name: "Home", ...precise }).click();
-    await mapClaim(page, FIXTURE_CLAIM_TITLE).click();
+    await expect(mapClaim(page, FIXTURE_CLAIM_TITLE)).toHaveAttribute("aria-pressed", "true");
+    const details = page.locator(".project-canvas-tools").getByRole("button", { name: "Details", ...precise });
+    if ((await details.getAttribute("aria-pressed")) === "false") await details.click();
     await expectCanvasClear(page);
     await zoom.getByRole("button", { name: "Zoom in", ...precise }).click();
     expect(await bounds(zoom)).toEqual(initialZoom);
