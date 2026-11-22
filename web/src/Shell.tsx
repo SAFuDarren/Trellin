@@ -274,7 +274,12 @@ export function Shell({ session }: { session: string }) {
             ) : section === "progress" ? (
               <ProgressPage session={session} sub={sub} onOpen={open} />
             ) : section === "settings" ? (
-              <SettingsPage onResetLayout={resetLayout} updates={releaseUpdates} />
+              <SettingsPage
+                sub={sub}
+                onResetLayout={resetLayout}
+                onShowShortcuts={() => setShortcutSheetOpen(true)}
+                updates={releaseUpdates}
+              />
             ) : section === "help" ? (
               <HelpPage sub={sub} onShowShortcuts={() => setShortcutSheetOpen(true)} />
             ) : (
