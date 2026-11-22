@@ -243,15 +243,17 @@ Several people and coding agents may work on the repository at once. The rules b
 | Translation catalogs | Keep both sides' keys on conflict | Catalog parity test |
 | Architecture decisions, interface contracts, schemas | Changed only in their own PR, approved by the maintainer | CODEOWNERS review routing and the owner's merge decision |
 
-**Integration**
-- Fetch and rebase on the latest upstream `main` before review and before merging. Run `python scripts/check_package_version.py` on the committed candidate and rerun required checks. If the upstream remote is named `upstream`, pass `--base upstream/main`. For a maintainer-approved increment, pass `--bump minor` or `--bump major`. If main advanced, choose the version from the new base and update both version files before checking again.
+#### Integration
+
+- Rebase on current upstream `main`, update both [version markers](#versioning-and-compatibility), and push the task branch. Submit from the clean branch with `python scripts/submit_pr.py --repo OWNER/REPO --title TITLE --body-file PR.md`. A fork supplies `--head-repo CONTRIBUTOR/FORK`. Use `--bump minor` or `--bump major` for an approved release increment.
+- The command checks current main, the pushed head, the version and the linked claim. If the create response is uncertain, rerun the same command to read back the existing PR. Follow the checks for that head. If main advances, update the existing PR with a rebased and rechecked head.
 - Keep each PR to one task.
 - Squash-merge with a Conventional Commit title.
 - Issues found outside the task become new issues, not extra changes in the branch.
 
 #### Owner merge preflight
 
-Contributors can prepare PRs in parallel. The owner chooses the integration order and processes one merge at a time. Each PR reserves the next patch version when it is ready for this queue. If the base advances, the contributor rebases, updates both version markers and verifies the new head.
+Contributors can prepare changes in parallel. The owner sequences submissions for the next patch version and merges one at a time.
 
 From a clean checkout of current upstream `main`, the owner reviews the diff and checks the exact commit with `python scripts/review_merge.py PR --head FULL_REVIEWED_SHA`. Supply the PR number and the complete reviewed SHA. With the same head, add `--merge` to apply the squash merge. The command reads PR and issue metadata from GitHub, verifies the latest base and version, and rechecks the owner-confirmed claim even if a prior Task Link run is already green. It requires successful checks from the configured sources on the reviewed head. The existing GitHub rules apply to the merge request.
 
@@ -358,17 +360,10 @@ An issue is done when every acceptance criterion holds and a test or a check in 
 
 ## CI runs
 
-- **Every job has a time limit.** Each job sets `timeout-minutes` at two to three times its usual duration. A new job must set one. GitHub's default of six hours turns a hang into a lost afternoon.
+- **Every job has a time limit.** Set `timeout-minutes` at two to three times the measured usual duration. The [workflow files](../.github/workflows/) hold the active limits and Actions history gives observed timings.
+- **Keep the pull request open while checks appear.** Read back the PR and exact head, then follow its Actions runs. Closing and reopening can launch a duplicate suite. The owner check recognizes an earlier cancellation only when a newer run of the same workflow passed for the current PR, head and base.
 
-  | Job | Usual time | Limit |
-  | --- | --- | --- |
-  | Lint and offline tests | 1 min | 15 min |
-  | Web interface (React) | 2 min | 20 min (end-to-end step 10 min) |
-  | Installed package smoke check | 1 min | 20 min |
-  | Required release regressions | 14 min (2 min when scoped out) | 30 min |
-  | DCO | under 1 min | 5 min |
-
-- **Long regressions run where they can matter.** Every pull request builds the wheel, checks the version marker and compares the CLI against its baseline. The PostgreSQL and Lean regressions in the same job are skipped for a pull request that only touches `web/`, `research_multiplier/workbench/app/`, `docs/`, `brand/`, `desktop/`, Markdown files at the root, issue and pull request templates, `tests/compat_validation/PACKAGE_VERSION`, or the version line of `pyproject.toml`. Any other path runs them, and so does every push to `main`, the weekly schedule and a manual run. The job summary says which applied. Extend the list only when a path cannot affect the database boundary or proof checking.
+- **Long regressions run where they can matter.** Every PR checks the installed package, version marker and CLI compatibility. [Checks](../.github/workflows/checks.yml) owns the path policy for PostgreSQL and Lean. Its job summary records the decision. Changes to that policy need proof that the paths cannot affect the database or proof boundary.
 - **Do not wait on a hung job.** A job that runs well past its usual time with no new log output is hung. Cancel the run (`gh run cancel ID`), read its log (`gh run view ID --log`), and either fix the cause or rerun once (`gh run rerun ID --failed`). If it hangs again, treat it as an incident (below) and fix the cause before merging.
 - **Do not download what the runner already has.** Prefer tools on the runner image (for example its Google Chrome for the end-to-end tests) and pinned versions over downloads during the run.
 - **Merge only on green.** Never merge with a required check pending or failed, and never disable, skip or loosen a check to make it pass. A flaky check gets an issue and a fix.

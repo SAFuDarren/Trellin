@@ -246,15 +246,17 @@ python scripts/check_privacy.py --pr NUMBER       # PR 的正文、评论、提�
 | 翻译文件 | 冲突时双方的条目都保留 | 中英文条目一致性测试 |
 | 架构决定、接口契约、schema | 只能在单独的 PR 里修改，并经维护者批准 | CODEOWNERS 请求评审，仓库所有者决定合并 |
 
-**合并**
-- 申请评审前和合并前，获取最新的上游 `main` 后 rebase。在已提交的候选版本上运行 `python scripts/check_package_version.py`，并重新跑必需检查。上游远端名为 `upstream` 时使用 `--base upstream/main`。经维护者批准的次版本或主版本递增分别使用 `--bump minor` 或 `--bump major`。如果 main 已推进，依据新的基准更新两个版本文件后再检查。
+#### 提交与合并
+
+- 基于当前上游 `main` rebase，更新两处[版本标记](#版本与兼容性)并推送任务分支。从干净的任务分支运行 `python scripts/submit_pr.py --repo OWNER/REPO --title TITLE --body-file PR.md`。使用 fork 时补 `--head-repo CONTRIBUTOR/FORK`。经批准递增次版本或主版本时使用 `--bump minor` 或 `--bump major`。
+- 命令核对当前 main、已推送的提交、版号和关联认领。创建请求结果不明时，重跑同一条命令可读回已有 PR。按该提交跟踪检查。main 推进后，在原 PR 更新已 rebase 并重新检查的提交。
 - 每个 PR 只做一个任务。
 - 用 squash 合并，标题采用 Conventional Commits 格式。
 - 在任务范围之外发现的问题，另开 issue，不要顺手改在当前分支里。
 
 #### 所有者合并前检查
 
-贡献者可以并行准备 PR，由所有者确定合并顺序并串行合入。PR 进入合并队列时再确认下一个补丁版本。基线推进后，由贡献者 rebase、更新两处版本标记并验证新提交。
+贡献者可以并行准备改动，由所有者按下一个补丁版本排提交顺序并串行合并。
 
 所有者先在 GitHub 审核差异，再从当前上游 `main` 的干净检出运行 `python scripts/review_merge.py PR --head FULL_REVIEWED_SHA`。替换 PR 编号和已审核的完整 SHA。使用同一 SHA 加上 `--merge` 执行 squash 合并。命令读取 GitHub 的 PR 和 issue 元数据，核对最新基线及版号。即使旧的 Task Link 已通过，也重新核对所有者确认的认领，并要求所审提交上来自指定来源的必过检查全部通过。GitHub 的现有规则继续对合并请求生效。
 
@@ -361,17 +363,10 @@ issue 的每一条验收标准都满足、并且有测试或 CI 检查能证明�
 
 ## CI 运行
 
-- **每个任务都有时间上限。** 每个 job 都设置 `timeout-minutes`，取平时耗时的两到三倍。新增 job 必须设置。GitHub 默认是六个小时，一次卡住就会白白耗掉一个下午。
+- **每个任务都有时间上限。** `timeout-minutes` 取实测常规耗时的两到三倍。当前上限见[工作流文件](../.github/workflows/)，实测耗时见 Actions 历史。
+- **等检查出现时保持 PR 开放。** 先读回 PR 和完整提交号，再跟踪该提交的工作流。关闭重开会触发重复检查。只有同一工作流的新一轮已为当前 PR、提交和基线通过时，所有者预检才会把更早的取消记录识别为已替代。
 
-  | 任务 | 平时耗时 | 上限 |
-  | --- | --- | --- |
-  | Lint and offline tests | 1 分钟 | 15 分钟 |
-  | Web interface (React) | 2 分钟 | 20 分钟（端到端测试这一步 10 分钟） |
-  | Installed package smoke check | 1 分钟 | 20 分钟 |
-  | Required release regressions | 14 分钟（按路径跳过时约 2 分钟） | 30 分钟 |
-  | DCO | 不到 1 分钟 | 5 分钟 |
-
-- **长回归只在可能受影响时运行。** 每个 PR 都会构建 wheel、核对版本标记，并把 CLI 与基线比对。同一个 job 里的 PostgreSQL 和 Lean 回归，在 PR 只改动 `web/`、`research_multiplier/workbench/app/`、`docs/`、`brand/`、`desktop/`、根目录的 Markdown 文件、issue 和 PR 模板、`tests/compat_validation/PACKAGE_VERSION` 或 `pyproject.toml` 的版本号这一行时跳过。改动其他任何路径都会运行；推送到 `main`、每周定时运行和手动运行也总会运行。job 摘要会写明本次是否运行。只有确认某个路径不会影响数据库边界或证明检查时，才把它加进这份清单。
+- **长回归只在可能受影响时运行。** 每个 PR 都检查安装包、版本标记和 CLI 兼容性。PostgreSQL 和 Lean 的路径判断以 [Checks 工作流](../.github/workflows/checks.yml) 为准，job 摘要记录本次决定。改变路径判断前需证明相关文件不会影响数据库或证明边界。
 - **卡住了就别等。** 一个 job 远远超过平时耗时、日志又没有新输出，就是卡住了。取消这次运行（`gh run cancel ID`），读日志（`gh run view ID --log`），然后修掉原因，或者重跑一次（`gh run rerun ID --failed`）。如果重跑又卡住，按下面的事故复盘处理，修好原因再合并。
 - **运行环境里已有的东西不要再下载。** 优先用 runner 镜像自带的工具（例如端到端测试用镜像里的 Google Chrome），并固定版本，不要在运行时下载。
 - **全绿才合并。** 有必需的检查还在等待或已失败时，不要合并；也不要为了通过而关闭、跳过或放宽检查。时好时坏的检查要开 issue 修好。

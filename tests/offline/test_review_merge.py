@@ -159,3 +159,55 @@ def test_local_details_in_the_pull_request_block_the_merge(review, candidate, mo
     with pytest.raises(SystemExit, match="Remove local or private details"):
         review.main(["4", "--head", HEAD, "--merge"])
     assert "home path" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("variant", [
+    "same-pr", "other-pr", "old-base", "other-workflow", "pending-suite", "failed",
+    "wrong-pr-without-duplicate", "pending-without-duplicate", "wrong-repository", "fork-without-association",
+])
+def test_only_a_newer_verified_suite_can_replace_a_cancelled_check(review, monkeypatch, variant):
+    pull = {"number": 4, "base": {"repo": {"id": 100}},
+            "head": {"sha": HEAD, "ref": "fix/demo", "repo": {"id": 100, "full_name": UPSTREAM}}}
+    subject = {"number": 4, "base": {"ref": "main", "sha": BASE, "repo": {"id": 100}},
+               "head": {"ref": "fix/demo", "sha": HEAD, "repo": {"id": 100}}}
+    catalog = {"event": "pull_request", "head_sha": HEAD, "head_branch": "fix/demo", "workflow_id": 21,
+               "path": ".github/workflows/checks.yml", "head_repository": {"full_name": UPSTREAM}}
+    old = dict(catalog, check_suite_id=40, run_number=1, status="completed", conclusion="cancelled", pull_requests=[])
+    new = dict(catalog, check_suite_id=50, run_number=2, status="completed", conclusion="success",
+               pull_requests=[subject])
+    common = {"head_sha": HEAD, "app": {"id": 10, "slug": "github-actions"}, "status": "completed",
+              "name": "Release check"}
+    cancelled = dict(common, check_suite={"id": 40}, conclusion="cancelled")
+    passed = dict(common, check_suite={"id": 50}, conclusion="success")
+    workflows = [old, new]
+    if variant in {"other-pr", "wrong-pr-without-duplicate"}:
+        subject["number"] = 5
+    elif variant == "old-base":
+        subject["base"]["sha"] = "d" * 40
+    elif variant == "other-workflow":
+        new["workflow_id"] = 22
+    elif variant in {"pending-suite", "pending-without-duplicate"}:
+        workflows.append(dict(new, check_suite_id=60, run_number=3, status="in_progress", conclusion=None))
+    elif variant == "failed":
+        cancelled["conclusion"] = "failure"
+    elif variant == "wrong-repository":
+        subject["base"]["repo"]["id"] = 200
+    elif variant == "fork-without-association":
+        pull["head"]["repo"]["full_name"] = "peer/Trellin"
+        new["pull_requests"] = []
+    checks = [passed] if variant.endswith("without-duplicate") or variant == "fork-without-association" else [cancelled, passed]
+    rule = {"type": "required_status_checks", "parameters": {"required_status_checks": [
+        {"context": "Release check", "integration_id": 10},
+    ]}}
+    replies = {
+        f"repos/{UPSTREAM}/rules/branches/main": [rule],
+        f"repos/{UPSTREAM}/commits/{HEAD}/check-runs?filter=latest&per_page=100": [{"check_runs": checks}],
+        f"repos/{UPSTREAM}/actions/runs?event=pull_request&head_sha={HEAD}&per_page=100": [{"workflow_runs": workflows}],
+    }
+    monkeypatch.setattr(review, "api", lambda endpoint, *flags: replies[endpoint])
+
+    if variant in {"same-pr", "fork-without-association"}:
+        assert review.required_checks(UPSTREAM, HEAD, pull, BASE) == 1
+    else:
+        with pytest.raises(SystemExit, match="Release check"):
+            review.required_checks(UPSTREAM, HEAD, pull, BASE)

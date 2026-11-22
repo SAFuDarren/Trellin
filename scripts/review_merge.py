@@ -17,7 +17,7 @@ from tasks import check_pull_request, gh, repository_name
 ROOT = Path(__file__).resolve().parents[1]
 SHA = re.compile(r"[0-9a-f]{40}")
 REVIEW_SENSITIVE = {"scripts/tasks.py", "scripts/review_merge.py", "scripts/check_package_version.py",
-                    "scripts/check_privacy.py"}
+                    "scripts/check_privacy.py", "scripts/submit_pr.py"}
 
 
 def api(path: str, *flags: str) -> dict | list:
@@ -46,7 +46,46 @@ def pull_snapshot(pull: dict, upstream: str) -> tuple[str, bool]:
     return head["sha"], outside
 
 
-def required_checks(upstream: str, head: str) -> int:
+def workflow_runs(upstream: str, pull: dict, head: str) -> dict[int, dict]:
+    pages = api(f"repos/{upstream}/actions/runs?event=pull_request&head_sha={head}&per_page=100", "--paginate", "--slurp")
+    source = pull["head"]["repo"]["full_name"].casefold()
+    return {
+        run["check_suite_id"]: run
+        for page in pages for run in page["workflow_runs"]
+        if run["event"] == "pull_request" and run["head_sha"] == head and run["head_branch"] == pull["head"]["ref"]
+        and (run.get("head_repository") or {}).get("full_name", "").casefold() == source
+    }
+
+
+def check_succeeded(run: dict) -> bool:
+    return run["status"] == "completed" and run["conclusion"] == "success"
+
+
+def workflow_key(run: dict) -> tuple[int, str]:
+    return run["workflow_id"], run["path"]
+
+
+def current_workflows(workflows: dict[int, dict], pull: dict, base: str) -> dict[tuple[int, str], dict]:
+    current = {}
+    base_repository = pull["base"]["repo"]["id"]
+    head_repository = pull["head"]["repo"]["id"]
+    for run in sorted(workflows.values(), key=lambda item: item["run_number"]):
+        if any(
+            pr["number"] == pull["number"] and pr["base"]["ref"] == "main" and pr["base"]["sha"] == base
+            and pr["head"]["sha"] == pull["head"]["sha"] and pr["head"]["ref"] == pull["head"]["ref"]
+            and (pr["base"].get("repo") or {}).get("id") == base_repository
+            and (pr["head"].get("repo") or {}).get("id") == head_repository
+            for pr in run.get("pull_requests", [])
+        ):
+            current[workflow_key(run)] = run
+    return current
+
+
+def suite_id(check: dict) -> int | None:
+    return (check.get("check_suite") or {}).get("id")
+
+
+def required_checks(upstream: str, head: str, pull: dict | None = None, base: str | None = None) -> int:
     rules = api(f"repos/{upstream}/rules/branches/main")
     expected = {
         (check["context"], check.get("integration_id"))
@@ -59,19 +98,50 @@ def required_checks(upstream: str, head: str) -> int:
     pages = api(f"repos/{upstream}/commits/{head}/check-runs?filter=latest&per_page=100", "--paginate", "--slurp")
     runs = [run for page in pages for run in page["check_runs"] if run["head_sha"] == head]
     blocked = []
+    workflows, current = None, {}
     for context, app_id in expected:
         matches = [run for run in runs
                    if run["name"] == context and (not app_id or (run.get("app") or {}).get("id") == app_id)]
-        if not matches or any(run["status"] != "completed" or run["conclusion"] != "success" for run in matches):
+        successes = {suite_id(run) for run in matches if check_succeeded(run)}
+        if not successes:
+            blocked.append(context)
+            continue
+        failures = [run for run in matches if not check_succeeded(run)]
+        # GitHub supplies PR associations for upstream Actions runs. Fork runs can omit them.
+        actions = any((run.get("app") or {}).get("slug") == "github-actions" for run in matches)
+        require_association = bool(pull and actions and (
+            pull["head"]["repo"]["full_name"].casefold() == upstream.casefold()
+            or any(run.get("pull_requests") for run in matches)
+        ))
+        cancellations = failures and all(run["conclusion"] == "cancelled" for run in failures)
+        if app_id and pull and base and (require_association or cancellations):
+            if workflows is None:
+                workflows = workflow_runs(upstream, pull, head)
+                current = current_workflows(workflows, pull, base)
+            if require_association:
+                relevant = {workflow_key(workflows[suite]) for suite in map(suite_id, matches) if suite in workflows}
+                if not relevant or any(key not in current or current[key]["check_suite_id"] not in successes
+                                       for key in relevant):
+                    blocked.append(context)
+                    continue
+            # Discard only completed cancellations that can be shown to have been replaced.
+            unresolved = []
+            for failure in failures:
+                prior = workflows.get(suite_id(failure))
+                latest = current.get(workflow_key(prior)) if prior else None
+                if not (failure["status"] == "completed" and failure["conclusion"] == "cancelled"
+                        and latest and latest["run_number"] > prior["run_number"]
+                        and latest["check_suite_id"] in successes and check_succeeded(latest)):
+                    unresolved.append(failure)
+            failures = unresolved
+        if failures:
             blocked.append(context)
     if blocked:
         raise SystemExit(f"Required checks without a matching success on {head}: {', '.join(sorted(blocked))}.")
     return len(expected)
 
 
-def check_candidate(upstream: str, pr: int, base: str, head: str, bump: str) -> None:
-    git("fetch", "--no-tags", "--no-write-fetch-head", f"https://github.com/{upstream}.git",
-        "refs/heads/main", f"refs/pull/{pr}/head")
+def check_version(base: str, head: str, bump: str) -> None:
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts/check_package_version.py"), "--base", base,
          "--candidate", head, "--bump", bump],
@@ -79,6 +149,12 @@ def check_candidate(upstream: str, pr: int, base: str, head: str, bump: str) -> 
     )
     if result.returncode:
         raise SystemExit("Version and base preflight failed. Rebase and check the updated pull request.")
+
+
+def check_candidate(upstream: str, pr: int, base: str, head: str, bump: str) -> None:
+    git("fetch", "--no-tags", "--no-write-fetch-head", f"https://github.com/{upstream}.git",
+        "refs/heads/main", f"refs/pull/{pr}/head")
+    check_version(base, head, bump)
 
 
 def privacy_findings(upstream: str, pr: int) -> list:
@@ -128,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     if findings:
         print("\n".join(str(finding) for finding in findings))
         raise SystemExit("Remove local or private details from the PR text, comments or commits before merging.")
-    count = required_checks(upstream, head)
+    count = required_checks(upstream, head, pull, base)
     latest = api(endpoint)
     if pull_snapshot(latest, upstream) != (head, outside) or api(base_ref)["object"]["sha"] != base:
         raise SystemExit("The candidate or main changed during preflight. Review the new state and retry.")
