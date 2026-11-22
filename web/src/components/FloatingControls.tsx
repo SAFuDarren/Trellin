@@ -27,6 +27,7 @@ type FloatingTrigger = {
   label: string;
   trigger?: ReactNode;
   triggerClassName?: string;
+  triggerTitle?: string;
   className?: string;
   placement?: Placement;
   keepVisible?: RefObject<HTMLElement | null>;
@@ -223,6 +224,7 @@ export function Popover({
   label,
   trigger,
   triggerClassName,
+  triggerTitle,
   className,
   placement,
   keepVisible,
@@ -264,7 +266,7 @@ export function Popover({
         className={triggerClassName ? `floating-trigger ${triggerClassName}` : "floating-trigger"}
         aria-label={label}
         aria-description={selectedLabel}
-        title={selectedLabel ?? label}
+        title={selectedLabel ?? triggerTitle ?? label}
         aria-haspopup={popup}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}

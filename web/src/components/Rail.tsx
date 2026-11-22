@@ -117,6 +117,7 @@ export function Rail({
         </button>
         <NavigationMenu
           label={t("navigation.utilities")}
+          tooltip={t("rail.settings")}
           className="rail-link"
           indicator={current === "settings" || current === "help"}
           items={UTILITIES.map((section) => ({

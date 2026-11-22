@@ -7,12 +7,14 @@ type NavigationItem = { href: string; label: string; current?: boolean; badge?: 
 /** A shared anchored menu whose page choices retain their navigation targets. */
 export function NavigationMenu({
   label,
+  tooltip,
   className,
   indicator,
   children,
   items,
 }: {
   label: string;
+  tooltip?: string;
   className?: string;
   indicator?: boolean;
   children: ReactNode;
@@ -21,6 +23,7 @@ export function NavigationMenu({
   return (
     <Menu
       label={label}
+      triggerTitle={tooltip}
       triggerClassName={className ? `navigation-trigger ${className}` : "navigation-trigger"}
       className="navigation-menu"
       dataCurrent={indicator}

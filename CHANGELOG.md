@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.94
+
+- The Settings and Help menu uses a gear icon and shows a Settings tooltip.
+
 ## 1.0.93
 
 - When dragging a research link, the project map marks both points where the link will attach. Keyboard focus uses a thin outline inside the map.
