@@ -18,7 +18,7 @@ import "../styles/team-agent-profiles.css";
 const EMPTY_CONNECTIONS: ModelConnection[] = [];
 const STARTER_SLOTS = [0, 1, 2] as const;
 
-function runtimeStatus(t: TFunction, connection?: ModelConnection) {
+export function runtimeStatus(t: TFunction, connection?: ModelConnection) {
   if (!connection || !dispatchableConnection(connection)) return t("teamAgents.unavailableRuntime");
   return t(`modelConnections.status.${connection.status}`);
 }
@@ -126,7 +126,9 @@ export function TeamAgentProfiles({ session }: { session: string }) {
                       <span className="team-agent-identity">
                         <TeamAgentAvatar avatar={agent.avatar} name={agent.name} />
                         <span>
-                          {agent.name}
+                          <a className="team-agent-name" href={href("team", "agent/" + agent.id)}>
+                            {agent.name}
+                          </a>
                           {agent.description && <span className="team-secondary">{agent.description}</span>}
                         </span>
                       </span>
@@ -190,7 +192,7 @@ export function TeamAgentProfiles({ session }: { session: string }) {
   );
 }
 
-function TeamAgentWizard({
+export function TeamAgentWizard({
   session,
   initial,
   initialStep,

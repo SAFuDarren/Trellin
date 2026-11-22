@@ -173,3 +173,81 @@ test("an unavailable runtime cannot be used to create an agent", async ({ page }
   await expect(wizard).toBeHidden();
   expect(writes).toBe(0);
 });
+
+test("an Agent profile shows its work, connection and editable instructions", async ({ page }) => {
+  const id = "a527e4b1-854f-4bde-a2ca-db6642130b65";
+  let agent: TeamAgent = {
+    id,
+    revision: 4,
+    connection_id: connection.id,
+    name: "Research Reviewer",
+    description: "Checks handoff criteria",
+    avatar: "compass",
+    instructions: "Start by reading the accepted evidence.",
+    starters: [],
+  };
+  const task = {
+    id: "6f37055b-ab72-416f-bb61-ec220308b1cc",
+    title: "Check the induction steps",
+    agent_id: id,
+    agent_name: agent.name,
+    mode: "review",
+    status: "running",
+    created_at: "2026-10-17T12:00:00Z",
+    updated_at: "2026-10-17T12:25:00Z",
+    delivery_sha256: null,
+    predecessor_id: null,
+    error: null,
+  };
+  await page.route("**/api/model-connections", (route) => route.fulfill({ json: { connections: [connection] } }));
+  await page.route("**/api/team-agents", (route) => route.fulfill({ json: { agents: [agent] } }));
+  await page.route("**/api/team-agents/save", (route) => {
+    const edited = route.request().postDataJSON() as TeamAgent;
+    expect(edited.revision).toBe(agent.revision);
+    agent = { ...edited, revision: edited.revision + 1 };
+    return route.fulfill({ json: { agent } });
+  });
+  await page.route("**/api/agent-work", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        tasks: [
+          task,
+          { ...task, id: "88490dcc-880c-4b29-b025-c9f47fcd6ee0", agent_id: null, title: "Unassigned work" },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/threads", (route) => route.fulfill({ json: { threads: [] } }));
+
+  const roster = await openAgents(page);
+  await roster.getByRole("link", { name: agent.name, exact: true }).click();
+  await expect(page.getByRole("heading", { name: agent.name, exact: true })).toBeVisible();
+  await expect(page.getByRole("main")).toContainText(agent.description);
+  await expect(page.getByRole("link", { name: /Check the induction steps/ })).toHaveAttribute(
+    "href",
+    "#agent-work/" + task.id,
+  );
+  await expect(page.getByText("Unassigned work")).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "Model connection" })).toContainText(connection.label);
+  await expect(page.getByRole("link", { name: "Chat", exact: true })).toHaveAttribute(
+    "href",
+    "#chat/" + encodeURIComponent("employee/" + id),
+  );
+  await expect(page.getByRole("link", { name: "Assign task", exact: true })).toHaveAttribute(
+    "href",
+    "#agent-work/" + encodeURIComponent("new/agent/" + id),
+  );
+
+  const instructions = page.getByRole("region", { name: "Instructions" });
+  const edit = instructions.getByRole("button", { name: "Edit", exact: true });
+  await expect(instructions).toContainText(agent.instructions);
+  await edit.click();
+  const wizard = page.getByRole("dialog");
+  await wizard.getByRole("textbox", { name: "Instructions", exact: true }).fill("Read the agreed scope first.");
+  await wizard.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(edit).toBeFocused();
+  await expect(instructions).toContainText("Read the agreed scope first.");
+  await page.reload();
+  await expect(instructions).toContainText("Read the agreed scope first.");
+});

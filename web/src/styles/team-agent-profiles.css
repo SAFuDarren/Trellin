@@ -120,3 +120,68 @@
     text-align: start;
   }
 }
+
+.team-agent-name {
+  color: var(--ink);
+  text-decoration-color: var(--edge-soft);
+  text-underline-offset: 3px;
+}
+
+.team-agent-name:hover {
+  text-decoration-color: var(--accent);
+}
+
+.team-agent-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 252px);
+  align-items: start;
+  gap: 24px;
+  width: min(100%, 1200px);
+}
+
+.section-main:has(.team-agent-detail) > .page-head a.button {
+  text-decoration: none;
+}
+
+.team-agent-detail-body {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.team-agent-detail h3 {
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-semibold);
+}
+
+.team-agent-detail :is(section, aside) {
+  padding: 14px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-card);
+}
+
+.team-agent-detail .agent-dock-activity-body {
+  max-height: 360px;
+  scrollbar-gutter: stable;
+}
+
+.team-agent-detail aside dt {
+  color: var(--sub);
+}
+
+.team-agent-detail aside dd {
+  margin: 4px 0 14px;
+  overflow-wrap: anywhere;
+}
+
+.agent-instructions-text {
+  margin-block-start: 10px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .team-agent-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

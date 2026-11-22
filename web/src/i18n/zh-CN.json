@@ -1165,6 +1165,11 @@
     }
   },
   "teamAgents": {
+    "profileMissing": "找不到该 Agent。",
+    "openChat": "对话",
+    "workActivity": "Agent 活动",
+    "instructionsEmpty": "尚未添加说明。",
+    "connection": "模型连接",
     "title": "已保存的员工",
     "add": "添加员工",
     "edit": "编辑",
