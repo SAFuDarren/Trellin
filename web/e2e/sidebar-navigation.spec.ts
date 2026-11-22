@@ -248,3 +248,23 @@ test("utilities and direct review links work in a narrow Chinese window", async 
   await expect(page).toHaveURL(/#workbench$/);
   await expect(page.getByRole("application", { name: "项目图谱", exact: true })).toBeVisible();
 });
+
+for (const [colorScheme, language, menuLabel, title] of [
+  ["light", "en", "Settings and help", "Settings"],
+  ["dark", "zh-CN", "设置与帮助", "设置"],
+] as const) {
+  test(`the rail shows a Settings gear and keeps the utility menu reachable in ${colorScheme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await page.addInitScript((locale) => localStorage.setItem("research-multiplier-language", locale), language);
+    await page.goto("/#session=fixture");
+    const utilities = page.locator("nav.rail").getByRole("button", { name: menuLabel, exact: true });
+    await expect(utilities).toHaveAttribute("title", title);
+    await expect(utilities).toHaveCSS("width", "36px");
+    await expect(utilities).toHaveCSS("height", "36px");
+    const path = utilities.locator("svg path");
+    await expect(path).toHaveAttribute("d", /^M10 3h4.*ZM15 12a3/);
+    await expect(utilities.locator("svg")).toHaveCSS("stroke-width", "1.6px");
+    const menu = await openMenu(utilities);
+    await expect(menu.getByRole("menuitem", { name: title, exact: true })).toBeVisible();
+  });
+}
