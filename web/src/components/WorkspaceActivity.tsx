@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { TeamAgent } from "../api/teamAgents";
 import { reviewItemHref, reviewItemKindLabel, reviewResultName } from "../shell/reviewItems";
 import { href } from "../shell/route";
@@ -22,6 +23,69 @@ function relativeTime(language: string, at: string, now: number) {
   if (Math.abs(seconds) < 3600) return format.format(Math.round(seconds / 60), "minute");
   if (Math.abs(seconds) < 86400) return format.format(Math.round(seconds / 3600), "hour");
   return format.format(Math.round(seconds / 86400), "day");
+}
+
+export function workspaceActivityDisplay(t: TFunction, agents: ReadonlyMap<string, TeamAgent>, row: ActivityRow) {
+  function providerLabel(provider?: string | null, model?: string | null) {
+    return [
+      provider && t(`team.providers.${provider}`, { defaultValue: harnessName(provider) || provider }),
+      model && prettyModel(model),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  switch (row.source) {
+    case "job": {
+      const { job } = row;
+      const title = t(job.kind === "verify" ? "activityKind.lean" : "workspaceActivity.proofJob");
+      const actor = providerLabel(job.provider, job.model) || (job.kind === "verify" ? t("team.verifier") : "");
+      const node = row.nodeId?.match(/^obligation:[^:]+:(\d+)$/)?.[1];
+      return {
+        title: job.claim_title || title,
+        status: t(`activityState.${job.state}`, { defaultValue: job.state }),
+        details: [job.claim_title && title, node && t("workspaceActivity.obligation", { index: node }), actor],
+        url: href("team", "jobs"),
+      };
+    }
+    case "work":
+      return {
+        title: row.task.title,
+        status: t(`agentWork.status.${row.task.status}`),
+        details: [agents.get(row.task.agent_id ?? "")?.name || row.task.agent_name, t("agentWork.title")],
+        url: href("agent-work", row.task.id),
+      };
+    case "chat": {
+      const { thread } = row;
+      const turn = thread.latest_turn;
+      return {
+        title: thread.title,
+        status: t(
+          row.state === "running"
+            ? "conversations.working"
+            : row.state === "completed"
+              ? "conversations.replied"
+              : "conversations.lastSendFailed",
+        ),
+        details: [
+          agents.get(thread.agent_id ?? "")?.name ||
+            providerLabel(turn?.provider, turn?.model || turn?.requested_model),
+          thread.claim_id ? t(thread.node_id ? "conversations.nodeScope" : "conversations.claimScope") : "",
+        ],
+        url: href("chat", thread.id),
+      };
+    }
+    case "review": {
+      const kind = reviewItemKindLabel(t, row.item);
+      const evidence = row.item.kind === "review_evidence";
+      return {
+        title: evidence ? reviewResultName(row.item) || kind : row.item.claim_title || kind,
+        status: evidence ? t("review.title") : t(`workspaceActivity.filter.${row.state}`),
+        details: [evidence ? row.item.claim_title : row.item.claim_title && kind],
+        url: reviewItemHref(row.item),
+      };
+    }
+  }
 }
 
 export function WorkspaceActivityList({
@@ -55,69 +119,6 @@ export function WorkspaceActivityList({
   }, []);
   const rows = filter === "all" ? activity.rows : activity.rows.filter((entry) => entry.state === filter);
 
-  function providerLabel(provider?: string | null, model?: string | null) {
-    return [
-      provider && t(`team.providers.${provider}`, { defaultValue: harnessName(provider) || provider }),
-      model && prettyModel(model),
-    ]
-      .filter(Boolean)
-      .join(" · ");
-  }
-
-  function rowContent(row: ActivityRow) {
-    switch (row.source) {
-      case "job": {
-        const { job } = row;
-        const title = t(job.kind === "verify" ? "activityKind.lean" : "workspaceActivity.proofJob");
-        const actor = providerLabel(job.provider, job.model) || (job.kind === "verify" ? t("team.verifier") : "");
-        const node = row.nodeId?.match(/^obligation:[^:]+:(\d+)$/)?.[1];
-        return {
-          title: job.claim_title || title,
-          status: t(`activityState.${job.state}`, { defaultValue: job.state }),
-          details: [job.claim_title && title, node && t("workspaceActivity.obligation", { index: node }), actor],
-          url: href("team", "jobs"),
-        };
-      }
-      case "work":
-        return {
-          title: row.task.title,
-          status: t(`agentWork.status.${row.task.status}`),
-          details: [agents.get(row.task.agent_id ?? "")?.name || row.task.agent_name, t("agentWork.title")],
-          url: href("agent-work", row.task.id),
-        };
-      case "chat": {
-        const { thread } = row;
-        const turn = thread.latest_turn;
-        return {
-          title: thread.title,
-          status: t(
-            row.state === "running"
-              ? "conversations.working"
-              : row.state === "completed"
-                ? "conversations.replied"
-                : "conversations.lastSendFailed",
-          ),
-          details: [
-            agents.get(thread.agent_id ?? "")?.name ||
-              providerLabel(turn?.provider, turn?.model || turn?.requested_model),
-            thread.claim_id ? t(thread.node_id ? "conversations.nodeScope" : "conversations.claimScope") : "",
-          ],
-          url: href("chat", thread.id),
-        };
-      }
-      case "review": {
-        const kind = reviewItemKindLabel(t, row.item);
-        const evidence = row.item.kind === "review_evidence";
-        return {
-          title: evidence ? reviewResultName(row.item) || kind : row.item.claim_title || kind,
-          status: evidence ? t("review.title") : t(`workspaceActivity.filter.${row.state}`),
-          details: [evidence ? row.item.claim_title : row.item.claim_title && kind],
-          url: reviewItemHref(row.item),
-        };
-      }
-    }
-  }
-
   return (
     <div className="agent-dock-activity">
       {hasActivity && (
@@ -134,7 +135,7 @@ export function WorkspaceActivityList({
         {rows.length ? (
           <ul>
             {rows.map((row) => {
-              const { title, status, details, url } = rowContent(row);
+              const { title, status, details, url } = workspaceActivityDisplay(t, agents, row);
               const summary = details.filter(Boolean).join(" · ");
               const caption =
                 row.time &&
