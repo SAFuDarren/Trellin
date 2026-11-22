@@ -145,6 +145,12 @@
     "title": "Agent 对话",
     "activity": "Agent 活动",
     "close": "收起 Agent 面板",
+    "maximize": "最大化 Agent 对话",
+    "restoreSize": "恢复对话大小",
+    "resize": {
+      "width": "调整对话宽度",
+      "height": "调整对话高度"
+    },
     "chooseAgent": "选择 Agent",
     "searchAgents": "搜索 Agent",
     "noAgents": "没有匹配的 Agent。",

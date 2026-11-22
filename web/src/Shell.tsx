@@ -78,7 +78,6 @@ export function Shell({ session }: { session: string }) {
   const projectClaims = useProjectCanvasClaims(session, showsClaimProgress);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [chatRequest, setChatRequest] = useState<{ session: string; value: AgentChatRequest } | null>(null);
-  const [chatCanvas, setChatCanvas] = useState<HTMLDivElement | null>(null);
   const [chatSelection, setChatSelection] = useState<{ session: string; scope: ConversationStarterScope } | null>(null);
   const saveChatStarterScope = useCallback(
     (scope: ConversationStarterScope) => setChatSelection({ session, scope }),
@@ -292,7 +291,6 @@ export function Shell({ session }: { session: string }) {
                 onChatAnchor={(anchor, title, starterScope) =>
                   setChatRequest({ session, value: { anchor, title, starterScope } })
                 }
-                onChatCanvas={setChatCanvas}
                 onChatStarterScope={saveChatStarterScope}
                 actionRequest={projectAction?.session === session ? projectAction.request : undefined}
                 onActionHandled={clearProjectAction}
@@ -304,7 +302,6 @@ export function Shell({ session }: { session: string }) {
             session={session}
             route={route}
             request={chatRequest?.session === session ? chatRequest.value : null}
-            canvas={section === "workbench" ? chatCanvas : null}
             starterScope={
               section === "workbench" && chatSelection?.session === session ? chatSelection.scope : undefined
             }

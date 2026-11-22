@@ -72,7 +72,6 @@ export function Workbench({
   onPositionChange,
   onChatAnchor,
   onChatStarterScope,
-  onChatCanvas,
   actionRequest,
   onActionHandled,
 }: {
@@ -86,7 +85,6 @@ export function Workbench({
   onPositionChange: (position: WorkbenchPosition) => void;
   onChatAnchor: (anchor: ConversationAnchor, title: string, starterScope: ConversationStarterScope) => void;
   onChatStarterScope: (scope: ConversationStarterScope) => void;
-  onChatCanvas: (element: HTMLDivElement | null) => void;
   actionRequest?: ProjectActionRequest;
   onActionHandled: () => void;
 }) {
@@ -807,7 +805,6 @@ export function Workbench({
             )}
           </div>
         </div>
-        <div className="workbench-agent-chat-slot" ref={onChatCanvas} />
       </main>
       {showReview && (
         <>

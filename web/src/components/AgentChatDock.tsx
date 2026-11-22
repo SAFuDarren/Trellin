@@ -1,13 +1,20 @@
-import { useId, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { ConversationSummary } from "../api/conversations";
 import { useTeamAgents } from "../api/teamAgents";
+import {
+  DEFAULT_CHAT_SIZE,
+  readAgentChatSize,
+  saveAgentChatSize,
+  useAgentChatArea,
+  type ChatSize,
+} from "../shell/agentChatGeometry";
 import { useConversationSending } from "../shell/ConversationEditors";
 import { href, type Route } from "../shell/route";
 import { reviewItemHref } from "../shell/reviewItems";
 import type { ActivityState, WorkspaceActivity } from "../shell/workspaceActivity";
 import { timeText } from "../workbench/text";
+import { AgentChatResizeHandles } from "./AgentChatResizeHandles";
 import { ConversationPanel } from "./ConversationPanel";
 import { Chevron, Mark } from "./Icons";
 import { Picker } from "./FloatingControls";
@@ -25,7 +32,6 @@ export function AgentChatDock({
   session,
   route,
   request,
-  canvas,
   starterScope,
   activity,
   activityLoading,
@@ -37,7 +43,6 @@ export function AgentChatDock({
   session: string;
   route: Route;
   request: AgentChatRequest | null;
-  canvas: HTMLElement | null;
   starterScope?: ConversationStarterScope;
   activity: WorkspaceActivity;
   activityLoading: boolean;
@@ -57,8 +62,19 @@ export function AgentChatDock({
   const [initialRecipient, setInitialRecipient] = useState<string>();
   const [focusComposer, setFocusComposer] = useState(false);
   const launcher = useRef<HTMLButtonElement>(null);
-  const footerPanelHost = useRef<HTMLDivElement>(null);
-  const [panelMount] = useState(() => document.createElement("div"));
+  const footer = useRef<HTMLElement>(null);
+  const panelElement = useRef<HTMLElement>(null);
+  const [chatSize, setChatSize] = useState(readAgentChatSize);
+  const [maximized, setMaximized] = useState(false);
+  const area = useAgentChatArea(footer, view === "chat", route.section, route.sub);
+  const preferredSize = chatSize ?? DEFAULT_CHAT_SIZE;
+  const floatStyle: CSSProperties & { "--agent-chat-height": string } = {
+    right: area.right,
+    bottom: area.bottom,
+    width: maximized ? area.width : Math.min(area.width, preferredSize.width),
+    "--agent-chat-height": `${maximized ? area.height : Math.min(area.height, preferredSize.height)}px`,
+    maxHeight: area.height,
+  };
   const activityLauncher = useRef<HTMLButtonElement>(null);
   const closeControl = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -110,16 +126,10 @@ export function AgentChatDock({
     setView(kind);
   }
 
-  useLayoutEffect(() => {
-    const host = view === "chat" && canvas ? canvas : footerPanelHost.current;
-    if (!host || panelMount.parentElement === host) return;
-    // Keep the same composer mounted while navigating between the canvas and other pages.
-    const active = document.activeElement;
-    host.append(panelMount);
-    if (active instanceof HTMLElement && panelMount.contains(active)) active.focus({ preventScroll: true });
-  }, [canvas, panelMount, view]);
-
-  useLayoutEffect(() => () => panelMount.remove(), [panelMount]);
+  function commitSize(size: ChatSize) {
+    setChatSize(size);
+    saveAgentChatSize(size);
+  }
 
   useLayoutEffect(() => {
     if (view === "activity") closeControl.current?.focus();
@@ -207,7 +217,11 @@ export function AgentChatDock({
 
   const panel = (
     <section
+      ref={panelElement}
       className="agent-dock-panel"
+      data-maximized={view === "chat" && maximized ? "true" : undefined}
+      data-user-size={view === "chat" && chatSize ? "true" : undefined}
+      style={view === "chat" ? floatStyle : undefined}
       data-view={view ?? undefined}
       id={panelId}
       aria-labelledby={titleId}
@@ -224,6 +238,15 @@ export function AgentChatDock({
         collapse();
       }}
     >
+      {view === "chat" && !maximized && (
+        <AgentChatResizeHandles
+          panel={panelElement}
+          preferred={chatSize}
+          available={area}
+          onSize={setChatSize}
+          onCommit={commitSize}
+        />
+      )}
       <header className="agent-dock-heading">
         <h2 id={titleId} className={view === "chat" ? "sr-only" : undefined}>
           {t(view === "activity" ? "agentDock.activity" : "agentDock.title")}
@@ -250,6 +273,19 @@ export function AgentChatDock({
               )}
             </div>
           </>
+        )}
+        {view === "chat" && (
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={t(maximized ? "agentDock.restoreSize" : "agentDock.maximize")}
+            title={t(maximized ? "agentDock.restoreSize" : "agentDock.maximize")}
+            onClick={() => setMaximized((current) => !current)}
+          >
+            <svg className="workbench-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d={maximized ? "M4 9h5V4m11 11h-5v5M9 9 4 4m11 11 5 5" : "M9 4H4v5m11 11h5v-5M4 4l5 5m11 11-5-5"} />
+            </svg>
+          </button>
         )}
         <button
           className="icon-button"
@@ -318,7 +354,7 @@ export function AgentChatDock({
   );
 
   return (
-    <footer className="agent-dock" aria-label={t("agentDock.title")}>
+    <footer ref={footer} className="agent-dock" aria-label={t("agentDock.title")}>
       <button
         ref={activityLauncher}
         type="button"
@@ -383,8 +419,7 @@ export function AgentChatDock({
         </svg>
         <span>{t("agentDock.title")}</span>
       </button>
-      <div className="agent-dock-panel-host" ref={footerPanelHost} />
-      {createPortal(panel, panelMount)}
+      {panel}
     </footer>
   );
 }

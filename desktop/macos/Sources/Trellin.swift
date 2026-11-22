@@ -19,6 +19,8 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     private let bridge = "trellinPosition"
     private let upgradeBridge = "trellinUpgradeProject"
     private let projectsBridge = "trellinProjects"
+    private let chatSizeBridge = "trellinAgentChatSize"
+    private let chatSizeKey = "agentChatSizeV1"
     private let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1260, height: 820),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable],
                                   backing: .buffered, defer: false)
@@ -367,10 +369,17 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(self, name: bridge)
         configuration.userContentController.add(self, name: upgradeBridge)
+        configuration.userContentController.add(self, name: chatSizeBridge)
         configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: projectsBridge)
         if let encoded = try? JSONEncoder().encode(projectName), let value = String(data: encoded, encoding: .utf8) {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: "window.trellinProjectName = \(value);", injectionTime: .atDocumentStart, forMainFrameOnly: true
+            ))
+        }
+        if let size = validatedChatSize(defaults.dictionary(forKey: chatSizeKey)),
+           let encoded = try? JSONEncoder().encode(size), let value = String(data: encoded, encoding: .utf8) {
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: "window.trellinAgentChatSize = \(value);", injectionTime: .atDocumentStart, forMainFrameOnly: true
             ))
         }
         if let position = last?.position {
@@ -407,6 +416,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         serverURL = nil
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: bridge)
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: upgradeBridge)
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: chatSizeBridge)
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: projectsBridge, contentWorld: .page)
         webView?.stopLoading()
         webView = nil
@@ -472,10 +482,21 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         return origin.protocol == serverURL.scheme && origin.host == serverURL.host && origin.port == serverURL.port
     }
 
+    private func validatedChatSize(_ value: Any?) -> [String: Int]? {
+        guard let size = value as? [String: Int], size.count == 2,
+              let width = size["width"], (280...4096).contains(width),
+              let height = size["height"], (180...4096).contains(height) else { return nil }
+        return size
+    }
+
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.webView === webView, trusted(message.frameInfo) else { return }
         if message.name == upgradeBridge {
             if message.body as? String == "confirm" { confirmProjectUpgrade() }
+            return
+        }
+        if message.name == chatSizeBridge {
+            if let size = validatedChatSize(message.body) { defaults.set(size, forKey: chatSizeKey) }
             return
         }
         guard message.name == bridge, let position = WorkbenchPosition(message: message.body),

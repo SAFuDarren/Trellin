@@ -307,29 +307,10 @@
   text-underline-offset: 0.13em;
 }
 
-.workbench-agent-chat-slot:empty {
-  display: none;
+.agent-dock-panel[data-view="chat"] {
+  position: fixed;
 }
 
-.workbench-agent-chat-slot {
-  --canvas-chat-height: clamp(180px, 41dvh, 365px);
-  flex: 0 0 var(--canvas-chat-height);
-  min-height: 0;
-  border-top: 1px solid var(--hair);
-  background: var(--main);
-}
-
-.workbench-agent-chat-slot .agent-dock-panel {
-  --agent-chat-height: var(--canvas-chat-height);
-  position: static;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.workbench-agent-chat-slot .chat-feed,
 .agent-dock-panel .conversation-panel[data-empty="true"] .chat-feed {
   min-height: 0;
 }
@@ -342,30 +323,73 @@
   padding-block: 0;
 }
 
-.agent-dock-panel[data-view="chat"]:has(.conversation-panel[data-empty="true"]) {
+.agent-dock-panel[data-view="chat"]:not([data-user-size], [data-maximized]):has(
+    .conversation-panel[data-empty="true"]
+  ) {
   height: auto;
-  max-height: var(--agent-chat-height);
 }
 
-.workbench-agent-chat-slot:has(.conversation-panel[data-empty="true"]) {
-  flex-basis: auto;
-  max-height: var(--canvas-chat-height);
+.agent-chat-resize {
+  position: absolute;
+  z-index: 1;
+  touch-action: none;
+}
+
+.agent-chat-resize[data-edge="top"] {
+  top: -5px;
+  right: 14px;
+  left: 14px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.agent-chat-resize[data-edge="left"] {
+  top: 14px;
+  bottom: 14px;
+  left: -5px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.agent-chat-resize[data-edge="corner"] {
+  top: -6px;
+  left: -6px;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+}
+
+.agent-chat-resize:is(:hover, :focus-visible, [data-dragging="true"])::after {
+  position: absolute;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  content: "";
+}
+
+.agent-chat-resize[data-edge="top"]::after {
+  inset: 4px 0;
+}
+
+.agent-chat-resize[data-edge="left"]::after {
+  inset: 0 4px;
+}
+
+.agent-chat-resize[data-edge="corner"]::after {
+  width: 12px;
+  height: 2px;
+  top: 10px;
+  left: 5px;
+  transform: rotate(-45deg);
 }
 
 @media (max-height: 560px) {
-  .workbench-agent-chat-slot .agent-dock-heading {
+  .agent-dock-panel[data-view="chat"] .agent-dock-heading {
     min-height: 38px;
     padding-block: 4px;
   }
 
-  .workbench-agent-chat-slot .conversation-panel {
+  .agent-dock-panel[data-view="chat"] .conversation-panel {
     gap: 6px;
     padding-block: 6px;
   }
-}
-
-.agent-dock-panel-host,
-.agent-dock-panel-host > div,
-.workbench-agent-chat-slot > div {
-  display: contents;
 }
