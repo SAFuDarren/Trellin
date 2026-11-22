@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.109
+
+- Settings changes things in place and no longer sends you to other pages: model connections and runtimes stay in **Team**, automation rules in **Automation**. The gear opens Settings in one click, and **Help** has its own icon at the bottom of the rail. Storage notes say "on this Mac" in the app.
+
 ## 1.0.108
 
 - **Home** opens a full-width project map with connection status beside the zoom controls. **Claims** is under **Work**, and existing Claims links still work.

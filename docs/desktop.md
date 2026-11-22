@@ -20,7 +20,7 @@ Use **Find claim** on the project map to search and select a card. In **Agent ch
 
 In the command palette, start with `#` to search claims, proof nodes and saved references, or `@` to search Agents. The footer lists these prefixes and navigation keys. Press the displayed shortcut, for example **⌥P** on Mac or **Alt+P** elsewhere, while the menu or palette is open.
 
-Open **Settings and help → Help** for short guides to the project map, Agent work and proof review. Each guide links to the relevant workbench page. Press **?** or open **Keyboard shortcuts** from Help to see the shortcuts for your platform. The **Details** and **Global map** icons show when their panels are open. With focus on the project map or its toolbar, press **I** for Details or **M** for Global map. Point at or keyboard-focus an icon to see its shortcut.
+Open **Help** at the bottom of the rail for short guides to the project map, Agent work and proof review. Each guide links to the relevant workbench page. Press **?** or open **Keyboard shortcuts** from Help to see the shortcuts for your platform. The **Details** and **Global map** icons show when their panels are open. With focus on the project map or its toolbar, press **I** for Details or **M** for Global map. Point at or keyboard-focus an icon to see its shortcut.
 
 The proof header shows the path from the project map to the claim and selected node. Choose the claim name to select its goal, or the map control to return to the canvas. In Agent work, a handoff task links to its source delivery in the task path.
 
@@ -72,7 +72,7 @@ The move applies to the library and the managed project files under it. External
 
 Use the existing [project backup workflow](research-foundation.md#recover-and-monitor) to preserve a project's files and PostgreSQL snapshot together. Keep app preferences and the registered library location separately when backing up Trellin's settings. A project archive can be restored as an independent project.
 
-Open **Settings** from **Settings and help** to search for an existing control or destination. For example, search **Lean** to open the environment checks in Team, or search **keyboard shortcuts** to reach the shortcut viewer. Language and layout preferences are saved in this browser.
+Open **Settings** with the gear at the bottom of the rail. Settings changes things in place: language, layout, keyboard shortcuts, updates and, in the Mac app, **Advanced**. It does not link to other pages; model connections and runtimes are in **Team**, and automation rules are in **Automation**. Search Settings for a control, for example **keyboard shortcuts**. Language and layout preferences are saved on this Mac in the app, or in the browser in a browser session. To find anything else, use the command palette (**⌘K**).
 
 **Settings → Updates** shows the installed version and a manual check for new stable releases. Automatic checks are off by default. If enabled, Trellin checks at most once every 24 hours while the workbench is open. The check requests public release metadata from GitHub without sending project data or credentials. You can open the release notes in your browser and choose when to install the update.
 

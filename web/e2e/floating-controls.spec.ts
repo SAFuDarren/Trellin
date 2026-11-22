@@ -3,27 +3,28 @@ import { expect, test } from "@playwright/test";
 test("the shared menu supports keyboard navigation, typeahead and focus return", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 460 });
   await page.goto("/#session=fixture");
-  const trigger = page.getByRole("button", { name: "Settings and help", exact: true });
-  const menu = page.getByRole("menu", { name: "Settings and help" });
-  const settings = menu.getByRole("menuitem", { name: "Settings", exact: true });
-  const help = menu.getByRole("menuitem", { name: "Help", exact: true });
+  // #293 removed the Settings and help menu; Research actions uses the same shared menu.
+  const trigger = page.getByRole("button", { name: "Research actions", exact: true });
+  const menu = page.getByRole("menu", { name: "Research actions" });
+  const items = menu.getByRole("menuitem");
 
   await trigger.press("ArrowDown");
   await expect(menu).toBeInViewport({ ratio: 1 });
-  await expect(settings).toBeFocused();
+  await expect(items.first()).toBeFocused();
   await page.keyboard.press("End");
-  await expect(help).toBeFocused();
-  await page.keyboard.press("s");
-  await expect(settings).toBeFocused();
+  await expect(items.last()).toBeFocused();
+  const firstName = (await items.first().innerText()).trim();
+  await page.keyboard.press(firstName[0]!.toLowerCase());
+  await expect(items.first()).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   await expect(trigger).toBeFocused();
 
   await trigger.press("ArrowUp");
-  await expect(help).toBeFocused();
-  await page.keyboard.press("Enter");
+  await expect(items.last()).toBeFocused();
+  await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
-  await expect(page.getByRole("heading", { level: 1, name: "Help" })).toBeVisible();
+  await expect(trigger).toBeFocused();
 });
 
 test("picker search stays in place and Escape returns focus without choosing", async ({ page }) => {

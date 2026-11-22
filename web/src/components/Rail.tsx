@@ -5,7 +5,6 @@ import { href, type Section } from "../shell/route";
 import { entryHref, SPACES, spaceOf, type Space, type SpaceId } from "../shell/spaces";
 import { formatShortcut, SHORTCUTS } from "../shortcuts";
 import { WorkbenchIcon } from "./Icons";
-import { NavigationMenu } from "./NavigationMenu";
 import { ProjectTile } from "./SidebarProjects";
 
 const SPACE_ICONS: Record<SpaceId, string> = {
@@ -15,7 +14,7 @@ const SPACE_ICONS: Record<SpaceId, string> = {
   team: "team",
   automation: "progress",
 };
-const UTILITIES = ["settings", "help"] as const;
+const UTILITIES = ["help", "settings"] as const;
 const brandMark = new URL("../brand/favicon.svg", import.meta.url).href;
 const HOVER_DELAY = 300;
 const SWITCH_WINDOW = 450;
@@ -61,38 +60,64 @@ export function Rail({
   }, []);
 
   const active = spaceOf(current)?.id;
+  const railLink = ({
+    id,
+    target,
+    label,
+    icon,
+    isCurrent,
+    badge,
+    badgeLabel,
+  }: {
+    id: string;
+    target: string;
+    label: string;
+    icon: string;
+    isCurrent: boolean;
+    badge?: { count: number; live?: boolean };
+    badgeLabel?: string;
+  }) => (
+    <a
+      key={id}
+      className="rail-link"
+      href={target}
+      aria-label={badgeLabel ? `${label} · ${badgeLabel}` : label}
+      aria-current={isCurrent ? "page" : undefined}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse")
+          show(event.currentTarget, label, performance.now() < warmUntil.current ? 0 : HOVER_DELAY);
+      }}
+      onPointerLeave={() => {
+        if (hint) warmUntil.current = performance.now() + SWITCH_WINDOW;
+        hide();
+      }}
+      onPointerDown={hide}
+      onFocus={(event) => {
+        if (event.currentTarget.matches(":focus-visible")) show(event.currentTarget, label, 0);
+      }}
+      onBlur={hide}
+    >
+      <WorkbenchIcon name={icon} />
+      {badge && badge.count > 0 && (
+        <b className={badge.live ? "rail-badge live" : "rail-badge"} aria-hidden="true">
+          {badge.count > 99 ? "99+" : badge.count}
+        </b>
+      )}
+    </a>
+  );
   const link = (space: Space) => {
-    const label = t(space.labelKey);
     const badge = badges[space.id];
-    const badgeLabel = badge?.count ? t(`rail.badge.${space.id}`, { count: badge.count }) : "";
     return (
       <li key={space.id}>
-        <a
-          className="rail-link"
-          href={entryHref(space.entries[0]!)}
-          aria-label={badgeLabel ? `${label} · ${badgeLabel}` : label}
-          aria-current={active === space.id ? "page" : undefined}
-          onPointerEnter={(event) => {
-            if (event.pointerType === "mouse")
-              show(event.currentTarget, label, performance.now() < warmUntil.current ? 0 : HOVER_DELAY);
-          }}
-          onPointerLeave={() => {
-            if (hint) warmUntil.current = performance.now() + SWITCH_WINDOW;
-            hide();
-          }}
-          onPointerDown={hide}
-          onFocus={(event) => {
-            if (event.currentTarget.matches(":focus-visible")) show(event.currentTarget, label, 0);
-          }}
-          onBlur={hide}
-        >
-          <WorkbenchIcon name={SPACE_ICONS[space.id]} />
-          {badge && badge.count > 0 && (
-            <b className={badge.live ? "rail-badge live" : "rail-badge"} aria-hidden="true">
-              {badge.count > 99 ? "99+" : badge.count}
-            </b>
-          )}
-        </a>
+        {railLink({
+          id: space.id,
+          target: entryHref(space.entries[0]!),
+          label: t(space.labelKey),
+          icon: SPACE_ICONS[space.id],
+          isCurrent: active === space.id,
+          badge,
+          badgeLabel: badge?.count ? t(`rail.badge.${space.id}`, { count: badge.count }) : "",
+        })}
       </li>
     );
   };
@@ -121,19 +146,16 @@ export function Rail({
         >
           <WorkbenchIcon name="search" />
         </button>
-        <NavigationMenu
-          label={t("navigation.utilities")}
-          tooltip={t("rail.settings")}
-          className="rail-link"
-          indicator={current === "settings" || current === "help"}
-          items={UTILITIES.map((section) => ({
-            href: href(section),
+        {/* #293: Help and Settings each open in one click; Settings no longer hides behind a menu. */}
+        {UTILITIES.map((section) =>
+          railLink({
+            id: section,
+            target: href(section),
             label: t(`rail.${section}`),
-            current: current === section,
-          }))}
-        >
-          <WorkbenchIcon name="settings" />
-        </NavigationMenu>
+            icon: section,
+            isCurrent: current === section,
+          }),
+        )}
       </div>
       {hint &&
         createPortal(

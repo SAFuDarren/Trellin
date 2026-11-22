@@ -736,8 +736,7 @@
   },
   "navigation": {
     "resourcePath": "Current location",
-    "home": "Home",
-    "utilities": "Settings and help"
+    "home": "Home"
   },
   "rail": {
     "label": "Sections",
@@ -1343,9 +1342,7 @@
     "noMatches": "No matching settings.",
     "groups": {
       "personal": "Personal",
-      "research": "Research and workflow",
-      "connections": "Connections",
-      "about": "Updates and help",
+      "about": "About",
       "advanced": "Advanced"
     },
     "updates": {
@@ -1373,16 +1370,8 @@
     "layout": "Workbench layout",
     "layoutNote": "Panel sizes, the overview position and collapsed panels are remembered in this browser.",
     "resetLayout": "Reset layout",
-    "environment": "Environment",
-    "environmentNote": "Check the database, logins, Lean and model services.",
-    "openRuntimes": "Open runtimes and checks",
-    "openModels": "Open model connections",
-    "automationNote": "See the project's active, proposed and stopped automation policies.",
-    "openAutomation": "Open project automation",
     "shortcutsNote": "View the keyboard shortcuts available in Trellin.",
     "showShortcuts": "View shortcuts",
-    "helpNote": "Read the project map, Agent work and proof review guides.",
-    "openHelp": "Open Help",
     "advanced": {
       "openFolder": "Open a project folder",
       "openFolderNote": "Open or create a project in a folder you choose, outside Trellin's library. Use this only for a project you already keep elsewhere.",
@@ -1390,7 +1379,9 @@
       "libraryLocation": "Library location",
       "libraryLocationNote": "Trellin keeps its library in a default location and maintains it for you. Move it only if it must live somewhere else, such as another disk.",
       "libraryLocationAction": "Change Location…"
-    }
+    },
+    "languageNoteDesktop": "Trellin remembers your interface language on this Mac. Research content stays in its original language.",
+    "layoutNoteDesktop": "Panel sizes, the overview position and collapsed panels are remembered on this Mac."
   },
   "help": {
     "basics": "Using Trellin",

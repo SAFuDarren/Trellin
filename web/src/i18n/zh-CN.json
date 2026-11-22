@@ -736,8 +736,7 @@
   },
   "navigation": {
     "resourcePath": "当前位置",
-    "home": "主页",
-    "utilities": "设置与帮助"
+    "home": "主页"
   },
   "rail": {
     "label": "功能",
@@ -1343,9 +1342,7 @@
     "noMatches": "没有匹配的设置。",
     "groups": {
       "personal": "个人",
-      "research": "研究与工作流",
-      "connections": "连接",
-      "about": "更新与帮助",
+      "about": "关于",
       "advanced": "高级"
     },
     "updates": {
@@ -1373,16 +1370,8 @@
     "layout": "工作台布局",
     "layoutNote": "各栏宽度、概览图位置和收起的面板会记在这个浏览器里。",
     "resetLayout": "恢复默认布局",
-    "environment": "运行环境",
-    "environmentNote": "检查数据库、登录角色、Lean 和模型服务。",
-    "openRuntimes": "查看运行环境与检查",
-    "openModels": "打开模型连接",
-    "automationNote": "查看当前项目已启用、待确认和已停止的自动化规则。",
-    "openAutomation": "打开项目自动化",
     "shortcutsNote": "查看 Trellin 中可用的键盘快捷键。",
     "showShortcuts": "查看快捷键",
-    "helpNote": "阅读项目图谱、Agent 任务和证明验收指南。",
-    "openHelp": "打开帮助",
     "advanced": {
       "openFolder": "打开课题文件夹",
       "openFolderNote": "在你选择的文件夹中打开或新建课题，它不在 Trellin 的库里。只在课题已经放在别处时使用。",
@@ -1390,7 +1379,9 @@
       "libraryLocation": "库位置",
       "libraryLocationNote": "Trellin 把库放在默认位置并替你维护。只有库必须放在别处时（例如另一块磁盘）才需要移动。",
       "libraryLocationAction": "更改位置…"
-    }
+    },
+    "languageNoteDesktop": "Trellin 会在这台 Mac 上记住你的界面语言。研究内容保留原文。",
+    "layoutNoteDesktop": "各栏宽度、概览图位置和收起的面板会记在这台 Mac 上。"
   },
   "help": {
     "basics": "使用 Trellin",

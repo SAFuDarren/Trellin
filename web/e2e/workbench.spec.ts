@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { ImpactPreview } from "../src/workbench/types";
-import { openDestination, openMenu, railSpace, type Destination } from "./navigation";
+import { openDestination, railSpace, type Destination } from "./navigation";
 import { openProof } from "./project-map";
 
 // Parity checklist from docs/roadmap.md (P1.4) and the section pages (P1.5),
@@ -29,7 +29,7 @@ const card = (page: Page, name: RegExp) =>
 const rail = (page: Page) => page.locator("nav.rail");
 const railLink = (page: Page, name: string) => rail(page).getByRole("link", { name: new RegExp(`^${name}( |$)`) });
 
-const utilityButton = (page: Page) => rail(page).getByRole("button", { name: "Settings and help", exact: true });
+const utilityButton = (page: Page) => rail(page).getByRole("link", { name: "Settings", exact: true });
 
 async function confirmImeCandidate(input: Locator) {
   await input.dispatchEvent("compositionstart");
@@ -40,9 +40,6 @@ async function confirmImeCandidate(input: Locator) {
 async function goToSection(page: Page, section: string) {
   if (["Review", "Claims", "Library", "Inbox", "Agent tasks"].includes(section)) {
     await openDestination(page, section as Destination);
-  } else if (section === "Settings" || section === "Help") {
-    const menu = await openMenu(utilityButton(page));
-    await menu.getByRole("menuitem", { name: section, exact: true }).click();
   } else {
     await railLink(page, section).click();
   }
