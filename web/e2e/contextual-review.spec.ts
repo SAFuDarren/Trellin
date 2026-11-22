@@ -17,8 +17,9 @@ async function inspectClaim(page: Page) {
 async function expectReview(page: Page, evidence: string, title: string) {
   await expect(page).toHaveURL(new RegExp(`#review/${evidence}$`));
   await expect(page.locator(".page-head h2")).toHaveText(title);
-  await expect(page.locator(".section-nav .nav-item[aria-current=page] .label")).toHaveText(title);
-  await expect(page.locator(".section-nav .nav-item[aria-current=page] .nav-sub")).toContainText(FIXTURE_CLAIM_TITLE);
+  const item = page.locator(".section-nav .nav-group:not(.space-entries) .nav-item[aria-current=page]");
+  await expect(item.locator(".label")).toHaveText(title);
+  await expect(item.locator(".nav-sub")).toContainText(FIXTURE_CLAIM_TITLE);
 }
 
 test.beforeEach(async ({ request }) => {

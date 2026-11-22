@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { SECTIONS } from "../src/shell/route";
 import { formatViolations, layoutViolations } from "./layout-invariants";
 import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
+import { openDestination } from "./navigation";
 
 // #283: every destination, plus the screens that open from it, keeps the layout invariants
 // at three window sizes and in both themes. A new destination is covered by adding it to
@@ -79,7 +80,7 @@ for (const theme of THEMES) {
 for (const layout of ["List", "Table"] as const) {
   test(`selecting ${layout.toLowerCase()} rows by pointer does not move any row`, async ({ page }) => {
     await page.goto("/#session=fixture");
-    await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
+    await openDestination(page, "Claims");
     await page.getByRole("button", { name: "Display", exact: true }).click();
     await page.getByRole("menuitemradio", { name: layout, exact: true }).click();
     const view = page.getByRole("region", { name: "Select items in All claims" });

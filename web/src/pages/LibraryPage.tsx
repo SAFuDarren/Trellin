@@ -92,6 +92,7 @@ export function LibraryPage({
   });
   return (
     <SectionLayout
+      space="work"
       title={t("rail.library")}
       groups={[
         {

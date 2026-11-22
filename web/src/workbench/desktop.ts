@@ -1,7 +1,7 @@
 export type DesktopPosition = { claimId: string; nodeId: string };
 export type DesktopProject = { id: string; name: string; available: boolean };
 type DesktopProjectList = { projects: DesktopProject[]; activeId?: string };
-export type DesktopProjectAction = { action: "new" | "folder" } | { action: "open"; id: string };
+export type DesktopProjectAction = { action: "new" | "folder" | "storage" } | { action: "open"; id: string };
 export type DesktopProjectLibrary = {
   list: () => Promise<DesktopProjectList>;
   act: (request: DesktopProjectAction) => Promise<void>;

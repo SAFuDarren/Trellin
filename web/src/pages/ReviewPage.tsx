@@ -6,7 +6,6 @@ import { useInbox, type InboxItem } from "../api/sections";
 import { ClarificationReview } from "../components/ClarificationReview";
 import { GoalReview } from "../components/GoalReview";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
-import { WorkbenchViewMenu } from "../components/WorkbenchViewMenu";
 import { href } from "../shell/route";
 import { GOAL_REVIEW_ROUTE, reviewItemHref, reviewItemKindLabel, reviewResultName } from "../shell/reviewItems";
 import { formatShortcut } from "../shortcuts";
@@ -30,11 +29,9 @@ export function ReviewPage({
   session,
   sub,
   onOpen,
-  pendingReviews,
 }: {
   session: string;
   sub: string;
-  pendingReviews: number | undefined;
   onOpen: (claimId: string, nodeId?: string) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -67,8 +64,8 @@ export function ReviewPage({
   useEffect(() => setNotice(""), [sub]);
   return (
     <SectionLayout
+      space="work"
       title={t("rail.review")}
-      headerActions={<WorkbenchViewMenu current="review" pendingReviews={pendingReviews} />}
       groups={[
         {
           name: t("review.waiting", { count: items.length }),

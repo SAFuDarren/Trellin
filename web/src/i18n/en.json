@@ -736,7 +736,6 @@
   "navigation": {
     "resourcePath": "Current location",
     "home": "Home",
-    "switchView": "Switch view",
     "utilities": "Settings and help"
   },
   "rail": {
@@ -752,10 +751,9 @@
     "help": "Help",
     "settings": "Settings",
     "badge": {
-      "agent-work_one": "{{count}} unread inbox item",
-      "agent-work_other": "{{count}} unread inbox items",
-      "review": "{{count}} waiting for review",
-      "team": "{{count}} running"
+      "team": "{{count}} running",
+      "work_one": "{{count}} waiting for you",
+      "work_other": "{{count}} waiting for you"
     }
   },
   "claimProgress": {
@@ -1346,7 +1344,8 @@
       "personal": "Personal",
       "research": "Research and workflow",
       "connections": "Connections",
-      "about": "Updates and help"
+      "about": "Updates and help",
+      "advanced": "Advanced"
     },
     "updates": {
       "title": "Updates",
@@ -1382,21 +1381,20 @@
     "shortcutsNote": "View the keyboard shortcuts available in Trellin.",
     "showShortcuts": "View shortcuts",
     "helpNote": "Read the project map, Agent work and proof review guides.",
-    "openHelp": "Open Help"
+    "openHelp": "Open Help",
+    "advanced": {
+      "openFolder": "Open a project folder",
+      "openFolderNote": "Open or create a project in a folder you choose, outside Trellin's library. Use this only for a project you already keep elsewhere.",
+      "openFolderAction": "Open Folder…",
+      "libraryLocation": "Library location",
+      "libraryLocationNote": "Trellin keeps its library in a default location and maintains it for you. Move it only if it must live somewhere else, such as another disk.",
+      "libraryLocationAction": "Change Location…"
+    }
   },
   "help": {
     "basics": "Using Trellin",
     "intro": "{{name}} brings your project map, proofs and Agent work together. Select a claim on the map to see its details while keeping the wider project in view.",
     "sections": "Where to work",
-    "about": {
-      "workbench": "Arrange and link claims on the project map. Open a claim’s proof to see its obligations.",
-      "claims": "Track claims by status and open Agent work to assign or review tasks.",
-      "library": "Read recorded statements and see the sources and claims that use them.",
-      "chat": "Talk with an Agent, switch conversations or read proof activity.",
-      "team": "Set up Agents and model connections. Check jobs, usage and runtimes.",
-      "progress": "Review the rules that advance proofs and follow their runs.",
-      "settings": "Choose the display language, reset the layout or check for updates."
-    },
     "controls": "Quick controls",
     "moveCard": "Arrow keys pan when the canvas has focus. To move a card, choose Move card from its menu, then preview with the arrows. Press {{confirm}} to save or {{cancel}} to cancel.",
     "guides": "Research guides",
@@ -1424,6 +1422,13 @@
         "second": "Open Proof task to review what will be checked. When results need a decision, open them from Agent activity.",
         "third": "Look up a result in Library to see its statement, source and which claims use it."
       }
+    },
+    "spaces": {
+      "home": "The project map: arrange and link claims and open a claim’s proof. Claims lists the same claims by status.",
+      "work": "Everything to act on: the Inbox, results to review, tasks handed to Agents, and the Library of recorded statements.",
+      "chat": "Talk with an Agent, switch conversations or read proof activity.",
+      "team": "Set up Agents and model connections. Check jobs, usage and runtimes.",
+      "automation": "Review the rules that advance proofs and follow their runs."
     }
   },
   "premise": {
@@ -1631,5 +1636,20 @@
     "copyFailed": "Could not copy to clipboard",
     "dismiss": "Dismiss",
     "libraryUnavailable": "Could not read Library sources"
+  },
+  "spaces": {
+    "home": "Home",
+    "work": "Work",
+    "chat": "Chats",
+    "team": "Team",
+    "automation": "Automation",
+    "entries": {
+      "map": "Project map",
+      "claims": "Claims",
+      "inbox": "Inbox",
+      "review": "Review",
+      "agentTasks": "Agent tasks",
+      "library": "Library"
+    }
   }
 }

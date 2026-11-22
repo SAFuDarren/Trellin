@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { currentEntry, currentRoute, entryHref, SPACES, type SpaceId } from "../shell/spaces";
 
 export type NavEntry = {
   key: string;
@@ -11,28 +13,75 @@ export type NavEntry = {
   dot?: "ok" | "warn" | "bad" | "live" | "none";
 };
 
+/** Counts shown beside space entries, keyed by entry (inbox, review). The shell provides them. */
+export const SpaceCounts = createContext<Record<string, number | undefined>>({});
+
+/** The second level of a space (#289): its entries come first in the panel, then the page's own groups. */
+export type NavGroup = { name?: string; entries: NavEntry[]; empty?: string; className?: string };
+
+export function useSpaceGroup(space: SpaceId | undefined): NavGroup | undefined {
+  const { t } = useTranslation();
+  const definition = SPACES.find((candidate) => candidate.id === space);
+  if (!definition || definition.entries.length < 2) return undefined;
+  const current = currentEntry(currentRoute())?.key;
+  return {
+    className: "space-entries",
+    entries: definition.entries.map((entry) => ({
+      key: `space-${entry.key}`,
+      label: t(entry.labelKey),
+      href: entryHref(entry),
+      current: entry.key === current,
+    })),
+  };
+}
+
 export function SectionLayout({
   title,
+  space,
   groups,
   headerActions,
   children,
 }: {
   title: string;
+  /** The space this page belongs to. Its name heads the panel and its entries come first. */
+  space?: SpaceId;
   groups: { name?: string; entries: NavEntry[]; empty?: string }[];
   headerActions?: ReactNode;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const spaceGroup = useSpaceGroup(space);
+  const spaceCounts = useContext(SpaceCounts);
+  const definition = SPACES.find((candidate) => candidate.id === space);
+  const heading = definition ? t(definition.labelKey) : title;
+  if (spaceGroup) {
+    for (const entry of spaceGroup.entries) {
+      const count = spaceCounts[entry.key.replace(/^space-/, "")];
+      if (count) entry.count = count;
+    }
+  }
+  // A page entry that leads where a space entry already leads (its "All" filter, say) is the same place.
+  const spaceTargets = new Set(spaceGroup?.entries.map((entry) => entry.href));
+  const pageGroups = groups.map((group, index) => ({
+    ...group,
+    name: spaceGroup && index === 0 && !group.name ? title : group.name,
+    entries: group.entries.filter((entry) => !spaceTargets.has(entry.href)),
+  }));
+  const allGroups: NavGroup[] = spaceGroup ? [spaceGroup, ...pageGroups] : groups;
   return (
     <div className="section">
       <nav className="section-nav" aria-labelledby="section-title">
         <header className="section-nav-header">
-          <h1 id="section-title">{title}</h1>
+          <h1 id="section-title">{heading}</h1>
           {headerActions}
         </header>
-        {groups
+        {allGroups
           .filter((group) => group.entries.length || group.empty)
           .map((group, position) => (
-            <div className="nav-group" key={group.name ?? position}>
+            <div
+              className={group.className ? `nav-group ${group.className}` : "nav-group"}
+              key={group.name ?? position}
+            >
               {group.name && <span>{group.name}</span>}
               {group.entries.length === 0 && group.empty && <p className="nav-empty">{group.empty}</p>}
               {group.entries.map((entry) => (

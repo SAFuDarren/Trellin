@@ -17,7 +17,7 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 ## Switch between the graph and Review
 
-Use **Home** in the rail to return to Workbench. In the Workbench or Review sidebar header, **Switch view** shows the number of items awaiting review. Open **Review** there and return with **Workbench** or **Home**. Your graph keeps its selected claim and node while you switch.
+The rail has five spaces: **Home**, **Work**, **Chats**, **Team** and **Automation**. Use **Home** to return to the project map. Open **Work → Review** for items awaiting review; the **Work** badge shows how many are waiting. Your graph keeps its selected claim and node while you switch.
 
 Use the left sidebar to open a project. Its **Project map** shows the project's claims on one canvas. Click a card or choose **Find claim** to select it and read its statement, Lean text, and review items in the right-hand details panel. Use **Details** to toggle the panel. Double-click a card, press Enter while it has focus, or choose **Open proof** in the inspector to show the proof graph on the main canvas. **Proof task** appears first in the inspector. The **More inspector actions** menu holds actions that cannot fit beside it. Use **Proof**, **References** and **If withdrawn** to explore the graph, then select a node to read its details. In a narrow window, Escape first closes the details drawer. Press Escape again or click **Project map** to return to the same map position and selection. The zoom controls sit below the canvas so they stay clear of the nodes.
 
@@ -98,7 +98,7 @@ With database revision `0083`, open **Team → Agents** and choose **Assign task
 
 For an implementation task, choose an independent Git checkout under the project's `inputs/` directory, a full commit ID, and the exact files to change. The agent proposes text replacements. Trellin builds a patch and checks that it applies to the recorded inputs in a temporary directory. The patch is a delivery for review. The apply check measures patch applicability.
 
-Choose **Assign review** on a delivery to send that version to another agent. Drafts and code patches use the same review flow. **Agent work** in the rail shows queued work, failures, delivered artifacts, and human decisions. Open a delivery to accept or return that exact version. Failed or interrupted work requires a new confirmation to retry the recorded input. Pending deliveries remain in the project after restarting the app.
+Choose **Assign review** on a delivery to send that version to another agent. Drafts and code patches use the same review flow. **Work → Agent tasks** shows queued work, failures, delivered artifacts, and human decisions. Open a delivery to accept or return that exact version. Failed or interrupted work requires a new confirmation to retry the recorded input. Pending deliveries remain in the project after restarting the app.
 
 ## Work with the models
 

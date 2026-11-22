@@ -736,7 +736,6 @@
   "navigation": {
     "resourcePath": "当前位置",
     "home": "主页",
-    "switchView": "切换视图",
     "utilities": "设置与帮助"
   },
   "rail": {
@@ -748,14 +747,13 @@
     "library": "定理库",
     "chat": "对话",
     "team": "团队",
-    "progress": "推进",
+    "progress": "自动化",
     "help": "帮助",
     "settings": "设置",
     "badge": {
-      "agent-work_one": "{{count}} 个未读条目",
-      "agent-work_other": "{{count}} 个未读条目",
-      "review": "{{count}} 项待审阅",
-      "team": "{{count}} 项运行中"
+      "team": "{{count}} 项运行中",
+      "work_one": "{{count}} 项等你处理",
+      "work_other": "{{count}} 项等你处理"
     }
   },
   "claimProgress": {
@@ -1346,7 +1344,8 @@
       "personal": "个人",
       "research": "研究与工作流",
       "connections": "连接",
-      "about": "更新与帮助"
+      "about": "更新与帮助",
+      "advanced": "高级"
     },
     "updates": {
       "title": "更新",
@@ -1382,21 +1381,20 @@
     "shortcutsNote": "查看 Trellin 中可用的键盘快捷键。",
     "showShortcuts": "查看快捷键",
     "helpNote": "阅读项目图谱、Agent 任务和证明验收指南。",
-    "openHelp": "打开帮助"
+    "openHelp": "打开帮助",
+    "advanced": {
+      "openFolder": "打开课题文件夹",
+      "openFolderNote": "在你选择的文件夹中打开或新建课题，它不在 Trellin 的库里。只在课题已经放在别处时使用。",
+      "openFolderAction": "打开文件夹…",
+      "libraryLocation": "库位置",
+      "libraryLocationNote": "Trellin 把库放在默认位置并替你维护。只有库必须放在别处时（例如另一块磁盘）才需要移动。",
+      "libraryLocationAction": "更改位置…"
+    }
   },
   "help": {
     "basics": "使用 Trellin",
     "intro": "{{name}} 让你在同一项目中查看图谱、证明和 Agent 任务。在图谱中选中课题，保留项目全局的同时查看该课题的详情。",
     "sections": "工作入口",
-    "about": {
-      "workbench": "在项目图谱中排列和关联课题，打开证明可查看证明义务。",
-      "claims": "按状态追踪课题，打开「Agent 任务」可派工和验收。",
-      "library": "查看已记录的陈述、对应来源和使用它们的课题。",
-      "chat": "和 Agent 对话、切换会话或查看证明活动。",
-      "team": "设置 Agent 和模型连接，查看任务队列、用量和运行环境。",
-      "progress": "查看推进证明的规则和运行情况。",
-      "settings": "切换显示语言、重置布局或检查更新。"
-    },
     "controls": "常用操作",
     "moveCard": "焦点在画布上时，方向键用来平移。要移动卡片，先从卡片菜单选择「移动卡片」，再用方向键预览位置。按 {{confirm}} 保存，或按 {{cancel}} 取消。",
     "guides": "科研指南",
@@ -1424,6 +1422,13 @@
         "second": "打开「证明任务」，核对要检查的范围。从 Agent 活动打开等待你决定的结果。",
         "third": "在定理库中查找结果，查看其陈述、来源和使用它的课题。"
       }
+    },
+    "spaces": {
+      "home": "项目地图：整理、连接课题，打开课题的证明。「课题」按状态列出同一批课题。",
+      "work": "所有要处理的事：收件箱、待审阅的结果、交给 Agent 的任务，以及记录在案的定理库。",
+      "chat": "与 Agent 对话、切换对话或查看证明动态。",
+      "team": "设置 Agent 和模型连接，查看任务、用量和运行环境。",
+      "automation": "查看推进证明的规则，并跟进它们的运行。"
     }
   },
   "premise": {
@@ -1631,5 +1636,20 @@
     "copyFailed": "无法复制到剪贴板",
     "dismiss": "关闭提示",
     "libraryUnavailable": "无法读取文库来源"
+  },
+  "spaces": {
+    "home": "主页",
+    "work": "工作",
+    "chat": "对话",
+    "team": "团队",
+    "automation": "自动化",
+    "entries": {
+      "map": "项目地图",
+      "claims": "课题",
+      "inbox": "收件箱",
+      "review": "审阅",
+      "agentTasks": "Agent 任务",
+      "library": "定理库"
+    }
   }
 }

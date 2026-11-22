@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Team } from "../src/api/sections";
 import { mockWorkspaceEvents } from "./workspace-events";
+import { openDestination } from "./navigation";
 
 const WORKSPACE = "11111111-2222-4333-8444-555555555555";
 const CLAIM_ID = "11111111-1111-4111-8111-111111111111";
@@ -38,7 +39,7 @@ test("running proof jobs agree across Agent activity, Claims, Chats and the Team
   await expect(team).toHaveAccessibleName(/2 running/);
   await expect(team.locator(".rail-badge")).toHaveText("2");
 
-  await rail.getByRole("link", { name: "Claims", exact: true }).click();
+  await openDestination(page, "Claims");
   const card = page.locator(".board-card").filter({ hasText: CLAIM_TITLE });
   await expect(card.getByText("2 running", { exact: true })).toBeVisible();
   await expect(card.getByRole("link", { name: "1 result to review", exact: true })).toBeVisible();
@@ -84,7 +85,7 @@ test("running proof jobs agree across Agent activity, Claims, Chats and the Team
   await activity.getByRole("button", { name: "Completed", exact: true }).click();
   await expect(activity.locator('[data-activity-source="job"][data-activity-state="completed"]')).toHaveCount(2);
 
-  await rail.getByRole("link", { name: "Claims", exact: true }).click();
+  await openDestination(page, "Claims");
   await expect(card.getByText("1 running", { exact: true })).toBeVisible();
   const reviewFilter = activity.getByRole("button", { name: "Needs review", exact: true });
   await reviewFilter.click();

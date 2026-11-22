@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { AgentWorkSummary } from "../src/api/agentWork";
 import type { InboxItem, Job } from "../src/api/sections";
+import { openDestination, railSpace } from "./navigation";
 
 const WORKSPACE = "11111111-2222-4333-8444-555555555555";
 const TASK_ID = "00112233-1122-4122-8122-334455667788";
@@ -19,9 +20,7 @@ const task: AgentWorkSummary = {
 };
 
 async function openInbox(page: Page) {
-  const rail = page.locator("nav.rail");
-  await rail.getByRole("link", { name: /^Agent work/ }).click();
-  await page.locator('.section-nav a[href="#agent-work/inbox"]').click();
+  await openDestination(page, "Inbox");
   await expect(page.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Display", exact: true })).toHaveCount(0);
   return page.getByRole("region", { name: "Inbox", exact: true });
@@ -61,10 +60,11 @@ for (const viewport of [
       }),
     );
     await page.goto("/#session=fixture");
-    const rail = page.locator("nav.rail");
-    const inboxBadge = rail.getByRole("link", { name: /^Agent work/ });
-    await expect(inboxBadge).toHaveAccessibleName(/4 unread inbox items/);
+    await expect(railSpace(page, "Work")).toHaveAccessibleName(/waiting for you/);
+    // #289: the Work panel's Inbox entry counts unread items.
+    const inboxBadge = page.locator("nav.section-nav").getByRole("link", { name: /^Inbox/ });
     let inbox = await openInbox(page);
+    await expect(inboxBadge).toHaveAccessibleName("Inbox 4");
     await expect(inbox.locator("[data-inbox-row]")).toHaveCount(4);
     await expect(inbox.getByText("Queued task stays in Activity")).toHaveCount(0);
     await inbox.getByRole("button", { name: /Delivered proof-writing task/ }).click();
@@ -87,22 +87,22 @@ for (const viewport of [
     const evidenceDetail = inbox.getByRole("complementary", { name: "reverseZeroAdd" });
     await expect(evidenceDetail.getByRole("link", { name: "Open record" })).toHaveAttribute("href", /#review\//);
     await evidence.press("r");
-    await expect(inboxBadge).toHaveAccessibleName(/3 unread inbox items/);
+    await expect(inboxBadge).toHaveAccessibleName("Inbox 3");
     await evidence.press("e");
     await expect(evidence).toHaveCount(0);
     await inbox.getByRole("button", { name: "Undo", exact: true }).press("z");
     await expect(evidence).toBeVisible();
-    await expect(inboxBadge).toHaveAccessibleName(/3 unread inbox items/);
+    await expect(inboxBadge).toHaveAccessibleName("Inbox 3");
     await evidence.press("e");
 
-    await rail.getByRole("link", { name: "Home", exact: true }).click();
+    await railSpace(page, "Home").click();
     inbox = await openInbox(page);
     await expect(inbox.getByRole("button", { name: /reverseZeroAdd/ })).toHaveCount(0);
     await inbox.getByRole("button", { name: "Archived", exact: true }).click();
     await inbox.getByRole("button", { name: /reverseZeroAdd/ }).click();
     await inbox.getByRole("button", { name: "Restore", exact: true }).click();
     await expect(inbox.getByRole("status")).toContainText("There are no archived items.");
-    await expect(rail.getByRole("link", { name: /^Review/ })).toHaveAccessibleName(/waiting for review/);
+    await expect(railSpace(page, "Work")).toHaveAccessibleName(/waiting for you/);
   });
 }
 
@@ -110,5 +110,5 @@ test("the inbox handles a workbench without a verified workspace identity", asyn
   await page.goto("/#session=fixture");
   await openInbox(page);
   await expect(page.getByText("Inbox is unavailable for this project.", { exact: true })).toBeVisible();
-  await expect(page.locator("nav.rail").getByRole("link", { name: "Agent work", exact: true })).toBeVisible();
+  await expect(railSpace(page, "Work")).toBeVisible();
 });
