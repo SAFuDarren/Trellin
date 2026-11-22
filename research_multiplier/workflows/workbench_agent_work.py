@@ -111,6 +111,8 @@ def _query(store, role, sql, *values):
         row, = store.query(role, sql, *values)
         return row["result"]
     except DatabaseOperationError as error:
+        if role == "scheduler" and error.retryable:
+            raise
         code = {
             "22023": "invalid", "23505": "stale", "23514": "stale",
             "P0002": "missing", "42501": "identity",

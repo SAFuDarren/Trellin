@@ -12,8 +12,9 @@ import pytest
 
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError
+from research_multiplier.workbench import server as workbench_server
 from research_multiplier.workbench.server import WorkbenchServer
-from research_multiplier.workflows import release_updates, workbench_project_canvas
+from research_multiplier.workflows import release_updates, workbench_agent_work, workbench_project_canvas
 
 pytestmark = pytest.mark.offline
 
@@ -26,6 +27,144 @@ def server(tmp_path):
     yield instance
     instance.shutdown()
     instance.server_close()
+
+
+@pytest.fixture
+def agent_work_polling(server, monkeypatch):
+    store = SimpleNamespace()
+    monkeypatch.setattr(paths, "use_workspace", lambda *args, **kwargs: nullcontext())
+    monkeypatch.setattr(workbench_server, "Store", lambda: nullcontext(store))
+    return server, store
+
+
+@pytest.mark.parametrize("error", [
+    OSError("Synthetic I/O fault."),
+    DatabaseOperationError("scheduler", "08006", retryable=True),
+])
+def test_agent_work_poll_recovers_without_another_wake(agent_work_polling, monkeypatch, error):
+    instance, store = agent_work_polling
+    polls = []
+    delays = []
+
+    def query(role, statement, worker, seconds):
+        assert role == "scheduler" and "rm.claim_agent_work" in statement
+        polls.append((worker, seconds))
+        if len(polls) == 1:
+            raise error
+        return [{"result": None}]
+
+    store.query = query
+    monkeypatch.setattr(instance.closing, "wait", lambda timeout: delays.append(timeout))
+    instance._run_agent_work()
+
+    assert delays == [0.25]
+    assert len(polls) == 2 and polls[0] == polls[1]
+    assert instance._agent_work_thread is None
+
+
+def test_agent_work_poll_exhaustion_preserves_diagnosis_and_can_reopen(agent_work_polling, monkeypatch, caplog):
+    instance, store = agent_work_polling
+    polls = []
+    delays = []
+
+    def offline(role, statement, worker, seconds):
+        polls.append(worker)
+        raise OSError("Synthetic unavailable database address.")
+
+    store.query = offline
+    monkeypatch.setattr(instance.closing, "wait", lambda timeout: delays.append(timeout))
+    instance._run_agent_work()
+
+    assert delays == [0.25, 0.5, 1.0]
+    assert len(polls) == 4 and len(set(polls)) == 1
+    assert instance._agent_work_thread is None
+    assert "paused after 3 retries (OSError)" in caplog.text
+    assert "Synthetic unavailable database address" not in caplog.text
+
+    store.query = lambda role, statement, worker, seconds: polls.append(worker) or [{"result": None}]
+    instance._run_agent_work()
+    assert len(polls) == 5 and polls[-1] != polls[0]
+
+
+@pytest.mark.parametrize("error", [
+    ValueError("Synthetic invalid configuration."),
+    DatabaseOperationError("scheduler", "42501"),
+])
+def test_agent_work_poll_stops_on_permanent_errors(agent_work_polling, monkeypatch, error):
+    instance, store = agent_work_polling
+
+    def invalid(*args):
+        raise error
+
+    store.query = invalid
+    monkeypatch.setattr(instance.closing, "wait", lambda timeout: pytest.fail("Retried a permanent error."))
+    instance._run_agent_work()
+    assert instance._agent_work_thread is None
+
+
+def test_agent_work_shutdown_interrupts_retry_wait(agent_work_polling, monkeypatch):
+    instance, store = agent_work_polling
+    waiting = threading.Event()
+    wait = instance.closing.wait
+    polls = []
+
+    def offline(*args):
+        polls.append(1)
+        raise OSError("Synthetic I/O fault.")
+
+    def track_wait(timeout):
+        waiting.set()
+        return wait(timeout)
+
+    store.query = offline
+    monkeypatch.setattr(instance.closing, "wait", track_wait)
+    monkeypatch.setattr(workbench_server, "_AGENT_WORK_RETRY_DELAYS", (60,), raising=False)
+    worker = threading.Thread(target=instance._run_agent_work, daemon=True)
+    worker.start()
+    try:
+        assert waiting.wait(2)
+    finally:
+        instance.server_close()
+        worker.join(2)
+
+    assert not worker.is_alive()
+    assert len(polls) == 1
+
+
+def test_agent_work_poll_does_not_repeat_external_attempt_after_lost_finish_receipt(
+    agent_work_polling, monkeypatch,
+):
+    instance, store = agent_work_polling
+    task = {"id": str(uuid4()), "generation": 1}
+    digest = "e" * 64
+    performed = []
+    steps = []
+
+    def query(role, statement, *values):
+        assert role == "scheduler"
+        if "rm.claim_agent_work" in statement:
+            steps.append("claim")
+            return [{"result": task if len(steps) == 1 else None}]
+        assert "rm.finish_agent_work" in statement and values[3:] == (digest, None)
+        steps.append("finish")
+        raise DatabaseOperationError("scheduler", "08006", retryable=True)
+
+    store.query = query
+    monkeypatch.setattr(instance.agent_work, "_execute", lambda item: performed.append(item) or digest)
+    monkeypatch.setattr(instance.closing, "wait", lambda timeout: False)
+    instance._run_agent_work()
+
+    assert steps == ["claim", "finish", "claim"]
+    assert performed == [task]
+
+
+def test_agent_work_human_database_errors_keep_the_public_mapping():
+    def unavailable(*args):
+        raise DatabaseOperationError("human", "08006", retryable=True)
+
+    store = SimpleNamespace(query=unavailable)
+    with pytest.raises(workbench_agent_work.AgentWorkError, match="agentWork.unavailable"):
+        workbench_agent_work._query(store, "human", "SELECT fixture")
 
 
 def request(server, method, path, *, body=None, headers=None, session=True, origin=True):
