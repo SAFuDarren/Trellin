@@ -270,6 +270,7 @@ select:disabled {
   background: var(--main);
 }
 .review {
+  container: workbench-inspector / inline-size;
   flex: 0 0 min(var(--right-w), calc(100% - var(--side-effective) - var(--canvas-min-width)));
   min-width: 0;
   display: flex;
@@ -653,6 +654,7 @@ select:disabled {
 }
 .impact-bar {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 12px;
@@ -664,7 +666,14 @@ select:disabled {
   font-weight: 600;
 }
 .impact-bar span {
+  overflow-wrap: anywhere;
   color: var(--sub);
+}
+@container (max-width: 420px) {
+  .impact-bar {
+    gap: 4px 8px;
+    padding: 6px 12px;
+  }
 }
 .notice {
   margin: 16px 18px;
@@ -1579,6 +1588,40 @@ select:disabled {
 .queue-empty {
   padding: 4px 10px;
   color: var(--sub);
+}
+
+@container workbench-inspector (max-width: 265px) {
+  .queue header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
+  }
+  .queue header #queue-count {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .queue header #queue-count:empty {
+    display: none;
+  }
+  .queue header .icon-button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .queue-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    padding-block: 6px;
+  }
+  .queue-item .label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .queue-item .kind {
+    max-inline-size: none;
+    padding-inline-start: 16px;
+    text-align: start;
+  }
 }
 
 .node-detail {
