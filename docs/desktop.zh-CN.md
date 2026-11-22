@@ -91,6 +91,15 @@ python -m pytest -m offline
 desktop/macos/tests/run-swift-tests.sh
 ```
 
+工作台打开前的各个画面（正在打开、选择文件夹，以及数据库不可用等问题）共用一个原生组件，使用与工作台相同的配色、字号和按钮样式。每个问题只给一个能解决它的主操作，路径和错误代码收在「显示详情」里。要检查所有画面的浅色和深色效果，把它们渲染到源码目录外一个已存在的文件夹：
+
+```sh
+desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders en
+desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
+```
+
+参考效果图见 [images/desktop-status](images/desktop-status/)。
+
 ## 核验签名构建
 
 在软件目录和 App 之外新建虚拟环境，运行[已安装 wheel 的兼容回归](../tests/compat_validation/README.md)。安装与 `tests/compat_validation/PACKAGE_VERSION` 一致的 wheel，课题、数据库和日志都使用临时位置。若 Python 或软件包来自 macOS App 内部，回归入口会在启动测试前拒绝执行。

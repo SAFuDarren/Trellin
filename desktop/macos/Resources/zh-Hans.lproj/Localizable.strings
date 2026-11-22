@@ -92,3 +92,8 @@
 "upgrade.backup.detail" = "Trellin 无法验证课题备份。请检查可用空间和数据库连接，然后重试。";
 "upgrade.unsupported.detail" = "此数据库版本需要按课题的手动升级说明操作。";
 "upgrade.login.detail" = "请先保存此课题的数据库所有者登录信息，再从 Trellin 备份并升级。";
+"library.open" = "打开库";
+"details.show" = "显示详情";
+"details.hide" = "隐藏详情";
+"details.copy" = "复制";
+"details.code" = "代码：";

@@ -92,3 +92,8 @@
 "upgrade.backup.detail" = "Trellin could not verify a project backup. Check free space and the database connection, then try again.";
 "upgrade.unsupported.detail" = "This database version needs the project’s manual upgrade procedure.";
 "upgrade.login.detail" = "This project needs a saved database owner login to back up and upgrade from Trellin.";
+"library.open" = "Open Library";
+"details.show" = "Show Details";
+"details.hide" = "Hide Details";
+"details.copy" = "Copy";
+"details.code" = "Code:";

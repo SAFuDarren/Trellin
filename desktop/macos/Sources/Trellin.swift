@@ -9,10 +9,7 @@ func localized(_ key: String) -> String {
 @main
 final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate,
                      WKScriptMessageHandler, WKScriptMessageHandlerWithReply, NSWindowDelegate {
-    private static let windowSurface = NSColor(name: nil) { appearance in
-        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        return NSColor(white: dark ? 0.10 : 0.91, alpha: 1)
-    }
+    private static let windowSurface = WorkbenchTokens.rail
     private let defaults = UserDefaults.standard
     private let lastKey = "lastWorkspaceV1"
     private let positionsKey = "workspacePositionsV1"
@@ -249,60 +246,33 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
 
     private func showStatus(_ key: String, retry: Bool) {
         window.subtitle = ""
-        let title = NSTextField(labelWithString: localized("\(key).title"))
-        title.font = .systemFont(ofSize: 30, weight: .semibold)
-        title.alignment = .center
-        let detail = NSTextField(wrappingLabelWithString: localized("\(key).detail"))
-        detail.alignment = .center
-        detail.textColor = .secondaryLabelColor
-        detail.preferredMaxLayoutWidth = 470
-        let group = NSStackView(views: [title])
-        group.orientation = .vertical
-        group.alignment = .centerX
-        group.spacing = 18
-        // Show the application icon while the workbench opens.
-        if key == "loading", let icon = NSApp.applicationIconImage {
-            let logo = NSImageView(image: icon)
-            logo.imageScaling = .scaleProportionallyUpOrDown
-            logo.setAccessibilityLabel("Trellin")
-            NSLayoutConstraint.activate([
-                logo.widthAnchor.constraint(equalToConstant: 96),
-                logo.heightAnchor.constraint(equalToConstant: 96),
-            ])
-            group.insertArrangedSubview(logo, at: 0)
-            group.setCustomSpacing(22, after: logo)
+        let presentation = StatusPresentation.of(key, canRetry: retry)
+        let actions: [StatusScreen.Action] = presentation.actions.compactMap { action in
+            switch action {
+            case .retry:
+                return StatusScreen.Action(title: localized("retry")) { [weak self] in self?.retryWorkspace() }
+            case .chooseFolder:
+                guard !storageBusy else { return nil }
+                return StatusScreen.Action(title: localized("choose")) { [weak self] in self?.chooseWorkspace() }
+            case .openLibrary:
+                guard !storageBusy else { return nil }
+                return StatusScreen.Action(title: localized("library.open")) { [weak self] in
+                    if self?.canPresent == true { self?.open(.library) }
+                }
+            case .quit:
+                return StatusScreen.Action(title: localized("quit")) { NSApp.terminate(nil) }
+            }
         }
-        if let requested {
-            let path = NSTextField(labelWithString: requested.path)
-            path.textColor = .secondaryLabelColor
-            path.toolTip = requested.path
-            path.lineBreakMode = .byTruncatingMiddle
-            path.widthAnchor.constraint(lessThanOrEqualToConstant: 520).isActive = true
-            group.addArrangedSubview(path)
-        }
-        group.addArrangedSubview(detail)
-        let choices = NSStackView()
-        choices.orientation = .horizontal
-        choices.spacing = 12
-        if key != "loading" && !storageBusy {
-            let choose = NSButton(title: localized("choose"), target: self, action: #selector(chooseWorkspace))
-            choose.keyEquivalent = "\r"
-            choose.bezelStyle = .rounded
-            choices.addArrangedSubview(choose)
-        }
-        if retry {
-            choices.addArrangedSubview(NSButton(title: localized("retry"), target: self, action: #selector(retryWorkspace)))
-        }
-        if !choices.arrangedSubviews.isEmpty { group.addArrangedSubview(choices) }
-        let view = NSView()
-        group.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(group)
-        NSLayoutConstraint.activate([
-            group.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            group.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            detail.widthAnchor.constraint(equalToConstant: 470),
-        ])
-        window.contentView = view
+        // Paths and codes help support, not the researcher, so they stay behind Show Details.
+        let details = presentation.kind == .problem
+            ? ([requested?.path, "\(localized("details.code")) \(key)"].compactMap { $0 }.joined(separator: "\n"))
+            : nil
+        window.contentView = StatusScreen(StatusScreen.Content(
+            title: localized("\(key).title"), detail: localized("\(key).detail"), presentation: presentation,
+            actions: actions, details: details, showDetails: localized("details.show"),
+            hideDetails: localized("details.hide"), copyDetails: localized("details.copy"),
+            icon: NSApp.applicationIconImage
+        ))
     }
 
     private func open(_ launch: WorkbenchLaunch) {

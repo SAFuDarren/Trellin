@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.106
+
+- The screens Trellin shows before the workbench opens now match the workbench: a centred panel with an icon for the kind of problem, one primary action that fixes it, and the path and error code behind **Show Details**. Problems a project cannot recover from offer **Open Library**.
+
 ## 1.0.105
 
 - Trellin no longer stops at "Cannot open the Trellin library" when the last project cannot be reopened, for example a project saved by another Trellin installation. It opens your library instead and shows a short notice with **Open Project…**. The last project is now reopened by its ID through the active library.
