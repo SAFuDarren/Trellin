@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.101
+
+- Contributor issues record difficulty, model fit and verification requirements. The contribution guide documents fork-based claims and the model score reference.
+
 ## 1.0.100
 
 - Agent work has an Inbox for pending reviews, questions, failed runs and Agent deliveries. Preview each item, mark it read or archive it, and undo the last change while the project stays open in this window.

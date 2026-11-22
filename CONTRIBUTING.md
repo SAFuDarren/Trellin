@@ -1,5 +1,22 @@
 # Contributing to Research Multiplier
 
+## Start a contribution
+
+1. Pick an open issue with clear acceptance criteria and prerequisites. Use the [difficulty rubric and model table](docs/engineering.md#difficulty-and-model-fit) to match the work to your model, tools and environment.
+2. Use your own GitHub account and fork the repo. Comment with your fork repository, proposed branch, scope, exact model configuration or human-only plan, and verification environment. Wait for the owner to confirm the claim.
+3. Branch from upstream `main`, sign off commits with `git commit -s` and run the relevant checks. Push to your fork and open a PR against upstream `main`. Fill in the tested SHA and evidence in the PR template. Link the issue with `Refs #N` if any acceptance criterion is still open.
+4. The owner reviews the claim and evidence and merges once all required GitHub checks pass. Keep the issue current until review ends or record an explicit handoff.
+
+In a clone of your fork, add the upstream remote once. Replace the example branch with your confirmed claim.
+
+```sh
+git remote add upstream https://github.com/SAFuDarren/Trellin.git
+git fetch upstream main
+git switch -c fix/123-short-topic upstream/main
+```
+
+Run the [version preflight](docs/engineering.md#versioning-and-compatibility) with `--base upstream/main` after committing and before pushing your branch. GitHub's [fork PR guide](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork) covers selecting the upstream base and your fork as the comparison.
+
 ## Find the code
 
 Read the [architecture direction and design decisions](docs/architecture.md) before adding a feature. New code follows the decisions marked settled there; ask before building on an open question. Build against the [interface contracts](docs/interfaces.md), pick up work from the [roadmap](docs/roadmap.md), sign off every commit (`git commit -s`, Developer Certificate of Origin), and follow the [engineering and project management guide](docs/engineering.md), including its change checklist, for every pull request. The root README is the user entry point. Consult the [repository layout](docs/engineering.md#repository-layout) before adding files. Keep new workflow guides in [docs](docs/README.md), update both quickstarts when first-use steps change, and record release changes in [CHANGELOG.md](CHANGELOG.md). When a command's decisions, model or network use, or the main research path changes, update the [agent guide](research_multiplier/agent_guide.md) that workspaces receive as `AGENTS.md`.

@@ -22,6 +22,17 @@ body:
     validations:
       required: true
   - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation and Agent fit
+      description: "The owner completes this before marking the issue ready. See docs/engineering.md#difficulty-and-model-fit."
+      placeholder: |
+        Baseline SHA, scope, exclusions, prerequisites and reproduction:
+        Difficulty (scope / uncertainty / impact / verification / dependencies, 0–3 each; total and D1–D4):
+        Model configuration or human-only path, source and date:
+        Required skills, tools, test environment, verification and evidence:
+        When to stop or hand off:
+  - type: textarea
     id: decisions
     attributes:
       label: Decisions and contracts

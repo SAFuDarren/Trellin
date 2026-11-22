@@ -75,6 +75,7 @@ def repository(tmp_path, monkeypatch):
 
     def claim(branch, days_ago):
         return {"created_at": (NOW - timedelta(days=days_ago)).isoformat(),
+                "user": {"login": "fixture"},
                 "body": f"<!-- rm-claim agent=fixture-codex branch={branch} -->"}
 
     payload = {

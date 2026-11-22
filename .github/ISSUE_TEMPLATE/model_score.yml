@@ -1,0 +1,24 @@
+name: Model score update
+description: Register a new model version or refresh an Artificial Analysis score
+title: "Model score update — "
+labels: ["type:chore", "status:triage"]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Provider and exact model ID or snapshot
+    validations:
+      required: true
+  - type: input
+    id: release
+    attributes:
+      label: Official announcement URL
+    validations:
+      required: true
+  - type: textarea
+    id: score
+    attributes:
+      label: Agent runner, effort and benchmark evidence
+      description: Link the exact Artificial Analysis Coding Agent Index version and dated score if published. Include fallback policy and cost per benchmark task. Leave scores pending until a matching row is published.
+    validations:
+      required: true

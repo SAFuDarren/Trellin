@@ -94,13 +94,13 @@
 ## 开发流程
 
 1. **先开 issue。** 稍有规模的改动都从一个 GitHub issue 开始。issue 写明要解决的问题、验收标准和相关决定的编号。小修小补可以直接提 PR。
-2. **建分支。** 有对应任务时，使用认领时记录的 `type/issue-short-topic` 分支名，例如 `feat/12-event-log`。从 `origin/main` 创建，在任务分支提交。
+2. **建分支。** 有对应任务时，使用认领时记录的 `type/issue-short-topic` 分支名，例如 `feat/12-event-log`。从上游 `main` 创建，在任务分支提交。
 3. **写提交说明。** 采用 Conventional Commits 格式：`类型(范围): 摘要`。
    - 类型有：`feat`、`fix`、`docs`、`refactor`、`test`、`build`、`ci`、`chore`。
    - 范围填所属的层或模块，例如 `kernel`、`lean`、`web`、`migrations`。
    - 每次提交只做一件事。
-4. **提 PR。** 按模板填写，包括下面的提交前检查清单。CI 必须通过，并且至少要有一位该模块的代码负责人批准，才能合并。
-5. **合并。** 用 squash 合并，保留 Conventional Commits 格式的标题；更新日志根据这些标题起草。
+4. **提 PR。** 填写模板和提交前检查清单。仓库所有者评审其他贡献者的 PR，并核对自己 PR 的验收证据。
+5. **合并。** 所有必需检查通过后，只由 GitHub 仓库所有者 squash 合并上游 PR，包括自己开的 PR。保留 Conventional Commits 格式的标题，供更新日志使用。
 6. **涉及架构决定。** 如果改动需要新增一条架构决定，或者修改已定的决定，就在同一个 PR 里同时更新 `architecture.md` 和 `architecture.zh-CN.md`：
    - 新决定按所在章节顺延编号。
    - 被取代的旧决定不删除，标注「已被某某取代」。
@@ -133,7 +133,7 @@
 - **里程碑**使用路线图的阶段名称。路线图里的每个任务对应一个 issue，大任务可以开一个总 issue 再拆子 issue。已有的路线图任务编号（如 `P1.3`）保留，供引用。
 - **范围和类型标签**包括 `layer:kernel`、`layer:plugin`、`layer:collab`、`layer:ai`、`layer:entry`、`area:web`、`area:migrations`、`area:lean`、`area:docs`、`type:bug`、`type:feature`、`type:refactor`、`type:docs`、`type:chore` 和 `type:incident`。卡在待定问题上的任务使用 `needs-decision`。用 `good first issue` 和 `help wanted` 邀请贡献。
 - **优先级。** 每个开放 issue 使用一个紧急程度标签，按以下顺序处理可推进的工作。`priority:p0` 是需要立即处理的严重阻塞，`priority:p1` 是本批次的紧急事项，`priority:p2` 在更紧急的事项之后处理，`priority:p3` 是紧急程度较低的积压事项。同一级先验收已有结果并记回原 issue，再认领最早可做的 issue。遇到阻塞时，在原 issue 记录原因和依赖，再处理下一条可推进的事项。调整优先级时在原 issue 写明原因。参见 [GitHub 队列](https://github.com/SAFuDarren/Trellin/issues/112#github-queues)。
-- **看板列**依次为待分诊、可开工、进行中、评审中、已完成。范围、依赖或决定尚待澄清时用 `status:triage`。验收条件和依赖明确时用 `status:ready`。认领评论和 `status:in-progress` 记录负责人。有可评审的 PR 时加 `status:in-review`，并保留有效的认领。见[并行开发](#并行开发)。
+- **看板列**依次为待分诊、可开工、进行中、评审中、已完成。范围、依赖或决定尚待澄清时用 `status:triage`。验收条件、依赖和[模型与环境要求](#难度与模型匹配)都明确时用 `status:ready`。认领评论和 `status:in-progress` 记录负责人。有可评审的 PR 时加 `status:in-review`，并保留有效的认领。见[并行开发](#并行开发)。
 - **分诊：** 维护者每周过一遍新 issue：打标签，归入里程碑或关闭，并关联卡住它的决定。
 - **维护路线图：** 新增、拆分或调整任务顺序时，`roadmap.md` 和 `roadmap.zh-CN.md` 要与 issue 一起更新。进度记在 issue 里，不记在路线图里；见[及时更新状态和记录](#及时更新状态和记录)。
 
@@ -190,14 +190,21 @@
 可能有多个人和多个编码 agent 同时在这个仓库里工作。以下规则用来避免彼此冲突；`AGENTS.md` 里有每个 agent 都会读到的简版。
 
 **分配工作**
-- 每个任务对应一个路线图任务的 GitHub issue，用 `scripts/tasks.py` 认领和释放。所有 agent 都通过同一个 GitHub 账号操作，所以认领记录是一条带隐藏标记的留言（写明 agent 名称和分支），再加上 `status:in-progress` 标签。认领后工具会重新读取 issue，如果发现有更早的认领就自动撤回；即使两个 agent 同时认领，最终也只有一个持有者。
-- `python scripts/tasks.py board` 列出所有未关闭的 issue：持有者、分支、认领时长（超过 48 小时标记为可能已停滞）、关联的 PR。停滞的认领由维护者释放。
-- CI 的 **Task link** 检查要求每个 PR 关联它的 issue（`Closes #N` 或 `Refs #N`）；如果该 issue 被别的分支持有，检查失败。没有对应任务的小改动 PR 加 `no-issue` 标签。
-- 只有当几个任务涉及的模块互不重叠时，维护者才让它们并行，例如后端测试（P0.2）和网页界面（P1.4）。会改同一批文件的任务按顺序做。
-- 每个人或 agent 同一时间只做一个任务。
+- 使用自己的 GitHub 身份。贡献者在自己的 fork 推送分支，向上游 `main` 提交 PR。仓库所有者的凭据留在其本人账户中。上游写权限归仓库所有者，所有者和贡献者的 PR 适用相同的必需检查。见 [GitHub 当前规则](https://github.com/SAFuDarren/Trellin/rules)。
+- 在未关闭的 issue 下申请认领，写明 GitHub 账号、fork 仓库、分支、预计改动路径、模型及推理档位或纯人工处理，以及验证所需工具。所有者在 issue 确认来源和匹配度后开工。每个人或 Agent 同时只做一个任务。
+
+  所有者在上游的本地检出中记录已确认的 fork 和改动范围。
+
+  ```sh
+  python scripts/tasks.py claim 123 --agent contributor-web --branch fix/123-short-topic \
+    --repository contributor/Trellin --contributor contributor --scope web/src
+  ```
+- 在上游检出运行 `python scripts/tasks.py board`，核对持有者、分支和关联 PR。认领超过 48 小时后检查进展。所有者记录释放并处理认领冲突。
+- PR 用 `Closes #N` 关联已满足全部验收的 issue，部分实现用 `Refs #N`。Task link 核对 PR 作者、来源仓库和分支是否与所有者确认的 fork 认领一致。没有对应任务的小改动由所有者添加 `no-issue` 标签。
+- 保留认领直到评审结束。交接时在 issue 留下已测试的提交 SHA、证据、剩余项和下一条验证命令。改动范围或模型变化时重新确认。相互重叠的工作按可独立评审的依赖拆分。
 
 **隔离**
-- 一个任务对应一个从 `origin/main` 开出的分支，以及一个 git worktree。谁都不改别人的分支或 worktree。
+- 一个任务对应一个从上游 `main` 开出的分支，以及一个 git worktree。谁都不改别人的分支或 worktree。
 - 本地资源各用各的：
   - 测试数据库名称不能重复；
   - 服务用 `--port 0` 启动，或者先确认端口空闲；
@@ -211,13 +218,40 @@
 | 构建好的界面 `research_multiplier/workbench/app/` | 每次 rebase 后重新生成，不手动合并 | 前端 CI 任务（提交的构建必须与源码一致） |
 | 生成的 API 类型（P1.2 之后） | 每次 rebase 后重新生成 | CI 差异检查（P1.2） |
 | 翻译文件 | 冲突时双方的条目都保留 | 中英文条目一致性测试 |
-| 架构决定、接口契约、schema | 只能在单独的 PR 里修改，并经维护者批准 | CODEOWNERS；仓库公开后加上分支保护 |
+| 架构决定、接口契约、schema | 只能在单独的 PR 里修改，并经维护者批准 | CODEOWNERS 请求评审，仓库所有者决定合并 |
 
 **合并**
-- 申请评审前和合并前，先获取最新的 main，再 rebase 到 `origin/main`。在已提交的候选版本上运行 `python scripts/check_package_version.py`，并重新跑必需检查。经维护者批准的次版本或主版本递增分别使用 `--bump minor` 或 `--bump major`。如果 main 已推进，依据新的基准更新两个版本文件后再检查。
+- 申请评审前和合并前，获取最新的上游 `main` 后 rebase。在已提交的候选版本上运行 `python scripts/check_package_version.py`，并重新跑必需检查。上游远端名为 `upstream` 时使用 `--base upstream/main`。经维护者批准的次版本或主版本递增分别使用 `--bump minor` 或 `--bump major`。如果 main 已推进，依据新的基准更新两个版本文件后再检查。
 - 每个 PR 只做一个任务。
 - 用 squash 合并，标题采用 Conventional Commits 格式。
 - 在任务范围之外发现的问题，另开 issue，不要顺手改在当前分支里。
+
+### 难度与模型匹配
+
+标记 issue 可开工前，写清基准提交 SHA、范围、前置条件、复现步骤、验收标准和所需验证环境。难度与优先级分别记录，五项各 0–3 分。
+
+| 维度 | 0 | 1 | 2 | 3 |
+| --- | --- | --- | --- | --- |
+| 范围 | 局部文档或测试 | 单组件 | 同子系统的多个组件 | 跨层或发布边界 |
+| 不确定性 | 修法已知 | 复现明确 | 有多种可行方案 | 需厘清问题或契约 |
+| 出错影响 | 易回退 | 局部行为 | 持久状态或兼容性 | 权限、迁移或证明完整性 |
+| 验收成本 | 一项确定性检查 | 一条测试通道 | 多条通道或服务 | 真机、精确回放或迁移演练 |
+| 依赖 | 无 | 一项前置 | 需协调多项改动 | 分步上线或独立验收 |
+
+从[模型登记表](../.github/agent-models.json)查看 [Artificial Analysis Coding Agent Index v2.1](https://artificialanalysis.ai/agents/coding-agents/comparisons/codex-vs-claude-code#models) 的初版门槛。评分按 Agent 运行器、模型、推理档位一起看。运行 `python scripts/model_routing.py D2` 查看当前达标配置，可把 D2 换成 issue 难度。记录匹配时使用的榜单版本和日期。
+
+| 难度 | Issue 得分 | 参考分数线 | Codex 首选 |
+| --- | ---: | ---: | --- |
+| D1 | 0–3 | 30 | GPT-6.2 Sol low，37 |
+| D2 | 4–7 | 45 | GPT-6.2 Sol medium，45 |
+| D3 | 8–11 | 50 | GPT-6.2 Sol xhigh，50，或 GPT-6.2 Astra high，52 |
+| D4 | 12–15 | 52 | GPT-6.2 Astra high，52，另需独立验证 |
+
+跨层持久状态设计、Mac 真机验收和 Lean 回放至少 D3。合并权限、CI 信任规则、受保护的迁移和不可逆科研证据变更定为 D4。参考线用于派单。D3/D4 仍由所有者确认范围和证据，D4 另加独立验证。
+
+满足门槛和环境要求后，优先选成本较低的配置。Web 任务需要 React/TypeScript、键盘交互和 Playwright。后端和证明分别使用[离线、PostgreSQL 和固定版本的 Lean 测试通道](../tests/README.md)，Mac 验收见[桌面指南](desktop.zh-CN.md)。仓库权限任务要会核对 GitHub Rulesets、fork 权限和签署提交。模型配置未收录时，凭同类任务证据向所有者申请例外。缺必需工具时，把验收交接给有对应环境的人，或只认领范围明确的复现或审核工作。验收证据仍须齐全。
+
+[模型目录工作流](../.github/workflows/model-catalog.yml)每天检查 OpenAI、Anthropic 和 Google 的官方目录，为新型号开待测 issue。目录尚未收录的发布或快照可用[模型分数更新表单](https://github.com/SAFuDarren/Trellin/issues/new?template=model_score.yml)登记。标题用 `Model score update — Provider / exact-model-id`，让工作流识别同一条记录。拿到同版本可比分数后提 PR 更新模型表。PR 记录模型、推理档位、榜单版本、日期、分数和来源。所有者合并后生效。榜单换版或模型退役时复核既有推荐。
 
 ### 分支生命周期与每周盘点
 

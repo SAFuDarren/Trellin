@@ -2,7 +2,15 @@
 
 <!-- What does this change do, and why? Link the issue and roadmap task, for example "P1.3". -->
 
-Closes #
+Refs #
+
+## Claim and verification
+
+- Confirmed claim and source repository/branch
+- Issue difficulty and Agent runner, exact model and effort, or human-only
+- Tested commit SHA
+- Verification command and result for each changed acceptance criterion
+- Remaining work or environment limits
 
 ## Decisions and contracts
 
