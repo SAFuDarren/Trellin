@@ -41,7 +41,7 @@ export function WorkspaceActivityList({
   onFilter: (filter: ActivityState | "all") => void;
   loading: boolean;
   unavailable: boolean;
-  onNavigate: () => void;
+  onNavigate?: () => void;
   onOpenProof: (claimId: string, nodeId?: string) => void;
   onOpenThread: (thread: Extract<ActivityRow, { source: "chat" }>["thread"]) => void;
 }) {
@@ -83,7 +83,7 @@ export function WorkspaceActivityList({
           title: row.task.title,
           status: t(`agentWork.status.${row.task.status}`),
           details: [agents.get(row.task.agent_id ?? "")?.name || row.task.agent_name, t("agentWork.title")],
-          url: href("claims", "agent-work/" + row.task.id),
+          url: href("agent-work", row.task.id),
         };
       case "chat": {
         const { thread } = row;
@@ -173,7 +173,7 @@ export function WorkspaceActivityList({
                     <button
                       type="button"
                       onClick={() => {
-                        onNavigate();
+                        onNavigate?.();
                         onOpenProof(claimId, row.nodeId ?? undefined);
                       }}
                     >
@@ -188,7 +188,7 @@ export function WorkspaceActivityList({
                           event.preventDefault();
                           onOpenThread(row.thread);
                         } else {
-                          onNavigate();
+                          onNavigate?.();
                         }
                       }}
                     >
@@ -206,7 +206,7 @@ export function WorkspaceActivityList({
             <p className="agent-dock-activity-empty">
               <span>{t(filter === "all" ? "agentDock.noActivity" : "workspaceActivity.noMatches")}</span>{" "}
               {filter === "all" ? (
-                <a href={href("claims", "agent-work")} onClick={onNavigate}>
+                <a href={href("agent-work")} onClick={onNavigate}>
                   {t("workspaceActivity.openWork")}
                 </a>
               ) : (

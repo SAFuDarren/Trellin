@@ -143,7 +143,7 @@ export function TeamAgentProfiles({ session }: { session: string }) {
                       <div className="team-agent-work-actions">
                         <a
                           className="button"
-                          href={href("claims", "agent-work/new/agent/" + agent.id)}
+                          href={href("agent-work", "new/agent/" + agent.id)}
                           aria-label={t("agentWork.assignNamed", { name: agent.name })}
                         >
                           {t("agentWork.assign")}

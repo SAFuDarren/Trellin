@@ -8,6 +8,7 @@ import { useReleaseUpdates } from "./api/releaseUpdates";
 import { useProjectCanvasClaims } from "./api/projectCanvas";
 import { useProofTask } from "./api/proofTask";
 import { useAtlas, useClaims, useInbox, useTeam } from "./api/sections";
+import { useTeamAgents } from "./api/teamAgents";
 import { workspaceEventCursor, workspaceId } from "./api/workspaceEvents";
 import { AgentChatDock, type AgentChatRequest } from "./components/AgentChatDock";
 import type { ConversationStarterScope } from "./components/ConversationRecipients";
@@ -15,6 +16,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { Rail } from "./components/Rail";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
 import { ShortcutSheet } from "./components/ShortcutSheet";
+import { WorkspaceActivityList } from "./components/WorkspaceActivity";
 import { AgentWorkPage } from "./pages/AgentWorkPage";
 import { ClaimsPage } from "./pages/ClaimsPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
@@ -28,7 +30,7 @@ import { ConversationEditors } from "./shell/ConversationEditors";
 import { usePaletteResults } from "./shell/paletteResults";
 import { useRoute } from "./shell/route";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
-import { buildWorkspaceActivity } from "./shell/workspaceActivity";
+import { buildWorkspaceActivity, type ActivityState } from "./shell/workspaceActivity";
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
 import { SHORTCUTS } from "./shortcuts";
 import { Workbench, type Focus, type WorkbenchPosition } from "./Workbench";
@@ -41,8 +43,8 @@ export function Shell({ session }: { session: string }) {
   const { t } = useTranslation();
   const [route, go] = useRoute();
   const { section, sub } = route;
-  const agentWork = sub === "agent-work" || sub.startsWith("agent-work/");
-  const showsClaims = section === "claims" && !agentWork;
+  const showsClaims = section === "claims";
+  const showsActivity = section === "agent-work" && sub === "activity";
   const showsClaimProgress = section === "workbench" || showsClaims;
   const releaseUpdates = useReleaseUpdates(session);
   const queries = useQueryClient();
@@ -57,6 +59,10 @@ export function Shell({ session }: { session: string }) {
   const team = useTeam(session, live);
   const agentWorkList = useAgentWork(session, live);
   const conversations = useConversations(session, undefined, live);
+  const activityAgents = useTeamAgents(session, showsActivity);
+  const [activityFilter, setActivityFilter] = useState<ActivityState | "all">("all");
+  const activityLoading = team.isPending || agentWorkList.isPending || conversations.isPending || inbox.isPending;
+  const activityUnavailable = team.isError || agentWorkList.isError || conversations.isError || inbox.isError;
   const activity = useMemo(
     () =>
       buildWorkspaceActivity({
@@ -218,25 +224,43 @@ export function Shell({ session }: { session: string }) {
             )}
             <Rail
               current={section}
-              badges={{ team: { count: activity.counts.running, live: true } }}
+              badges={{
+                team: { count: activity.counts.running, live: true },
+                review: { count: pendingReviews ?? 0 },
+              }}
               onSearch={openPalette}
             />
             {section === "review" ? (
               <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
+            ) : section === "agent-work" ? (
+              <AgentWorkPage
+                session={session}
+                sub={sub}
+                activity={
+                  showsActivity && (
+                    <WorkspaceActivityList
+                      activity={activity}
+                      agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
+                      selectedFilter={activityFilter}
+                      onFilter={setActivityFilter}
+                      loading={activityLoading}
+                      unavailable={activityUnavailable}
+                      onOpenProof={(id, nodeId) => open(id, nodeId, true)}
+                      onOpenThread={(thread) => go("chat", thread.id)}
+                    />
+                  )
+                }
+              />
             ) : section === "claims" ? (
-              agentWork ? (
-                <AgentWorkPage session={session} sub={sub} />
-              ) : (
-                <ClaimsPage
-                  session={session}
-                  sub={sub}
-                  onOpen={open}
-                  claimProgress={claimProgress}
-                  claimReviews={activity.reviewItemsByClaim}
-                  atlasClaims={atlas.data?.claims}
-                  running={activity.runningByClaim}
-                />
-              )
+              <ClaimsPage
+                session={session}
+                sub={sub}
+                onOpen={open}
+                claimProgress={claimProgress}
+                claimReviews={activity.reviewItemsByClaim}
+                atlasClaims={atlas.data?.claims}
+                running={activity.runningByClaim}
+              />
             ) : section === "library" ? (
               <LibraryPage session={session} sub={sub} onOpen={open} />
             ) : section === "chat" ? (
@@ -285,8 +309,8 @@ export function Shell({ session }: { session: string }) {
               section === "workbench" && chatSelection?.session === session ? chatSelection.scope : undefined
             }
             activity={activity}
-            activityLoading={team.isPending || agentWorkList.isPending || conversations.isPending || inbox.isPending}
-            activityUnavailable={team.isError || agentWorkList.isError || conversations.isError || inbox.isError}
+            activityLoading={activityLoading}
+            activityUnavailable={activityUnavailable}
             conversations={conversations.data?.threads ?? []}
             conversationsLoading={conversations.isPending}
             onOpenProof={(id, nodeId) => open(id, nodeId, true)}
