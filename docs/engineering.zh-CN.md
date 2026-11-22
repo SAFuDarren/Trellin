@@ -257,6 +257,8 @@
 
 在仓库检出中运行 `python scripts/tasks.py branches`。命令读取 `origin` 的实时分支头、本机分支、worktree、GitHub PR 和有效认领。加 `--json` 可保存带时间的快照。维护者每周查阅一次，通过 issue 将停滞分支和到期的保留记录交给负责人复核。
 
+[Branch inventory 工作流](../.github/workflows/branch-inventory.yml)每周运行一次，也可手动运行。它在 [#205](https://github.com/SAFuDarren/Trellin/issues/205) 更新同一条远端分支报告，列出待复核的候选。工作树和提交覆盖范围在本机检出中检查。
+
 | 状态 | 依据 | 负责人和动作 |
 | --- | --- | --- |
 | 活跃 | 分支有开放 PR、被开放 PR 用作基线，或已认领并有近期提交。新认领有 48 小时提交进展。近期提交但未认领、或无法核实提交日期的分支暂留复核。 | 任务负责人继续开发或交接。 |
@@ -277,6 +279,8 @@
 **清理分支。** 开放任务的分支继续保留。合入后用 `gh pr view "$pr" --json state,headRefOid,mergeCommit,baseRefName` 确认 `MERGED`，记录已评审的最终分支头。拉取目标分支，确认 GitHub 报告的合并提交在其历史中。Squash 合并后，原分支头可能不在目标分支的提交历史里。任务未合入但已明确关闭时，记录已保存的内容，并由维护者决定是否清理。
 
 用 `gh pr list --state open --head "$branch"` 和 `gh pr list --state open --base "$branch"` 查找依赖。堆叠 PR 的负责人先改用已合入的基线，只重放自己的改动并通过必需检查，再清理父分支。对照本机分支头、远端分支头和评审提交，保存额外改动。任务关闭或释放且检查通过后，尝试 `git branch -d "$branch"`。Git 拒绝时交维护者处理。远端任务分支由负责人最后一次核查依赖后清理。
+
+合并后，维护者在有完整历史的检出中先拉取上游 `main`，再运行 `python scripts/retire_merged_branches.py` 预览可退役分支。用 `--protect-checkout PATH` 指定其他需要保护工作树的本机克隆。预览确认合并提交可从当前 `main` 到达，且 GitHub 仍可从 PR 的 head 引用取回准确的原分支头。核对外部引用并与其他持有人协调后，使用相同的保护路径和 `--apply BRANCH` 退役指定分支。命令重新核验，并仅在远端头仍匹配时删除。在原任务记录 PR、原分支头和合并提交，便于恢复。GitHub 自动删除来源分支保持关闭，堆叠 PR 和正在检出的分支由维护者核对。
 
 ### 压力测试
 

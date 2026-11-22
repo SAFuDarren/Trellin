@@ -254,6 +254,8 @@ The [Model catalog workflow](../.github/workflows/model-catalog.yml) checks the 
 
 Run `python scripts/tasks.py branches` from a repository checkout. The command reads live `origin` branch heads, local branches, worktrees, GitHub PRs, and held claims. Add `--json` to keep a dated snapshot. The maintainer reviews the inventory weekly and uses the issue to return stale branches and due preservation reviews to their owners.
 
+The [Branch inventory workflow](../.github/workflows/branch-inventory.yml) updates one remote report in [#205](https://github.com/SAFuDarren/Trellin/issues/205) each week and on manual dispatch. The report lists candidates for review. Use a local checkout for the worktree and commit coverage checks.
+
 | State | Evidence | Who acts |
 | --- | --- | --- |
 | Active | An open PR, an open PR using the branch as its base, or a held claim with recent progress. A new claim has 48 hours to make progress. Recent unclaimed tips and tips without a verifiable commit date are held for review. | The task owner continues the work or hands it off. |
@@ -274,6 +276,8 @@ The owner handles local checkout cleanup or arranges an explicit handoff in the 
 **Retire a branch.** Keep an open task branch. After integration, use `gh pr view "$pr" --json state,headRefOid,mergeCommit,baseRefName` to verify `MERGED` and record the final reviewed head. Fetch the target and verify that the reported merge commit is in its history. A squash merge does not preserve the original head in the target history. After explicit closure without merge, record the preserved work and get the maintainer's retirement decision.
 
 Check open PRs with `gh pr list --state open --head "$branch"` and `gh pr list --state open --base "$branch"`. With stacked changes, the dependent owner retargets to the integrated base, reapplies only that PR's commits and runs the required checks before the parent branch retires. Compare the local and live remote tips with the reviewed commit and preserve any extra work. Once the task is closed or released and the checks pass, try `git branch -d "$branch"`. Leave a refusal for the maintainer. The owner may remove a verified remote task branch after one last check for dependent PRs.
+
+After a merge, the maintainer previews eligible upstream branches with `python scripts/retire_merged_branches.py` from a full checkout. Fetch the current upstream `main` first. Add `--protect-checkout PATH` for each other local clone with worktrees to protect. The preview confirms that the merge is reachable from current `main` and GitHub still serves the exact original tip at the PR head ref. Review external references and check with any other worker holding the branch. To retire a reviewed branch, rerun with the same protected checkouts and `--apply BRANCH`. The command rechecks eligibility and requires the exact tip in the remote deletion lease. Record the PR, original tip and merge commit in the task for recovery. The maintainer leaves GitHub's automatic head deletion disabled to retain explicit review of stacked PRs and checked-out branches.
 
 ### Stress tests
 

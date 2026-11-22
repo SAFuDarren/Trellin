@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "branch": "ci-validation-v1.0.0",
+    "reason": "Historical validation baseline. Confirm the pinned compatibility source covers downstream references before retirement.",
+    "owner": "SAFuDarren",
+    "review_on": "2026-11-29"
+  },
+  {
+    "branch": "codex/31-7-rules-handoff",
+    "reason": "Repository rules handoff referenced by the local development ledger and its comparison link.",
+    "owner": "SAFuDarren",
+    "review_on": "2026-11-29"
+  },
+  {
+    "branch": "test/30-native-regressions",
+    "reason": "PR #33 closed without merging. Keep the original regression work available for review against the adopted patches.",
+    "owner": "SAFuDarren",
+    "review_on": "2026-11-29"
+  }
+]
