@@ -1563,7 +1563,10 @@ select:disabled {
   text-overflow: ellipsis;
 }
 .queue-item .kind {
-  flex: none;
+  flex: 0 1 auto;
+  max-inline-size: 60%;
+  overflow-wrap: anywhere;
+  text-align: end;
   font-size: var(--type-meta-size);
   font-weight: var(--type-regular);
   color: var(--sub);
@@ -1739,6 +1742,7 @@ select:disabled {
 }
 .detail-header {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -1751,6 +1755,11 @@ select:disabled {
   font-size: var(--type-meta-size);
   color: var(--sub);
   font-weight: var(--type-regular);
+  overflow-wrap: anywhere;
+}
+.detail-head .tag {
+  max-inline-size: 100%;
+  white-space: normal;
 }
 .detail-head .claim-progress {
   display: flex;

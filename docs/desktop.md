@@ -42,6 +42,8 @@ Use **Agent activity** in the bottom bar to see recorded proof and model jobs, A
 
 When a result is waiting, choose **Review** from its inspector or the queue above it. The bottom-bar review count opens the result directly when there is one, or shows only reviews when several are waiting. Review lists show the checked result before its claim. Choose **Approve** or **Return**, write the reason, and record your choice with **⌘↵** (**Ctrl+Enter** on other platforms) or **Record decision**. Trellin records approval as acceptance of the evidence and records the reviewer’s attribution.
 
+When the inspector is narrow, open **More inspector actions** to reach actions that do not fit beside the primary action.
+
 In Library, hover over a row or focus it with the keyboard to reveal its **Edit statement** icon. From a focused row, press **Tab** and then **Enter** to open the revision form. You can also open it from the entry inspector.
 
 The project map, claim inspector and Claims page show the claim’s recorded review, decision and verification state. Select a claim to load its current proof task. The count covers obligations recorded in reduction routes for the current Lean statement. An obligation counts as verified while its checked proof remains current. If two routes record the same proposition, each occurrence counts in its route.
