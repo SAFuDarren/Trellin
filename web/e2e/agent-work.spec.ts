@@ -233,9 +233,15 @@ test("retrying an interrupted run requires fresh scope approval and resends the 
   });
 
   await page.goto("/#session=fixture");
-  await page.locator("nav.rail").getByRole("link", { name: "Claims" }).click();
-  await page.locator(".section-nav").getByRole("link", { name: "Agent work" }).click();
+  await page.locator("nav.rail").getByRole("link", { name: "Agent work", exact: true }).click();
   await page.getByRole("link", { name: /Draft the release summary/ }).click();
+  const pageHeader = page.locator(".agent-work-view > .page-head");
+  const scrollPanel = page.locator(".agent-work-scroll");
+  const agentRow = scrollPanel.locator("dt").filter({ hasText: /^Agent$/ });
+  await expect(agentRow).toBeVisible();
+  const headerBounds = (await pageHeader.boundingBox())!;
+  expect((await scrollPanel.boundingBox())!.y).toBeGreaterThanOrEqual(headerBounds.y + headerBounds.height);
+  expect((await agentRow.boundingBox())!.y).toBeGreaterThan(headerBounds.y + headerBounds.height);
   await page.getByRole("button", { name: "Retry task" }).click();
   await expect(page.getByText("Original approved task context")).toBeVisible();
   const confirm = page.getByRole("button", { name: "Start retry" });
@@ -252,4 +258,50 @@ test("retrying an interrupted run requires fresh scope approval and resends the 
   ]);
   expect(previews[0]?.task_id).toBe(original.id);
   expect(previews[0]?.action_id).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test("Claims, Agent work and Review each have one active rail link, including legacy Agent work links", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto("/#session=fixture");
+  const rail = page.locator("nav.rail");
+  const sidebar = page.locator(".section-nav");
+  const activeRail = rail.locator('[aria-current="page"]');
+
+  await rail.getByRole("link", { name: "Claims", exact: true }).click();
+  await expect(activeRail).toHaveCount(1);
+  await expect(activeRail).toHaveAttribute("href", "#claims");
+  await expect(sidebar.getByRole("link", { name: "Agent work", exact: true })).toHaveCount(0);
+
+  for (const sub of ["", "/waiting", "%2Fnew%2Fagent%2F" + savedAgents[0]!.id]) {
+    await page.evaluate((legacy) => {
+      window.location.hash = legacy;
+    }, "#claims/agent-work" + sub);
+    const canonical = "#agent-work" + (sub.startsWith("%2F") ? "/" + sub.slice(3) : sub);
+    await expect(page).toHaveURL(new RegExp(canonical + "$"));
+    await expect(activeRail).toHaveCount(1);
+    await expect(activeRail).toHaveAttribute("href", "#agent-work");
+    await expect(sidebar.getByRole("link", { name: "Claims", exact: true })).toHaveCount(0);
+  }
+
+  await sidebar.getByRole("link", { name: "Agent activity", exact: true }).click();
+  await expect(page).toHaveURL(/#agent-work\/activity$/);
+  await expect(activeRail).toHaveAttribute("href", "#agent-work");
+  const activity = page.locator("main").getByRole("group", { name: "Filter activity" });
+  await expect(activity).toBeVisible();
+  await activity.getByRole("button", { name: "Running", exact: true }).click();
+  await expect(page.locator('main [data-activity-state="running"]').first()).toBeVisible();
+  await expect(page.locator('main [data-activity-state="completed"]')).toHaveCount(0);
+
+  const review = rail.getByRole("link", { name: /^Review/ });
+  await review.click();
+  await expect(activeRail).toHaveCount(1);
+  await expect(activeRail).toHaveAttribute("href", "#review");
+  await page.evaluate(() => {
+    window.location.hash = "#review/77777777-7777-4777-8777-777777777777";
+  });
+  await expect(page).toHaveURL(/#review\/77777777-7777-4777-8777-777777777777$/);
+  await expect(activeRail).toHaveCount(1);
+  await expect(activeRail).toHaveAttribute("href", "#review");
 });

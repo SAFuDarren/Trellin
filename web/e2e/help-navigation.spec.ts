@@ -9,13 +9,13 @@ const destinations = {
   "#progress": ["Automation", "推进"],
   "#settings": ["Settings", "设置"],
   "#team/agents": ["Agents", "执行者"],
-  "#claims/agent-work": ["Agent work", "Agent 任务"],
+  "#agent-work": ["Agent work", "Agent 任务"],
 } as const;
 type Destination = keyof typeof destinations;
 
 const guides = [
   { path: "project-map", title: ["Build a project map", "建立项目图谱"], links: ["#workbench"] },
-  { path: "agents", title: ["Coordinate Agents", "协调多个 Agent"], links: ["#team/agents", "#claims/agent-work"] },
+  { path: "agents", title: ["Coordinate Agents", "协调多个 Agent"], links: ["#team/agents", "#agent-work"] },
   { path: "proofs", title: ["Check and reuse a proof", "核验和复用证明"], links: ["#claims", "#library"] },
 ] as const;
 

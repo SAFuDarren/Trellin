@@ -7,7 +7,7 @@ import { WorkbenchIcon } from "./Icons";
 import { NavigationMenu } from "./NavigationMenu";
 
 const GROUPS: Section[][] = [
-  ["workbench", "claims", "library"],
+  ["workbench", "claims", "agent-work", "review", "library"],
   ["chat", "team", "progress"],
 ];
 const UTILITIES = ["settings", "help"] as const;

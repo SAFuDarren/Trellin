@@ -15,7 +15,7 @@ const GUIDES: readonly {
     id: "agents",
     links: [
       { section: "team", sub: "agents", label: "help.openAgents" },
-      { section: "claims", sub: "agent-work", label: "help.openAgentWork" },
+      { section: "agent-work", label: "help.openAgentWork" },
     ],
   },
   {

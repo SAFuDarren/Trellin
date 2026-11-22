@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
@@ -25,10 +25,9 @@ import { harnessName, timeText } from "../workbench/text";
 import "../styles/project-entry.css";
 import "../styles/agent-work.css";
 
-const ROOT = "agent-work";
 const TASK_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
-const agentWorkHref = (path = "") => href("claims", path ? `${ROOT}/${path}` : ROOT);
+const agentWorkHref = (path = "") => href("agent-work", path);
 const eligibleInput = (task: AgentWorkSummary) =>
   task.delivery_sha256 && ["delivered", "accepted"].includes(task.status);
 function workError(t: TFunction, error: unknown, fallback: string) {
@@ -37,13 +36,14 @@ function workError(t: TFunction, error: unknown, fallback: string) {
   return t(key, { defaultValue: t(`agentWork.errors.${fallback}`) });
 }
 
-export function AgentWorkPage({ session, sub }: { session: string; sub: string }) {
+export function AgentWorkPage({ session, sub, activity }: { session: string; sub: string; activity: ReactNode }) {
   const { t } = useTranslation();
   const work = useAgentWork(session);
   const tasks = work.data?.tasks ?? [];
-  const [, path, target, id] = sub.split("/");
+  const [path, target, id] = sub.split("/");
   const waiting = tasks.filter((task) => task.status === "delivered");
   const filtered = path === "waiting";
+  const showingActivity = path === "activity";
   const creating = path === "new";
   const taskId = TASK_ID.test(path ?? "") ? path : null;
   const originId = creating && TASK_ID.test(id ?? "") ? id : undefined;
@@ -65,14 +65,27 @@ export function AgentWorkPage({ session, sub }: { session: string; sub: string }
               current: filtered,
               count: waiting.length,
             },
-            { key: "claims", label: t("rail.claims"), href: href("claims") },
+            {
+              key: "activity",
+              label: t("agentDock.activity"),
+              href: agentWorkHref("activity"),
+              current: showingActivity,
+            },
           ],
         },
       ]}
     >
       <div className="agent-work-view">
         <PageHead
-          title={t(creating ? "agentWork.newTask" : filtered ? "agentWork.waiting" : "agentWork.title")}
+          title={t(
+            showingActivity
+              ? "agentDock.activity"
+              : creating
+                ? "agentWork.newTask"
+                : filtered
+                  ? "agentWork.waiting"
+                  : "agentWork.title",
+          )}
           actions={
             work.data?.available &&
             !creating && (
@@ -82,38 +95,42 @@ export function AgentWorkPage({ session, sub }: { session: string; sub: string }
             )
           }
         />
-        {work.isPending ? (
-          <Empty>{t("common.loading")}</Empty>
-        ) : work.isError && !work.data ? (
-          <div className="page-body">
-            <p className="project-entry-status" role="alert">
-              {t("agentWork.errors.load")}
-            </p>
-            <div className="project-entry-buttons">
-              <button type="button" className="button" onClick={() => void work.refetch()}>
-                {t("agentWork.retry")}
-              </button>
+        <div className="agent-work-scroll" key={sub}>
+          {showingActivity ? (
+            activity
+          ) : work.isPending ? (
+            <Empty>{t("common.loading")}</Empty>
+          ) : work.isError && !work.data ? (
+            <div className="page-body">
+              <p className="project-entry-status" role="alert">
+                {t("agentWork.errors.load")}
+              </p>
+              <div className="project-entry-buttons">
+                <button type="button" className="button" onClick={() => void work.refetch()}>
+                  {t("agentWork.retry")}
+                </button>
+              </div>
             </div>
-          </div>
-        ) : !work.data?.available ? (
-          <Empty>{t("agentWork.unavailable")}</Empty>
-        ) : creating && target === "delivery" && !predecessor ? (
-          <Empty>{t("agentWork.errors.predecessor")}</Empty>
-        ) : creating ? (
-          <NewAgentWork
-            key={`${session}/${sub}`}
-            session={session}
-            agentId={target === "agent" ? originId : undefined}
-            predecessor={predecessor}
-            candidates={candidates}
-          />
-        ) : taskId ? (
-          <AgentWorkDetail key={`${session}/${taskId}`} session={session} id={taskId} />
-        ) : visible.length > 0 ? (
-          <AgentWorkList tasks={visible} />
-        ) : (
-          <Empty>{t(filtered ? "agentWork.emptyWaiting" : "agentWork.empty")}</Empty>
-        )}
+          ) : !work.data?.available ? (
+            <Empty>{t("agentWork.unavailable")}</Empty>
+          ) : creating && target === "delivery" && !predecessor ? (
+            <Empty>{t("agentWork.errors.predecessor")}</Empty>
+          ) : creating ? (
+            <NewAgentWork
+              key={`${session}/${sub}`}
+              session={session}
+              agentId={target === "agent" ? originId : undefined}
+              predecessor={predecessor}
+              candidates={candidates}
+            />
+          ) : taskId ? (
+            <AgentWorkDetail key={`${session}/${taskId}`} session={session} id={taskId} />
+          ) : visible.length > 0 ? (
+            <AgentWorkList tasks={visible} />
+          ) : (
+            <Empty>{t(filtered ? "agentWork.emptyWaiting" : "agentWork.empty")}</Empty>
+          )}
+        </div>
       </div>
     </SectionLayout>
   );

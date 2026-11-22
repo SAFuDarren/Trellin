@@ -5,6 +5,7 @@ export const SECTIONS = [
   "workbench",
   "review",
   "claims",
+  "agent-work",
   "library",
   "chat",
   "team",
@@ -18,7 +19,11 @@ export type Route = { section: Section; sub: string };
 export function parseRoute(hash: string): Route {
   const [head = "", ...rest] = hash.replace(/^#/, "").split("/");
   const section = (SECTIONS as readonly string[]).includes(head) ? (head as Section) : "workbench";
-  return { section, sub: decodeURIComponent(rest.join("/")) };
+  const sub = decodeURIComponent(rest.join("/"));
+  if (section === "claims" && (sub === "agent-work" || sub.startsWith("agent-work/"))) {
+    return { section: "agent-work", sub: sub.slice("agent-work/".length) };
+  }
+  return { section, sub };
 }
 
 export function href(section: Section, sub = ""): string {
@@ -28,7 +33,15 @@ export function href(section: Section, sub = ""): string {
 export function useRoute(): [Route, (section: Section, sub?: string) => void] {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash));
   useEffect(() => {
-    const onChange = () => setRoute(parseRoute(window.location.hash));
+    const onChange = () => {
+      const hash = window.location.hash;
+      const next = parseRoute(hash);
+      if (hash.startsWith("#claims/") && next.section === "agent-work") {
+        window.history.replaceState(window.history.state, "", href(next.section, next.sub));
+      }
+      setRoute(next);
+    };
+    onChange();
     window.addEventListener("hashchange", onChange);
     return () => window.removeEventListener("hashchange", onChange);
   }, []);

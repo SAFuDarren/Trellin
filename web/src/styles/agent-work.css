@@ -1,3 +1,28 @@
+.agent-work-view {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.agent-work-view > .page-head {
+  position: static;
+  flex: none;
+}
+
+.agent-work-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.agent-work-scroll > .agent-dock-activity {
+  height: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
 .agent-work-body,
 .agent-work-list {
   width: 100%;

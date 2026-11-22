@@ -121,6 +121,6 @@ test("an empty Agent activity panel offers a path to Agent work", async ({ page 
   const assignment = activity.getByRole("link", { name: "Open Agent work", exact: true });
   await expect(assignment).toBeInViewport({ ratio: 1 });
   await assignment.press("Enter");
-  await expect(page).toHaveURL(/#claims\/agent-work$/);
+  await expect(page).toHaveURL(/#agent-work$/);
   await expect(page.getByRole("main").getByRole("heading", { name: "Agent work", exact: true })).toBeVisible();
 });

@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.88
+
+- Agent work, Claims and Review have separate destinations in the rail. Agent work includes the project activity list, and task details scroll below their header. Existing Agent work links still open the same task.
+
 ## 1.0.87
 
 - Inspector tags and status labels wrap within the pane, and actions that need more room are available in **More inspector actions**.

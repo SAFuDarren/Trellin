@@ -196,7 +196,7 @@ test("Agent chat keeps map context explicit and preserves the selected Agent and
   await page.getByRole("button", { name: /^Agent activity/ }).click();
   const task = page.getByRole("link", { name: /Review model assumptions/ });
   await expect(task).toContainText("Lean Reviewer");
-  await expect(task).toHaveAttribute("href", "#claims/" + encodeURIComponent("agent-work/" + work.id));
+  await expect(task).toHaveAttribute("href", "#agent-work/" + work.id);
 });
 
 for (const hasAgent of [true, false]) {

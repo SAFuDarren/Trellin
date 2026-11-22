@@ -98,7 +98,7 @@ With database revision `0083`, open **Team → Agents** and choose **Assign task
 
 For an implementation task, choose an independent Git checkout under the project's `inputs/` directory, a full commit ID, and the exact files to change. The agent proposes text replacements. Trellin builds a patch and checks that it applies to the recorded inputs in a temporary directory. The patch is a delivery for review. The apply check measures patch applicability.
 
-Choose **Assign review** on a delivery to send that version to another agent. Drafts and code patches use the same review flow. **Claims → Agent work** shows queued work, failures, delivered artifacts, and human decisions. Open a delivery to accept or return that exact version. Failed or interrupted work requires a new confirmation to retry the recorded input. Pending deliveries remain in the project after restarting the app.
+Choose **Assign review** on a delivery to send that version to another agent. Drafts and code patches use the same review flow. **Agent work** in the rail shows queued work, failures, delivered artifacts, and human decisions. Open a delivery to accept or return that exact version. Failed or interrupted work requires a new confirmation to retry the recorded input. Pending deliveries remain in the project after restarting the app.
 
 ## Work with the models
 
