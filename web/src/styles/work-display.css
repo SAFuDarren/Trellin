@@ -1,0 +1,121 @@
+.work-display-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.work-display-trigger .workbench-icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.6;
+}
+
+.work-display-list {
+  width: 100%;
+  max-width: 850px;
+  padding: 0;
+  list-style: none;
+}
+
+.work-display-list .board-card {
+  border: 0;
+  border-block-end: 1px solid var(--hair);
+  border-radius: 0;
+  background: transparent;
+}
+
+.work-display-list .board-card[data-live="true"] {
+  box-shadow: inset 2px 0 var(--live);
+}
+
+.work-display-list .board-card-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 25%);
+  align-items: start;
+}
+
+.work-display-list .board-card-toggle:hover {
+  background: var(--track);
+}
+
+.work-display-list .progress,
+.work-display-list .claim-progress {
+  grid-column: 1;
+}
+
+.work-display-list .meta {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-content: flex-end;
+  text-align: end;
+}
+
+.work-display-board {
+  min-height: 100%;
+}
+
+.work-display-task {
+  color: inherit;
+  text-decoration: none;
+}
+
+.work-display-grid .table-wrap:focus-visible {
+  outline-offset: -2px;
+}
+
+.work-display-grid .table :is(th[scope="row"], td) {
+  overflow-wrap: anywhere;
+}
+
+.work-display-grid .table th[scope="row"] {
+  min-width: 145px;
+  color: var(--ink);
+  font-size: inherit;
+  vertical-align: top;
+  white-space: normal;
+}
+
+.work-display-name {
+  display: inline-block;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--type-semibold);
+  text-align: start;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.work-display-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.work-display-grid tr[data-expanded="true"],
+.work-display-detail {
+  background: var(--canvas);
+}
+
+.work-display-grid .table .work-display-detail > td {
+  padding: 0;
+}
+
+.work-display-detail .board-preview {
+  border-top: 0;
+}
+
+.work-display-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.work-display-progress .tags {
+  padding: 0;
+}
+
+.work-display-progress .tag {
+  white-space: normal;
+}

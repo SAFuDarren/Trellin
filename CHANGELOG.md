@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.97
+
+- Claims and Agent work can switch among Board, List and Table. Each page remembers its layout on this device, with the same recorded details and actions available in each view.
+
 ## 1.0.96
 
 - Open a saved Agent’s name to view its project activity, edit its existing instructions, check the model connection, assign a task, or continue chatting.

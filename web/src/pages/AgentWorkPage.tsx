@@ -11,6 +11,7 @@ import {
   type AgentWorkPreview,
   type AgentWorkRequest,
   type AgentWorkRetryPreview,
+  type AgentWorkStatus,
   type AgentWorkSummary,
   type AgentWorkTask,
 } from "../api/agentWork";
@@ -20,6 +21,13 @@ import { Picker } from "../components/FloatingControls";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { useDesktopProjectList } from "../components/SidebarProjects";
+import {
+  WorkDisplayMenu,
+  WorkStatusColumn,
+  WorkTable,
+  useWorkLayout,
+  type WorkLayout,
+} from "../components/WorkDisplay";
 import { href } from "../shell/route";
 import { harnessName, timeText } from "../workbench/text";
 import "../styles/project-entry.css";
@@ -27,6 +35,16 @@ import "../styles/agent-work.css";
 
 const TASK_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const BOARD_STATES: Record<AgentWorkStatus, Parameters<typeof WorkStatusColumn>[0]["tone"]> = {
+  queued: "none",
+  running: "live",
+  blocked: "bad",
+  delivered: "warn",
+  accepted: "ok",
+  returned: "bad",
+  failed: "bad",
+  interrupted: "bad",
+};
 const agentWorkHref = (path = "") => href("agent-work", path);
 const eligibleInput = (task: AgentWorkSummary) =>
   task.delivery_sha256 && ["delivered", "accepted"].includes(task.status);
@@ -38,6 +56,7 @@ function workError(t: TFunction, error: unknown, fallback: string) {
 
 export function AgentWorkPage({ session, sub, activity }: { session: string; sub: string; activity: ReactNode }) {
   const { t } = useTranslation();
+  const [layout, setLayout] = useWorkLayout("agent-work", "list");
   const work = useAgentWork(session);
   const tasks = work.data?.tasks ?? [];
   const [path, target, id] = sub.split("/");
@@ -89,9 +108,12 @@ export function AgentWorkPage({ session, sub, activity }: { session: string; sub
           actions={
             work.data?.available &&
             !creating && (
-              <a className="button primary" href={agentWorkHref("new")}>
-                {t("agentWork.newTask")}
-              </a>
+              <>
+                {!taskId && !showingActivity && <WorkDisplayMenu layout={layout} onChange={setLayout} />}
+                <a className="button primary" href={agentWorkHref("new")}>
+                  {t("agentWork.newTask")}
+                </a>
+              </>
             )
           }
         />
@@ -126,7 +148,11 @@ export function AgentWorkPage({ session, sub, activity }: { session: string; sub
           ) : taskId ? (
             <AgentWorkDetail key={`${session}/${taskId}`} session={session} id={taskId} />
           ) : visible.length > 0 ? (
-            <AgentWorkList tasks={visible} />
+            <AgentWorkRows
+              tasks={visible}
+              layout={layout}
+              label={t(filtered ? "agentWork.waiting" : "agentWork.all")}
+            />
           ) : (
             <Empty>{t(filtered ? "agentWork.emptyWaiting" : "agentWork.empty")}</Empty>
           )}
@@ -136,22 +162,90 @@ export function AgentWorkPage({ session, sub, activity }: { session: string; sub
   );
 }
 
-function AgentWorkList({ tasks }: { tasks: AgentWorkSummary[] }) {
+function AgentWorkRows({ tasks, layout, label }: { tasks: AgentWorkSummary[]; layout: WorkLayout; label: string }) {
   const { t, i18n } = useTranslation();
+  const taskDate = (task: AgentWorkSummary) => (
+    <time className="agent-work-secondary" dateTime={task.updated_at}>
+      {timeText(i18n.language, task.updated_at, true)}
+    </time>
+  );
+  const taskState = (status: AgentWorkStatus) => t(`agentWork.status.${status}`, { defaultValue: status });
+  const taskMode = (task: AgentWorkSummary) => t(`agentWork.mode.${task.mode}`);
+
+  if (layout === "board") {
+    const statuses = new Set([...Object.keys(BOARD_STATES), ...tasks.map((task) => task.status)]);
+    return (
+      <div className="board work-display-board" aria-label={label}>
+        {[...statuses].map((status) => {
+          const rows = tasks.filter((task) => task.status === status);
+          if (!rows.length) return null;
+          const state = rows[0]!.status;
+          return (
+            <WorkStatusColumn
+              key={state}
+              label={taskState(state)}
+              count={rows.length}
+              tone={BOARD_STATES[state] ?? "none"}
+            >
+              {rows.map((task) => (
+                <article className="board-card" key={task.id} data-live={state === "running"}>
+                  <a className="board-card-toggle work-display-task" href={agentWorkHref(task.id)}>
+                    <strong className="title">{task.title}</strong>
+                    <span className="meta">
+                      {task.agent_name} · {taskMode(task)}
+                    </span>
+                    {taskDate(task)}
+                  </a>
+                </article>
+              ))}
+            </WorkStatusColumn>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (layout === "table") {
+    return (
+      <WorkTable
+        label={label}
+        columns={[
+          t("agentWork.taskTitle"),
+          t("workDisplay.status"),
+          t("agentWork.agent"),
+          t("agentWork.taskType"),
+          t("agentWork.updated"),
+        ]}
+      >
+        {tasks.map((task) => (
+          <tr key={task.id}>
+            <th scope="row">
+              <a className="work-display-name" href={agentWorkHref(task.id)}>
+                {task.title}
+              </a>
+            </th>
+            <td>{taskState(task.status)}</td>
+            <td>{task.agent_name}</td>
+            <td>{taskMode(task)}</td>
+            <td>{taskDate(task)}</td>
+          </tr>
+        ))}
+      </WorkTable>
+    );
+  }
+
   return (
     <div className="page-body">
-      <ul className="agent-work-list">
+      <ul className="agent-work-list" role="list" aria-label={label}>
         {tasks.map((task) => (
           <li key={task.id}>
             <a href={agentWorkHref(task.id)}>
               <strong>{task.title}</strong>
-              <span>{t(`agentWork.status.${task.status}`)}</span>
+              <span>{taskState(task.status)}</span>
               <span className="agent-work-secondary">
-                {task.agent_name} · {t(`agentWork.mode.${task.mode}`)}
+                {task.agent_name} · {taskMode(task)}
               </span>
-              <time className="agent-work-secondary" dateTime={task.updated_at}>
-                {timeText(i18n.language, task.updated_at, true)}
-              </time>
+              {taskDate(task)}
             </a>
           </li>
         ))}
