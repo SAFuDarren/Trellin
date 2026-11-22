@@ -2,8 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const destinations = {
   "#workbench": ["Project map", "项目图谱"],
-  // #289: Claims sits in the Home space and the Library in the Work space, so their panels carry the space name.
-  "#claims": ["Home", "主页"],
+  "#claims": ["Work", "工作"],
   "#library": ["Work", "工作"],
   "#agent-work/inbox": ["Work", "工作"],
   "#chat": ["Chats", "对话"],

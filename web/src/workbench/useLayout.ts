@@ -12,7 +12,6 @@ export type Sizes = {
   chat: number;
   chatOpen: boolean;
   atlasOpen: boolean;
-  sidebarOpen: boolean | null;
   reviewOpen: boolean | null;
   atlas: AtlasBox | null;
   cards: CardLayouts;
@@ -26,13 +25,10 @@ export const DEFAULT_SIZES: Sizes = {
   chat: 320,
   chatOpen: true,
   atlasOpen: true,
-  sidebarOpen: null,
   reviewOpen: null,
   atlas: null,
   cards: {},
 };
-// Rail 56 + sidebar 240 + inspector 340 + a canvas of at least 560 for three columns of cards.
-export const SIDEBAR_AUTO_OPEN_WIDTH = 1200;
 export const LIMITS: Record<SizeKey, [number, number]> = { side: [180, 420], right: [280, 640], chat: [140, 640] };
 
 function entries(value: unknown): [string, unknown][] {
@@ -65,7 +61,7 @@ function load(): Sizes {
     const saved = JSON.parse(window.localStorage.getItem(KEY) || "{}") as Partial<Record<keyof Sizes, unknown>>;
     for (const key of ["side", "right", "chat"] as const)
       if (typeof saved[key] === "number") sizes[key] = saved[key] as number;
-    for (const key of ["chatOpen", "atlasOpen", "sidebarOpen", "reviewOpen"] as const) {
+    for (const key of ["chatOpen", "atlasOpen", "reviewOpen"] as const) {
       if (typeof saved[key] === "boolean") (sizes[key] as boolean) = saved[key] as boolean;
     }
     const atlas = saved.atlas as Partial<AtlasBox> | null | undefined;
@@ -136,15 +132,12 @@ export function useLayout() {
     setSizes(DEFAULT_SIZES);
     save(DEFAULT_SIZES);
   }, [save]);
-  // Without a saved choice, side panels fold away on narrow windows so the columns stay side by side.
-  // The project sidebar opens by default only when the rail, the sidebar, the inspector and a
-  // readable canvas fit together (#283).
-  const sidebarOpen = sizes.sidebarOpen ?? windowSize.width >= SIDEBAR_AUTO_OPEN_WIDTH;
+  // Without a saved choice, the inspector folds away on narrow windows.
   const reviewOpen = sizes.reviewOpen ?? windowSize.width >= 760;
   const clamped = {
     side: clampSize("side", sizes.side, windowSize.height),
     right: clampSize("right", sizes.right, windowSize.height),
     chat: clampSize("chat", sizes.chat, windowSize.height),
   };
-  return { sizes, clamped, sidebarOpen, reviewOpen, windowHeight: windowSize.height, update, resizeCard, reset };
+  return { sizes, clamped, reviewOpen, windowHeight: windowSize.height, update, resizeCard, reset };
 }

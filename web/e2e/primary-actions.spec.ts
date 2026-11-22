@@ -24,7 +24,7 @@ test("the header, inspector and current dialog each have one filled main action"
     });
   });
   await page.goto("/#session=fixture");
-  const header = page.locator(".project-toolbar-actions");
+  const header = page.locator("#workbench .page-head .page-actions");
   const add = header.getByRole("button", { name: "Add theorem", exact: true });
   await expect(header.locator(PRIMARY)).toHaveCount(1);
   await expect(header.locator(PRIMARY)).toHaveAccessibleName("Add theorem");

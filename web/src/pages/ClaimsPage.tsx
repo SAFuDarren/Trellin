@@ -222,7 +222,7 @@ export function ClaimsPage({
 
   return (
     <SectionLayout
-      space="home"
+      space="work"
       title={t("rail.claims")}
       groups={[
         {

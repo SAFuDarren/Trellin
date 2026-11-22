@@ -18,10 +18,7 @@ export const SPACES: Space[] = [
   {
     id: "home",
     labelKey: "spaces.home",
-    entries: [
-      { key: "map", section: "workbench", labelKey: "spaces.entries.map" },
-      { key: "claims", section: "claims", labelKey: "spaces.entries.claims" },
-    ],
+    entries: [{ key: "map", section: "workbench", labelKey: "spaces.entries.map" }],
   },
   {
     id: "work",
@@ -29,6 +26,7 @@ export const SPACES: Space[] = [
     entries: [
       { key: "inbox", section: "agent-work", sub: "inbox", labelKey: "spaces.entries.inbox" },
       { key: "review", section: "review", labelKey: "spaces.entries.review" },
+      { key: "claims", section: "claims", labelKey: "spaces.entries.claims" },
       { key: "agent-tasks", section: "agent-work", labelKey: "spaces.entries.agentTasks" },
       { key: "library", section: "library", labelKey: "spaces.entries.library" },
     ],

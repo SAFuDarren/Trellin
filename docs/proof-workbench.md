@@ -17,9 +17,9 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 ## Switch between the graph and Review
 
-The rail has five spaces: **Home**, **Work**, **Chats**, **Team** and **Automation**. Use **Home** to return to the project map. Open **Work → Review** for items awaiting review; the **Work** badge shows how many are waiting. Your graph keeps its selected claim and node while you switch.
+The rail has five spaces: **Home**, **Work**, **Chats**, **Team** and **Automation**. **Home** opens the **Project map** beside the rail. The **Work** panel lists **Inbox**, **Review**, **Claims**, **Agent tasks** and **Library**. Choose **Work → Review** for items awaiting review. The **Work** badge shows how many are waiting, and the graph keeps its selected claim and node while you switch.
 
-Use the left sidebar to open a project. Its **Project map** shows the project's claims on one canvas. Click a card or choose **Find claim** to select it and read its statement, Lean text, and review items in the right-hand details panel. Use **Details** to toggle the panel. Double-click a card, press Enter while it has focus, or choose **Open proof** in the inspector to show the proof graph on the main canvas. **Proof task** appears first in the inspector. The **More inspector actions** menu holds actions that cannot fit beside it. Use **Proof**, **References** and **If withdrawn** to explore the graph, then select a node to read its details. In a narrow window, Escape first closes the details drawer. Press Escape again or click **Project map** to return to the same map position and selection. The zoom controls sit below the canvas so they stay clear of the nodes.
+In the Mac app, use the project tile at the top of the rail to switch projects. The **Project map** shows the project's claims on one canvas. Click a card or choose **Find claim** to select it and read its statement, Lean text, and review items in the right-hand details panel. Use **Details** to toggle the panel. Double-click a card, press Enter while it has focus, or choose **Open proof** in the inspector to show the proof graph on the main canvas. **Proof task** appears first in the inspector. The **More inspector actions** menu holds actions that cannot fit beside it. Use **Proof**, **References** and **If withdrawn** to explore the graph, then select a node to read its details. In a narrow window, Escape first closes the details drawer. Press Escape again or click **Project map** to return to the same map position and selection. The map footer shows the connection status next to the zoom controls.
 
 Choose **Global map** to show the existing overview of recent claims and their recorded proof dependencies in the current workspace. Move it by its title, resize it from the corner, or choose a claim in the overview to bring its card into view.
 
@@ -63,7 +63,7 @@ Review the target, approved starting basis, and proposed premise before recordin
 
 Some projects have no Lean statement for a record. The workbench shows its recorded wording and indicates the Lean text is unavailable. It does not invent a formula or infer a mathematical field from the checker name.
 
-The narrow bar on the far left switches between sections: **Workbench**, **Review** (results and questions waiting for you, with approve and return), **Claims** (every claim by status), **Library** (theorems and hypotheses, and where each is used), **Chats** (model conversations across claims), **Team** (runtimes, model agents, usage and jobs), and **Automation** (advancement policies). Counts on the bar show items waiting for review and jobs running now. **Help** and **Settings** sit at the bottom of the bar.
+In **Work → Claims**, use the Board, List or Table view to browse claims by status. **Work → Library** shows theorems and hypotheses and where they are used. **Help** and **Settings** sit at the bottom of the rail.
 
 On database revision `0073` or later, **Review** records the local researcher's ID from the bound workspace for each new evidence decision. Enter the reason and choose **Approve** or **Return**. Workspaces with an older database still use the earlier review form. Previous decisions retain their recorded names.
 
@@ -86,7 +86,7 @@ returns. Older databases keep the earlier refresh behavior. Agent text and
 clarification answers remain in the workspace and are fetched through the
 existing authorized views.
 
-The left column lists registered projects. The centre shows the project map. The right column lists records awaiting review, with the selected claim or proof node and its **Proof details** below. Choose **If withdrawn** to see affected records. Drag the borders to resize the columns, or focus a border and use the arrow keys. The sizes are remembered in this browser and **Settings** can reset them. Choose **简体中文** in **Settings** to switch the interface language.
+The selected claim or proof node appears in **Proof details** to the right of the canvas, below records awaiting review. Choose **If withdrawn** to see affected records. Drag the inspector border to resize it, or focus the border and use the arrow keys. Panel sizes are remembered in this browser and **Settings** can reset them. Choose **简体中文** in **Settings** to switch the interface language.
 
 Opening a proof fits small graphs and starts large graphs at a readable zoom around the selected node. Use **Fit to window** in the corner to see the entire graph. Drag to pan. Pinch, or scroll with Ctrl or ⌘ held, to zoom around the pointer. With the canvas focused, the arrow keys pan, + and − zoom and 0 fits.
 

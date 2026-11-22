@@ -18,7 +18,7 @@ export async function openMenu(trigger: Locator) {
 // does: the space in the rail, then the entry in its panel.
 const SPACE_OF = {
   "Project map": "Home",
-  Claims: "Home",
+  Claims: "Work",
   Inbox: "Work",
   Review: "Work",
   "Agent tasks": "Work",
@@ -36,12 +36,8 @@ export async function openDestination(page: Page, destination: Destination) {
   const space = railSpace(page, SPACE_OF[destination]);
   await space.click();
   await expect(space).toHaveAttribute("aria-current", "page");
-  // The Home panel folds in narrower windows; other spaces' panels stay beside the page.
-  if (SPACE_OF[destination] === "Home") {
-    const expand = page.locator("#sidebar").getByRole("button", { name: "Expand sidebar", exact: true });
-    if (await expand.isVisible()) await expand.click();
-  }
-  const panel = page.locator("nav#sidebar, nav.section-nav");
+  if (destination === "Project map") return;
+  const panel = page.locator("nav.section-nav");
   // An entry with a count is named with it ("Review 2").
   const entry = panel.getByRole("link", { name: new RegExp(`^${destination}( \\d+)?$`) });
   await entry.click();

@@ -147,13 +147,18 @@ export function GraphView(props: Props) {
   }, []);
 
   const fitScale = Math.min(1.25, areaWidth / canvasWidth, areaHeight / canvasHeight);
+  // Count only the graph content when choosing between the overview and a cropped, readable opening.
+  const contentFitScale = Math.min(
+    stageSize.width / Math.max(1, canvasWidth - CARD.pad * 2),
+    stageSize.height / Math.max(1, canvasHeight - CARD.pad * 2),
+  );
   const minimumScale = Math.min(0.3, fitScale);
   const fit = useCallback(
     (mode: Exclude<CameraMode, "manual">) => {
       if (!stageSize.width || !stageSize.height) return;
       const focus = initialNode.current;
       const point = focus ? layout.points.get(focus) : undefined;
-      if (mode === "readable" && fitScale < OVERVIEW_SCALE && focus && point) {
+      if (mode === "readable" && contentFitScale < 0.6 && focus && point) {
         const card = sizes.get(focus) ?? CARD;
         const k = Math.min(READABLE_SCALE, areaWidth / card.width, areaHeight / card.height);
         setCamera({
@@ -169,7 +174,7 @@ export function GraphView(props: Props) {
         y: STAGE_INSET + (areaHeight - canvasHeight * fitScale) / 2,
       });
     },
-    [stageSize, areaWidth, areaHeight, fitScale, canvasWidth, canvasHeight, layout.points, sizes],
+    [stageSize, areaWidth, areaHeight, fitScale, contentFitScale, canvasWidth, canvasHeight, layout.points, sizes],
   );
 
   useLayoutEffect(() => {

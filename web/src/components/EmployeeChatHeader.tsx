@@ -4,6 +4,7 @@ import type { ConversationSummary } from "../api/conversations";
 import type { TeamAgent } from "../api/teamAgents";
 import { Chevron } from "./Icons";
 import { Picker } from "./FloatingControls";
+import { PageHead } from "./SectionLayout";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
 import "../styles/project-entry.css";
 
@@ -109,35 +110,42 @@ export function EmployeeChatHeader({
   const submitting = useRef(false);
   const dialogId = useId();
   return (
-    <header className="page-head employee-chat-head">
-      <div className="employee-chat-heading">
-        <div className="employee-chat-path">
-          <TeamAgentAvatar avatar={employee.avatar} name={employee.name} />
-          <h2 title={employee.name}>{employee.name}</h2>
-          {tasks.length > 0 && (
-            <>
-              <Chevron />
-              <TaskSwitcher tasks={tasks} current={current} onSwitch={onSwitch} trigger={switcherRef} />
-            </>
-          )}
-        </div>
-        {!listUnavailable && <EmployeeStatus tasks={tasks} announce />}
-      </div>
-      <div className="page-actions employee-chat-actions">
-        <button
-          type="button"
-          className="button"
-          disabled={creating || listUnavailable}
-          onClick={() => {
-            onShowCreate();
-            setTitle("");
-            dialog.current?.showModal();
-          }}
-        >
-          {t("employeeChats.newTask")}
-        </button>
-        {actions}
-      </div>
+    <>
+      <PageHead
+        className="employee-chat-head"
+        heading={
+          <div className="employee-chat-heading">
+            <div className="employee-chat-path">
+              <TeamAgentAvatar avatar={employee.avatar} name={employee.name} />
+              <h2 title={employee.name}>{employee.name}</h2>
+              {tasks.length > 0 && (
+                <>
+                  <Chevron />
+                  <TaskSwitcher tasks={tasks} current={current} onSwitch={onSwitch} trigger={switcherRef} />
+                </>
+              )}
+            </div>
+            {!listUnavailable && <EmployeeStatus tasks={tasks} announce />}
+          </div>
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              className="button"
+              disabled={creating || listUnavailable}
+              onClick={() => {
+                onShowCreate();
+                setTitle("");
+                dialog.current?.showModal();
+              }}
+            >
+              {t("employeeChats.newTask")}
+            </button>
+            {actions}
+          </>
+        }
+      />
       <dialog
         className="project-entry employee-chat-dialog"
         ref={dialog}
@@ -188,6 +196,6 @@ export function EmployeeChatHeader({
           </div>
         </form>
       </dialog>
-    </header>
+    </>
   );
 }

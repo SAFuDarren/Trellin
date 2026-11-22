@@ -17,7 +17,7 @@ import { FeedEntry } from "../components/FeedEntry";
 import { Menu } from "../components/FloatingControls";
 import { Chevron, Clock } from "../components/Icons";
 import { NewConversation } from "../components/NewConversation";
-import { Empty, PageHead } from "../components/SectionLayout";
+import { Empty, PageHead, SectionFrame, SectionPanel } from "../components/SectionLayout";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
 import { EMPLOYEE_CHAT_PATH, href } from "../shell/route";
 import { proofActivityKey } from "../shell/workspaceActivity";
@@ -290,151 +290,152 @@ export function ConversationsPage({
     );
   }
 
-  return (
-    <div className="chats-page" data-thread={String(narrowDetail)}>
-      <nav className="chats-sidebar" aria-labelledby="section-title">
-        <header className="chat-list-head">
-          <h1 id="section-title">{t("rail.chat")}</h1>
-          {employees.length > 0 ? (
-            <a
-              className="icon-button employee-chat-history-link"
-              href={href("chat", HISTORY_ROUTE)}
-              aria-current={historyView ? "page" : undefined}
-              aria-label={t("employeeChats.history")}
-              title={t("employeeChats.history")}
-            >
-              <Clock />
-            </a>
-          ) : (
-            !profiles.isPending && newConversation
-          )}
-        </header>
-        <div className="chat-list-scroll">
-          {error && !error.named && (
-            <p className="chat-list-note" role="alert">
-              {error.message}
-            </p>
-          )}
-          {employees.length ? (
-            <>
-              <label className="search-field employee-chat-search">
-                <input
-                  type="search"
-                  value={employeeQuery}
-                  placeholder={t("employeeChats.search")}
-                  aria-label={t("employeeChats.search")}
-                  onChange={(event) => setEmployeeQuery(event.currentTarget.value)}
-                />
-              </label>
-              {visibleEmployees.length ? (
-                <ul aria-label={t("employeeChats.employees")}>
-                  {visibleEmployees.map((profile) => (
-                    <li key={profile.id}>
-                      <a
-                        className="chat-list-item employee-chat-person"
-                        href={openEmployee(profile)}
-                        aria-current={profile.id === employee?.id ? "page" : undefined}
-                      >
-                        <TeamAgentAvatar avatar={profile.avatar} name={profile.name} />
-                        <span className="employee-chat-person-label">
-                          <strong title={profile.name}>{profile.name}</strong>
-                          {direct.isSuccess && <EmployeeStatus tasks={tasksByEmployee.get(profile.id) ?? []} />}
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="chat-list-note">{t("employeeChats.noMatches")}</p>
-              )}
-            </>
-          ) : (
-            historyList
-          )}
-        </div>
-      </nav>
-      <main className="chats-main" tabIndex={-1}>
-        {historyView ? (
+  const panel = (
+    <SectionPanel
+      title={t("rail.chat")}
+      actions={
+        employees.length > 0 ? (
+          <a
+            className="icon-button employee-chat-history-link"
+            href={href("chat", HISTORY_ROUTE)}
+            aria-current={historyView ? "page" : undefined}
+            aria-label={t("employeeChats.history")}
+            title={t("employeeChats.history")}
+          >
+            <Clock />
+          </a>
+        ) : (
+          !profiles.isPending && newConversation
+        )
+      }
+    >
+      <div className="chat-list-scroll">
+        {error && !error.named && (
+          <p className="chat-list-note" role="alert">
+            {error.message}
+          </p>
+        )}
+        {employees.length ? (
           <>
-            <PageHead title={t("employeeChats.history")} actions={back} />
-            <div className="chat-history-content">{historyList}</div>
-          </>
-        ) : showProof && selectedProof ? (
-          <ProofHistory key={proofKey(selectedProof)} thread={selectedProof} onOpen={onOpen} back={back} />
-        ) : !showProof && current ? (
-          <ConversationPanel
-            key={session + "/" + current.id}
-            session={session}
-            thread={current}
-            employee={employee}
-            recipientChoice={{
-              agents: employees,
-              pending: profiles.isPending,
-              onSelect: (id) => {
-                if (id === (current.agent_id ?? DIRECT_MODEL)) return;
-                const recipient = employees.find((profile) => profile.id === id);
-                if (recipient) window.location.hash = openEmployee(recipient);
-                else if (id === DIRECT_MODEL) window.location.hash = href("chat", DIRECT_ROUTE);
-              },
-            }}
-            onRemove={() => {
-              window.location.hash = employee
-                ? href("chat", tasks.find((task) => task.id !== current.id)?.id ?? EMPLOYEE_CHAT_PATH + employee.id)
-                : href("chat", employees.length ? HISTORY_ROUTE : "");
-            }}
-            header={({ remove, removeDisabled, triggerRef }) =>
-              employee ? (
-                employeeHeader(employee, conversationActions(current, remove, removeDisabled, triggerRef))
-              ) : (
-                <PageHead
-                  title={current.title}
-                  note={t(
-                    current.node_id
-                      ? "conversations.nodeScope"
-                      : current.claim_id
-                        ? "conversations.claimScope"
-                        : "conversations.projectScope",
-                  )}
-                  actions={conversationActions(current, remove, removeDisabled, triggerRef)}
-                />
-              )
-            }
-          />
-        ) : employee ? (
-          <>
-            {employeeHeader(employee, back)}
-            {direct.isError && <Empty>{conversationErrorText(t, direct.error)}</Empty>}
-            {compose(employee.id)}
-          </>
-        ) : !sub || newView ? (
-          <>
-            <PageHead
-              title={t(newView ? "agentDock.newConversation" : "rail.chat")}
-              actions={newView ? back : undefined}
-            />
-            {direct.isError && <Empty>{conversationErrorText(t, direct.error)}</Empty>}
-            {compose(sub === DIRECT_ROUTE ? DIRECT_MODEL : undefined)}
+            <label className="search-field employee-chat-search">
+              <input
+                type="search"
+                value={employeeQuery}
+                placeholder={t("employeeChats.search")}
+                aria-label={t("employeeChats.search")}
+                onChange={(event) => setEmployeeQuery(event.currentTarget.value)}
+              />
+            </label>
+            {visibleEmployees.length ? (
+              <ul aria-label={t("employeeChats.employees")}>
+                {visibleEmployees.map((profile) => (
+                  <li key={profile.id}>
+                    <a
+                      className="nav-item chat-list-item employee-chat-person"
+                      href={openEmployee(profile)}
+                      aria-current={profile.id === employee?.id ? "page" : undefined}
+                    >
+                      <TeamAgentAvatar avatar={profile.avatar} name={profile.name} />
+                      <span className="employee-chat-person-label">
+                        <strong title={profile.name}>{profile.name}</strong>
+                        {direct.isSuccess && <EmployeeStatus tasks={tasksByEmployee.get(profile.id) ?? []} />}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="chat-list-note">{t("employeeChats.noMatches")}</p>
+            )}
           </>
         ) : (
-          <>
-            <PageHead title={t("rail.chat")} actions={back} />
-            <Empty>
-              {direct.isError && !showProof
-                ? conversationErrorText(t, direct.error)
-                : proof.isError && showProof
-                  ? conversationErrorText(t, proof.error)
-                  : direct.isPending || (showProof && proof.isPending) || ((!sub || employeeId) && profiles.isPending)
-                    ? t("common.loading")
-                    : employeeId && profiles.isError
-                      ? t("teamAgents.listFailed")
-                      : sub
-                        ? t("conversations.conversationMissing")
-                        : t(employees.length ? "employeeChats.chooseEmployee" : "conversations.emptyProject")}
-            </Empty>
-          </>
+          historyList
         )}
-      </main>
-    </div>
+      </div>
+    </SectionPanel>
+  );
+  return (
+    <SectionFrame panel={panel} chatThread={narrowDetail}>
+      {historyView ? (
+        <>
+          <PageHead title={t("employeeChats.history")} actions={back} />
+          <div className="chat-history-content">{historyList}</div>
+        </>
+      ) : showProof && selectedProof ? (
+        <ProofHistory key={proofKey(selectedProof)} thread={selectedProof} onOpen={onOpen} back={back} />
+      ) : !showProof && current ? (
+        <ConversationPanel
+          key={session + "/" + current.id}
+          session={session}
+          thread={current}
+          employee={employee}
+          recipientChoice={{
+            agents: employees,
+            pending: profiles.isPending,
+            onSelect: (id) => {
+              if (id === (current.agent_id ?? DIRECT_MODEL)) return;
+              const recipient = employees.find((profile) => profile.id === id);
+              if (recipient) window.location.hash = openEmployee(recipient);
+              else if (id === DIRECT_MODEL) window.location.hash = href("chat", DIRECT_ROUTE);
+            },
+          }}
+          onRemove={() => {
+            window.location.hash = employee
+              ? href("chat", tasks.find((task) => task.id !== current.id)?.id ?? EMPLOYEE_CHAT_PATH + employee.id)
+              : href("chat", employees.length ? HISTORY_ROUTE : "");
+          }}
+          header={({ remove, removeDisabled, triggerRef }) =>
+            employee ? (
+              employeeHeader(employee, conversationActions(current, remove, removeDisabled, triggerRef))
+            ) : (
+              <PageHead
+                title={current.title}
+                note={t(
+                  current.node_id
+                    ? "conversations.nodeScope"
+                    : current.claim_id
+                      ? "conversations.claimScope"
+                      : "conversations.projectScope",
+                )}
+                actions={conversationActions(current, remove, removeDisabled, triggerRef)}
+              />
+            )
+          }
+        />
+      ) : employee ? (
+        <>
+          {employeeHeader(employee, back)}
+          {direct.isError && <Empty>{conversationErrorText(t, direct.error)}</Empty>}
+          {compose(employee.id)}
+        </>
+      ) : !sub || newView ? (
+        <>
+          <PageHead
+            title={t(newView ? "agentDock.newConversation" : "rail.chat")}
+            actions={newView ? back : undefined}
+          />
+          {direct.isError && <Empty>{conversationErrorText(t, direct.error)}</Empty>}
+          {compose(sub === DIRECT_ROUTE ? DIRECT_MODEL : undefined)}
+        </>
+      ) : (
+        <>
+          <PageHead title={t("rail.chat")} actions={back} />
+          <Empty>
+            {direct.isError && !showProof
+              ? conversationErrorText(t, direct.error)
+              : proof.isError && showProof
+                ? conversationErrorText(t, proof.error)
+                : direct.isPending || (showProof && proof.isPending) || ((!sub || employeeId) && profiles.isPending)
+                  ? t("common.loading")
+                  : employeeId && profiles.isError
+                    ? t("teamAgents.listFailed")
+                    : sub
+                      ? t("conversations.conversationMissing")
+                      : t(employees.length ? "employeeChats.chooseEmployee" : "conversations.emptyProject")}
+          </Empty>
+        </>
+      )}
+    </SectionFrame>
   );
 }
 

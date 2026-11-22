@@ -19,9 +19,22 @@ describe("navigation spaces (#289)", () => {
     expect(SPACES.map((space) => space.id)).toEqual(["home", "work", "chat", "team", "automation"]);
   });
 
+  it("keeps Home focused on the map and gives Claims a place in Work", () => {
+    expect(spaceOf("workbench")?.entries.map((entry) => entry.key)).toEqual(["map"]);
+    expect(spaceOf("claims")?.id).toBe("work");
+    expect(spaceOf("claims")?.entries.map((entry) => entry.key)).toEqual([
+      "inbox",
+      "review",
+      "claims",
+      "agent-tasks",
+      "library",
+    ]);
+  });
+
   it("finds the entry for every address, including sub-routes and old addresses", () => {
     const entry = (hash: string) => currentEntry(parseRoute(hash))?.key;
     expect(entry("#workbench")).toBe("map");
+    expect(entry("#claims")).toBe("claims");
     expect(entry("#claims/board")).toBe("claims");
     expect(entry("#agent-work/inbox")).toBe("inbox");
     expect(entry("#agent-work")).toBe("agent-tasks");

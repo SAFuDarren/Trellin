@@ -218,6 +218,7 @@
   },
   "canvasShell": {
     "map": "Project map",
+    "mapNote": "Arrange and link claims",
     "details": "Details",
     "researchActions": "Research actions",
     "proofOverview": "Show proof overview",
@@ -723,7 +724,7 @@
     "workActor": "{{agent}} · {{model}}"
   },
   "splitter": {
-    "side": "Drag to resize the claims column",
+    "side": "Resize navigation panel",
     "right": "Drag to resize the review column",
     "chat": "Drag to resize the conversation"
   },
@@ -1398,7 +1399,7 @@
     "controls": "Quick controls",
     "moveCard": "Arrow keys pan when the canvas has focus. To move a card, choose Move card from its menu, then preview with the arrows. Press {{confirm}} to save or {{cancel}} to cancel.",
     "guides": "Research guides",
-    "openMap": "Open the workbench",
+    "openMap": "Open project map",
     "openAgents": "Open Team Agents",
     "openAgentWork": "Open Agent work",
     "openClaims": "Open Claims",
@@ -1424,8 +1425,8 @@
       }
     },
     "spaces": {
-      "home": "The project map: arrange and link claims and open a claim’s proof. Claims lists the same claims by status.",
-      "work": "Everything to act on: the Inbox, results to review, tasks handed to Agents, and the Library of recorded statements.",
+      "home": "The project map. Arrange and link claims and open their proofs.",
+      "work": "Open the Inbox, Review, Claims, Agent tasks or Library.",
       "chat": "Talk with an Agent, switch conversations or read proof activity.",
       "team": "Set up Agents and model connections. Check jobs, usage and runtimes.",
       "automation": "Review the rules that advance proofs and follow their runs."

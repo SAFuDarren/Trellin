@@ -38,15 +38,6 @@ export function SidebarProjects(props: SidebarProjectsProps) {
   );
 }
 
-export function ProjectHeading({ name }: { name: string }) {
-  // Projects are switched from the tile at the top of the rail (#289).
-  return (
-    <h1 aria-label={name} title={name}>
-      {name}
-    </h1>
-  );
-}
-
 /** The current project at the top of the rail, like Multica's workspace tile. It opens the project switcher. */
 export function ProjectTile({ fallback }: { fallback: ReactNode }) {
   const { t } = useTranslation();

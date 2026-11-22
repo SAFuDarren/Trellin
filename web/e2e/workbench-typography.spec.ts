@@ -38,7 +38,7 @@ for (const variant of [
   {
     language: "en",
     width: 1440,
-    expand: "Expand sidebar",
+    map: "Project map",
     chats: "Chats",
     activity: "Proof activity",
     zoom: "Zoom in",
@@ -50,7 +50,7 @@ for (const variant of [
   {
     language: "zh-CN",
     width: 860,
-    expand: "展开侧栏",
+    map: "项目图谱",
     chats: "对话",
     activity: "证明活动",
     zoom: "放大",
@@ -126,16 +126,13 @@ for (const variant of [
 
     await page.goto("/#session=fixture");
     await expect(page.locator("html")).toHaveAttribute("lang", variant.language);
-    await expectTextRole([page.locator(".claim-meta")], "metadata");
+    const mapTitle = page.getByRole("main").getByRole("heading", { name: variant.map, exact: true });
+    await expectTextRole([mapTitle], "page");
     await openProof(page, undefined, variant.openProof);
-    const sidebar = page.locator("#sidebar");
-    const expand = sidebar.getByRole("button", { name: variant.expand });
-    if (await expand.isVisible()) await expand.click();
     const goalCard = page.locator(`.graph-node[data-node="${goalId}"]`);
     await goalCard.press("Enter");
     await expect(page.locator("#node-detail h2")).toHaveText(variant.title);
-    await expectTextRole([page.locator(".claim-heading h1")], "page");
-    await expectTextRole([sidebar.locator(".sidebar-space-title")], "heading");
+    await expectTextRole([page.locator(".proof-path h1")], "page");
 
     const inspector = page.locator(".node-detail");
     await expectTextRole([inspector.locator("h2")], "page");
@@ -147,11 +144,8 @@ for (const variant of [
     await expect(lean).toHaveCSS("font-family", /monospace/);
     await expect(lean).toHaveCSS("white-space", "pre-wrap");
 
-    const sideDivider = page.locator('.splitter[data-split="side"]');
     const inspectorDivider = page.locator('.splitter[data-split="right"]');
     if (variant.width >= 900) {
-      await moveDivider(page, sideDivider, 32);
-      await expect(sideDivider).toHaveAttribute("aria-valuenow", "272");
       await moveDivider(page, inspectorDivider, 48);
       await expect(inspectorDivider).toHaveAttribute("aria-valuenow", "292");
     } else {
@@ -166,7 +160,7 @@ for (const variant of [
     const beforeZoom = await canvasScale();
     await page.locator(".main-proof-graph").getByRole("button", { name: variant.zoom, exact: true }).click();
     await expect.poll(canvasScale).toBeGreaterThan(beforeZoom);
-    await expectTextRole([page.locator(".claim-heading h1")], "page");
+    await expectTextRole([page.locator(".proof-path h1")], "page");
 
     await page.locator(`.graph-node[data-node="${obligationId}"]`).press("Enter");
     const proof = page.locator(".chat");
@@ -183,8 +177,6 @@ for (const variant of [
 
     if (variant.width < 900) {
       await page.setViewportSize({ width: 640, height: 720 });
-      const collapse = sidebar.getByRole("button", { name: "收起侧栏" });
-      if (await collapse.isVisible()) await collapse.click();
       const tabs = page.locator(".proof-lenses");
       await tabs.scrollIntoViewIfNeeded();
       await expect
@@ -205,7 +197,7 @@ for (const variant of [
     const status = row.locator(".chat-list-status");
     await expect(status).toHaveText(variant.replied);
     await expect(status).toBeInViewport();
-    await expectTextRole([chats.locator(".chat-list-head h1")], "page");
+    await expectTextRole([chats.locator(".section-nav-header h1")], "heading");
     await expectTextRole([status], "metadata");
     await row.click();
     const main = chats.locator(".chats-main");

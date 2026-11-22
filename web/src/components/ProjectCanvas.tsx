@@ -211,6 +211,7 @@ type Props = {
   onOpenProof?: (id: string) => void;
   onContextClaim: (id: string | null) => void;
   claimActions: (id: string, link: FloatingOption, move: FloatingOption) => FloatingGroup[];
+  status: string;
   detailsOpen: boolean;
   onDetailsChange: (open: boolean) => void;
   atlasClaims: AtlasClaim[] | undefined;
@@ -234,6 +235,7 @@ export function ProjectCanvas({
   onOpenProof,
   onContextClaim,
   claimActions,
+  status,
   detailsOpen,
   onDetailsChange,
   atlasClaims,
@@ -1266,6 +1268,9 @@ export function ProjectCanvas({
           ))}
       </div>
       <div className="canvas-footer">
+        <span className="canvas-status" role="status">
+          {status}
+        </span>
         <CanvasZoom scale={camera.k} onZoom={zoom} onFit={() => fit(true)} />
       </div>
       {contextTarget && contextCard && (

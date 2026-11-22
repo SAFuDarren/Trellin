@@ -54,7 +54,7 @@ test("project claims open the existing inspector without leaving or moving the c
   const first = mapClaim(page, FIXTURE_CLAIM_TITLE);
   const second = mapClaim(page, SECOND_TITLE);
   await expect(canvas.locator(".project-canvas-node")).toHaveCount(5);
-  await expect(page.locator("#sidebar").getByText(SECOND_TITLE, { exact: true })).toHaveCount(0);
+  await expect(page.locator(".section-nav")).toHaveCount(0);
   const plot = canvas.locator(".project-canvas-plot");
   const camera = () => plot.evaluate((element) => getComputedStyle(element).transform);
   // Keep the selected neighbourhood within the area available beside the inspector.

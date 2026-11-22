@@ -1,6 +1,8 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { currentEntry, currentRoute, entryHref, SPACES, type SpaceId } from "../shell/spaces";
+import { clampSize, useLayout } from "../workbench/useLayout";
+import { Splitter } from "./Splitter";
 
 export type NavEntry = {
   key: string;
@@ -19,7 +21,7 @@ export const SpaceCounts = createContext<Record<string, number | undefined>>({})
 /** The second level of a space (#289): its entries come first in the panel, then the page's own groups. */
 export type NavGroup = { name?: string; entries: NavEntry[]; empty?: string; className?: string };
 
-export function useSpaceGroup(space: SpaceId | undefined): NavGroup | undefined {
+function useSpaceGroup(space: SpaceId | undefined): NavGroup | undefined {
   const { t } = useTranslation();
   const definition = SPACES.find((candidate) => candidate.id === space);
   if (!definition || definition.entries.length < 2) return undefined;
@@ -33,6 +35,64 @@ export function useSpaceGroup(space: SpaceId | undefined): NavGroup | undefined 
       current: entry.key === current,
     })),
   };
+}
+
+export function SectionPanel({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <nav className="section-nav" aria-labelledby="section-title">
+      <header className="section-nav-header">
+        <h1 id="section-title">{title}</h1>
+        {actions}
+      </header>
+      {children}
+    </nav>
+  );
+}
+
+export function SectionFrame({
+  panel,
+  children,
+  chatThread,
+}: {
+  panel: ReactNode;
+  children: ReactNode;
+  chatThread?: boolean;
+}) {
+  const { t } = useTranslation();
+  const layout = useLayout();
+  const [dragWidth, setDragWidth] = useState<number>();
+  const side = dragWidth ?? layout.clamped.side;
+  const chat = chatThread !== undefined;
+  return (
+    <div
+      className={chat ? "section chats-page" : "section"}
+      data-thread={chatThread}
+      style={{ "--side-w": `${side}px` } as CSSProperties}
+    >
+      {panel}
+      <Splitter
+        name="side"
+        value={side}
+        label={t("splitter.side")}
+        onResize={(width) => setDragWidth(clampSize("side", width, layout.windowHeight))}
+        onCommit={(width) => {
+          setDragWidth(undefined);
+          layout.update({ side: clampSize("side", width, layout.windowHeight) });
+        }}
+      />
+      <main className={chat ? "section-main chats-main" : "section-main"} tabIndex={-1}>
+        {children}
+      </main>
+    </div>
+  );
 }
 
 export function SectionLayout({
@@ -68,61 +128,60 @@ export function SectionLayout({
     entries: group.entries.filter((entry) => !spaceTargets.has(entry.href)),
   }));
   const allGroups: NavGroup[] = spaceGroup ? [spaceGroup, ...pageGroups] : groups;
-  return (
-    <div className="section">
-      <nav className="section-nav" aria-labelledby="section-title">
-        <header className="section-nav-header">
-          <h1 id="section-title">{heading}</h1>
-          {headerActions}
-        </header>
-        {allGroups
-          .filter((group) => group.entries.length || group.empty)
-          .map((group, position) => (
-            <div
-              className={group.className ? `nav-group ${group.className}` : "nav-group"}
-              key={group.name ?? position}
-            >
-              {group.name && <span>{group.name}</span>}
-              {group.entries.length === 0 && group.empty && <p className="nav-empty">{group.empty}</p>}
-              {group.entries.map((entry) => (
-                <a
-                  key={entry.key}
-                  className="nav-item"
-                  href={entry.href}
-                  title={entry.sub ? `${entry.label}\n${entry.sub}` : entry.label}
-                  aria-current={entry.current ? "page" : undefined}
-                >
-                  <span className="nav-line">
-                    {entry.dot === "live" ? (
-                      <span className="status-dot" data-tone="live" aria-hidden="true" />
-                    ) : entry.dot && entry.dot !== "none" ? (
-                      <span className="status-dot" data-tone={entry.dot} aria-hidden="true" />
-                    ) : null}
-                    <span className="label">{entry.label}</span>
-                    {entry.count !== undefined && entry.count !== "" && (
-                      <span className="count" data-tone={entry.countTone}>
-                        {entry.count}
-                      </span>
-                    )}
-                  </span>
-                  {entry.sub && <span className="nav-sub">{entry.sub}</span>}
-                </a>
-              ))}
-            </div>
-          ))}
-      </nav>
-      <main className="section-main" tabIndex={-1}>
-        {children}
-      </main>
-    </div>
+  const panel = (
+    <SectionPanel title={heading} actions={headerActions}>
+      {allGroups
+        .filter((group) => group.entries.length || group.empty)
+        .map((group, position) => (
+          <div className={group.className ? `nav-group ${group.className}` : "nav-group"} key={group.name ?? position}>
+            {group.name && <span>{group.name}</span>}
+            {group.entries.length === 0 && group.empty && <p className="nav-empty">{group.empty}</p>}
+            {group.entries.map((entry) => (
+              <a
+                key={entry.key}
+                className="nav-item"
+                href={entry.href}
+                title={entry.sub ? `${entry.label}\n${entry.sub}` : entry.label}
+                aria-current={entry.current ? "page" : undefined}
+              >
+                <span className="nav-line">
+                  {entry.dot === "live" ? (
+                    <span className="status-dot" data-tone="live" aria-hidden="true" />
+                  ) : entry.dot && entry.dot !== "none" ? (
+                    <span className="status-dot" data-tone={entry.dot} aria-hidden="true" />
+                  ) : null}
+                  <span className="label">{entry.label}</span>
+                  {entry.count !== undefined && entry.count !== "" && (
+                    <span className="count" data-tone={entry.countTone}>
+                      {entry.count}
+                    </span>
+                  )}
+                </span>
+                {entry.sub && <span className="nav-sub">{entry.sub}</span>}
+              </a>
+            ))}
+          </div>
+        ))}
+    </SectionPanel>
   );
+  return <SectionFrame panel={panel}>{children}</SectionFrame>;
 }
 
-export function PageHead({ title, note, actions }: { title: string; note?: string; actions?: ReactNode }) {
+export function PageHead({
+  title,
+  heading,
+  note,
+  actions,
+  className,
+}: ({ title: string; heading?: never } | { heading: ReactNode; title?: never }) & {
+  note?: string;
+  actions?: ReactNode;
+  className?: string;
+}) {
   return (
-    <header className="page-head">
+    <header className={className ? `page-head ${className}` : "page-head"}>
       <div className="heading">
-        <h2>{title}</h2>
+        {heading ?? <h2 title={title}>{title}</h2>}
         {note && (
           <span className="note" title={note}>
             {note}
