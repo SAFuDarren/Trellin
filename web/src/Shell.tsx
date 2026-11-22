@@ -17,6 +17,7 @@ import { Rail } from "./components/Rail";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
 import { ShortcutSheet } from "./components/ShortcutSheet";
 import { WorkspaceActivityList } from "./components/WorkspaceActivity";
+import { WorkspaceInbox } from "./components/WorkspaceInbox";
 import { AgentWorkPage } from "./pages/AgentWorkPage";
 import { ClaimsPage } from "./pages/ClaimsPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
@@ -31,6 +32,7 @@ import { usePaletteResults } from "./shell/paletteResults";
 import { useRoute } from "./shell/route";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
 import { buildWorkspaceActivity, type ActivityState } from "./shell/workspaceActivity";
+import { useWorkspaceInbox, workspaceInboxScope } from "./shell/workspaceInbox";
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
 import { SHORTCUTS } from "./shortcuts";
 import { Workbench, type Focus, type WorkbenchPosition } from "./Workbench";
@@ -45,6 +47,7 @@ export function Shell({ session }: { session: string }) {
   const { section, sub } = route;
   const showsClaims = section === "claims";
   const showsActivity = section === "agent-work" && sub === "activity";
+  const showsInbox = section === "agent-work" && sub === "inbox";
   const showsClaimProgress = section === "workbench" || showsClaims;
   const releaseUpdates = useReleaseUpdates(session);
   const queries = useQueryClient();
@@ -59,7 +62,7 @@ export function Shell({ session }: { session: string }) {
   const team = useTeam(session, live);
   const agentWorkList = useAgentWork(session, live);
   const conversations = useConversations(session, undefined, live);
-  const activityAgents = useTeamAgents(session, showsActivity);
+  const activityAgents = useTeamAgents(session, showsActivity || showsInbox);
   const [activityFilter, setActivityFilter] = useState<ActivityState | "all">("all");
   const activityLoading = team.isPending || agentWorkList.isPending || conversations.isPending || inbox.isPending;
   const activityUnavailable = team.isError || agentWorkList.isError || conversations.isError || inbox.isError;
@@ -74,6 +77,8 @@ export function Shell({ session }: { session: string }) {
       }),
     [team.data, agentWorkList.data, conversations.data, inbox.data],
   );
+  const inboxScope = workspaceInboxScope(session, workspace, inbox.data?.review_identity?.workspace_id);
+  const workspaceInbox = useWorkspaceInbox(inboxScope, activity.rows);
   const atlas = useAtlas(session, showsClaims);
   const projectClaims = useProjectCanvasClaims(session, showsClaimProgress);
   const [focus, setFocus] = useState<Focus | null>(null);
@@ -226,6 +231,7 @@ export function Shell({ session }: { session: string }) {
               badges={{
                 team: { count: activity.counts.running, live: true },
                 review: { count: pendingReviews ?? 0 },
+                "agent-work": { count: workspaceInbox.unread },
               }}
               onSearch={openPalette}
             />
@@ -235,6 +241,19 @@ export function Shell({ session }: { session: string }) {
               <AgentWorkPage
                 session={session}
                 sub={sub}
+                inboxUnread={workspaceInbox.unread}
+                inbox={
+                  showsInbox && (
+                    <WorkspaceInbox
+                      key={inboxScope ?? session}
+                      inbox={workspaceInbox}
+                      agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
+                      loading={inbox.isPending || team.isPending || agentWorkList.isPending}
+                      unavailable={inbox.isError || team.isError || agentWorkList.isError}
+                      onOpenProof={(id, nodeId) => open(id, nodeId, true)}
+                    />
+                  )
+                }
                 activity={
                   showsActivity && (
                     <WorkspaceActivityList

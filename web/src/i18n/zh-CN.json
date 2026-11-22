@@ -752,6 +752,8 @@
     "help": "帮助",
     "settings": "设置",
     "badge": {
+      "agent-work_one": "{{count}} 个未读条目",
+      "agent-work_other": "{{count}} 个未读条目",
       "review": "{{count}} 项待审阅",
       "team": "{{count}} 项运行中"
     }
@@ -812,6 +814,29 @@
     "verified": "已核验 {{done}}/{{total}}",
     "running_one": "{{count}} 个模型在运行",
     "running_other": "{{count}} 项运行中"
+  },
+  "agentInbox": {
+    "title": "收件箱",
+    "filter": "筛选收件箱",
+    "filters": {
+      "all": "全部",
+      "unread": "未读",
+      "archived": "已归档"
+    },
+    "empty": {
+      "all": "收件箱暂无条目。",
+      "unread": "没有未读条目。",
+      "archived": "没有已归档条目。"
+    },
+    "windowNote": "项目在当前窗口打开期间，会保留已读和归档状态。",
+    "unavailable": "这个项目无法使用收件箱。",
+    "undo": "撤销",
+    "unread": "未读",
+    "openRecord": "打开记录",
+    "restore": "恢复",
+    "markRead": "标为已读",
+    "markUnread": "标为未读",
+    "archive": "归档"
   },
   "agentWork": {
     "title": "Agent 任务",

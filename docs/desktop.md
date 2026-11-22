@@ -44,6 +44,8 @@ Agent chat opens at the lower right, clear of the inspector and canvas controls.
 
 Use **Agent activity** in the bottom bar to see recorded proof and model jobs, Agent work, conversations and results waiting for you. Filter by state and open an item to go to its job, proof, conversation or review. The Team badge counts running activity across the project. Claims and Chats show the count for the claim or proof node they display. Open **Agent work → Agent activity** in the rail for the same activity list in a full page. The **Review** rail icon shows how many items are waiting for you. A chat without messages opens at the height of its composer and suggestions.
 
+**Agent work → Inbox** shows pending reviews, questions, failed runs and delivered Agent work. Select an item to preview it and open the underlying record. With focus in the inbox, press **R** to mark an item as read, **E** to archive it, or **Z** to undo the last change. Read and archive choices stay available while this project is open in the current window. The Agent work badge counts unread inbox items.
+
 When a result is waiting, choose **Review** from its inspector or the queue above it. The bottom-bar review count opens the result directly when there is one, or shows only reviews when several are waiting. Review lists show the checked result before its claim. Choose **Approve** or **Return**, write the reason, and record your choice with **⌘↵** (**Ctrl+Enter** on other platforms) or **Record decision**. Trellin records approval as acceptance of the evidence and records the reviewer’s attribution.
 
 When the inspector is narrow, open **More inspector actions** to reach actions that do not fit beside the primary action.

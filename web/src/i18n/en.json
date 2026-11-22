@@ -752,6 +752,8 @@
     "help": "Help",
     "settings": "Settings",
     "badge": {
+      "agent-work_one": "{{count}} unread inbox item",
+      "agent-work_other": "{{count}} unread inbox items",
       "review": "{{count}} waiting for review",
       "team": "{{count}} running"
     }
@@ -812,6 +814,29 @@
     "verified": "{{done}} of {{total}} verified",
     "running_one": "{{count}} running",
     "running_other": "{{count}} running"
+  },
+  "agentInbox": {
+    "title": "Inbox",
+    "filter": "Inbox filter",
+    "filters": {
+      "all": "All",
+      "unread": "Unread",
+      "archived": "Archived"
+    },
+    "empty": {
+      "all": "There are no inbox items.",
+      "unread": "There are no unread items.",
+      "archived": "There are no archived items."
+    },
+    "windowNote": "Read and archive choices last while this project is open in this window.",
+    "unavailable": "Inbox is unavailable for this project.",
+    "undo": "Undo",
+    "unread": "Unread",
+    "openRecord": "Open record",
+    "restore": "Restore",
+    "markRead": "Mark as read",
+    "markUnread": "Mark as unread",
+    "archive": "Archive"
   },
   "agentWork": {
     "title": "Agent work",
