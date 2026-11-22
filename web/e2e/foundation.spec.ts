@@ -148,7 +148,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
 
     await page.getByRole("button", { name: "Agent chat", exact: true }).click();
     const dock = page.getByRole("region", { name: "Agent chat", exact: true });
-    await expectEnter(dock, "rm-panel-in", panelDuration);
+    await expectEnter(dock, "rm-fade-in", panelDuration);
     await expectToken(dock, "box-shadow", "--elevation-dialog");
     if (reducedMotion === "reduce") {
       await expect(card).toHaveCSS("transition-duration", "0s, 0s, 0s, 0s, 0s");

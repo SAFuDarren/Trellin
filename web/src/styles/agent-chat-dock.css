@@ -309,6 +309,8 @@
 
 .agent-dock-panel[data-view="chat"] {
   position: fixed;
+  /* Keep the resize targets in place while the panel fades in. */
+  animation-name: rm-fade-in;
 }
 
 .agent-dock-panel .conversation-panel[data-empty="true"] .chat-feed {
