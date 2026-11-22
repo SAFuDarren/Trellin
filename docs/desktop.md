@@ -28,6 +28,8 @@ Changing the interface language keeps proof nodes in the same order and preserve
 
 In **If withdrawn**, the graph legend and inspector show the same total of affected records, including other claims, and identify the premise being previewed. Open other proof actions from **Proof**.
 
+In a narrow inspector, each affected record has a full-width title with its status on the next line. The impact summary sits below the list heading.
+
 Selected map cards, proof nodes and review rows have a Navy edge and a light tint. Hover adds a neutral highlight, and keyboard focus adds an offset outline. A spinner and count inside a proof node show its running jobs.
 
 Drag from a card’s bottom handle to connect two claims. The preview snaps to the saved route over the other card. Select a link to see the two claim names, remove it or undo a removal.
