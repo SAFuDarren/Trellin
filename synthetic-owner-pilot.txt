@@ -1,1 +1,1 @@
-Base of the isolated owner-only merge rehearsal.
+Feature of the isolated owner-only merge rehearsal.
