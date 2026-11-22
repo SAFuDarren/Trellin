@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.100
+
+- Agent work has an Inbox for pending reviews, questions, failed runs and Agent deliveries. Preview each item, mark it read or archive it, and undo the last change while the project stays open in this window.
+
 ## 1.0.99
 
 - Select several claims or Agent tasks in List and Table. Shift-click or use the keyboard to select displayed rows, then copy their exact record IDs.
