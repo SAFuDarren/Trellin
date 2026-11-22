@@ -89,7 +89,7 @@ python -m pytest -m offline
 desktop/macos/tests/run-swift-tests.sh
 ```
 
-The screens shown before the workbench opens (opening, choosing a folder, and problems such as an unavailable database) share one native component that uses the workbench's colours, type and button styles. Each problem offers one primary action that leads to a fix, and keeps the path and error code behind **Show Details**. To review every screen in light and dark, render them into an existing folder outside the checkout:
+The screens shown before the workbench opens (opening, choosing a folder, and problems such as an unavailable database) share one native component that uses the workbench's colours, type and button styles. Each problem offers one primary action that leads to a fix. Problems with a project lead back to **Open Library**, and only the folder flow offers **Open Folder…**. Each screen keeps the path and error code behind **Show Details**. To review every screen in light and dark, render them into an existing folder outside the checkout:
 
 ```sh
 desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders en

@@ -33,12 +33,13 @@ struct StatusPresentation: Equatable {
             return StatusPresentation(kind: .problem, symbol: "exclamationmark.triangle", actions: [.quit])
         case "library", "disconnected", "create-postgres":
             return StatusPresentation(kind: .problem, symbol: symbol(for: key), actions: [.retry])
-        default:
-            if canRetry {
-                return StatusPresentation(kind: .problem, symbol: symbol(for: key), actions: [.retry, .chooseFolder])
-            }
-            // The project or folder cannot be used as it is. Pick another one, or go back to the library.
+        case "create-path", "create-failed", "workspace-occupied":
+            // Only reached after the researcher chose a folder, so choosing another one is the fix.
             return StatusPresentation(kind: .problem, symbol: symbol(for: key), actions: [.chooseFolder, .openLibrary])
+        default:
+            if canRetry { return StatusPresentation(kind: .problem, symbol: symbol(for: key), actions: [.retry]) }
+            // Opening arbitrary folders is an advanced tool. Ordinary problems lead back to the app's own library.
+            return StatusPresentation(kind: .problem, symbol: symbol(for: key), actions: [.openLibrary])
         }
     }
 

@@ -2,7 +2,7 @@
 
 ## 1.0.106
 
-- The screens Trellin shows before the workbench opens now match the workbench: a centred panel with an icon for the kind of problem, one primary action that fixes it, and the path and error code behind **Show Details**. Problems a project cannot recover from offer **Open Library**.
+- The screens Trellin shows before the workbench opens now match the workbench: a centred panel with an icon for the kind of problem, one primary action that fixes it, and the path and error code behind **Show Details**. Problems with a project lead back to **Open Library**; opening another folder is offered only after you chose one.
 
 ## 1.0.105
 

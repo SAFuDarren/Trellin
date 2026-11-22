@@ -48,7 +48,10 @@ struct WorkbenchProcessTests {
             else { precondition(!presentation.actions.contains(.retry), "\(key) cannot be retried") }
         }
         precondition(StatusPresentation.of("install", canRetry: false).actions == [.quit])
-        precondition(StatusPresentation.of("project", canRetry: false).actions == [.chooseFolder, .openLibrary])
+        // Opening a folder is advanced: only the folder flow itself offers it (#286 review).
+        precondition(StatusPresentation.of("project", canRetry: false).actions == [.openLibrary])
+        precondition(StatusPresentation.of("postgres", canRetry: true).actions == [.retry])
+        precondition(StatusPresentation.of("workspace-occupied", canRetry: false).actions.first == .chooseFolder)
         for strings in [english, chinese] {
             for key in ["library.open", "details.show", "details.hide", "details.copy", "details.code", "retry", "choose", "quit"] {
                 precondition(strings[key] != nil, "missing \(key)")
