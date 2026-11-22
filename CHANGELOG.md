@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.91
+
+- In narrow proof windows, the withdrawal inspector gives affected records room to show their full names and places the count below the heading. The preview bar stays above the graph.
+
 ## 1.0.90
 
 - The proof graph keeps status names and counts readable across window sizes. When the graph is too narrow for the labels, open them from the Status button.
