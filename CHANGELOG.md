@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.87
+
+- Inspector tags and status labels wrap within the pane, and actions that need more room are available in **More inspector actions**.
+
 ## 1.0.86
 
 - Dragging a research link previews its saved route over the target card. Select a link to see both claim names without covering cards. Use Undo after removing a link to restore it.
