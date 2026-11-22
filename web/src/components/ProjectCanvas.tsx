@@ -360,7 +360,7 @@ export function ProjectCanvas({
   }, [active]);
 
   const fit = useCallback(
-    (all: boolean) => {
+    (all: boolean): Camera | undefined => {
       const first = cards[0]?.point;
       if (!first || !viewportWidth || !viewportHeight) return;
       const left = Math.min(...cards.map(({ point }) => point.x));
@@ -371,14 +371,17 @@ export function ProjectCanvas({
       if (!all && k < 0.6) {
         // Open at a readable scale on extensive maps; Fit to window can zoom out to the whole layout.
         const scale = 0.6;
-        setCamera({ x: viewportWidth / 2 - (first.x + WIDTH / 2) * scale, y: 28 - first.y * scale, k: scale });
-      } else {
-        setCamera({
-          x: (viewportWidth - width * k) / 2 - left * k,
-          y: (viewportHeight - height * k) / 2 - top * k - 10,
-          k,
-        });
+        const next = { x: viewportWidth / 2 - (first.x + WIDTH / 2) * scale, y: 28 - first.y * scale, k: scale };
+        setCamera(next);
+        return next;
       }
+      const next = {
+        x: (viewportWidth - width * k) / 2 - left * k,
+        y: (viewportHeight - height * k) / 2 - top * k - 10,
+        k,
+      };
+      setCamera(next);
+      return next;
     },
     [cards, viewportWidth, viewportHeight],
   );
@@ -389,6 +392,19 @@ export function ProjectCanvas({
     lastAutomaticFit.current = fit;
     fit(false);
   }, [active, fit]);
+
+  // Selecting a card keeps the camera still, but the inspector it opens narrows the canvas. Until
+  // the researcher pans or zooms, fit again when the canvas changes size, so opening the inspector
+  // never pushes cards out of view (#283).
+  const cameraAtSelection = useRef<Camera | null>(null);
+  const fittedSize = useRef(size);
+  useEffect(() => {
+    const previous = fittedSize.current;
+    fittedSize.current = size;
+    if (!active || !previous.width || (previous.width === size.width && previous.height === size.height)) return;
+    if (!movedCamera.current || camera !== cameraAtSelection.current) return;
+    cameraAtSelection.current = fit(false) ?? null;
+  }, [active, camera, fit, size]);
 
   useLayoutEffect(() => {
     // Choose the overview's opening corner once per opening, after the map has
@@ -624,6 +640,7 @@ export function ProjectCanvas({
       setLinkNotice("");
       setSelectedLink(null);
     }
+    if (!movedCamera.current || camera === cameraAtSelection.current) cameraAtSelection.current = camera;
     movedCamera.current = true;
     onSelect(id, openDetails);
   }

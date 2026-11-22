@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.104
+
+- The project sidebar starts folded when there is only one project or the window is narrower than 1,200 px, so the map keeps room beside the inspector. Opening the inspector refits the map until you pan or zoom.
+- Selecting rows in Claims and Agent work no longer moves the list: the selection bar floats over the bottom edge.
+- Primary actions that open another page no longer show a link underline, and canvas handles and legend toggles have full-size hit areas.
+- A browser check covers every page at three window sizes in light and dark for clipped text, hidden cards and other layout faults.
+
 ## 1.0.103
 
 - The owner merge command checks the current PR claim, patch version and required checks on the reviewed commit before merging.

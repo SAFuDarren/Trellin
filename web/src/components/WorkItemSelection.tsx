@@ -99,6 +99,8 @@ export function WorkSelectionArea({
       tabIndex={0}
       onKeyDown={shortcut}
     >
+      {children}
+      {/* After the list and floating at its bottom edge, so selecting never moves a row (#272, #283). */}
       {count > 0 && (
         <div className="work-selection-actions" role="group" aria-label={t("workSelection.actions")}>
           <span role="status">{t("workSelection.count", { count })}</span>
@@ -120,7 +122,6 @@ export function WorkSelectionArea({
           </span>
         </div>
       )}
-      {children}
     </div>
   );
 }

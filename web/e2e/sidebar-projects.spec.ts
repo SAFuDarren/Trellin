@@ -150,6 +150,9 @@ test("an empty desktop library retains the project actions and can recover from 
 test("a workbench without the native bridge can find claims on the project map", async ({ page }) => {
   await page.goto("/#session=fixture");
   const sidebar = page.locator("#sidebar");
+  // With only the current project to show, the sidebar starts folded and gives the map its width (#283).
+  await expect(page.locator("#workbench")).toHaveAttribute("data-sidebar", "collapsed");
+  await sidebar.getByRole("button", { name: "Expand sidebar", exact: true }).click();
   await expect(sidebar.getByRole("searchbox")).toHaveCount(0);
   await expect(sidebar.getByRole("region", { name: "Projects" }).getByText("Current project")).toBeVisible();
   await expect(sidebar.getByRole("button", { name: "New project" })).toHaveCount(0);

@@ -340,6 +340,7 @@ test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   const before = await level.textContent();
   await zoom.getByRole("button", { name: "Zoom in" }).click();
   await expect(level).not.toHaveText(before ?? "");
+  await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
   const splitter = page.locator('.splitter[data-split="side"]');
   await splitter.focus();
   await page.keyboard.press("ArrowRight");

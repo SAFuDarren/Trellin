@@ -28,7 +28,13 @@ import { href } from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
 import type { InboxItem } from "./api/sections";
 import type { ClaimProgress } from "./workbench/claimProgress";
-import { desktopPosition, desktopProjectName, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
+import {
+  desktopPosition,
+  desktopProjectLibrary,
+  desktopProjectName,
+  saveDesktopPosition,
+  type DesktopPosition,
+} from "./workbench/desktop";
 import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
 import { nodeTitle } from "./workbench/text";
 import type { ActivitySnapshot, GraphNode, ImpactPreview } from "./workbench/types";
@@ -127,8 +133,11 @@ export function Workbench({
   const [live, setLive] = useState<{ side?: number; right?: number }>({});
   const canvas = useProjectCanvas(session, true);
   const projects = useDesktopProjectList();
-  const sidebarOpen =
-    sizes.sidebarOpen ?? (layout.sidebarOpen && !projects.isLoading && projects.data?.projects.length !== 1);
+  // The sidebar lists projects, so without a saved choice it stays folded when there is only one:
+  // a browser session (no project library) or a library with a single project. An empty or failed
+  // library keeps it open, because adding or retrying a project happens there.
+  const singleProject = !desktopProjectLibrary() || projects.data?.projects.length === 1;
+  const sidebarOpen = sizes.sidebarOpen ?? (layout.sidebarOpen && !projects.isLoading && !singleProject);
   const projectName =
     projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name.trim() ||
     desktopProjectName() ||
