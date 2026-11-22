@@ -17,6 +17,7 @@ import {
 } from "../api/agentWork";
 import { ApiError } from "../api/client";
 import { useTeamAgents } from "../api/teamAgents";
+import { Chevron } from "../components/Icons";
 import { Picker } from "../components/FloatingControls";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
@@ -146,7 +147,7 @@ export function AgentWorkPage({ session, sub, activity }: { session: string; sub
               candidates={candidates}
             />
           ) : taskId ? (
-            <AgentWorkDetail key={`${session}/${taskId}`} session={session} id={taskId} />
+            <AgentWorkDetail key={`${session}/${taskId}`} session={session} id={taskId} tasks={tasks} />
           ) : visible.length > 0 ? (
             <AgentWorkRows
               tasks={visible}
@@ -673,17 +674,34 @@ function AgentWorkApproval({
   );
 }
 
-function AgentWorkDetail({ session, id }: { session: string; id: string }) {
+function AgentWorkDetail({ session, id, tasks }: { session: string; id: string; tasks: AgentWorkSummary[] }) {
   const { t, i18n } = useTranslation();
   const result = useAgentWorkTask(session, id);
   if (result.isPending) return <Empty>{t("common.loading")}</Empty>;
   const task = result.data;
   if (!task) return <Empty>{t("agentWork.errors.loadTask")}</Empty>;
+  const inputTitle = tasks.find((entry) => entry.id === task.predecessor_id)?.title;
   const canHandoff = task.delivery && task.mode !== "review" && eligibleInput(task);
   return (
     <div className="page-body agent-work-body">
       <header className="agent-work-heading">
-        <h3>{task.title}</h3>
+        <nav className="resource-path" aria-label={t("navigation.resourcePath")}>
+          <a className="resource-path-hop" href={agentWorkHref()}>
+            {t("agentWork.all")}
+          </a>
+          <Chevron />
+          {task.predecessor_id && (
+            <>
+              <a className="resource-path-hop" href={agentWorkHref(task.predecessor_id)} title={inputTitle}>
+                {inputTitle || t("agentWork.openInput")}
+              </a>
+              <Chevron />
+            </>
+          )}
+          <h3 className="resource-path-current" aria-current="page" title={task.title}>
+            {task.title}
+          </h3>
+        </nav>
         <p role="status">{t(`agentWork.status.${task.status}`)}</p>
       </header>
       <dl className="facts">

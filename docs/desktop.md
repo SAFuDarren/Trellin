@@ -20,6 +20,8 @@ In the command palette, start with `#` to search claims, proof nodes and saved r
 
 Open **Settings and help → Help** for short guides to the project map, Agent work and proof review. Each guide links to the relevant workbench page. Press **?** or open **Keyboard shortcuts** from Help to see the shortcuts for your platform. The **Details** and **Global map** icons show when their panels are open. With focus on the project map or its toolbar, press **I** for Details or **M** for Global map. Point at or keyboard-focus an icon to see its shortcut.
 
+The proof header shows the path from the project map to the claim and selected node. Choose the claim name to select its goal, or the map control to return to the canvas. In Agent work, a handoff task links to its source delivery in the task path.
+
 Arrow keys pan when the canvas has focus. To move a focused card, open its context menu with **⇧F10** (**Shift+F10** on other platforms) and choose **Move card**. Use the arrow keys to preview the new position. Hold **Shift** for larger steps. Press **Enter** to save the position or **Escape** to cancel.
 
 Open a proof to start at a readable zoom on the main canvas. **Fit to window** shows the whole graph. Select a node to read its full formula and Lean statement in the inspector. Hover over an activity count or check the inspector to see the recorded Agent and model. The footer shows labelled proof counts. In a narrow window, **Status** opens the full list when the labels run out of space. **Edge styles** opens the legend for the current view. Switch to **References** to see recorded uses, allowed premises and planned steps distinguished by line style.

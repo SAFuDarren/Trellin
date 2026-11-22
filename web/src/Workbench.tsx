@@ -16,7 +16,7 @@ import { useAtlas, useClaimGraph, useClaims, useLibrary } from "./api/sections";
 import { ProofActivity } from "./components/ChatPanel";
 import type { ConversationStarterScope } from "./components/ConversationRecipients";
 import { GraphView } from "./components/GraphView";
-import { WorkbenchIcon } from "./components/Icons";
+import { Chevron, WorkbenchIcon } from "./components/Icons";
 import type { FloatingGroup, FloatingOption } from "./components/FloatingControls";
 import { ProjectCanvas } from "./components/ProjectCanvas";
 import { ProjectActions } from "./components/project/ProjectActions";
@@ -168,6 +168,7 @@ export function Workbench({
   const target = selection?.claimId === claimId ? selection?.nodeId : undefined;
   const selected = target && graph?.nodes.has(target) ? target : (goal?.id ?? graph?.order[0] ?? null);
   const node = selected ? graph?.nodes.get(selected) : undefined;
+  const proofPathNode = node && goal && node.id !== goal.id ? node : null;
   const starterScope = claimId ? chatStarterScope(graph, node) : "project";
   useEffect(() => onChatStarterScope(starterScope), [onChatStarterScope, starterScope]);
   const assumption = graph?.hypotheses.find(({ id }) => id === assumptionId) ?? graph?.hypotheses[0];
@@ -584,7 +585,7 @@ export function Workbench({
         <header className="toolbar">
           <div className="claim-heading">
             {proofOpen ? (
-              <>
+              <nav className="resource-path proof-path" aria-label={t("navigation.resourcePath")}>
                 <button
                   ref={proofReturn}
                   aria-label={t("canvasShell.map")}
@@ -595,8 +596,28 @@ export function Workbench({
                 >
                   <span aria-hidden="true">‹</span> <span className="proof-return-label">{t("canvasShell.map")}</span>
                 </button>
-                <h1 title={graph?.claim.title ?? undefined}>{graph?.claim.title || t("graph.label")}</h1>
-              </>
+                <h1 title={graph?.claim.title ?? undefined} aria-current={proofPathNode ? undefined : "page"}>
+                  {proofPathNode && goal ? (
+                    <button type="button" className="resource-path-hop" onClick={() => selectNode(goal.id)}>
+                      {graph?.claim.title || t("graph.label")}
+                    </button>
+                  ) : (
+                    graph?.claim.title || t("graph.label")
+                  )}
+                </h1>
+                {proofPathNode && (
+                  <>
+                    <Chevron />
+                    <span
+                      className="resource-path-current"
+                      aria-current="page"
+                      title={nodeTitle(t, proofPathNode, { full: true })}
+                    >
+                      {nodeTitle(t, proofPathNode)}
+                    </span>
+                  </>
+                )}
+              </nav>
             ) : (
               <>
                 <ProjectHeading name={projectName} />

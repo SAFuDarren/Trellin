@@ -1779,6 +1779,65 @@ select:disabled {
 .proof-return span {
   padding-inline-end: 3px;
 }
+.resource-path {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.resource-path > .chevron {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--sub);
+}
+
+.resource-path-hop,
+.resource-path-current {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.resource-path-hop {
+  color: var(--sub);
+  text-decoration: none;
+}
+
+button.resource-path-hop {
+  max-width: 100%;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  outline-offset: -2px;
+}
+
+.resource-path-hop:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.resource-path-current {
+  color: var(--ink);
+}
+
+.proof-path .proof-return {
+  flex: none;
+}
+
+.proof-path h1 {
+  flex: 1 1 22rem;
+}
+
+.proof-path .resource-path-current {
+  flex: 0 2 14rem;
+  min-width: min(7ch, 25%);
+  font-size: var(--type-meta-size);
+}
+
 .inspector-activity .chat {
   padding-inline: 16px;
 }

@@ -113,3 +113,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.agent-work-heading .resource-path-current {
+  flex: 1 1 14rem;
+  min-width: 6ch;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

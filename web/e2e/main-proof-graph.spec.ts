@@ -18,6 +18,13 @@ test("Enter opens proof in the main workspace and Escape restores the panned map
   await expect(map).toBeHidden();
   await expect(page.locator("#review .graph-node")).toHaveCount(0);
   await expect(page.locator(".proof-return")).toBeFocused();
+  const path = page.getByRole("navigation", { name: "Current location" });
+  const obligation = proof.getByRole("button", { name: /^Proof obligation 2\b/ });
+  await obligation.click();
+  await expect(path.locator('[aria-current="page"]')).toHaveText("Proof obligation 2");
+  await path.getByRole("button", { name: FIXTURE_CLAIM_TITLE, exact: true }).click();
+  await expect(path.locator('[aria-current="page"]')).toHaveText(FIXTURE_CLAIM_TITLE);
+  await expect(obligation).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("button", { name: "References", exact: true }).click();
   await expect(proof.locator("[data-proof-view=references]")).toBeVisible();
   await page.getByRole("button", { name: "If withdrawn", exact: true }).click();

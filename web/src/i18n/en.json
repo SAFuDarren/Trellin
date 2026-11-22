@@ -734,6 +734,7 @@
     "openInWorkbench": "Open in workbench"
   },
   "navigation": {
+    "resourcePath": "Current location",
     "home": "Home",
     "switchView": "Switch view",
     "utilities": "Settings and help"
