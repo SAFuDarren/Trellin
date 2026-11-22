@@ -1,6 +1,6 @@
 # Changes
 
-## 1.0.111
+## 1.0.112
 
 - Contributors' local information stays out of the public repository. `scripts/check_privacy.py` finds local paths, temporary directories, personal email addresses and your own private terms in files, issue or PR text and commits. CI scans every tracked file, and the owner merge preflight refuses a PR that fails the scan. The rule is in `AGENTS.md`, `CONTRIBUTING.md` and the engineering guide.
 
