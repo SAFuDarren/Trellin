@@ -785,6 +785,17 @@
     "progress": "证明进展",
     "status": "状态"
   },
+  "workSelection": {
+    "region": "在{{label}}中选择条目",
+    "column": "选择",
+    "select": "选择{{title}}",
+    "actions": "多选操作",
+    "count": "已选 {{count}} 项",
+    "copy": "复制记录编号",
+    "clear": "清除选择",
+    "copied": "已复制记录编号",
+    "copyFailed": "无法使用剪贴板，请重试。"
+  },
   "claimsPage": {
     "openWorkbench": "在工作台打开",
     "noStatement": "这项课题没有已记录的陈述。",

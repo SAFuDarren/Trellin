@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.99
+
+- Select several claims or Agent tasks in List and Table. Shift-click or use the keyboard to select displayed rows, then copy their exact record IDs.
+
 ## 1.0.98
 
 - Proof headers show the selected node’s place in the claim, with links back to its goal and the project map. Agent handoff details link to the original delivery in their header.

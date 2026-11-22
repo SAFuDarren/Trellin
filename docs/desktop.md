@@ -54,6 +54,8 @@ The project map, claim inspector and Claims page show the claim’s recorded rev
 
 In **Claims** or **Agent work**, choose **Display → Board**, **List** or **Table**. Board groups work by status, List puts each item on its own line and Table aligns each item’s fields. Claims starts in Board and Agent work starts in List. Each section remembers its own layout on this device. Open a claim’s preview or a task’s details from any layout.
 
+In List or Table, use the checkboxes to select items. Shift-click a checkbox to include the rows between it and the last selection. With the list or table focused, press **⌘A** (**Ctrl+A** on Windows) to select every visible item or **Esc** to clear. **Copy record IDs** puts the selected claim or Agent work IDs on the clipboard in display order.
+
 Team opens on **Agents**. Add installed models from [Team → Runtimes](project-intake.md#connect-a-model), where **Environment check** has its own section. For a managed installation with tools outside the standard locations, the Trellin launch environment can supply colon-separated absolute directories through `RM_DESKTOP_TOOL_PATH`.
 
 If **Proof activity** needs a newer database, choose **Back up and upgrade**. Confirm the project path in the Mac dialog. Trellin verifies a local archive containing the project files and PostgreSQL snapshot before it upgrades the selected database, then reopens the project. Keep the archive for recovery. The dialog requires this project’s saved database owner login.

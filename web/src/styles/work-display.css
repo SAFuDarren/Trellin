@@ -119,3 +119,65 @@
 .work-display-progress .tag {
   white-space: normal;
 }
+
+.work-selection-area {
+  min-width: 0;
+}
+
+.work-selection-area:focus-visible {
+  outline-offset: -2px;
+}
+
+.work-selection-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 12px 22px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: var(--track);
+  font-size: var(--type-meta-size);
+}
+
+.work-selection-actions > span:first-child {
+  font-weight: var(--type-semibold);
+}
+
+.work-selection-notice {
+  color: var(--sub);
+}
+
+.work-selection-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+}
+
+.work-selection-row-content {
+  min-width: 0;
+}
+
+.work-selection-checkbox {
+  width: 15px;
+  height: 15px;
+  margin: 2px 0;
+  cursor: pointer;
+}
+
+.work-selection-row > .work-selection-checkbox {
+  justify-self: center;
+  margin-block-start: 15px;
+}
+
+.work-display-grid .table .work-selection-cell {
+  width: 32px;
+  padding-inline: 8px;
+  text-align: center;
+  vertical-align: top;
+}
+
+.work-selection-area [data-work-selected="true"] {
+  background: var(--accent-wash);
+}

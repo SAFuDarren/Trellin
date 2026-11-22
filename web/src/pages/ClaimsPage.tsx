@@ -8,6 +8,7 @@ import { ClaimReviewLinks } from "../components/ClaimReviewLinks";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { Spin } from "../components/Icons";
 import { WorkDisplayMenu, WorkStatusColumn, WorkTable, useWorkLayout } from "../components/WorkDisplay";
+import { WorkSelectionArea, WorkSelectionCheckbox, useWorkItemSelection } from "../components/WorkItemSelection";
 import { href } from "../shell/route";
 import type { ClaimProgress } from "../workbench/claimProgress";
 import { statusText } from "../workbench/text";
@@ -114,6 +115,8 @@ export function ClaimsPage({
     ...new Set(list.map((claim) => claim.status).filter((status) => !(COLUMNS as readonly string[]).includes(status))),
   ];
   const title = domain || t(`claimsPage.filter.${filter}`);
+  const selectionScope = JSON.stringify([session, sub, layout]);
+  const selection = useWorkItemSelection(selectionScope, layout === "board" ? [] : shown.map(({ id }) => id));
 
   function renderClaim(claim: ClaimsResponse["claims"][number]) {
     const record = counts.get(claim.id);
@@ -164,10 +167,13 @@ export function ClaimsPage({
       <ClaimPreview session={session} claimId={claim.id} id={previewId} onOpen={() => onOpen(claim.id)} />
     );
 
+    const checkbox = <WorkSelectionCheckbox id={claim.id} title={name} selection={selection} />;
+    const selected = selection.contains(claim.id);
     if (layout === "table") {
       return (
         <Fragment key={claim.id}>
-          <tr data-expanded={expanded}>
+          <tr data-expanded={expanded} data-work-selected={selected}>
+            <td className="work-selection-cell">{checkbox}</td>
             <th scope="row">
               <button type="button" className="work-display-name" {...toggleProps}>
                 {name}
@@ -183,7 +189,7 @@ export function ClaimsPage({
           </tr>
           {preview && (
             <tr className="work-display-detail">
-              <td colSpan={3}>{preview}</td>
+              <td colSpan={4}>{preview}</td>
             </tr>
           )}
         </Fragment>
@@ -203,8 +209,9 @@ export function ClaimsPage({
       </>
     );
     return layout === "list" ? (
-      <li className="board-card" key={claim.id} data-live={live > 0}>
-        {content}
+      <li className="board-card work-selection-row" key={claim.id} data-live={live > 0} data-work-selected={selected}>
+        {checkbox}
+        <div className="work-selection-row-content">{content}</div>
       </li>
     ) : (
       <article className="board-card" key={claim.id} data-live={live > 0}>
@@ -248,16 +255,24 @@ export function ClaimsPage({
         <Empty>{claims.error.message}</Empty>
       ) : shown.length === 0 ? (
         <Empty>{claims.isPending ? t("common.loading") : t("claimsPage.none")}</Empty>
-      ) : layout === "table" ? (
-        <WorkTable label={title} columns={[t("workDisplay.claim"), t("workDisplay.domain"), t("workDisplay.progress")]}>
-          {shown.map(renderClaim)}
-        </WorkTable>
-      ) : layout === "list" ? (
-        <div className="page-body">
-          <ul className="work-display-list" role="list" aria-label={title}>
-            {shown.map(renderClaim)}
-          </ul>
-        </div>
+      ) : layout !== "board" ? (
+        <WorkSelectionArea key={selectionScope} label={title} selection={selection}>
+          {layout === "table" ? (
+            <WorkTable
+              label={title}
+              columns={[t("workDisplay.claim"), t("workDisplay.domain"), t("workDisplay.progress")]}
+              selectionLabel={t("workSelection.column")}
+            >
+              {shown.map(renderClaim)}
+            </WorkTable>
+          ) : (
+            <div className="page-body">
+              <ul className="work-display-list" role="list" aria-label={title}>
+                {shown.map(renderClaim)}
+              </ul>
+            </div>
+          )}
+        </WorkSelectionArea>
       ) : (
         <div className="board">
           {columns.map((status) => {
