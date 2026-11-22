@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.93
+
+- When dragging a research link, the project map marks both points where the link will attach. Keyboard focus uses a thin outline inside the map.
+
 ## 1.0.92
 
 - Navigation, project and chat selections and selected Library rows now use a soft background fill. Keyboard focus keeps its own outline.
