@@ -5,6 +5,7 @@ import type { InboxItem, Job } from "../src/api/sections";
 import type { AtlasClaim, GraphSnapshot } from "../src/workbench/types";
 import { mapClaim } from "./project-map";
 import { mockWorkspaceEvents } from "./workspace-events";
+import { openDestination } from "./navigation";
 
 const WORKSPACE = "11111111-2222-4333-8444-555555555555";
 const WAITING_SINCE = "2026-11-21T00:00:00Z";
@@ -274,7 +275,7 @@ test("exact obligation totals and waiting states agree on the map, inspector and
   await expect(readyCard).toHaveAccessibleDescription(/No recorded obligations/);
   await expectProgress(detail, "Ready to start", "open", ZERO);
 
-  await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
+  await openDestination(page, "Claims");
   for (const [target, label, tone, count] of states.slice(1, 3)) {
     const card = page.locator(".board-card").filter({ hasText: target.title! });
     await expectProgress(card, label, tone, count);
@@ -377,7 +378,7 @@ test("a proved claim keeps its status and opens either recorded result by identi
   await expectProgress(detail, "Proved", "ok", null);
   await expect(detail.getByRole("button", { name: "Review", exact: true })).toBeVisible();
 
-  await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
+  await openDestination(page, "Claims");
   const provedColumn = page.getByRole("region", { name: "Proved", exact: true });
   const provedCard = provedColumn.locator(".board-card").filter({ hasText: proved.title! });
   await expect(provedCard.locator(".claim-progress-empty")).toHaveCount(0);

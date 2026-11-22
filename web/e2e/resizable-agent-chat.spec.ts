@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
+import { openDestination } from "./navigation";
 
 const SIZE_KEY = "research-multiplier-agent-chat-size";
 const precise = { exact: true };
@@ -97,8 +98,9 @@ for (const viewport of [
     await expect(draft).toHaveValue("Keep this floating-chat draft across pages.");
 
     const rail = page.getByRole("navigation", { name: "Sections", ...precise });
-    for (const label of [/^Library$/, /^Claims$/, /^Team/]) {
-      await rail.getByRole("link", { name: label }).click();
+    for (const destination of ["Library", "Claims", "Team"] as const) {
+      if (destination === "Team") await rail.getByRole("link", { name: /^Team/ }).click();
+      else await openDestination(page, destination);
       await expect(dock).toHaveCSS("position", "fixed");
       await expect.poll(() => size(dock)).toEqual(chosen);
       await expect(draft).toHaveValue("Keep this floating-chat draft across pages.");
@@ -143,7 +145,7 @@ test("desktop restores the per-user size and writes only dimensions after resizi
     });
   });
   await page.goto("/#session=fixture");
-  await page.getByRole("link", { name: "Library", ...precise }).click();
+  await openDestination(page, "Library");
   await launcher(page).click();
   await expect.poll(() => size(chat(page))).toEqual({ width: 384, height: 316 });
   await chat(page)

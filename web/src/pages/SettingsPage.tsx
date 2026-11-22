@@ -5,6 +5,7 @@ import { LANGUAGES, setLanguage, type Language } from "../i18n";
 import { ReleaseNotesLink } from "../components/ReleaseUpdateNotice";
 import { SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
+import { desktopProjectLibrary } from "../workbench/desktop";
 import "../styles/settings.css";
 
 type Setting = {
@@ -47,6 +48,7 @@ export function SettingsPage({
     return () => cancelAnimationFrame(frame);
   }, [sub, hasUpdates]);
 
+  const desktop = desktopProjectLibrary();
   const groups: { id: string; label: string; entries: Setting[] }[] = [
     {
       id: "personal",
@@ -130,6 +132,37 @@ export function SettingsPage({
         },
       ],
     },
+    ...(desktop
+      ? [
+          {
+            // #289: tools that change where projects live. Ordinary use never needs them.
+            id: "advanced",
+            label: t("settings.groups.advanced"),
+            entries: [
+              {
+                id: "open-folder",
+                label: t("settings.advanced.openFolder"),
+                note: t("settings.advanced.openFolderNote"),
+                control: (
+                  <button className="button" type="button" onClick={() => void desktop.act({ action: "folder" })}>
+                    {t("settings.advanced.openFolderAction")}
+                  </button>
+                ),
+              },
+              {
+                id: "library-location",
+                label: t("settings.advanced.libraryLocation"),
+                note: t("settings.advanced.libraryLocationNote"),
+                control: (
+                  <button className="button" type="button" onClick={() => void desktop.act({ action: "storage" })}>
+                    {t("settings.advanced.libraryLocationAction")}
+                  </button>
+                ),
+              },
+            ],
+          },
+        ]
+      : []),
     {
       id: "about",
       label: t("settings.groups.about"),

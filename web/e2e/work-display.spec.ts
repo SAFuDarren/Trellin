@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { AgentWorkTask } from "../src/api/agentWork";
+import { openDestination } from "./navigation";
 
 const CLAIM = "自然数加零的对称性";
 const COUNT = "1 of 2 obligations verified";
@@ -37,8 +38,8 @@ async function layout(page: Page, name: string) {
   await expect(display(page)).toBeFocused();
 }
 
-async function section(page: Page, name: string) {
-  await page.locator("nav.rail").getByRole("link", { name, exact: true }).click();
+async function section(page: Page, name: "Claims" | "Agent work") {
+  await openDestination(page, name === "Agent work" ? "Agent tasks" : name);
 }
 
 test("Claims preserves progress, review links and previews in Board, List and Table", async ({ page }) => {
@@ -115,7 +116,8 @@ test("Agent work remembers its layout separately and opens the same handoff reco
   await board.getByRole("link", { name: new RegExp(delivered.title) }).click();
   await expect(page.getByText("The lemma was checked.")).toBeVisible();
   await expect(display(page)).toHaveCount(0);
-  const all = page.locator(".section-nav").getByRole("link", { name: /^All tasks/ });
+  // #289: the space entry "Agent tasks" is the full list; the page no longer repeats it as "All tasks".
+  const all = page.locator(".section-nav").getByRole("link", { name: /^Agent tasks/ });
   await all.click();
 
   await layout(page, "Table");

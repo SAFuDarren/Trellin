@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
+import { openDestination } from "./navigation";
 
 // #163: interactive elements share one transition, radii come from one scale,
 // floating layers enter with motion, and reduced motion removes it.
@@ -152,7 +153,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     if (reducedMotion === "reduce") {
       await expect(card).toHaveCSS("transition-duration", "0s, 0s, 0s, 0s, 0s");
     }
-    await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
+    await openDestination(page, "Claims");
     await expectToken(dock, "box-shadow", "--elevation-dialog");
   });
 }

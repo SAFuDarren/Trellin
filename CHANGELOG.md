@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.107
+
+- The left rail now has five spaces, as in Multica: **Home** (project map and Claims), **Work** (Inbox, Review, Agent tasks and the Library), **Chats**, **Team** and **Automation**. Each space's panel lists its pages, and pages no longer repeat an entry the panel already has.
+- Projects are switched and created from the tile at the top of the rail. **Open Folder** and the library location moved to **Settings → Advanced**. The Switch view and Refresh buttons are gone from the sidebar header.
+
 ## 1.0.106
 
 - The screens Trellin shows before the workbench opens now match the workbench: a centred panel with an icon for the kind of problem, one primary action that fixes it, and the path and error code behind **Show Details**. Problems with a project lead back to **Open Library**; opening another folder is offered only after you chose one.

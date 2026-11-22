@@ -572,10 +572,13 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
                 replyHandler(true, nil)
                 self.open(.registered(id, workspace))
             }
-        case .newProject, .folder:
+        case .newProject, .folder, .storage:
             guard canPresent else { replyHandler(nil, unavailable); return }
-            if request == .newProject { newProject() }
-            else { chooseWorkspace() }
+            switch request {
+            case .newProject: newProject()
+            case .storage: showStorage()
+            default: chooseWorkspace()
+            }
             replyHandler(true, nil)
         }
     }

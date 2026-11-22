@@ -2,14 +2,16 @@ import { expect, test, type Page } from "@playwright/test";
 
 const destinations = {
   "#workbench": ["Project map", "项目图谱"],
-  "#claims": ["Claims", "课题"],
-  "#library": ["Library", "定理库"],
+  // #289: Claims sits in the Home space and the Library in the Work space, so their panels carry the space name.
+  "#claims": ["Home", "主页"],
+  "#library": ["Work", "工作"],
+  "#agent-work/inbox": ["Work", "工作"],
   "#chat": ["Chats", "对话"],
   "#team": ["Team", "团队"],
-  "#progress": ["Automation", "推进"],
+  "#progress": ["Automation", "自动化"],
   "#settings": ["Settings", "设置"],
   "#team/agents": ["Agents", "执行者"],
-  "#agent-work": ["Agent work", "Agent 任务"],
+  "#agent-work": ["Work", "工作"],
 } as const;
 type Destination = keyof typeof destinations;
 
@@ -51,15 +53,8 @@ for (const [localeName, locale] of [
     await expect(inside.locator('a[href="#review"]')).toHaveCount(0);
 
     const places = inside.getByRole("region", { name: ["Where to work", "工作入口"][locale], exact: true });
-    const primaryDestinations = [
-      "#workbench",
-      "#claims",
-      "#library",
-      "#chat",
-      "#team",
-      "#progress",
-      "#settings",
-    ] as const;
+    // One link per space, in rail order (#289).
+    const primaryDestinations = ["#workbench", "#agent-work/inbox", "#chat", "#team", "#progress"] as const;
     await expect(places.getByRole("link")).toHaveCount(primaryDestinations.length);
     for (const path of primaryDestinations) {
       await places.locator(`a[href="${path}"]`).click();

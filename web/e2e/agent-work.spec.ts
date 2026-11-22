@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { AgentWorkRequest, AgentWorkTask } from "../src/api/agentWork";
 import type { TeamAgent } from "../src/api/teamAgents";
+import { openDestination } from "./navigation";
 
 const WORKSPACE = "11000000-0000-4000-8000-000000000011";
 const CONNECTION = "11000000-0000-4000-8000-000000000012";
@@ -236,7 +237,7 @@ test("retrying an interrupted run requires fresh scope approval and resends the 
   });
 
   await page.goto("/#session=fixture");
-  await page.locator("nav.rail").getByRole("link", { name: "Agent work", exact: true }).click();
+  await openDestination(page, "Agent tasks");
   await page.getByRole("link", { name: /Draft the release summary/ }).click();
   const pageHeader = page.locator(".agent-work-view > .page-head");
   const scrollPanel = page.locator(".agent-work-scroll");
@@ -272,9 +273,9 @@ test("Claims, Agent work and Review each have one active rail link, including le
   const sidebar = page.locator(".section-nav");
   const activeRail = rail.locator('[aria-current="page"]');
 
-  await rail.getByRole("link", { name: "Claims", exact: true }).click();
+  await openDestination(page, "Claims");
   await expect(activeRail).toHaveCount(1);
-  await expect(activeRail).toHaveAttribute("href", "#claims");
+  await expect(activeRail).toHaveAccessibleName("Home");
   await expect(sidebar.getByRole("link", { name: "Agent work", exact: true })).toHaveCount(0);
 
   for (const sub of ["", "/waiting", "%2Fnew%2Fagent%2F" + savedAgents[0]!.id]) {
@@ -284,27 +285,26 @@ test("Claims, Agent work and Review each have one active rail link, including le
     const canonical = "#agent-work" + (sub.startsWith("%2F") ? "/" + sub.slice(3) : sub);
     await expect(page).toHaveURL(new RegExp(canonical + "$"));
     await expect(activeRail).toHaveCount(1);
-    await expect(activeRail).toHaveAttribute("href", "#agent-work");
+    await expect(activeRail).toHaveAccessibleName(/^Work/);
     await expect(sidebar.getByRole("link", { name: "Claims", exact: true })).toHaveCount(0);
   }
 
   await sidebar.getByRole("link", { name: "Agent activity", exact: true }).click();
   await expect(page).toHaveURL(/#agent-work\/activity$/);
-  await expect(activeRail).toHaveAttribute("href", "#agent-work");
+  await expect(activeRail).toHaveAccessibleName(/^Work/);
   const activity = page.locator("main").getByRole("group", { name: "Filter activity" });
   await expect(activity).toBeVisible();
   await activity.getByRole("button", { name: "Running", exact: true }).click();
   await expect(page.locator('main [data-activity-state="running"]').first()).toBeVisible();
   await expect(page.locator('main [data-activity-state="completed"]')).toHaveCount(0);
 
-  const review = rail.getByRole("link", { name: /^Review/ });
-  await review.click();
+  await openDestination(page, "Review");
   await expect(activeRail).toHaveCount(1);
-  await expect(activeRail).toHaveAttribute("href", "#review");
+  await expect(activeRail).toHaveAccessibleName(/^Work/);
   await page.evaluate(() => {
     window.location.hash = "#review/77777777-7777-4777-8777-777777777777";
   });
   await expect(page).toHaveURL(/#review\/77777777-7777-4777-8777-777777777777$/);
   await expect(activeRail).toHaveCount(1);
-  await expect(activeRail).toHaveAttribute("href", "#review");
+  await expect(activeRail).toHaveAccessibleName(/^Work/);
 });

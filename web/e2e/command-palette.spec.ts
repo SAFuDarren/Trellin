@@ -5,6 +5,7 @@ import type { TeamAgent } from "../src/api/teamAgents";
 import { SECTIONS } from "../src/shell/route";
 import type { Atlas, GraphNode, GraphSnapshot } from "../src/workbench/types";
 import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
+import { openDestination } from "./navigation";
 
 const CLAIM_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_CLAIM_ID = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -68,8 +69,9 @@ test("both shortcuts work throughout the shell and Escape restores the previous 
   const home = page.locator("nav.rail").getByRole("link", { name: "Home", exact: true });
   for (const [index, section] of SECTIONS.entries()) {
     await page.goto(`/#${section}`);
-    if (["workbench", "claims", "library", "chat", "team", "progress"].includes(section)) {
-      await expect(page.locator(`nav.rail .rail-link[href="#${section}"]`)).toHaveAttribute("aria-current", "page");
+    if (!["settings", "help"].includes(section)) {
+      // #289: every page lights up exactly one space in the rail.
+      await expect(page.locator('nav.rail .rail-group [aria-current="page"]')).toHaveCount(1);
     }
     await home.focus();
     const search = await openPalette(page, index % 2 === 0 ? "Control+k" : "Meta+k");
@@ -213,7 +215,7 @@ test("the # prefix searches claims and exact proof references with the keyboard"
   await expect(original).toBeFocused();
 
   await page.getByRole("button", { name: "Collapse review column" }).click();
-  await page.locator("nav.rail").getByRole("link", { name: "Library", exact: true }).click();
+  await openDestination(page, "Library");
   await choose(page, "OTHER-02", "OTHER-02");
   await expect(page.locator(".claim-heading h1")).toHaveText("Other claim");
   await page.locator(".proof-return").click();

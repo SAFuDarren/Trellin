@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { GraphSnapshot } from "../src/workbench/types";
 import { openProof } from "./project-map";
+import { openDestination, railSpace } from "./navigation";
 
 const CLAIM_TITLE = "自然数加零的对称性";
 const LONG_TITLE = "Symmetry of equality on the natural numbers";
@@ -28,12 +29,12 @@ async function open(page: Page, singleGoal = false) {
 
 test("a claim expands and collapses in place with its recorded statement", async ({ page }) => {
   await open(page);
-  await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
+  await openDestination(page, "Claims");
   const card = page.locator(".board").getByRole("button", { name: new RegExp(CLAIM_TITLE) });
   await expect(card).toHaveAttribute("aria-expanded", "false");
   await card.click();
   await expect(card).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator("#section-title")).toHaveText("Claims");
+  await expect(page.locator("#section-title")).toHaveText("Home");
   await expect(page.getByText(WORDING, { exact: true })).toBeVisible();
   await expect(page.getByText(FORMALIZATION, { exact: true })).toBeVisible();
   await card.click();
@@ -92,7 +93,7 @@ test("the proof inspector keeps the complete formula and Lean text", async ({ pa
 
 test("Library shows the same state in the list and the inspector", async ({ page }) => {
   await open(page);
-  await page.locator("nav.rail").getByRole("link", { name: "Library", exact: true }).click();
+  await openDestination(page, "Library");
   const workspace = page.locator(".page-body");
   const admitted = workspace.getByRole("row", { name: /Nat.add_zero/ });
   const needsRecheck = workspace.getByRole("row", { name: /Nat.mul_comm/ });
@@ -132,7 +133,7 @@ for (const { width, height, colorScheme } of [
       });
     });
     await page.goto("/#session=fixture");
-    await page.locator("nav.rail").getByRole("link", { name: "Library", exact: true }).click();
+    await openDestination(page, "Library");
 
     const table = page.getByRole("table");
     await expect(table.getByRole("columnheader", { name: "Actions", exact: true })).toHaveCount(0);
@@ -155,7 +156,7 @@ for (const { width, height, colorScheme } of [
     await expect(action).toHaveCSS("opacity", "0");
     await proseName.hover();
     await expect(action).toHaveCSS("opacity", "1");
-    await page.locator("nav.rail").getByRole("link", { name: "Library", exact: true }).hover();
+    await railSpace(page, "Work").hover();
     await expect(action).toHaveCSS("opacity", "0");
 
     await proseRow.focus();

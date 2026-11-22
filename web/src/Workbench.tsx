@@ -28,13 +28,7 @@ import { href } from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
 import type { InboxItem } from "./api/sections";
 import type { ClaimProgress } from "./workbench/claimProgress";
-import {
-  desktopPosition,
-  desktopProjectLibrary,
-  desktopProjectName,
-  saveDesktopPosition,
-  type DesktopPosition,
-} from "./workbench/desktop";
+import { desktopPosition, desktopProjectName, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
 import { nodeTitle } from "./workbench/text";
 import type { ActivitySnapshot, GraphNode, ImpactPreview } from "./workbench/types";
@@ -73,7 +67,6 @@ export function Workbench({
   claimReviews,
   focus,
   onFocusHandled,
-  pendingReviews,
   returnTo,
   onPositionChange,
   onChatAnchor,
@@ -86,7 +79,6 @@ export function Workbench({
   claimReviews: ReadonlyMap<string, readonly InboxItem[]>;
   focus?: Focus | null;
   onFocusHandled: (focus: null) => void;
-  pendingReviews: number | undefined;
   returnTo?: WorkbenchPosition;
   onPositionChange: (position: WorkbenchPosition) => void;
   onChatAnchor: (anchor: ConversationAnchor, title: string, starterScope: ConversationStarterScope) => void;
@@ -133,11 +125,8 @@ export function Workbench({
   const [live, setLive] = useState<{ side?: number; right?: number }>({});
   const canvas = useProjectCanvas(session, true);
   const projects = useDesktopProjectList();
-  // The sidebar lists projects, so without a saved choice it stays folded when there is only one:
-  // a browser session (no project library) or a library with a single project. An empty or failed
-  // library keeps it open, because adding or retrying a project happens there.
-  const singleProject = !desktopProjectLibrary() || projects.data?.projects.length === 1;
-  const sidebarOpen = sizes.sidebarOpen ?? (layout.sidebarOpen && !projects.isLoading && !singleProject);
+  // The sidebar is the Home space's panel (#289). It opens by default only where the map keeps room beside it.
+  const sidebarOpen = sizes.sidebarOpen ?? layout.sidebarOpen;
   const projectName =
     projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name.trim() ||
     desktopProjectName() ||
@@ -507,9 +496,6 @@ export function Workbench({
     if (next === "impact" && assumption) selectNode(assumption.id);
     setView(next);
   };
-  const refresh = () => {
-    void queries.invalidateQueries();
-  };
   const openRecorded = async (id?: string) => {
     await queries.invalidateQueries();
     if (id) inspectClaim(id);
@@ -576,12 +562,9 @@ export function Workbench({
       style={{ "--side-w": `${side}px`, "--right-w": `${right}px` } as React.CSSProperties}
     >
       <Sidebar
-        pendingReviews={pendingReviews}
         open={sidebarOpen}
         workspaceState={workspaceState}
         onToggle={() => layout.update({ sidebarOpen: !sidebarOpen })}
-        onRefresh={refresh}
-        refreshing={claims.isFetching}
       />
       <Splitter
         name="side"

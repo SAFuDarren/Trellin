@@ -2,14 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { href, type Section } from "../shell/route";
+import { entryHref, SPACES, spaceOf, type Space, type SpaceId } from "../shell/spaces";
 import { formatShortcut, SHORTCUTS } from "../shortcuts";
 import { WorkbenchIcon } from "./Icons";
 import { NavigationMenu } from "./NavigationMenu";
+import { ProjectTile } from "./SidebarProjects";
 
-const GROUPS: Section[][] = [
-  ["workbench", "claims", "agent-work", "review", "library"],
-  ["chat", "team", "progress"],
-];
+const SPACE_ICONS: Record<SpaceId, string> = {
+  home: "workbench",
+  work: "claims",
+  chat: "chat",
+  team: "team",
+  automation: "progress",
+};
 const UTILITIES = ["settings", "help"] as const;
 const brandMark = new URL("../brand/favicon.svg", import.meta.url).href;
 const HOVER_DELAY = 300;
@@ -22,7 +27,7 @@ export function Rail({
   onSearch,
 }: {
   current: Section;
-  badges: Partial<Record<Section, { count: number; live?: boolean }>>;
+  badges: Partial<Record<SpaceId, { count: number; live?: boolean }>>;
   onSearch: () => void;
 }) {
   const { t } = useTranslation();
@@ -55,17 +60,18 @@ export function Rail({
     };
   }, []);
 
-  const link = (section: Section) => {
-    const label = t(section === "workbench" ? "navigation.home" : `rail.${section}`);
-    const badge = badges[section];
-    const badgeLabel = badge?.count ? t(`rail.badge.${section}`, { count: badge.count }) : "";
+  const active = spaceOf(current)?.id;
+  const link = (space: Space) => {
+    const label = t(space.labelKey);
+    const badge = badges[space.id];
+    const badgeLabel = badge?.count ? t(`rail.badge.${space.id}`, { count: badge.count }) : "";
     return (
-      <li key={section}>
+      <li key={space.id}>
         <a
           className="rail-link"
-          href={href(section)}
+          href={entryHref(space.entries[0]!)}
           aria-label={badgeLabel ? `${label} · ${badgeLabel}` : label}
-          aria-current={current === section ? "page" : undefined}
+          aria-current={active === space.id ? "page" : undefined}
           onPointerEnter={(event) => {
             if (event.pointerType === "mouse")
               show(event.currentTarget, label, performance.now() < warmUntil.current ? 0 : HOVER_DELAY);
@@ -80,7 +86,7 @@ export function Rail({
           }}
           onBlur={hide}
         >
-          <WorkbenchIcon name={section} />
+          <WorkbenchIcon name={SPACE_ICONS[space.id]} />
           {badge && badge.count > 0 && (
             <b className={badge.live ? "rail-badge live" : "rail-badge"} aria-hidden="true">
               {badge.count > 99 ? "99+" : badge.count}
@@ -93,15 +99,15 @@ export function Rail({
 
   return (
     <nav className="rail" aria-label={t("rail.label")}>
-      <a className="rail-brand" href={href("workbench")} title={t("app.name")} aria-label={t("app.name")}>
-        <img src={brandMark} alt="" width={32} height={32} />
-      </a>
+      <ProjectTile
+        fallback={
+          <a className="rail-brand" href={href("workbench")} title={t("app.name")} aria-label={t("app.name")}>
+            <img src={brandMark} alt="" width={32} height={32} />
+          </a>
+        }
+      />
       <div className="rail-main" onScroll={hide}>
-        {GROUPS.map((sections) => (
-          <ul className="rail-group" key={sections[0]}>
-            {sections.map(link)}
-          </ul>
-        ))}
+        <ul className="rail-group">{SPACES.map(link)}</ul>
       </div>
       <div className="rail-foot">
         <button

@@ -1,9 +1,13 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { desktopProjectLibrary, type DesktopProjectAction, type DesktopProjectLibrary } from "../workbench/desktop";
+import {
+  desktopProjectLibrary,
+  desktopProjectName,
+  type DesktopProjectAction,
+  type DesktopProjectLibrary,
+} from "../workbench/desktop";
 import { Popover } from "./FloatingControls";
-import { Chevron } from "./Icons";
 import "../styles/sidebar-projects.css";
 
 type SidebarProjectsProps = { open: boolean; onExpand?: () => void };
@@ -35,32 +39,37 @@ export function SidebarProjects(props: SidebarProjectsProps) {
 }
 
 export function ProjectHeading({ name }: { name: string }) {
-  const { t } = useTranslation();
-  const id = useId();
-  const label = t("projects.switch", { name });
-  const library = desktopProjectLibrary();
+  // Projects are switched from the tile at the top of the rail (#289).
   return (
     <h1 aria-label={name} title={name}>
-      {library ? (
-        <Popover
-          label={label}
-          panelId={id}
-          popup="dialog"
-          triggerClassName="project-switcher-trigger"
-          className="project-switcher-panel"
-          trigger={
-            <>
-              <span>{name}</span>
-              <Chevron />
-            </>
-          }
-        >
-          {() => <RegisteredProjects open library={library} />}
-        </Popover>
-      ) : (
-        name
-      )}
+      {name}
     </h1>
+  );
+}
+
+/** The current project at the top of the rail, like Multica's workspace tile. It opens the project switcher. */
+export function ProjectTile({ fallback }: { fallback: ReactNode }) {
+  const { t } = useTranslation();
+  const id = useId();
+  const library = desktopProjectLibrary();
+  const list = useDesktopProjectList(library);
+  if (!library) return fallback;
+  const active = list.data?.projects.find((project) => project.id.toLowerCase() === list.data?.activeId);
+  const name = active?.name ?? desktopProjectName() ?? t("projects.title");
+  const initial = Array.from(name.trim())[0]?.toLocaleUpperCase() ?? "T";
+  return (
+    <Popover
+      label={t("projects.switch", { name })}
+      panelId={id}
+      popup="dialog"
+      triggerClassName="rail-project-tile"
+      triggerTitle={t("projects.switch", { name })}
+      className="project-switcher-panel"
+      placement="bottom-start"
+      trigger={<span aria-hidden="true">{initial}</span>}
+    >
+      {() => <RegisteredProjects open library={library} />}
+    </Popover>
   );
 }
 
@@ -139,16 +148,6 @@ function RegisteredProjects({ library, open, onExpand }: SidebarProjectsProps & 
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
-        </button>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label={t("projects.openFolder")}
-          title={t("projects.openFolder")}
-          aria-disabled={opening || undefined}
-          onClick={() => void act({ action: "folder" })}
-        >
-          <Folder />
         </button>
       </header>
       {list.isPending && <p role="status">{t("common.loading")}</p>}

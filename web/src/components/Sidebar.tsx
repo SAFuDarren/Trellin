@@ -1,40 +1,26 @@
 import { useTranslation } from "react-i18next";
-import { SidebarProjects } from "./SidebarProjects";
-import { WorkbenchViewMenu } from "./WorkbenchViewMenu";
+import { useSpaceGroup } from "./SectionLayout";
 
+/** The Home space's panel (#289): its entries, with projects switched from the rail tile. */
 export function Sidebar({
-  pendingReviews,
   open,
   workspaceState,
   onToggle,
-  onRefresh,
-  refreshing,
 }: {
-  pendingReviews: number | undefined;
   open: boolean;
   workspaceState: string;
   onToggle: () => void;
-  onRefresh: () => void;
-  refreshing: boolean;
 }) {
   const { t } = useTranslation();
+  const group = useSpaceGroup("home");
   return (
-    <nav className="sidebar project-sidebar" id="sidebar" aria-label={t("projects.title")}>
+    <nav className="sidebar project-sidebar" id="sidebar" aria-labelledby="home-space-title">
       <div className="brand">
-        <WorkbenchViewMenu current="workbench" pendingReviews={pendingReviews} />
-        <button
-          type="button"
-          className="icon-button sidebar-refresh"
-          aria-label={t("sidebar.refresh")}
-          title={t("sidebar.refresh")}
-          disabled={refreshing}
-          onClick={onRefresh}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 11a8 8 0 1 0-2.3 5.7" />
-            <path d="M20 4v7h-7" />
-          </svg>
-        </button>
+        {open && (
+          <h1 id="home-space-title" className="sidebar-space-title">
+            {t("spaces.home")}
+          </h1>
+        )}
         <button
           type="button"
           className="icon-button"
@@ -49,7 +35,23 @@ export function Sidebar({
           </svg>
         </button>
       </div>
-      <SidebarProjects open={open} onExpand={onToggle} />
+      {open && group && (
+        <div className="nav-group sidebar-space-entries">
+          {group.entries.map((entry) => (
+            <a
+              key={entry.key}
+              className="nav-item"
+              href={entry.href}
+              aria-current={entry.current ? "page" : undefined}
+              title={entry.label}
+            >
+              <span className="nav-line">
+                <span className="label">{entry.label}</span>
+              </span>
+            </a>
+          ))}
+        </div>
+      )}
       <footer className="sidebar-foot">
         <span title={workspaceState}>{workspaceState}</span>
       </footer>

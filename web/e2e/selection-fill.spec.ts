@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { openDestination, railSpace } from "./navigation";
 
 for (const theme of ["light", "dark"] as const) {
   test(`selected navigation and Library rows use fill, hover and focus in ${theme}`, async ({ page }) => {
@@ -19,13 +20,9 @@ for (const theme of ["light", "dark"] as const) {
       await expect(item).toHaveCSS("background-color", selectedFill);
       await expect(item).toHaveCSS("box-shadow", "none");
     };
-    // A browser session has one project, so the project sidebar starts folded (#283).
-    await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
-    await expectSelected(page.locator('.sidebar-projects-row[aria-current="page"]'));
-
-    const claims = rail.getByRole("link", { name: "Claims", exact: true });
-    await claims.click();
-    const allClaims = sidebar.getByRole("link", { name: /^All claims/ });
+    await openDestination(page, "Claims");
+    const claims = railSpace(page, "Home");
+    const allClaims = sidebar.getByRole("link", { name: "Claims", exact: true });
     const otherClaimView = sidebar.locator('.nav-item:not([aria-current="page"])').first();
     await expectSelected(claims);
     await expectSelected(allClaims);
@@ -38,10 +35,10 @@ for (const theme of ["light", "dark"] as const) {
     await expect(allClaims).toHaveCSS("outline-width", "2px");
     await expect(allClaims).toHaveCSS("outline-style", "solid");
 
-    await rail.getByRole("link", { name: "Library", exact: true }).click();
+    await openDestination(page, "Library");
     const firstRow = page.locator(".library-table tr[data-row]").first();
     await firstRow.click();
-    await expectSelected(sidebar.locator('[aria-current="page"]'));
+    await expectSelected(sidebar.getByRole("link", { name: "Library", exact: true }));
     await expect(firstRow).toHaveAttribute("aria-selected", "true");
     await expectSelected(firstRow);
     await expect(firstRow.locator("td").first()).toHaveCSS("box-shadow", "none");

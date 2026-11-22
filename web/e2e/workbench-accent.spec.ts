@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { GraphSnapshot } from "../src/workbench/types";
 import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
+import { openDestination } from "./navigation";
 
 type Contrast = { foreground: string; background: string };
 
@@ -200,7 +201,7 @@ for (const colorScheme of ["light", "dark"] as const) {
 
 test("the board has a distinct page, section and card heading scale", async ({ page }) => {
   await page.goto("/#session=fixture");
-  await page.locator("nav.rail").getByRole("link", { name: "Claims", exact: true }).click();
+  await openDestination(page, "Claims");
   await expect(page.locator(".page-head h2")).toHaveCSS("font-size", "22px");
   const column = page.locator(".board-column").first();
   await expect(column.locator("header").first()).toHaveCSS("font-size", "16px");

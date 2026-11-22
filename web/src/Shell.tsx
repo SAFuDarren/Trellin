@@ -14,6 +14,7 @@ import { AgentChatDock, type AgentChatRequest } from "./components/AgentChatDock
 import type { ConversationStarterScope } from "./components/ConversationRecipients";
 import { CommandPalette } from "./components/CommandPalette";
 import { Rail } from "./components/Rail";
+import { SpaceCounts } from "./components/SectionLayout";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
 import { ShortcutSheet } from "./components/ShortcutSheet";
 import { WorkspaceActivityList } from "./components/WorkspaceActivity";
@@ -230,96 +231,97 @@ export function Shell({ session }: { session: string }) {
               current={section}
               badges={{
                 team: { count: activity.counts.running, live: true },
-                review: { count: pendingReviews ?? 0 },
-                "agent-work": { count: workspaceInbox.unread },
+                // The inbox already holds the review items (#270), so the larger count is the number waiting.
+                work: { count: Math.max(pendingReviews ?? 0, workspaceInbox.unread) },
               }}
               onSearch={openPalette}
             />
-            {section === "review" ? (
-              <ReviewPage session={session} sub={sub} onOpen={open} pendingReviews={pendingReviews} />
-            ) : section === "agent-work" ? (
-              <AgentWorkPage
-                session={session}
-                sub={sub}
-                inboxUnread={workspaceInbox.unread}
-                inbox={
-                  showsInbox && (
-                    <WorkspaceInbox
-                      key={inboxScope ?? session}
-                      inbox={workspaceInbox}
-                      agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
-                      loading={inbox.isPending || team.isPending || agentWorkList.isPending}
-                      unavailable={inbox.isError || team.isError || agentWorkList.isError}
-                      onOpenProof={(id, nodeId) => open(id, nodeId, true)}
-                    />
-                  )
-                }
-                activity={
-                  showsActivity && (
-                    <WorkspaceActivityList
-                      activity={activity}
-                      agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
-                      selectedFilter={activityFilter}
-                      onFilter={setActivityFilter}
-                      loading={activityLoading}
-                      unavailable={activityUnavailable}
-                      onOpenProof={(id, nodeId) => open(id, nodeId, true)}
-                      onOpenThread={(thread) => go("chat", thread.id)}
-                    />
-                  )
-                }
-              />
-            ) : section === "claims" ? (
-              <ClaimsPage
-                session={session}
-                sub={sub}
-                onOpen={open}
-                claimProgress={claimProgress}
-                claimReviews={activity.reviewItemsByClaim}
-                atlasClaims={atlas.data?.claims}
-                running={activity.runningByClaim}
-              />
-            ) : section === "library" ? (
-              <LibraryPage session={session} sub={sub} onOpen={open} />
-            ) : section === "chat" ? (
-              <ConversationsPage
-                session={session}
-                sub={sub}
-                onOpen={open}
-                runningByProofNode={activity.runningByProofNode}
-              />
-            ) : section === "team" ? (
-              <TeamPage session={session} sub={sub} onOpen={open} />
-            ) : section === "progress" ? (
-              <ProgressPage session={session} sub={sub} onOpen={open} />
-            ) : section === "settings" ? (
-              <SettingsPage
-                sub={sub}
-                onResetLayout={resetLayout}
-                onShowShortcuts={() => setShortcutSheetOpen(true)}
-                updates={releaseUpdates}
-              />
-            ) : section === "help" ? (
-              <HelpPage sub={sub} onShowShortcuts={() => setShortcutSheetOpen(true)} />
-            ) : (
-              <Workbench
-                key={session}
-                session={session}
-                claimProgress={claimProgress}
-                claimReviews={activity.reviewItemsByClaim}
-                focus={focus}
-                onFocusHandled={setFocus}
-                pendingReviews={pendingReviews}
-                returnTo={position}
-                onPositionChange={saveWorkbench}
-                onChatAnchor={(anchor, title, starterScope) =>
-                  setChatRequest({ session, value: { anchor, title, starterScope } })
-                }
-                onChatStarterScope={saveChatStarterScope}
-                actionRequest={projectAction?.session === session ? projectAction.request : undefined}
-                onActionHandled={clearProjectAction}
-              />
-            )}
+            <SpaceCounts.Provider value={{ inbox: workspaceInbox.unread, review: pendingReviews }}>
+              {section === "review" ? (
+                <ReviewPage session={session} sub={sub} onOpen={open} />
+              ) : section === "agent-work" ? (
+                <AgentWorkPage
+                  session={session}
+                  sub={sub}
+                  inboxUnread={workspaceInbox.unread}
+                  inbox={
+                    showsInbox && (
+                      <WorkspaceInbox
+                        key={inboxScope ?? session}
+                        inbox={workspaceInbox}
+                        agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
+                        loading={inbox.isPending || team.isPending || agentWorkList.isPending}
+                        unavailable={inbox.isError || team.isError || agentWorkList.isError}
+                        onOpenProof={(id, nodeId) => open(id, nodeId, true)}
+                      />
+                    )
+                  }
+                  activity={
+                    showsActivity && (
+                      <WorkspaceActivityList
+                        activity={activity}
+                        agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
+                        selectedFilter={activityFilter}
+                        onFilter={setActivityFilter}
+                        loading={activityLoading}
+                        unavailable={activityUnavailable}
+                        onOpenProof={(id, nodeId) => open(id, nodeId, true)}
+                        onOpenThread={(thread) => go("chat", thread.id)}
+                      />
+                    )
+                  }
+                />
+              ) : section === "claims" ? (
+                <ClaimsPage
+                  session={session}
+                  sub={sub}
+                  onOpen={open}
+                  claimProgress={claimProgress}
+                  claimReviews={activity.reviewItemsByClaim}
+                  atlasClaims={atlas.data?.claims}
+                  running={activity.runningByClaim}
+                />
+              ) : section === "library" ? (
+                <LibraryPage session={session} sub={sub} onOpen={open} />
+              ) : section === "chat" ? (
+                <ConversationsPage
+                  session={session}
+                  sub={sub}
+                  onOpen={open}
+                  runningByProofNode={activity.runningByProofNode}
+                />
+              ) : section === "team" ? (
+                <TeamPage session={session} sub={sub} onOpen={open} />
+              ) : section === "progress" ? (
+                <ProgressPage session={session} sub={sub} onOpen={open} />
+              ) : section === "settings" ? (
+                <SettingsPage
+                  sub={sub}
+                  onResetLayout={resetLayout}
+                  onShowShortcuts={() => setShortcutSheetOpen(true)}
+                  updates={releaseUpdates}
+                />
+              ) : section === "help" ? (
+                <HelpPage sub={sub} onShowShortcuts={() => setShortcutSheetOpen(true)} />
+              ) : (
+                <Workbench
+                  key={session}
+                  session={session}
+                  claimProgress={claimProgress}
+                  claimReviews={activity.reviewItemsByClaim}
+                  focus={focus}
+                  onFocusHandled={setFocus}
+                  returnTo={position}
+                  onPositionChange={saveWorkbench}
+                  onChatAnchor={(anchor, title, starterScope) =>
+                    setChatRequest({ session, value: { anchor, title, starterScope } })
+                  }
+                  onChatStarterScope={saveChatStarterScope}
+                  actionRequest={projectAction?.session === session ? projectAction.request : undefined}
+                  onActionHandled={clearProjectAction}
+                />
+              )}
+            </SpaceCounts.Provider>
             <ReleaseUpdateNotice updates={releaseUpdates} />
           </div>
           <AgentChatDock

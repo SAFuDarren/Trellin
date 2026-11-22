@@ -2,9 +2,9 @@ import { useTranslation } from "react-i18next";
 import { PageHead, SectionLayout } from "../components/SectionLayout";
 import { navigationShortcutRows } from "../components/ShortcutSheet";
 import { href, type Section } from "../shell/route";
+import { entryHref, SPACES } from "../shell/spaces";
 import { formatShortcut, SHORTCUTS } from "../shortcuts";
 
-const PLACES = ["workbench", "claims", "library", "chat", "team", "progress", "settings"] as const;
 const STEPS = ["first", "second", "third"] as const;
 const GUIDES: readonly {
   id: string;
@@ -84,14 +84,14 @@ export function HelpPage({ sub, onShowShortcuts }: { sub: string; onShowShortcut
             <section className="block" aria-labelledby="help-places">
               <h3 id="help-places">{t("help.sections")}</h3>
               <dl className="keys">
-                {PLACES.map((section) => (
-                  <div key={section} className="contents">
+                {SPACES.map((space) => (
+                  <div key={space.id} className="contents">
                     <dt>
-                      <a className="relation" href={href(section)}>
-                        {t(`rail.${section}`)}
+                      <a className="relation" href={entryHref(space.entries[0]!)}>
+                        {t(space.labelKey)}
                       </a>
                     </dt>
-                    <dd>{t(`help.about.${section}`)}</dd>
+                    <dd>{t(`help.spaces.${space.id}`)}</dd>
                   </div>
                 ))}
               </dl>

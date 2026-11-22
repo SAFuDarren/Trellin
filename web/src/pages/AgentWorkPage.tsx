@@ -87,6 +87,7 @@ export function AgentWorkPage({
 
   return (
     <SectionLayout
+      space="work"
       title={t("agentWork.title")}
       groups={[
         {

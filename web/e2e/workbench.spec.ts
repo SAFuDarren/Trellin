@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { ImpactPreview } from "../src/workbench/types";
-import { openMenu } from "./navigation";
+import { openDestination, openMenu, railSpace, type Destination } from "./navigation";
 import { openProof } from "./project-map";
 
 // Parity checklist from docs/roadmap.md (P1.4) and the section pages (P1.5),
@@ -29,7 +29,6 @@ const card = (page: Page, name: RegExp) =>
 const rail = (page: Page) => page.locator("nav.rail");
 const railLink = (page: Page, name: string) => rail(page).getByRole("link", { name: new RegExp(`^${name}( |$)`) });
 
-const viewMenu = (page: Page) => openMenu(page.getByRole("button", { name: "Switch view", exact: true }));
 const utilityButton = (page: Page) => rail(page).getByRole("button", { name: "Settings and help", exact: true });
 
 async function confirmImeCandidate(input: Locator) {
@@ -39,9 +38,8 @@ async function confirmImeCandidate(input: Locator) {
 }
 
 async function goToSection(page: Page, section: string) {
-  if (section === "Review") {
-    const menu = await viewMenu(page);
-    await menu.getByRole("menuitem", { name: /^Review/ }).click();
+  if (["Review", "Claims", "Library", "Inbox", "Agent tasks"].includes(section)) {
+    await openDestination(page, section as Destination);
   } else if (section === "Settings" || section === "Help") {
     const menu = await openMenu(utilityButton(page));
     await menu.getByRole("menuitem", { name: section, exact: true }).click();
@@ -340,7 +338,8 @@ test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   const before = await level.textContent();
   await zoom.getByRole("button", { name: "Zoom in" }).click();
   await expect(level).not.toHaveText(before ?? "");
-  await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
+  // The Home panel opens by default in a wide window (#289).
+  await expect(page.getByRole("button", { name: "Collapse sidebar", exact: true })).toBeVisible();
   const splitter = page.locator('.splitter[data-split="side"]');
   await splitter.focus();
   await page.keyboard.press("ArrowRight");
@@ -410,15 +409,15 @@ test("graph controls and Help retain accessible structure", async ({ page }) => 
   await goToSection(page, "Help");
   const definitions = page.locator(".help dl.keys");
   await expect(definitions).toHaveCount(2);
-  await expect(definitions.locator(":scope > div > dt + dd")).toHaveCount(9);
+  await expect(definitions.locator(":scope > div > dt + dd")).toHaveCount(7);
 });
 
 test("every section opens through the rail or a navigation menu without errors", async ({ page }) => {
   const errors = await open(page);
   const sections: [string, string][] = [
-    ["Review", "Review"],
-    ["Claims", "Claims"],
-    ["Library", "Library"],
+    ["Review", "Work"],
+    ["Claims", "Home"],
+    ["Library", "Work"],
     ["Chats", "Chats"],
     ["Team", "Team"],
     ["Automation", "Automation"],
@@ -434,16 +433,16 @@ test("every section opens through the rail or a navigation menu without errors",
   expect(errors).toEqual([]);
 });
 
-test("the view menu shows review counts and the rail keeps Team and utilities reachable", async ({ page }) => {
+test("Work shows review counts and the rail keeps Team and utilities reachable", async ({ page }) => {
   await open(page);
   // The rail sits beside the page, not above it.
   const railBox = await rail(page).boundingBox();
   const sidebarBox = await page.locator(".sidebar").boundingBox();
   expect(railBox?.height ?? 0).toBeGreaterThan(800);
   expect(sidebarBox?.x ?? 0).toBeGreaterThanOrEqual((railBox?.x ?? 0) + (railBox?.width ?? 0) - 1);
-  const menu = await viewMenu(page);
-  const review = menu.getByRole("menuitem", { name: /^Review/ });
-  await expect(review).toHaveAccessibleName(/2(?: waiting for review)?$/);
+  await expect(railSpace(page, "Work")).toHaveAccessibleName(/2 waiting for you$/);
+  await openDestination(page, "Review");
+  const review = page.locator("nav.section-nav").getByRole("link", { name: /^Review/ });
   await expect(review.getByText("2", { exact: true })).toBeVisible();
   await expect(rail(page).getByLabel("2 running")).toBeVisible();
   const settings = await utilityButton(page).boundingBox();
@@ -461,8 +460,7 @@ test("approving a verified result records it and clears it from the inbox", asyn
   await page.getByRole("radio", { name: "Approve" }).check();
   await page.getByRole("button", { name: "Record decision" }).click();
   await expect(page.locator(".page-notice")).toHaveText("Approved and recorded.");
-  const review = (await viewMenu(page)).getByRole("menuitem", { name: /^Review/ });
-  await expect(review).toHaveAccessibleName(/1(?: waiting for review)?$/);
+  const review = page.locator("nav.section-nav").getByRole("link", { name: /^Review/ });
   await expect(review.getByText("1", { exact: true })).toBeVisible();
   await expect(review).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".page-head h2")).not.toHaveText("reverseZeroAdd");

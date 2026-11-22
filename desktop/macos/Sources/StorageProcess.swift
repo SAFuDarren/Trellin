@@ -47,6 +47,8 @@ enum DesktopProjectsRequest: Equatable {
     case open(UUID)
     case newProject
     case folder
+    /// Settings → Advanced → Library location (#289).
+    case storage
 
     init?(message: Any) {
         guard let fields = message as? [String: String] else { return nil }
@@ -54,6 +56,7 @@ enum DesktopProjectsRequest: Equatable {
         case "list" where fields.count == 1: self = .list
         case "new" where fields.count == 1: self = .newProject
         case "folder" where fields.count == 1: self = .folder
+        case "storage" where fields.count == 1: self = .storage
         case "open" where fields.count == 2:
             guard let value = fields["id"], let id = UUID(uuidString: value) else { return nil }
             self = .open(id)

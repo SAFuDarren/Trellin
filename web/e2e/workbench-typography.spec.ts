@@ -135,7 +135,7 @@ for (const variant of [
     await goalCard.press("Enter");
     await expect(page.locator("#node-detail h2")).toHaveText(variant.title);
     await expectTextRole([page.locator(".claim-heading h1")], "page");
-    await expectTextRole([sidebar.locator(".sidebar-projects h2")], "heading");
+    await expectTextRole([sidebar.locator(".sidebar-space-title")], "heading");
 
     const inspector = page.locator(".node-detail");
     await expectTextRole([inspector.locator("h2")], "page");

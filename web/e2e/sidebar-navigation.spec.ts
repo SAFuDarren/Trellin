@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { controlledMenu, openMenu } from "./navigation";
+import { controlledMenu, openDestination, openMenu, railSpace } from "./navigation";
 import { mapClaim, openProof } from "./project-map";
 
 test("keyboard shortcuts open from the canvas or Help and return focus", async ({ page }) => {
@@ -67,6 +67,10 @@ test("the icon rail keeps names and badges and shows labels by pointer and keybo
 
   await expect(home).toHaveAttribute("aria-current", "page");
   await expect(home).toHaveAttribute("href", "#workbench");
+  // #289: five spaces, as in Multica. Pages live in each space's panel, not in the rail.
+  await expect(rail.locator(".rail-group .rail-link")).toHaveCount(5);
+  for (const space of ["Home", "Work", "Chats", "Team", "Automation"])
+    await expect(railSpace(page, space)).toHaveCount(1);
   await expect(automation).toHaveText("");
   await expect(team.locator(".rail-badge")).toHaveText("2");
   await expect(team).toHaveAccessibleName(/2 running/);
@@ -107,7 +111,7 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   await page.getByRole("button", { name: "Find claim", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Search claims on map" })).toBeVisible();
   await expect(workbenchSidebar.getByRole("searchbox")).toHaveCount(0);
-  await rail.getByRole("link", { name: "Library", exact: true }).click();
+  await openDestination(page, "Library");
   const navigation = page.locator(".section-nav");
   const needsRecheck = navigation.getByRole("link", { name: /^Needs recheck/ });
   await needsRecheck.click();
@@ -127,10 +131,9 @@ test("proof activity opens with the keyboard and dark navigation uses Navy selec
   await expect(proofActivity).toHaveCSS("outline-width", "2px");
   await expect(page.locator(".inspector-activity")).toHaveAttribute("open", "");
 
-  const rail = page.locator("nav.rail");
-  const claims = rail.getByRole("link", { name: "Claims", exact: true });
-  await claims.click();
-  const allClaims = page.locator(".section-nav").getByRole("link", { name: /^All claims/ });
+  await openDestination(page, "Claims");
+  const home = railSpace(page, "Home");
+  const claims = page.locator("nav.section-nav").getByRole("link", { name: "Claims", exact: true });
   const selectedTint = await page.evaluate(() => {
     const probe = document.createElement("span");
     probe.hidden = true;
@@ -140,20 +143,20 @@ test("proof activity opens with the keyboard and dark navigation uses Navy selec
     probe.remove();
     return color;
   });
-  for (const selected of [claims, allClaims]) {
+  for (const selected of [home, claims]) {
     await expect(selected).toHaveAttribute("aria-current", "page");
     await expect(selected).toHaveCSS("background-color", selectedTint);
     await expect(selected).toHaveCSS("box-shadow", "none");
   }
 });
 
-test("the view switcher and Home restore the selected claim and proof node", async ({ page, request }) => {
+test("Work → Review and Home restore the selected claim and proof node", async ({ page, request }) => {
   await request.post("/__reset", { data: {} });
   await page.setViewportSize({ width: 860, height: 720 });
   await page.goto("/#session=fixture");
 
-  const home = page.locator("nav.rail").getByRole("link", { name: "Home", exact: true });
-  const switchView = page.getByRole("button", { name: "Switch view", exact: true });
+  const home = railSpace(page, "Home");
+  await expect(page.getByRole("button", { name: "Switch view" })).toHaveCount(0);
   await openProof(page, "单射映射的复合");
   const proof = page.locator(".main-proof-graph");
   await expect(proof).toBeVisible();
@@ -161,43 +164,17 @@ test("the view switcher and Home restore the selected claim and proof node", asy
   await chosen.click();
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
 
-  await switchView.focus();
-  await page.keyboard.press("Space");
-  await expect(switchView).toHaveAttribute("aria-expanded", "true");
-  let menu = await controlledMenu(switchView);
-  await expect(menu).toBeInViewport({ ratio: 1 });
-  const workbench = menu.getByRole("menuitem", { name: "Workbench", exact: true });
-  await expect(workbench).toHaveAttribute("aria-current", "page");
-  await expect(workbench).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(menu).toBeHidden();
-  await expect(switchView).toBeFocused();
-
-  menu = await openMenu(switchView);
-  await page.locator(".proof-path .resource-path-current").click();
-  await expect(menu).toBeHidden();
-  await expect(switchView).toHaveAttribute("aria-expanded", "false");
-  await expect(switchView).toBeFocused();
-
-  for (const returnVia of ["switcher", "home"]) {
-    menu = await openMenu(switchView);
-    await menu.getByRole("menuitem", { name: /^Review/ }).click();
-    await expect(page).toHaveURL(/#review$/);
-    await expect(home).not.toHaveAttribute("aria-current", "page");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Review");
-    await expect(page.locator("#node-detail")).toHaveCount(0);
-    if (returnVia === "switcher") {
-      const reviewMenu = await openMenu(switchView);
-      await expect(reviewMenu.getByRole("menuitem", { name: /^Review/ })).toHaveAttribute("aria-current", "page");
-      await reviewMenu.getByRole("menuitem", { name: "Workbench", exact: true }).click();
-    } else {
-      await home.click();
-    }
-    await expect(page).toHaveURL(/#workbench$/);
-    await expect(proof).toBeVisible();
-    await expect(chosen).toHaveAttribute("aria-pressed", "true");
-    await expect(home).toHaveAttribute("aria-current", "page");
-  }
+  await openDestination(page, "Review");
+  await expect(page).toHaveURL(/#review$/);
+  await expect(home).not.toHaveAttribute("aria-current", "page");
+  await expect(railSpace(page, "Work")).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#section-title")).toHaveText("Work");
+  await expect(page.locator("#node-detail")).toHaveCount(0);
+  await home.click();
+  await expect(page).toHaveURL(/#workbench$/);
+  await expect(proof).toBeVisible();
+  await expect(chosen).toHaveAttribute("aria-pressed", "true");
+  await expect(home).toHaveAttribute("aria-current", "page");
   await page.locator(".proof-return").click();
   await expect(mapClaim(page, "单射映射的复合")).toHaveAttribute("aria-pressed", "true");
 });
@@ -235,15 +212,13 @@ test("utilities and direct review links work in a narrow Chinese window", async 
 
   await page.goto("/#review/77777777-7777-4777-8777-777777777777");
   await page.reload();
-  await expect(page.locator("#section-title")).toHaveText("审阅");
+  await expect(page.locator("#section-title")).toHaveText("工作");
   await expect(page.locator(".page-head h2")).toHaveText("reverseZeroAdd");
-  const chineseSwitcher = page.getByRole("button", { name: "切换视图", exact: true });
-  menu = await openMenu(chineseSwitcher);
-  const review = menu.getByRole("menuitem", { name: /^审阅/ });
+  const review = page.locator("nav.section-nav").getByRole("link", { name: /^审阅/ });
   await expect(review).toHaveAttribute("aria-current", "page");
   await expect(review.getByText("2", { exact: true })).toBeVisible();
 
-  await rail.getByRole("link", { name: "主页", exact: true }).click();
+  await railSpace(page, "主页").click();
   await expect(page).toHaveURL(/#workbench$/);
   await expect(page.getByRole("application", { name: "项目图谱", exact: true })).toBeVisible();
 });

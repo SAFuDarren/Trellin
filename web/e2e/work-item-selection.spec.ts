@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { AgentWorkSummary } from "../src/api/agentWork";
+import { openDestination } from "./navigation";
 
 const claimIds = [
   "11111111-1111-4111-8111-111111111111",
@@ -15,7 +16,7 @@ const recordedAt = "2026-08-04T12:00:00Z";
 
 async function openSection(page: Page, section: string) {
   await page.goto("/#session=fixture");
-  await page.locator("nav.rail").getByRole("link", { name: section, exact: true }).click();
+  await openDestination(page, section === "Agent work" ? "Agent tasks" : (section as "Claims"));
 }
 
 async function setLayout(page: Page, layout: "List" | "Table" | "Board") {

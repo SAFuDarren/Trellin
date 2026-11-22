@@ -130,6 +130,8 @@ struct WorkbenchProcessTests {
         precondition(DesktopProjectsRequest(message: ["action": "open", "id": token]) == .open(id))
         precondition(DesktopProjectsRequest(message: ["action": "new"]) == .newProject)
         precondition(DesktopProjectsRequest(message: ["action": "folder"]) == .folder)
+        precondition(DesktopProjectsRequest(message: ["action": "storage"]) == .storage)
+        precondition(DesktopProjectsRequest(message: ["action": "storage", "id": token]) == nil)
         precondition(DesktopProjectsRequest(message: ["action": "open", "id": "/Studies/Project"]) == nil)
         precondition(DesktopProjectsRequest(message: ["action": "open", "id": token, "path": "/Studies/Project"]) == nil)
         precondition(DesktopProjectsRequest(message: ["action": "new", "id": token]) == nil)
