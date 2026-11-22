@@ -223,6 +223,16 @@ Several people and coding agents may work on the repository at once. The rules b
 - Squash-merge with a Conventional Commit title.
 - Issues found outside the task become new issues, not extra changes in the branch.
 
+#### Owner merge preflight
+
+Contributors can prepare PRs in parallel. The owner chooses the integration order and processes one merge at a time. Each PR reserves the next patch version when it is ready for this queue. If the base advances, the contributor rebases, updates both version markers and verifies the new head.
+
+From a clean checkout of current upstream `main`, the owner reviews the diff and checks the exact commit with `python scripts/review_merge.py PR --head FULL_REVIEWED_SHA`. Supply the PR number and the complete reviewed SHA. With the same head, add `--merge` to apply the squash merge. The command reads PR and issue metadata from GitHub, verifies the latest base and version, and rechecks the owner-confirmed claim even if a prior Task Link run is already green. It requires successful checks from the configured sources on the reviewed head. The existing GitHub rules apply to the merge request.
+
+Approve a first-time contribution's CI after reviewing its changed files. For the first outside merge, complete the license decision in [#24](https://github.com/SAFuDarren/Trellin/issues/24). Outside changes to workflow definitions or merge verification require separate review before using `--reviewed-workflow-changes`. Run verification from the protected checkout. The candidate is read as Git objects and metadata, while the isolated PR CI executes its tests.
+
+For newcomer acceptance, let a contributor with a separate GitHub account take a [good first issue](https://github.com/SAFuDarren/Trellin/labels/good%20first%20issue) and follow the public guide from clone to a reviewable PR. Record the claim, signed commit, fixture result, CI approval, one review or handoff, and the contributor and owner permission outcomes in [#267](https://github.com/SAFuDarren/Trellin/issues/267). Include setup time, CI retries and active reviewer time for the delivery audit in [#23](https://github.com/SAFuDarren/Trellin/issues/23).
+
 ### Difficulty and model fit
 
 Before marking an issue ready, record the baseline SHA, scope, prerequisites, reproduction, acceptance criteria and required verification environment. Score each dimension from 0 to 3 independently of urgency.

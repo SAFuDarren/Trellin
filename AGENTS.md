@@ -32,7 +32,7 @@ Each has a Chinese version (`*.zh-CN.md`). Update both when you change one.
 - Never print, log or commit credentials, DSNs or research content. Use temporary workspaces and disposable databases; never a real research project.
 - User-facing interface strings go into message catalogs, English default and Chinese (E6). This applies after the React migration (P1.4).
 - Follow the [change checklist](docs/engineering.md#change-checklist) and say in the PR why any item does not apply.
-- CI: merge only when every required check passes. A job far past its usual time with no new log output is hung: cancel it, read the log, fix the cause or rerun once; do not wait it out. Every job sets `timeout-minutes`. See [CI runs](docs/engineering.md#ci-runs).
+- CI: merge only when every required check passes. The owner uses the [merge preflight](docs/engineering.md#owner-merge-preflight) from current upstream `main` to check the reviewed SHA and active claim. A job far past its usual time with no new log output is hung: cancel it, read the log, fix the cause or rerun once; do not wait it out. Every job sets `timeout-minutes`. See [CI runs](docs/engineering.md#ci-runs).
 - When something in the engineering process fails (a hung CI run, a bad merge, lost work), open an **Incident review** issue. See [engineering incident reviews](docs/engineering.md#engineering-incident-reviews).
 
 ## Engineering principles

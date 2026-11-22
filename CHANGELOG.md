@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.103
+
+- The owner merge command checks the current PR claim, patch version and required checks on the reviewed commit before merging.
+
 ## 1.0.102
 
 - Maintainers can preview and retire recoverable merged branch heads. A weekly GitHub report tracks pending branch reviews.

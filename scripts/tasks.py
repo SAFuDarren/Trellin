@@ -323,8 +323,12 @@ def cmd_branches(args: argparse.Namespace) -> int:
 
 def cmd_check_pr(args: argparse.Namespace) -> int:
     upstream = repository_name()
-    owner = upstream.split("/", 1)[0]
     pull = json.loads(gh("api", f"repos/{upstream}/pulls/{args.pr}"))
+    return check_pull_request(upstream, pull)
+
+
+def check_pull_request(upstream: str, pull: dict) -> int:
+    owner = upstream.split("/", 1)[0]
     if "no-issue" in label_names(pull):
         print("Labelled no-issue; skipping the claim check.")
         return 0
