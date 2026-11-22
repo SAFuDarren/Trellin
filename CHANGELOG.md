@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.98
+
+- Proof headers show the selected node’s place in the claim, with links back to its goal and the project map. Agent handoff details link to the original delivery in their header.
+
 ## 1.0.97
 
 - Claims and Agent work can switch among Board, List and Table. Each page remembers its layout on this device, with the same recorded details and actions available in each view.
