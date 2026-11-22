@@ -11,11 +11,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+from check_privacy import fetch_pull_request, scan_pull_request
 from tasks import check_pull_request, gh, repository_name
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA = re.compile(r"[0-9a-f]{40}")
-REVIEW_SENSITIVE = {"scripts/tasks.py", "scripts/review_merge.py", "scripts/check_package_version.py"}
+REVIEW_SENSITIVE = {"scripts/tasks.py", "scripts/review_merge.py", "scripts/check_package_version.py",
+                    "scripts/check_privacy.py"}
 
 
 def api(path: str, *flags: str) -> dict | list:
@@ -79,6 +81,11 @@ def check_candidate(upstream: str, pr: int, base: str, head: str, bump: str) -> 
         raise SystemExit("Version and base preflight failed. Rebase and check the updated pull request.")
 
 
+def privacy_findings(upstream: str, pr: int) -> list:
+    """The repository is public: the PR's text, commits and identities must hold no local details (#307)."""
+    return scan_pull_request(fetch_pull_request(pr, upstream))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pr", type=int)
@@ -117,6 +124,10 @@ def main(argv: list[str] | None = None) -> int:
                for path in changed):
             raise SystemExit("Separately review the outside PR's workflow changes before confirming them.")
 
+    findings = privacy_findings(upstream, args.pr)
+    if findings:
+        print("\n".join(str(finding) for finding in findings))
+        raise SystemExit("Remove local or private details from the PR text, comments or commits before merging.")
     count = required_checks(upstream, head)
     latest = api(endpoint)
     if pull_snapshot(latest, upstream) != (head, outside) or api(base_ref)["object"]["sha"] != base:

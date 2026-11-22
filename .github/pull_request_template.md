@@ -33,4 +33,5 @@ Tick each item or say why it does not apply. See docs/engineering.md#change-chec
 - [ ] `research_multiplier/agent_guide.md` is updated if commands, decisions, model or network use changed.
 - [ ] `CHANGELOG.md` has an entry for anything a user or plugin author would notice.
 - [ ] No secrets, connection strings or research content in logs, URLs or fixtures.
+- [ ] Nothing from my machine in files, screenshots, this description or commits: no local paths, personal email or private project details (`python scripts/check_privacy.py --tracked`; sign off with the GitHub noreply address).
 - [ ] Every commit is signed off (`git commit -s`).

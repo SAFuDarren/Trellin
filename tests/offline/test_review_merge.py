@@ -58,6 +58,7 @@ def candidate(review, monkeypatch):
     monkeypatch.setattr(review, "repository_name", lambda: UPSTREAM)
     monkeypatch.setattr(review, "check_candidate", lambda *args: None)
     monkeypatch.setattr(review, "required_checks", lambda *args: 12)
+    monkeypatch.setattr(review, "privacy_findings", lambda *args: [])
     monkeypatch.setattr(review, "gh", lambda *args: json.dumps({"reviewDecision": ""}))
     monkeypatch.setattr(review, "check_pull_request", lambda *args: 0)
     return pull, records, api_calls, git_calls
@@ -150,3 +151,11 @@ def test_required_check_needs_matching_commit_and_app(review, monkeypatch, head,
 
     check.update(head_sha=HEAD, conclusion="success", app={"id": 10})
     assert review.required_checks(UPSTREAM, HEAD) == 1
+
+
+def test_local_details_in_the_pull_request_block_the_merge(review, candidate, monkeypatch, capsys):
+    # #307: the repository is public, so a PR that names a contributor's local paths cannot merge.
+    monkeypatch.setattr(review, "privacy_findings", lambda *args: ["PR #4:1: home path — write ~/…"])
+    with pytest.raises(SystemExit, match="Remove local or private details"):
+        review.main(["4", "--head", HEAD, "--merge"])
+    assert "home path" in capsys.readouterr().out

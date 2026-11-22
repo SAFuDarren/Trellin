@@ -123,6 +123,30 @@
 - [ ] 如果命令、决策流程、模型或网络的使用方式变了，同步更新了 `research_multiplier/agent_guide.md`。
 - [ ] 用户或插件作者能感知到的变化，都写进了 `CHANGELOG.md`。
 - [ ] 日志、URL、测试数据里没有出现密钥、数据库连接串或研究内容。
+- [ ] 文件、截图、PR 正文和提交里没有贡献者本机的内容：没有本机路径、个人邮箱或私人课题信息。`python scripts/check_privacy.py --tracked` 通过。
+
+## 本机信息不进入公开仓库
+
+本仓库及其 issue、PR 和评论都是公开的。贡献者在自己的电脑上试用 Trellin，常常用的是自己的研究。**贡献者本机的任何内容都不得进入仓库或其公开记录。**泄露后无法完全撤回：GitHub 会保留编辑历史，也可能已被 fork 或缓存。
+
+在受版本控制的文件、测试数据、截图、issue 或 PR 正文、评论和提交信息中，一律不得出现：
+
+- 本机路径、用户名、主机名、临时目录或试用版本的位置；
+- 个人邮箱。把 `git config user.email` 设为 GitHub noreply 地址，`Signed-off-by` 也使用这个地址；
+- 私人研究课题的名称、命题、定义、参考文献或合作者，以及真实数据的截图；
+- 密钥、数据库连接串或研究内容（见提交前检查清单）。
+
+改为写通用的复现步骤，并使用合成测试数据（`tests/fixtures/`），例如「带 Mathlib 命题的目标」「由某定理推出的推论」。如果问题是在自己的课题里发现的，只写「在真实课题中发现」。
+
+发布文字前、提交代码前先检查：
+
+```sh
+python scripts/check_privacy.py issue.md          # issue、PR 描述或评论草稿
+python scripts/check_privacy.py --tracked         # 所有受版本控制的文本文件
+python scripts/check_privacy.py --pr NUMBER       # PR 的正文、评论、提交信息和提交身份
+```
+
+自己的私人词条（课题、论文或合作者名称）逐行写在 `~/.config/research-multiplier/private-terms.txt`，或写在 `RM_PRIVATE_TERMS_FILE` 指定的文件中，永远不提交。CI 中的离线测试 `tests/offline/test_privacy_check.py` 会扫描所有受版本控制的文件。[所有者合并前检查](#所有者合并前检查)会拒绝正文、评论、提交信息或提交身份未通过扫描的 PR。一旦误发私人内容，立即改写，在 GitHub 编辑历史中删除旧版本，并发起事故复盘。
 
 ---
 

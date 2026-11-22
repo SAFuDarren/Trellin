@@ -120,6 +120,30 @@ Every pull request confirms each item, or says why it does not apply:
 - [ ] `research_multiplier/agent_guide.md` is updated if commands, decisions, model use or network use changed.
 - [ ] `CHANGELOG.md` has an entry for anything a user or plugin author would notice.
 - [ ] No secrets, connection strings or research content appear in logs, URLs or test fixtures.
+- [ ] Nothing from a contributor's machine appears in files, screenshots, the PR text or commits: no local paths, personal emails or private project details. `python scripts/check_privacy.py --tracked` passes.
+
+## Keep local information out of the public repository
+
+This repository and its issues, pull requests and comments are public. Contributors try Trellin on their own machines and often with their own research. **Nothing from a contributor's machine may reach the repository or its records.** A leak cannot be fully undone: GitHub keeps edit history, forks and caches.
+
+Never publish, in tracked files, fixtures, screenshots, issue or PR text, comments or commit messages:
+
+- local paths, user names, host names, temporary directories or trial build locations;
+- personal email addresses. Set `git config user.email` to your GitHub noreply address, and use it in `Signed-off-by` lines;
+- the names, statements, definitions, references or collaborators of a private research project, or screenshots of real data;
+- credentials, connection strings or research content (see the change checklist).
+
+Write a generic reproduction instead, on the synthetic fixtures (`tests/fixtures/`), for example "targets with Mathlib-backed propositions" or "a corollary that follows from a theorem". If a finding came from your own project, say "found while using a real project" and nothing more.
+
+Check text before publishing it, and check the tree before committing:
+
+```sh
+python scripts/check_privacy.py issue.md          # an issue, PR description or comment draft
+python scripts/check_privacy.py --tracked         # every tracked text file
+python scripts/check_privacy.py --pr NUMBER       # a PR's text, comments, commit messages and identities
+```
+
+Keep your own private terms (project, paper or collaborator names) in `~/.config/research-multiplier/private-terms.txt`, or in the file named by `RM_PRIVATE_TERMS_FILE`, one per line. They are never committed. The offline test `tests/offline/test_privacy_check.py` scans every tracked file in CI. The [owner merge preflight](#owner-merge-preflight) refuses a PR whose text, comments, commit messages or identities fail the scan. If something private was published, rewrite it at once, delete the old revisions from the GitHub edit history, and open an incident review.
 
 ---
 
