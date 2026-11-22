@@ -226,6 +226,16 @@
 - 用 squash 合并，标题采用 Conventional Commits 格式。
 - 在任务范围之外发现的问题，另开 issue，不要顺手改在当前分支里。
 
+#### 所有者合并前检查
+
+贡献者可以并行准备 PR，由所有者确定合并顺序并串行合入。PR 进入合并队列时再确认下一个补丁版本。基线推进后，由贡献者 rebase、更新两处版本标记并验证新提交。
+
+所有者先在 GitHub 审核差异，再从当前上游 `main` 的干净检出运行 `python scripts/review_merge.py PR --head FULL_REVIEWED_SHA`。替换 PR 编号和已审核的完整 SHA。使用同一 SHA 加上 `--merge` 执行 squash 合并。命令读取 GitHub 的 PR 和 issue 元数据，核对最新基线及版号。即使旧的 Task Link 已通过，也重新核对所有者确认的认领，并要求所审提交上来自指定来源的必过检查全部通过。GitHub 的现有规则继续对合并请求生效。
+
+首次贡献者的 CI 由所有者审核变更文件后批准。首次合入外部贡献前，在 [#24](https://github.com/SAFuDarren/Trellin/issues/24) 完成许可证复核。外部 PR 变更工作流定义或合并校验时，单独审阅后才使用 `--reviewed-workflow-changes`。合并检查从受保护的检出运行，只读取候选提交与元数据。候选代码的测试在隔离的 PR CI 中运行。
+
+新人验收由一位使用独立 GitHub 账号的贡献者，从 [good first issue](https://github.com/SAFuDarren/Trellin/labels/good%20first%20issue) 和公开指南走完克隆到可评审 PR 的流程。在 [#267](https://github.com/SAFuDarren/Trellin/issues/267) 记录认领、签署提交、夹具验证、CI 审批、一次审核或交接，以及贡献者和所有者的权限验证结果。另把安装耗时、CI 重跑次数和人工评审时间记入 [#23](https://github.com/SAFuDarren/Trellin/issues/23) 的交付审计。
+
 ### 难度与模型匹配
 
 标记 issue 可开工前，写清基准提交 SHA、范围、前置条件、复现步骤、验收标准和所需验证环境。难度与优先级分别记录，五项各 0–3 分。

@@ -2,10 +2,10 @@
 
 ## Start a contribution
 
-1. Pick an open issue with clear acceptance criteria and prerequisites. Use the [difficulty rubric and model table](docs/engineering.md#difficulty-and-model-fit) to match the work to your model, tools and environment.
+1. Pick an open issue with clear acceptance criteria and prerequisites. First-time contributors can start with [good first issues](https://github.com/SAFuDarren/Trellin/labels/good%20first%20issue). Use the [difficulty rubric and model table](docs/engineering.md#difficulty-and-model-fit) to match the work to your model, tools and environment.
 2. Use your own GitHub account and fork the repo. Comment with your fork repository, proposed branch, scope, exact model configuration or human-only plan, and verification environment. Wait for the owner to confirm the claim.
 3. Branch from upstream `main`, sign off commits with `git commit -s` and run the relevant checks. Push to your fork and open a PR against upstream `main`. Fill in the tested SHA and evidence in the PR template. Link the issue with `Refs #N` if any acceptance criterion is still open.
-4. The owner reviews the claim and evidence and merges once all required GitHub checks pass. Keep the issue current until review ends or record an explicit handoff.
+4. The owner reviews the first fork workflow before approving its run. Keep the issue current until review ends or record an explicit handoff. The owner uses the [merge preflight](docs/engineering.md#owner-merge-preflight) after all required GitHub checks pass.
 
 In a clone of your fork, add the upstream remote once. Replace the example branch with your confirmed claim.
 
