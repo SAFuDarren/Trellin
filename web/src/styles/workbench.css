@@ -2592,14 +2592,11 @@ select:disabled {
 .table tbody tr[data-row] {
   cursor: pointer;
 }
-.table tbody tr[data-row]:hover {
-  background: var(--canvas);
+.table tbody tr[data-row]:where(:hover) {
+  background: var(--navigation-hover);
 }
 .table tbody tr[aria-selected="true"] {
   background: var(--state-selected);
-}
-.table tbody tr[aria-selected="true"] > :first-child {
-  box-shadow: inset 2px 0 var(--accent);
 }
 .table .group-row td {
   padding: 9px 12px;

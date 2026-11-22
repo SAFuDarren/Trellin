@@ -66,7 +66,10 @@ for (const colorScheme of ["light", "dark"] as const) {
     ).toBeGreaterThanOrEqual(3);
 
     const activeNav = page.locator("nav.rail a[aria-current='page']");
-    await expect(activeNav).toHaveCSS("box-shadow", new RegExp(accent.replace(/[()]/g, "\\$&")));
+    await expect(activeNav).toHaveCSS("box-shadow", "none");
+    expect(await contrast(activeNav, { foreground: "color", background: "background-color" })).toBeGreaterThanOrEqual(
+      4.5,
+    );
     const live = page.locator(".rail-badge.live");
     await expect(live).toHaveText("2");
     expect(await contrast(live, { foreground: "color", background: "background-color" })).toBeGreaterThanOrEqual(4.5);

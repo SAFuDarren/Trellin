@@ -143,7 +143,7 @@ test("proof activity opens with the keyboard and dark navigation uses Navy selec
   for (const selected of [claims, allClaims]) {
     await expect(selected).toHaveAttribute("aria-current", "page");
     await expect(selected).toHaveCSS("background-color", selectedTint);
-    await expect(selected).toHaveCSS("box-shadow", /rgb\(164, 183, 223\).*inset/);
+    await expect(selected).toHaveCSS("box-shadow", "none");
   }
 });
 
