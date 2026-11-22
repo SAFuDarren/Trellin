@@ -16,14 +16,16 @@ const size = async (element: Locator) => {
   return { width: Math.round(width), height: Math.round(height) };
 };
 
-async function dragEdge(page: Page, edge: string, dx: number, dy: number) {
-  const hit = await bounds(chat(page).locator(`.agent-chat-resize[data-edge="${edge}"]`));
-  const x = hit.x + hit.width / 2;
-  const y = hit.y + hit.height / 2;
+async function dragFrom(page: Page, { x, y }: { x: number; y: number }, dx: number, dy: number) {
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + dx, y + dy, { steps: 6 });
   await page.mouse.up();
+}
+
+async function dragEdge(page: Page, edge: string, dx: number, dy: number) {
+  const hit = await bounds(chat(page).locator(`.agent-chat-resize[data-edge="${edge}"]`));
+  await dragFrom(page, { x: hit.x + hit.width / 2, y: hit.y + hit.height / 2 }, dx, dy);
 }
 
 async function expectCanvasClear(page: Page) {
@@ -129,6 +131,33 @@ for (const viewport of [
     await expectCanvasClear(page);
   });
 }
+
+test("the compact chat resize handle stays reachable from its opening position", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.route(/\/api\/conversations(?:[/?]|$)/, (route) => route.fulfill({ json: { threads: [] } }));
+  await page.goto("/#session=fixture");
+  await mapClaim(page, FIXTURE_CLAIM_TITLE).click();
+  // Pause before opening so the measurement cannot miss the entrance animation.
+  await page.locator(".agent-dock-panel").evaluate((panel: HTMLElement) => {
+    panel.style.animationPlayState = "paused";
+  });
+  await launcher(page).click();
+  const dock = chat(page);
+  const handle = dock.getByRole("separator", { name: "Resize chat height", ...precise });
+  const openingPoint = await handle.evaluate((element) => {
+    const animation = element.closest(".agent-dock-panel")?.getAnimations()[0];
+    if (!animation) throw new Error("Expected the chat entrance animation");
+    animation.currentTime = 0;
+    const { x, y, width, height } = element.getBoundingClientRect();
+    animation.finish();
+    return { x: x + width / 2, y: y + height / 2 };
+  });
+
+  const initial = await size(dock);
+  await dragFrom(page, openingPoint, 0, -48);
+  await expect.poll(() => size(dock)).toEqual({ width: initial.width, height: initial.height + 48 });
+});
 
 test("desktop restores the per-user size and writes only dimensions after resizing", async ({ page }) => {
   await page.addInitScript(() => {
