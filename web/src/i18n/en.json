@@ -785,6 +785,17 @@
     "progress": "Proof progress",
     "status": "Status"
   },
+  "workSelection": {
+    "region": "Select items in {{label}}",
+    "column": "Select",
+    "select": "Select {{title}}",
+    "actions": "Selection actions",
+    "count": "{{count}} selected",
+    "copy": "Copy record IDs",
+    "clear": "Clear selection",
+    "copied": "Record IDs copied",
+    "copyFailed": "Clipboard unavailable. Try copying again."
+  },
   "claimsPage": {
     "openWorkbench": "Open in Workbench",
     "noStatement": "There is no recorded statement for this claim.",

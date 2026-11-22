@@ -82,13 +82,28 @@ export function WorkStatusColumn({
   );
 }
 
-export function WorkTable({ label, columns, children }: { label: string; columns: string[]; children: ReactNode }) {
+export function WorkTable({
+  label,
+  columns,
+  selectionLabel,
+  children,
+}: {
+  label: string;
+  columns: string[];
+  selectionLabel?: string;
+  children: ReactNode;
+}) {
   return (
     <div className="page-body work-display-grid">
       <div className="table-wrap" role="region" aria-label={label} tabIndex={0}>
         <table className="table" aria-label={label}>
           <thead>
             <tr>
+              {selectionLabel && (
+                <th className="work-selection-cell" scope="col">
+                  <span className="sr-only">{selectionLabel}</span>
+                </th>
+              )}
               {columns.map((column) => (
                 <th key={column} scope="col">
                   {column}

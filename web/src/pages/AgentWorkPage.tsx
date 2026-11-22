@@ -29,6 +29,7 @@ import {
   useWorkLayout,
   type WorkLayout,
 } from "../components/WorkDisplay";
+import { WorkSelectionArea, WorkSelectionCheckbox, useWorkItemSelection } from "../components/WorkItemSelection";
 import { href } from "../shell/route";
 import { harnessName, timeText } from "../workbench/text";
 import "../styles/project-entry.css";
@@ -150,6 +151,7 @@ export function AgentWorkPage({ session, sub, activity }: { session: string; sub
             <AgentWorkDetail key={`${session}/${taskId}`} session={session} id={taskId} tasks={tasks} />
           ) : visible.length > 0 ? (
             <AgentWorkRows
+              key={`${session}/${layout}`}
               tasks={visible}
               layout={layout}
               label={t(filtered ? "agentWork.waiting" : "agentWork.all")}
@@ -165,6 +167,10 @@ export function AgentWorkPage({ session, sub, activity }: { session: string; sub
 
 function AgentWorkRows({ tasks, layout, label }: { tasks: AgentWorkSummary[]; layout: WorkLayout; label: string }) {
   const { t, i18n } = useTranslation();
+  const selection = useWorkItemSelection(layout, layout === "board" ? [] : tasks.map(({ id }) => id));
+  const checkbox = (task: AgentWorkSummary) => (
+    <WorkSelectionCheckbox id={task.id} title={task.title} selection={selection} />
+  );
   const taskDate = (task: AgentWorkSummary) => (
     <time className="agent-work-secondary" dateTime={task.updated_at}>
       {timeText(i18n.language, task.updated_at, true)}
@@ -208,50 +214,57 @@ function AgentWorkRows({ tasks, layout, label }: { tasks: AgentWorkSummary[]; la
 
   if (layout === "table") {
     return (
-      <WorkTable
-        label={label}
-        columns={[
-          t("agentWork.taskTitle"),
-          t("workDisplay.status"),
-          t("agentWork.agent"),
-          t("agentWork.taskType"),
-          t("agentWork.updated"),
-        ]}
-      >
-        {tasks.map((task) => (
-          <tr key={task.id}>
-            <th scope="row">
-              <a className="work-display-name" href={agentWorkHref(task.id)}>
-                {task.title}
-              </a>
-            </th>
-            <td>{taskState(task.status)}</td>
-            <td>{task.agent_name}</td>
-            <td>{taskMode(task)}</td>
-            <td>{taskDate(task)}</td>
-          </tr>
-        ))}
-      </WorkTable>
+      <WorkSelectionArea label={label} selection={selection}>
+        <WorkTable
+          label={label}
+          selectionLabel={t("workSelection.column")}
+          columns={[
+            t("agentWork.taskTitle"),
+            t("workDisplay.status"),
+            t("agentWork.agent"),
+            t("agentWork.taskType"),
+            t("agentWork.updated"),
+          ]}
+        >
+          {tasks.map((task) => (
+            <tr key={task.id} data-work-selected={selection.contains(task.id)}>
+              <td className="work-selection-cell">{checkbox(task)}</td>
+              <th scope="row">
+                <a className="work-display-name" href={agentWorkHref(task.id)}>
+                  {task.title}
+                </a>
+              </th>
+              <td>{taskState(task.status)}</td>
+              <td>{task.agent_name}</td>
+              <td>{taskMode(task)}</td>
+              <td>{taskDate(task)}</td>
+            </tr>
+          ))}
+        </WorkTable>
+      </WorkSelectionArea>
     );
   }
 
   return (
-    <div className="page-body">
-      <ul className="agent-work-list" role="list" aria-label={label}>
-        {tasks.map((task) => (
-          <li key={task.id}>
-            <a href={agentWorkHref(task.id)}>
-              <strong>{task.title}</strong>
-              <span>{taskState(task.status)}</span>
-              <span className="agent-work-secondary">
-                {task.agent_name} · {taskMode(task)}
-              </span>
-              {taskDate(task)}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <WorkSelectionArea label={label} selection={selection}>
+      <div className="page-body">
+        <ul className="agent-work-list" role="list" aria-label={label}>
+          {tasks.map((task) => (
+            <li className="work-selection-row" key={task.id} data-work-selected={selection.contains(task.id)}>
+              {checkbox(task)}
+              <a className="work-selection-row-content" href={agentWorkHref(task.id)}>
+                <strong>{task.title}</strong>
+                <span>{taskState(task.status)}</span>
+                <span className="agent-work-secondary">
+                  {task.agent_name} · {taskMode(task)}
+                </span>
+                {taskDate(task)}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </WorkSelectionArea>
   );
 }
 
