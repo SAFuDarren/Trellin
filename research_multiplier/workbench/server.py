@@ -44,6 +44,7 @@ _MAX_GUIDANCE_BYTES = 16_384
 _MAX_CLARIFICATION_BYTES = 64_000
 _MAX_PROJECT_BYTES = 240_000
 _DOCTOR_SECONDS = 120
+_AGENT_WORK_RETRY_DELAYS = (0.25, 0.5, 1.0)
 _SCHEMA_SQLSTATES = {"42883", "42P01", "42703"}
 # Each workspace-wide page takes no parameters.
 _SECTIONS = {
@@ -351,18 +352,40 @@ class WorkbenchServer(ThreadingHTTPServer):
 
     def _run_agent_work(self):
         worker = uuid4()
+        retries = 0
         while not self.closing.is_set():
             self._agent_work_wakeup.clear()
             try:
                 with paths.use_workspace(self.workspace, strict=True), Store() as store:
-                    if self.agent_work.work_one(store, worker):
-                        continue
+                    worked = self.agent_work.work_one(store, worker)
             except (ValueError, OSError) as error:
-                _LOG.warning("Workbench Agent work polling paused (%s).", type(error).__name__)
+                retryable = isinstance(error, OSError) or (
+                    isinstance(error, DatabaseOperationError) and error.role == "scheduler" and error.retryable
+                )
+                if not retryable:
+                    _LOG.warning("Workbench Agent work polling paused (%s).", type(error).__name__)
+                    break
+                if retries == len(_AGENT_WORK_RETRY_DELAYS):
+                    _LOG.warning("Workbench Agent work polling paused after %d retries (%s).",
+                                 retries, type(error).__name__)
+                    break
+                delay = _AGENT_WORK_RETRY_DELAYS[retries]
+                retries += 1
+                _LOG.info("Workbench Agent work polling retry %d in %.2fs (%s).",
+                          retries, delay, type(error).__name__)
+                if self.closing.wait(delay):
+                    break
+                # Poll the durable queue again; a claimed attempt is never replayed by this loop.
+                continue
+            retries = 0
+            if worked:
+                continue
             with self._agent_work_lock:
                 if not self._agent_work_wakeup.is_set():
                     self._agent_work_thread = None
                     return
+        with self._agent_work_lock:
+            self._agent_work_thread = None
 
     def _work_on_conversation(self, thread_id, request_id):
         try:

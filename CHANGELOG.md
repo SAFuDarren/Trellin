@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.114
+
+- Agent work resumes polling after a temporary connection error. Work that may have already run still follows its recorded lease and review history.
+
 ## 1.0.113
 
 - The floating Agent chat can be resized as soon as it opens. Its handles stay in the same place during the fade-in.

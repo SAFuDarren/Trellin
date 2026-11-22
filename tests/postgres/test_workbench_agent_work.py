@@ -11,6 +11,7 @@ import pytest
 
 from research_multiplier.model_adapters import ModelConfig
 from research_multiplier.models.model_errors import ModelFailure
+from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.server import WorkbenchServer
 from research_multiplier.workflows import workbench_agent_work
 from tests.postgres.test_workbench_routes import _request, workbench  # noqa: F401
@@ -32,6 +33,60 @@ def _finished(server, identifier, *, status="delivered"):
             assert task["status"] == status, task["error"]
             return task
         sleep(.02)
+
+
+@pytest.mark.parametrize("first_receipt_committed", [True, False])
+def test_workbench_resumes_the_queue_after_finish_connection_loss(workbench, monkeypatch, first_receipt_committed):
+    server, _, _, _ = workbench
+    identity = {"id": str(uuid4()), "provider": "codex-cli", "model": "fixture", "fingerprint": "a" * 64}
+    config = ModelConfig("codex-cli", "fixture", "openai", "", binary="/usr/bin/true")
+    agent = {
+        "id": str(uuid4()), "revision": 1, "name": "Writer", "connection_id": identity["id"],
+        "instructions": "Follow the approved fixture.",
+    }
+    monkeypatch.setattr(server.team_agents, "list", lambda: [agent])
+    monkeypatch.setattr(server.connections, "resolve", lambda _: (config, identity))
+    monkeypatch.setattr(server.connections, "use", lambda _: nullcontext((config, identity)))
+
+    calls = []
+
+    def model_result(config, role, system, user, cap, timeout):
+        calls.append(user["title"])
+        return SimpleNamespace(output={"summary": "Drafted fixture guidance", "body": "Approved test text."})
+
+    monkeypatch.setattr(workbench_agent_work, "complete_structured", model_result)
+
+    def enqueue(title):
+        item = {"task_id": str(uuid4()), "agent_id": agent["id"], "mode": "draft", "title": title,
+                "instructions": "Draft a short note.", "criteria": "One actionable sentence."}
+        preview = _request(server, "POST", _ROUTE + "/preview", body=item)
+        server.write(server.agent_work.start, {**item, "token": preview["token"], "confirm_external": True})
+        return item["task_id"]
+
+    first = enqueue("First approved fixture")
+    second = enqueue("Second approved fixture")
+    query = Store.query
+    lost = []
+
+    def lose_first_receipt(store, role, sql, *values):
+        if role == "scheduler" and "rm.finish_agent_work" in sql and str(values[0]) == first:
+            lost.append(values[1])
+            if first_receipt_committed:
+                query(store, role, sql, *values)
+            raise DatabaseOperationError("scheduler", "08006", retryable=True)
+        return query(store, role, sql, *values)
+
+    monkeypatch.setattr(Store, "query", lose_first_receipt)
+    server._run_agent_work()
+
+    assert lost == [1]
+    assert calls == ["First approved fixture", "Second approved fixture"]
+    first_detail = _get(server, first)
+    if first_receipt_committed:
+        assert first_detail["status"] == "delivered" and first_detail["delivery_sha256"]
+    else:
+        assert first_detail["status"] == "running" and not first_detail["delivery_sha256"]
+    assert _get(server, second)["status"] == "delivered"
 
 
 def test_workbench_pins_code_handoff_and_requires_a_human_decision(workbench, monkeypatch):
