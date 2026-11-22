@@ -74,16 +74,15 @@ def repository(tmp_path, monkeypatch):
         }
 
     def claim(branch, days_ago):
-        return {"created_at": (NOW - timedelta(days=days_ago)).isoformat(),
-                "user": {"login": "fixture"},
+        return {"createdAt": (NOW - timedelta(days=days_ago)).isoformat(),
+                "author": {"login": "fixture"},
                 "body": f"<!-- rm-claim agent=fixture-codex branch={branch} -->"}
 
     payload = {
         "pulls": [[pr(1, "open", "open"), pr(2, "merged", "merged")],
                   [pr(3, "closed", "closed"), pr(4, "fork", "open", "stacked", "another/fork")]],
-        "issues": [[{"number": 8}, {"number": 11, "pull_request": {}}], [{"number": 9}]],
-        "issues/8/comments": [[claim("claimed", 0.5)]],
-        "issues/9/comments": [[claim("expired", 4)]],
+        "issues": [{"number": 8, "comments": [claim("claimed", 0.5)]},
+                   {"number": 9, "comments": [claim("expired", 4)]}],
     }
     responses = tmp_path / "responses.json"
     responses.write_text(json.dumps(payload))
@@ -98,6 +97,9 @@ from pathlib import Path
 args = sys.argv[1:]
 if args[:2] == ["repo", "view"]:
     print(json.dumps({{"nameWithOwner": "fixture/sample", "defaultBranchRef": {{"name": "main"}}}}))
+elif args[:2] == ["issue", "list"]:
+    assert args[-1] == "number,comments", args
+    print(json.dumps(json.loads(Path({str(responses)!r}).read_text())["issues"]))
 else:
     assert args[:5] == ["api", "--method", "GET", "--paginate", "--slurp"], args
     endpoint = args[-1].removeprefix("repos/fixture/sample/").split("?")[0]

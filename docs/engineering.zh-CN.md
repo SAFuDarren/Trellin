@@ -215,17 +215,19 @@ python scripts/check_privacy.py --pr NUMBER       # PR 的正文、评论、提�
 
 **分配工作**
 - 使用自己的 GitHub 身份。贡献者在自己的 fork 推送分支，向上游 `main` 提交 PR。仓库所有者的凭据留在其本人账户中。上游写权限归仓库所有者，所有者和贡献者的 PR 适用相同的必需检查。见 [GitHub 当前规则](https://github.com/SAFuDarren/Trellin/rules)。
-- 在未关闭的 issue 下申请认领，写明 GitHub 账号、fork 仓库、分支、预计改动路径、模型及推理档位或纯人工处理，以及验证所需工具。所有者在 issue 确认来源和匹配度后开工。每个人或 Agent 同时只做一个任务。
+- 在 Ready 的 issue 下申请认领，写明 GitHub 账号、fork、分支、范围、实际模型及推理档位或人工处理，以及验证工具。所有者补齐 [Agent fit 段落](https://github.com/SAFuDarren/Trellin/issues/153)，运行 `python scripts/tasks.py ready ISSUE` 后确认认领。`tasks.py audit-fit` 列出活跃任务的缺项。
 
   所有者在上游的本地检出中记录已确认的 fork 和改动范围。
 
   ```sh
   python scripts/tasks.py claim 123 --agent contributor-web --branch fix/123-short-topic \
-    --repository contributor/Trellin --contributor contributor --scope web/src
+    --repository contributor/Trellin --contributor contributor --scope web/src \
+    --runner Codex --model gpt-6.2-sol --effort medium --environment "locked Node and Chromium"
   ```
+- 同一执行者一次领一个任务。实操使用 `--human`，所有者批准的例外用 `--fit-exception` 记录证据。更新标签中断时重跑同一条认领或释放命令。归属以有效认领记录为准。
 - 在上游检出运行 `python scripts/tasks.py board`，核对持有者、分支和关联 PR。认领超过 48 小时后检查进展。所有者记录释放并处理认领冲突。
 - PR 用 `Closes #N` 关联已满足全部验收的 issue，部分实现用 `Refs #N`。Task link 核对 PR 作者、来源仓库和分支是否与所有者确认的 fork 认领一致。没有对应任务的小改动由所有者添加 `no-issue` 标签。
-- 保留认领直到评审结束。交接时在 issue 留下已测试的提交 SHA、证据、剩余项和下一条验证命令。改动范围或模型变化时重新确认。相互重叠的工作按可独立评审的依赖拆分。
+- 保留认领直到评审结束。交接时先在 issue 留下已测试的提交号、证据、剩余项和下一条验证命令，再运行 `tasks.py release`。范围或模型改变后重新确认。
 
 **隔离**
 - 一个任务对应一个从上游 `main` 开出的分支，以及一个 git worktree。谁都不改别人的分支或 worktree。
@@ -272,14 +274,14 @@ python scripts/check_privacy.py --pr NUMBER       # PR 的正文、评论、提�
 | 验收成本 | 一项确定性检查 | 一条测试通道 | 多条通道或服务 | 真机、精确回放或迁移演练 |
 | 依赖 | 无 | 一项前置 | 需协调多项改动 | 分步上线或独立验收 |
 
-从[模型登记表](../.github/agent-models.json)查看 [Artificial Analysis Coding Agent Index v2.1](https://artificialanalysis.ai/agents/coding-agents/comparisons/codex-vs-claude-code#models) 的初版门槛。评分按 Agent 运行器、模型、推理档位一起看。运行 `python scripts/model_routing.py D2` 查看当前达标配置，可把 D2 换成 issue 难度。记录匹配时使用的榜单版本和日期。
+[模型登记表](../.github/agent-models.json)保存榜单版本、日期、分数线和配置评分。比较时一起核对运行器、模型和推理档位。用 `python scripts/model_routing.py D2` 查看当前达标配置和基准成本，把 D2 换成对应难度。记录推荐时使用的来源和日期。
 
-| 难度 | Issue 得分 | 参考分数线 | Codex 首选 |
-| --- | ---: | ---: | --- |
-| D1 | 0–3 | 30 | GPT-6.2 Sol low，37 |
-| D2 | 4–7 | 45 | GPT-6.2 Sol medium，45 |
-| D3 | 8–11 | 50 | GPT-6.2 Sol xhigh，50，或 GPT-6.2 Astra high，52 |
-| D4 | 12–15 | 52 | GPT-6.2 Astra high，52，另需独立验证 |
+| 难度 | Issue 得分 |
+| --- | ---: |
+| D1 | 0–3 |
+| D2 | 4–7 |
+| D3 | 8–11 |
+| D4 | 12–15 |
 
 跨层持久状态设计、Mac 真机验收和 Lean 回放至少 D3。合并权限、CI 信任规则、受保护的迁移和不可逆科研证据变更定为 D4。参考线用于派单。D3/D4 仍由所有者确认范围和证据，D4 另加独立验证。
 
@@ -352,7 +354,7 @@ issue 的每一条验收标准都满足、并且有测试或 CI 检查能证明�
 
 - **由 PR 关闭。** 只有当 PR 满足全部验收标准时，才在 PR 描述里写 `Closes #N`，合并后 issue 会自动关闭。如果只满足了一部分，写 `Refs #N`，并在 PR 里列出还剩什么。
 - **手动关闭。** 如果验收标准是由几个 PR 共同完成的、是在做别的 issue 时顺带完成的，或者不需要写代码，就手动关闭，并留言写明是哪些 PR 或提交、每条标准怎么证明：`gh issue close N --comment "..."`。
-- **每次合并之后**，检查这个 PR 涉及的 issue：关联的 issue 已关闭，`status:in-progress` 标签已去掉，跟踪类 issue（例如 #18）里的勾选项已勾上。再看看这次合并还顺带解决了哪些其他 issue，一并留言关闭。
+- **合并后**，运行 `python scripts/tasks.py finish ISSUE --agent AGENT --pr PR`，记录合并 SHA 并结束对应认领。核对关联 issue 状态，更新已经验收的跟踪项。交接或放弃任务时使用 `tasks.py release`。
 - **没做完。** 有任何一条标准没满足，就不要关闭。在 issue 里写明还剩什么，或者把剩下的部分拆成新 issue 并互相链接。
 - **不再做。** 决定不做的 issue，以 "not planned" 关闭，并写明原因。
 - **重新打开。** 如果出现回归，说明其实没有完成，就重新打开 issue，并链接到回归问题。

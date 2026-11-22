@@ -212,17 +212,19 @@ Several people and coding agents may work on the repository at once. The rules b
 
 **Assigning work**
 - Use your own GitHub identity. Contributors push to their own forks and open PRs against upstream `main`. Keep owner credentials out of Agent runtimes. The owner holds upstream write access and applies the same required checks to owner-authored and contributor PRs. See the [live GitHub rules](https://github.com/SAFuDarren/Trellin/rules).
-- Request a claim on an open issue. Include GitHub login, fork repository, head branch, expected paths, model and effort or human-only work, and the tools needed for verification. The owner confirms the source and fit in the issue before work starts. Keep one active issue per person or Agent.
+- Request a claim on a Ready issue. Include GitHub login, fork, branch, scope, actual model and effort or human-only work, and verification tools. The owner adds the [Agent fit section](https://github.com/SAFuDarren/Trellin/issues/153), runs `python scripts/tasks.py ready ISSUE` and confirms the claim. `tasks.py audit-fit` lists missing or invalid fit on active work.
 
   From an upstream checkout, the owner records the confirmed fork request and scope.
 
   ```sh
   python scripts/tasks.py claim 123 --agent contributor-web --branch fix/123-short-topic \
-    --repository contributor/Trellin --contributor contributor --scope web/src
+    --repository contributor/Trellin --contributor contributor --scope web/src \
+    --runner Codex --model gpt-6.2-sol --effort medium --environment "locked Node and Chromium"
   ```
+- Keep one active issue per worker. Use the claim command's `--human` for physical work and `--fit-exception` for an explicit owner exception with its evidence. Retry the same claim or release after an interrupted label update. Only the recorded claim decides ownership.
 - Use `python scripts/tasks.py board` in an upstream checkout for holders, branches and linked PRs. Claims older than 48 hours need a progress review. The owner records releases and resolves conflicting requests.
 - Link the issue in the PR using `Closes #N` when complete and `Refs #N` for partial work. Task link verifies the PR author, source repository and branch against the owner-confirmed fork claim. A trivial PR without a task uses the owner-assigned `no-issue` label.
-- Keep the claim through review. For a handoff, post the tested SHA, evidence, remaining work and next verification command. Record scope or model changes and obtain confirmation before continuing. Split overlapping work by a reviewable dependency boundary.
+- Keep the claim through review. For a handoff, post the tested SHA, evidence, remaining work and next verification command before `tasks.py release`. Record scope or model changes before continuing.
 
 **Isolation**
 - One task, one branch from upstream `main`, one git worktree. Nobody edits another worker's branch or worktree.
@@ -269,14 +271,14 @@ Before marking an issue ready, record the baseline SHA, scope, prerequisites, re
 | Verification | One deterministic check | One lane | Multiple lanes or services | Native device, exact replay or migration rehearsal |
 | Dependencies | None | One prerequisite | Coordinated changes | Sequenced rollout or independent approval |
 
-Use the [model registry](../.github/agent-models.json) to apply the initial floors in the [Artificial Analysis Coding Agent Index v2.1](https://artificialanalysis.ai/agents/coding-agents/comparisons/codex-vs-claude-code#models). Compare the published Agent, model and effort together. Run `python scripts/model_routing.py D2` for the current eligible configurations, replacing D2 with the issue level. Keep the benchmark version and date with the fit decision.
+The [model registry](../.github/agent-models.json) holds the benchmark, dates, floors and scores. Compare the published runner, model and effort together. Run `python scripts/model_routing.py D2`, replacing D2 with the issue level, for current eligible configurations and benchmark costs. Record the source and date with the fit decision.
 
-| Level | Issue points | Approximate index floor | First Codex recommendation |
-| --- | ---: | ---: | --- |
-| D1 | 0–3 | 30 | GPT-6.2 Sol low, 37 |
-| D2 | 4–7 | 45 | GPT-6.2 Sol medium, 45 |
-| D3 | 8–11 | 50 | GPT-6.2 Sol xhigh, 50, or GPT-6.2 Astra high, 52 |
-| D4 | 12–15 | 52 | GPT-6.2 Astra high, 52, with independent verification |
+| Level | Issue points |
+| --- | ---: |
+| D1 | 0–3 |
+| D2 | 4–7 |
+| D3 | 8–11 |
+| D4 | 12–15 |
 
 Cross-layer persistent-state design, native Mac acceptance and Lean replay are at least D3. Merge authority, CI trust, protected migrations and irreversible research evidence are D4. The floors guide routing. D3/D4 still require owner confirmation of scope and evidence, and D4 requires a separate verification step.
 
@@ -349,7 +351,7 @@ An issue is done when every acceptance criterion holds and a test or a check in 
 
 - **Closed by its pull request.** Write `Closes #N` in the PR description only when the PR meets every criterion. Merging then closes the issue. If the PR meets only some criteria, write `Refs #N` and list in the PR what remains.
 - **Closed by hand.** When the criteria are met by several PRs, by work done for another issue, or without code, close the issue yourself with a comment that names the PRs or commits and how each criterion is shown: `gh issue close N --comment "..."`.
-- **After every merge**, check the issues the PR touched: the linked issue is closed, `status:in-progress` is removed, and tracking-issue checkboxes (for example #18) are ticked. Also look for other open issues the merge resolved, and close them with a comment.
+- **After every merge**, run `python scripts/tasks.py finish ISSUE --agent AGENT --pr PR` to record the merge revision and finish the matching claim. Check the linked issue state and update any tracking checkboxes whose criteria passed. Use `tasks.py release` for a handoff or abandonment.
 - **Not done.** Never close an issue with an unmet criterion. Comment on what remains instead, or split the rest into a new issue and link it.
 - **Not planned.** Close an issue that will not be done as "not planned", with the reason.
 - **Reopen** an issue when a regression shows it was not done, and link the regression.
