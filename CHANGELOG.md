@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.95
+
+- Settings groups the existing controls and links. Search in English or Chinese to jump to the matching setting or open its page.
+
 ## 1.0.94
 
 - The Settings and Help menu uses a gear icon and shows a Settings tooltip.
