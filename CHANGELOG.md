@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.96
+
+- Open a saved Agent’s name to view its project activity, edit its existing instructions, check the model connection, assign a task, or continue chatting.
+
 ## 1.0.95
 
 - Settings groups the existing controls and links. Search in English or Chinese to jump to the matching setting or open its page.
