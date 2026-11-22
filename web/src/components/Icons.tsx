@@ -5,6 +5,8 @@ const ICONS: Record<string, string> = {
   workbench: "M3.5 10.5 12 3.5l8.5 7M5.5 9v10.5a1 1 0 0 0 1 1h3.25v-6h4.5v6h3.25a1 1 0 0 0 1-1V9",
   claims:
     "M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 5 4.5ZM9.5 4.5v15M15 4.5v15",
+  list: "M8 6h12M8 12h12M8 18h12M4 6h.5M4 12h.5M4 18h.5",
+  table: "M4 5h16v14H4zM4 10h16M4 14.5h16m-10-9.5v14",
   "agent-work": "M4 7h16v13H4zM8 7V4h8v3M4 12h16m-10 0v2h4v-2",
   review: "M4 6h16l2 10v4H2v-4L4 6ZM2 16h5l2 2h6l2-2h5M9 11l2 2 4-4",
   library: "M5 4.5h4.5v15H5zM9.5 4.5H14v15H9.5zM14.5 5.2l3.8-1 3.2 14.3-3.8 1z",

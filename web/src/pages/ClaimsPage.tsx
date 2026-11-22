@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api } from "../api/client";
+import { api, type ClaimsResponse } from "../api/client";
 import { useClaims, type InboxItem } from "../api/sections";
 import { ClaimProgressSummary, claimProgressText } from "../components/ClaimProgress";
 import { ClaimReviewLinks } from "../components/ClaimReviewLinks";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { Spin } from "../components/Icons";
+import { WorkDisplayMenu, WorkStatusColumn, WorkTable, useWorkLayout } from "../components/WorkDisplay";
 import { href } from "../shell/route";
 import type { ClaimProgress } from "../workbench/claimProgress";
 import { statusText } from "../workbench/text";
@@ -82,6 +83,7 @@ export function ClaimsPage({
 }) {
   const { t } = useTranslation();
   const [expandedClaim, setExpandedClaim] = useState<string | null>(null);
+  const [layout, setLayout] = useWorkLayout("claims", "board");
   const claims = useClaims(session);
   const counts = new Map((atlasClaims ?? []).map((claim) => [claim.id, claim]));
   const list = claims.data?.claims ?? [];
@@ -111,6 +113,106 @@ export function ClaimsPage({
     ...COLUMNS,
     ...new Set(list.map((claim) => claim.status).filter((status) => !(COLUMNS as readonly string[]).includes(status))),
   ];
+  const title = domain || t(`claimsPage.filter.${filter}`);
+
+  function renderClaim(claim: ClaimsResponse["claims"][number]) {
+    const record = counts.get(claim.id);
+    const progress = claimProgress.get(claim.id);
+    const summary = claimProgressText(t, progress, claim.status);
+    const live = running.get(claim.id) ?? 0;
+    const repeatColumn =
+      layout === "board" &&
+      (summary.label === statusText(t, claim.status) ||
+        (claim.status === "awaiting_interpretation_review" && summary.state === "decision"));
+    const reviewItems = claimReviews.get(claim.id);
+    const showReview = Boolean(reviewItems?.length);
+    const repeatCount = (showReview && summary.state === "review") || (live > 0 && summary.state === "running");
+    const showBlocked = Boolean(record?.blocked) && summary.state !== "decision" && summary.state !== "recheck";
+    const expanded = expandedClaim === claim.id;
+    const previewId = "claim-preview-" + claim.id;
+    const toggleProps = {
+      "aria-expanded": expanded,
+      "aria-controls": expanded ? previewId : undefined,
+      onClick: () => setExpandedClaim(expanded ? null : claim.id),
+    };
+    const name = claim.title || t("sidebar.untitled");
+    const claimDomain = claim.domain || t("sidebar.uncategorized");
+    const obligations = progress?.obligations;
+    const bar = obligations && obligations.total > 0 && (
+      <span className="progress" aria-hidden="true">
+        <span className="done" style={{ width: `${Math.round((obligations.verified / obligations.total) * 100)}%` }} />
+      </span>
+    );
+    const progressSummary = <ClaimProgressSummary {...summary} showState={!repeatColumn && !repeatCount} />;
+    const tags = (showReview || showBlocked || live > 0) && (
+      <div className="tags board-card-tags">
+        {live > 0 && (
+          <span className="tag" data-tone="live">
+            <Spin />
+            {t("claimsPage.running", { count: live })}
+          </span>
+        )}
+        {reviewItems && <ClaimReviewLinks items={reviewItems} />}
+        {showBlocked && (
+          <span className="tag" data-tone="bad">
+            {t("sidebar.blocked", { count: record!.blocked })}
+          </span>
+        )}
+      </div>
+    );
+    const preview = expanded && (
+      <ClaimPreview session={session} claimId={claim.id} id={previewId} onOpen={() => onOpen(claim.id)} />
+    );
+
+    if (layout === "table") {
+      return (
+        <Fragment key={claim.id}>
+          <tr data-expanded={expanded}>
+            <th scope="row">
+              <button type="button" className="work-display-name" {...toggleProps}>
+                {name}
+              </button>
+            </th>
+            <td className="muted">{claimDomain}</td>
+            <td>
+              <div className="work-display-progress">
+                {progressSummary}
+                {tags}
+              </div>
+            </td>
+          </tr>
+          {preview && (
+            <tr className="work-display-detail">
+              <td colSpan={3}>{preview}</td>
+            </tr>
+          )}
+        </Fragment>
+      );
+    }
+
+    const content = (
+      <>
+        <button type="button" className="board-card-toggle" {...toggleProps}>
+          <span className="title">{name}</span>
+          {bar}
+          {progressSummary}
+          <span className="meta">{claimDomain}</span>
+        </button>
+        {tags}
+        {preview}
+      </>
+    );
+    return layout === "list" ? (
+      <li className="board-card" key={claim.id} data-live={live > 0}>
+        {content}
+      </li>
+    ) : (
+      <article className="board-card" key={claim.id} data-live={live > 0}>
+        {content}
+      </article>
+    );
+  }
+
   return (
     <SectionLayout
       title={t("rail.claims")}
@@ -137,102 +239,47 @@ export function ClaimsPage({
         },
       ]}
     >
-      <PageHead title={domain || t(`claimsPage.filter.${filter}`)} note={t("claimsPage.byStatus")} />
+      <PageHead
+        title={title}
+        note={layout === "board" ? t("claimsPage.byStatus") : undefined}
+        actions={<WorkDisplayMenu layout={layout} onChange={setLayout} />}
+      />
       {claims.isError ? (
         <Empty>{claims.error.message}</Empty>
       ) : shown.length === 0 ? (
         <Empty>{claims.isPending ? t("common.loading") : t("claimsPage.none")}</Empty>
+      ) : layout === "table" ? (
+        <WorkTable label={title} columns={[t("workDisplay.claim"), t("workDisplay.domain"), t("workDisplay.progress")]}>
+          {shown.map(renderClaim)}
+        </WorkTable>
+      ) : layout === "list" ? (
+        <div className="page-body">
+          <ul className="work-display-list" role="list" aria-label={title}>
+            {shown.map(renderClaim)}
+          </ul>
+        </div>
       ) : (
         <div className="board">
           {columns.map((status) => {
             const cards = shown.filter((claim) => claim.status === status);
             if (!cards.length && !["open", "proved"].includes(status)) return null;
             return (
-              <section className="board-column" key={status} aria-label={statusText(t, status)}>
-                <header>
-                  <span
-                    className="status-dot"
-                    data-tone={
-                      status === "proved"
-                        ? "ok"
-                        : status === "needs_recheck" || status === "refuted"
-                          ? "bad"
-                          : status === "open"
-                            ? "none"
-                            : "warn"
-                    }
-                  />
-                  <span>{statusText(t, status)}</span>
-                  <span>{cards.length}</span>
-                </header>
-                {cards.map((claim) => {
-                  const record = counts.get(claim.id);
-                  const progress = claimProgress.get(claim.id);
-                  const summary = claimProgressText(t, progress, claim.status);
-                  const live = running.get(claim.id) ?? 0;
-                  const repeatColumn =
-                    summary.label === statusText(t, status) ||
-                    (status === "awaiting_interpretation_review" && summary.state === "decision");
-                  const reviewItems = claimReviews.get(claim.id);
-                  const showRunning = live > 0;
-                  const showReview = Boolean(reviewItems?.length);
-                  const repeatCount =
-                    (showReview && summary.state === "review") || (showRunning && summary.state === "running");
-                  const showBlocked =
-                    Boolean(record?.blocked) && summary.state !== "decision" && summary.state !== "recheck";
-                  const expanded = expandedClaim === claim.id;
-                  const previewId = "claim-preview-" + claim.id;
-                  return (
-                    <article className="board-card" key={claim.id} data-live={String(live > 0)}>
-                      <button
-                        type="button"
-                        className="board-card-toggle"
-                        aria-expanded={expanded}
-                        aria-controls={expanded ? previewId : undefined}
-                        onClick={() => setExpandedClaim(expanded ? null : claim.id)}
-                      >
-                        <span className="title">{claim.title || t("sidebar.untitled")}</span>
-                        {progress?.obligations && progress.obligations.total > 0 && (
-                          <span className="progress" aria-hidden="true">
-                            <span
-                              className="done"
-                              style={{
-                                width: `${Math.round((progress.obligations.verified / progress.obligations.total) * 100)}%`,
-                              }}
-                            />
-                          </span>
-                        )}
-                        <ClaimProgressSummary {...summary} showState={!repeatColumn && !repeatCount} />
-                        <span className="meta">{claim.domain || t("sidebar.uncategorized")}</span>
-                      </button>
-                      {(showReview || showBlocked || showRunning) && (
-                        <div className="tags board-card-tags">
-                          {showRunning && (
-                            <span className="tag" data-tone="live">
-                              <Spin />
-                              {t("claimsPage.running", { count: live })}
-                            </span>
-                          )}
-                          {reviewItems && <ClaimReviewLinks items={reviewItems} />}
-                          {showBlocked && (
-                            <span className="tag" data-tone="bad">
-                              {t("sidebar.blocked", { count: record!.blocked })}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {expanded && (
-                        <ClaimPreview
-                          session={session}
-                          claimId={claim.id}
-                          id={previewId}
-                          onOpen={() => onOpen(claim.id)}
-                        />
-                      )}
-                    </article>
-                  );
-                })}
-              </section>
+              <WorkStatusColumn
+                key={status}
+                label={statusText(t, status)}
+                count={cards.length}
+                tone={
+                  status === "proved"
+                    ? "ok"
+                    : status === "needs_recheck" || status === "refuted"
+                      ? "bad"
+                      : status === "open"
+                        ? "none"
+                        : "warn"
+                }
+              >
+                {cards.map(renderClaim)}
+              </WorkStatusColumn>
             );
           })}
         </div>

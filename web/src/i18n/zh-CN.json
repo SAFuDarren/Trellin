@@ -774,6 +774,16 @@
       "queued": "证明任务排队中"
     }
   },
+  "workDisplay": {
+    "display": "显示方式",
+    "board": "看板",
+    "list": "列表",
+    "table": "表格",
+    "claim": "课题",
+    "domain": "领域",
+    "progress": "证明进展",
+    "status": "状态"
+  },
   "claimsPage": {
     "openWorkbench": "在工作台打开",
     "noStatement": "这项课题没有已记录的陈述。",
