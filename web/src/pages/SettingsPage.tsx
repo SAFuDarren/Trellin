@@ -8,15 +8,18 @@ import { href } from "../shell/route";
 import { desktopProjectLibrary } from "../workbench/desktop";
 import "../styles/settings.css";
 
+// #293: a setting changes in place. Settings never links out to another space; each thing configured
+// elsewhere (model connections and runtimes in Team, automation rules in Automation) has one home.
 type Setting = {
   id: string;
   label: string;
   note?: string;
   terms?: string[];
-} & ({ control: ReactNode } | { action: string; destination: string });
+  control: ReactNode;
+};
 
 function settingHref(entry: Setting): string {
-  return "destination" in entry ? entry.destination : href("settings", entry.id);
+  return href("settings", entry.id);
 }
 
 function focusSetting(id: string): void {
@@ -57,7 +60,7 @@ export function SettingsPage({
         {
           id: "language",
           label: t("settings.language"),
-          note: t("settings.languageNote"),
+          note: t(desktop ? "settings.languageNoteDesktop" : "settings.languageNote"),
           terms: Object.values(LANGUAGES),
           control: (
             <div className="choices" role="group" aria-labelledby="setting-language">
@@ -79,7 +82,7 @@ export function SettingsPage({
         {
           id: "layout",
           label: t("settings.layout"),
-          note: t("settings.layoutNote"),
+          note: t(desktop ? "settings.layoutNoteDesktop" : "settings.layoutNote"),
           terms: [t("settings.resetLayout")],
           control: (
             <button type="button" className="button" onClick={onResetLayout}>
@@ -96,39 +99,6 @@ export function SettingsPage({
               {t("settings.showShortcuts")}
             </button>
           ),
-        },
-      ],
-    },
-    {
-      id: "research",
-      label: t("settings.groups.research"),
-      entries: [
-        {
-          id: "automation",
-          label: t("rail.progress"),
-          note: t("settings.automationNote"),
-          action: t("settings.openAutomation"),
-          destination: href("progress"),
-        },
-      ],
-    },
-    {
-      id: "connections",
-      label: t("settings.groups.connections"),
-      entries: [
-        {
-          id: "models",
-          label: t("modelConnections.title"),
-          note: t("team.notes.models"),
-          action: t("settings.openModels"),
-          destination: href("team", "models"),
-        },
-        {
-          id: "runtimes",
-          label: t("settings.environment"),
-          note: t("settings.environmentNote"),
-          action: t("settings.openRuntimes"),
-          destination: href("team", "runtimes"),
         },
       ],
     },
@@ -182,21 +152,15 @@ export function SettingsPage({
               },
             ]
           : []),
-        {
-          id: "help",
-          label: t("rail.help"),
-          note: t("settings.helpNote"),
-          action: t("settings.openHelp"),
-          destination: href("help"),
-        },
       ],
     },
   ];
+  // A group can be empty in a browser session (no updates or advanced tools there).
+  const shown = groups.filter((group) => group.entries.length > 0);
   const words = normalize(query).trim().split(/\s+/).filter(Boolean);
   const results = groups.flatMap(({ label, entries }) =>
     entries.flatMap((entry) => {
-      const action = "action" in entry ? entry.action : "";
-      const haystack = normalize([label, entry.label, entry.note, action, ...(entry.terms ?? [])].join(" "));
+      const haystack = normalize([label, entry.label, entry.note, ...(entry.terms ?? [])].join(" "));
       return words.every((word) => haystack.includes(word)) ? [{ group: label, entry }] : [];
     }),
   );
@@ -204,7 +168,7 @@ export function SettingsPage({
   return (
     <SectionLayout
       title={t("rail.settings")}
-      groups={groups.map(({ label, entries }) => ({
+      groups={shown.map(({ label, entries }) => ({
         name: label,
         entries: entries.map((entry) => ({
           key: entry.id,
@@ -261,7 +225,7 @@ export function SettingsPage({
         </div>
       ) : (
         <div className="page-body settings">
-          {groups.map(({ id, label, entries }) => (
+          {shown.map(({ id, label, entries }) => (
             <section key={id} className="settings-group" aria-labelledby={`settings-group-${id}`}>
               <h2 id={`settings-group-${id}`}>{label}</h2>
               {entries.map((entry) => (
@@ -270,13 +234,7 @@ export function SettingsPage({
                     {entry.label}
                   </h3>
                   {entry.note && <p>{entry.note}</p>}
-                  {"control" in entry ? (
-                    entry.control
-                  ) : (
-                    <a className="button" href={entry.destination}>
-                      {entry.action}
-                    </a>
-                  )}
+                  {entry.control}
                 </section>
               ))}
             </section>

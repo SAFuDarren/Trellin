@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { controlledMenu, openDestination, openMenu, railSpace } from "./navigation";
+import { openDestination, railSpace } from "./navigation";
 import { mapClaim, openProof } from "./project-map";
 
 test("keyboard shortcuts open from the canvas or Help and return focus", async ({ page }) => {
@@ -99,13 +99,9 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   await page.setViewportSize({ width: 540, height: 460 });
   await page.goto("/#session=fixture");
   const rail = page.locator("nav.rail");
-  const utilities = rail.getByRole("button", { name: "Settings and help", exact: true });
-  await expect(utilities).toBeInViewport();
-  const utilityMenu = await openMenu(utilities);
-  await expect(utilityMenu.getByRole("menuitem", { name: "Help", exact: true })).toBeInViewport({ ratio: 1 });
-  await expect(utilityMenu.getByRole("menuitem", { name: "Settings", exact: true })).toBeInViewport({ ratio: 1 });
-  await page.keyboard.press("Escape");
-  await expect(utilities).toBeFocused();
+  // #293: Help and Settings are separate rail links, each one click away.
+  await expect(rail.getByRole("link", { name: "Help", exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(rail.getByRole("link", { name: "Settings", exact: true })).toBeInViewport({ ratio: 1 });
   await expect(page.locator(".section-nav")).toHaveCount(0);
   await page.getByRole("button", { name: "Find claim", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Search claims on map" })).toBeVisible();
@@ -182,31 +178,19 @@ test("utilities and direct review links work in a narrow Chinese window", async 
   await page.setViewportSize({ width: 860, height: 720 });
   await page.goto("/#session=fixture");
   const rail = page.locator("nav.rail");
-  const utilities = rail.getByRole("button", { name: "Settings and help", exact: true });
-
-  await utilities.focus();
-  await page.keyboard.press("Enter");
-  await expect(utilities).toHaveAttribute("aria-expanded", "true");
-  let menu = await controlledMenu(utilities);
-  const settings = menu.getByRole("menuitem", { name: "Settings", exact: true });
-  await expect(settings).toBeFocused();
+  const settings = rail.getByRole("link", { name: "Settings", exact: true });
+  await settings.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/#settings$/);
   await page.getByRole("button", { name: "简体中文", exact: true }).click();
 
-  const chineseUtilities = rail.getByRole("button", { name: "设置与帮助", exact: true });
-  menu = await openMenu(chineseUtilities);
-  await expect(menu.getByRole("menuitem", { name: "设置", exact: true })).toHaveAttribute("aria-current", "page");
-  const help = menu.getByRole("menuitem", { name: "帮助", exact: true });
-  await expect(help).toBeInViewport({ ratio: 1 });
-  await help.click();
+  const chineseHelp = rail.getByRole("link", { name: "帮助", exact: true });
+  await expect(chineseHelp).toBeInViewport({ ratio: 1 });
+  await chineseHelp.click();
   await expect(page).toHaveURL(/#help$/);
   await expect(page.locator("#section-title")).toHaveText("帮助");
-  menu = await openMenu(chineseUtilities);
-  await expect(menu.getByRole("menuitem", { name: "帮助", exact: true })).toHaveAttribute("aria-current", "page");
-  await page.keyboard.press("Escape");
-  await expect(menu).toBeHidden();
-  await expect(chineseUtilities).toBeFocused();
+  await expect(chineseHelp).toHaveAttribute("aria-current", "page");
+  await expect(rail.getByRole("link", { name: "设置", exact: true })).not.toHaveAttribute("aria-current", "page");
 
   await page.goto("/#review/77777777-7777-4777-8777-777777777777");
   await page.reload();
@@ -221,22 +205,22 @@ test("utilities and direct review links work in a narrow Chinese window", async 
   await expect(page.getByRole("application", { name: "项目图谱", exact: true })).toBeVisible();
 });
 
-for (const [colorScheme, language, menuLabel, title] of [
-  ["light", "en", "Settings and help", "Settings"],
-  ["dark", "zh-CN", "设置与帮助", "设置"],
+for (const [colorScheme, language, title] of [
+  ["light", "en", "Settings"],
+  ["dark", "zh-CN", "设置"],
 ] as const) {
-  test(`the rail shows a Settings gear and keeps the utility menu reachable in ${colorScheme}`, async ({ page }) => {
+  test(`the rail shows a Settings gear that opens Settings directly in ${colorScheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme });
     await page.addInitScript((locale) => localStorage.setItem("research-multiplier-language", locale), language);
     await page.goto("/#session=fixture");
-    const utilities = page.locator("nav.rail").getByRole("button", { name: menuLabel, exact: true });
-    await expect(utilities).toHaveAttribute("title", title);
-    await expect(utilities).toHaveCSS("width", "36px");
-    await expect(utilities).toHaveCSS("height", "36px");
-    const path = utilities.locator("svg path");
+    const gear = page.locator("nav.rail").getByRole("link", { name: title, exact: true });
+    await expect(gear).toHaveCSS("width", "36px");
+    await expect(gear).toHaveCSS("height", "36px");
+    const path = gear.locator("svg path");
     await expect(path).toHaveAttribute("d", /^M10 3h4.*ZM15 12a3/);
-    await expect(utilities.locator("svg")).toHaveCSS("stroke-width", "1.6px");
-    const menu = await openMenu(utilities);
-    await expect(menu.getByRole("menuitem", { name: title, exact: true })).toBeVisible();
+    await expect(gear.locator("svg")).toHaveCSS("stroke-width", "1.6px");
+    await gear.click();
+    await expect(page).toHaveURL(/#settings$/);
+    await expect(gear).toHaveAttribute("aria-current", "page");
   });
 }
