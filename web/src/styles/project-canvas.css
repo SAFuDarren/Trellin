@@ -151,6 +151,11 @@
   background-size: 24px 24px;
 }
 
+.project-canvas-stage:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .project-canvas-paths {
   position: absolute;
   overflow: visible;
@@ -255,6 +260,18 @@
 }
 .project-canvas-link:focus-visible [data-research-link] {
   stroke-width: 4px;
+}
+
+.project-canvas-link-anchor {
+  position: absolute;
+  z-index: 3;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--canvas);
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%) scale(var(--map-inverse-scale, 1));
+  pointer-events: none;
 }
 
 .project-canvas-node[data-link-target="true"] {

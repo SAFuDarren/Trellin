@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
 
 const TARGET = "单射映射的复合";
+const SOURCE_ID = "11111111-1111-4111-8111-111111111111";
+const TARGET_ID = "aaaaaaaa-0000-4000-8000-000000000001";
 
 function getMap(page: Page) {
   return page.getByRole("application", { name: "Project map", exact: true });
@@ -265,6 +267,18 @@ test("selected links expose both names in the compact map and retain a keyboard 
   await link.press("Enter");
   await expect(details.getByRole("button", { name: "Remove", exact: true })).toBeEnabled();
   await page.keyboard.press("Delete");
+  await expect(map).toBeFocused();
+  await expect(map).toHaveCSS("outline-width", "1px");
+  await expect(map).toHaveCSS("outline-offset", "-1px");
+  const focusColor = await map.evaluate((element) => {
+    const sample = document.createElement("span");
+    sample.style.color = "var(--accent)";
+    element.append(sample);
+    const color = getComputedStyle(sample).color;
+    sample.remove();
+    return color;
+  });
+  await expect(map).toHaveCSS("outline-color", focusColor);
   const notice = page.locator(".workbench-action-toast").filter({ hasText: "Research link removed." });
   await expect(notice).toBeVisible();
   const noticeBounds = (await notice.boundingBox())!;
@@ -335,3 +349,77 @@ test("failed link changes roll back and Undo can be retried", async ({ page }) =
   await page.reload();
   await expect(paths).toHaveCount(1);
 });
+
+const routes = [
+  { from: "right", to: "left", x: 620, y: 300 },
+  { from: "left", to: "right", x: 20, y: 300 },
+  { from: "bottom", to: "top", x: 320, y: 540 },
+  { from: "top", to: "bottom", x: 320, y: 60 },
+] as const;
+
+function edgePoint(
+  box: { x: number; y: number; width: number; height: number },
+  side: (typeof routes)[number]["from"],
+) {
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  if (side === "left") return { x: box.x, y };
+  if (side === "right") return { x: box.x + box.width, y };
+  if (side === "top") return { x, y: box.y };
+  return { x, y: box.y + box.height };
+}
+
+for (const route of routes) {
+  test(`dragging previews both markers on the routed ${route.from} and ${route.to} card edges`, async ({
+    page,
+    request,
+  }) => {
+    await page.route("**/api/project-canvas/claims", async (intercept) => {
+      const response = await intercept.fetch();
+      const { claims } = (await response.json()) as { claims: { id: string }[] };
+      await intercept.fulfill({
+        response,
+        json: { claims: claims.filter(({ id }) => id === SOURCE_ID || id === TARGET_ID) },
+      });
+    });
+    for (const [id, x, y] of [
+      [SOURCE_ID, 320, 300],
+      [TARGET_ID, route.x, route.y],
+    ] as const) {
+      const reply = await request.post("/api/project-canvas", { data: { action: "move", id, x, y } });
+      expect(reply.ok()).toBe(true);
+    }
+    await page.goto("/#session=fixture");
+    const map = getMap(page);
+    const source = mapClaim(page, FIXTURE_CLAIM_TITLE);
+    const target = mapClaim(page, TARGET);
+    const preview = map.locator(".project-canvas-link-preview");
+    const markers = map.locator(".project-canvas-link-anchor");
+    let snappedPath: string | null = null;
+    await startLinkDrag(page);
+    try {
+      await expect(markers).toHaveCount(0);
+      await moveTo(page, target);
+      await expect(target).toHaveAttribute("data-link-target", "true");
+      await expect(markers).toHaveCount(2);
+      for (const [id, card, side] of [
+        [SOURCE_ID, source, route.from],
+        [TARGET_ID, target, route.to],
+      ] as const) {
+        const marker = map.locator(`.project-canvas-link-anchor[data-anchor-claim="${id}"]`);
+        await expect(marker).toBeVisible();
+        const actual = await center(marker);
+        const expected = edgePoint((await card.boundingBox())!, side);
+        expect(actual.x).toBeCloseTo(expected.x, 0);
+        expect(actual.y).toBeCloseTo(expected.y, 0);
+      }
+      snappedPath = await preview.getAttribute("d");
+      expect(snappedPath).toBeTruthy();
+    } finally {
+      await page.mouse.up();
+    }
+    const saved = map.locator("[data-research-link]");
+    await expect(saved).toHaveAttribute("d", snappedPath!);
+    await expect(markers).toHaveCount(0);
+  });
+}

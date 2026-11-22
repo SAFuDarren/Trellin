@@ -76,6 +76,8 @@ function connect(a: Point, b: Point) {
     const by = b.y + HEIGHT / 2;
     return {
       path: `M ${ax} ${ay} C ${middle} ${ay}, ${middle} ${by}, ${bx} ${by}`,
+      start: { x: ax, y: ay },
+      end: { x: bx, y: by },
       midpoint: { x: middle, y: (ay + by) / 2 },
     };
   }
@@ -86,6 +88,8 @@ function connect(a: Point, b: Point) {
   const middle = (ay + by) / 2;
   return {
     path: `M ${ax} ${ay} C ${ax} ${middle}, ${bx} ${middle}, ${bx} ${by}`,
+    start: { x: ax, y: ay },
+    end: { x: bx, y: by },
     midpoint: { x: (ax + bx) / 2, y: middle },
   };
 }
@@ -934,8 +938,9 @@ export function ProjectCanvas({
 
   const snappedLink =
     activeSource && validTarget && orderedResearchLink({ source: activeSource.id, target: validTarget });
-  const previewPath = snappedLink
-    ? connect(position(snappedLink.source), position(snappedLink.target)).path
+  const snappedConnection = snappedLink && connect(position(snappedLink.source), position(snappedLink.target));
+  const previewPath = snappedConnection
+    ? snappedConnection.path
     : activeSource &&
       linkEnd &&
       linkPreview({ x: activeSource.point.x + WIDTH / 2, y: activeSource.point.y + HEIGHT }, linkEnd);
@@ -1208,6 +1213,20 @@ export function ProjectCanvas({
               </div>
             );
           })}
+          {snappedLink &&
+            snappedConnection &&
+            [
+              { id: snappedLink.source, point: snappedConnection.start },
+              { id: snappedLink.target, point: snappedConnection.end },
+            ].map(({ id, point }) => (
+              <span
+                key={id}
+                className="project-canvas-link-anchor"
+                data-anchor-claim={id}
+                style={{ left: point.x, top: point.y }}
+                aria-hidden="true"
+              />
+            ))}
         </div>
         {detailPosition && linkDetails}
         {!cards.length && <p className="project-canvas-empty">{t("notice.noClaims")}</p>}
