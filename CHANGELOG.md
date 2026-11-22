@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.102
+
+- Maintainers can preview and retire recoverable merged branch heads. A weekly GitHub report tracks pending branch reviews.
+
 ## 1.0.101
 
 - Contributor issues record difficulty, model fit and verification requirements. The contribution guide documents fork-based claims and the model score reference.
