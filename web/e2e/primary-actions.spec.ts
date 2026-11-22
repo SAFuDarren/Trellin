@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
+import { clickInspectorAction, FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
 
 const PRIMARY = ".button.primary:visible";
 
@@ -53,8 +53,7 @@ test("the header, inspector and current dialog each have one filled main action"
   const inspector = page.locator("#review");
   await expect(inspector.locator(PRIMARY)).toHaveCount(1);
   await expect(inspector.locator(PRIMARY)).toHaveAccessibleName("Review");
-  const task = inspector.getByRole("button", { name: "Proof task", exact: true });
-  await task.click();
+  await clickInspectorAction(page, "Proof task");
   const proof = page.getByRole("dialog", { name: "Proof task", exact: true });
   await expect(proof.locator(PRIMARY)).toHaveCount(1);
   await expect(proof.locator(PRIMARY)).toHaveAccessibleName("Authorize and start");
