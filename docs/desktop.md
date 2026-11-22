@@ -62,7 +62,9 @@ The move applies to the library and the managed project files under it. External
 
 Use the existing [project backup workflow](research-foundation.md#recover-and-monitor) to preserve a project's files and PostgreSQL snapshot together. Keep app preferences and the registered library location separately when backing up Trellin's settings. A project archive can be restored as an independent project.
 
-**Settings → Software updates** shows the installed version and a manual check for new stable releases. Automatic checks are off by default. If enabled, Trellin checks at most once every 24 hours while the workbench is open. The check requests public release metadata from GitHub without sending project data or credentials. You can open the release notes in your browser and choose when to install the update.
+Open **Settings** from **Settings and help** to search for an existing control or destination. For example, search **Lean** to open the environment checks in Team, or search **keyboard shortcuts** to reach the shortcut viewer. Language and layout preferences are saved in this browser.
+
+**Settings → Updates** shows the installed version and a manual check for new stable releases. Automatic checks are off by default. If enabled, Trellin checks at most once every 24 hours while the workbench is open. The check requests public release metadata from GitHub without sending project data or credentials. You can open the release notes in your browser and choose when to install the update.
 
 ## Build for local review
 

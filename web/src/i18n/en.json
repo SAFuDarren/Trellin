@@ -1285,7 +1285,17 @@
     }
   },
   "settings": {
-    "general": "General",
+    "search": "Search settings",
+    "results": "Settings search results",
+    "matches_one": "{{count}} matching setting",
+    "matches_other": "{{count}} matching settings",
+    "noMatches": "No matching settings.",
+    "groups": {
+      "personal": "Personal",
+      "research": "Research and workflow",
+      "connections": "Connections",
+      "about": "Updates and help"
+    },
     "updates": {
       "title": "Updates",
       "installed": "Installed version {{version}}",
@@ -1307,13 +1317,20 @@
       }
     },
     "language": "Language",
-    "languageNote": "English is the default. Research content always stays as written.",
+    "languageNote": "This browser remembers your interface language. Research content stays in its original language.",
     "layout": "Workbench layout",
     "layoutNote": "Panel sizes, the overview position and collapsed panels are remembered in this browser.",
     "resetLayout": "Reset layout",
     "environment": "Environment",
     "environmentNote": "Check the database, logins, Lean and model services.",
-    "openRuntimes": "Open runtimes and checks"
+    "openRuntimes": "Open runtimes and checks",
+    "openModels": "Open model connections",
+    "automationNote": "See the project's active, proposed and stopped automation policies.",
+    "openAutomation": "Open project automation",
+    "shortcutsNote": "View the keyboard shortcuts available in Trellin.",
+    "showShortcuts": "View shortcuts",
+    "helpNote": "Read the project map, Agent work and proof review guides.",
+    "openHelp": "Open Help"
   },
   "help": {
     "basics": "Using Trellin",

@@ -1285,7 +1285,17 @@
     }
   },
   "settings": {
-    "general": "通用",
+    "search": "搜索设置",
+    "results": "设置搜索结果",
+    "matches_one": "{{count}} 项匹配设置",
+    "matches_other": "{{count}} 项匹配设置",
+    "noMatches": "没有匹配的设置。",
+    "groups": {
+      "personal": "个人",
+      "research": "研究与工作流",
+      "connections": "连接",
+      "about": "更新与帮助"
+    },
     "updates": {
       "title": "更新",
       "installed": "已安装版本 {{version}}",
@@ -1307,13 +1317,20 @@
       }
     },
     "language": "语言",
-    "languageNote": "默认英文。研究内容始终保持原文。",
+    "languageNote": "这个浏览器会记住你的界面语言。研究内容保留原文。",
     "layout": "工作台布局",
     "layoutNote": "各栏宽度、概览图位置和收起的面板会记在这个浏览器里。",
     "resetLayout": "恢复默认布局",
     "environment": "运行环境",
     "environmentNote": "检查数据库、登录角色、Lean 和模型服务。",
-    "openRuntimes": "查看运行环境与检查"
+    "openRuntimes": "查看运行环境与检查",
+    "openModels": "打开模型连接",
+    "automationNote": "查看当前项目已启用、待确认和已停止的自动化规则。",
+    "openAutomation": "打开项目自动化",
+    "shortcutsNote": "查看 Trellin 中可用的键盘快捷键。",
+    "showShortcuts": "查看快捷键",
+    "helpNote": "阅读项目图谱、Agent 任务和证明验收指南。",
+    "openHelp": "打开帮助"
   },
   "help": {
     "basics": "使用 Trellin",

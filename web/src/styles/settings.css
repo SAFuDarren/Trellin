@@ -1,0 +1,90 @@
+.settings-toolbar .search-field {
+  flex: 0 1 24rem;
+  min-inline-size: 0;
+}
+
+.settings-toolbar .search-field:focus-within {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.settings {
+  gap: 26px;
+  max-inline-size: 42rem;
+}
+
+.settings-group > h2 {
+  padding-block-end: 7px;
+  border-block-end: 1px solid var(--hair);
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-semibold);
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-block: 14px;
+}
+
+.setting-item + .setting-item {
+  border-block-start: 1px solid var(--hair);
+}
+
+.setting-item h3 {
+  font-size: var(--type-control-size);
+  font-weight: var(--type-semibold);
+  scroll-margin-block-start: 64px;
+}
+
+.setting-item p {
+  color: var(--sub);
+}
+
+.setting-item > a.button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.setting-item .update-preference {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-results li + li {
+  border-block-start: 1px solid var(--hair);
+}
+
+.settings-results a {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 10px 8px;
+  color: var(--ink);
+  border-radius: var(--radius-control);
+  text-decoration: none;
+}
+
+.settings-results a:hover {
+  background: var(--track);
+}
+
+.settings-results strong {
+  font-weight: var(--type-semibold);
+}
+
+.settings-results span {
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}

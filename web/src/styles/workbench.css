@@ -2832,30 +2832,6 @@ select:disabled {
   background: var(--state-selected);
   color: var(--ink);
 }
-.settings {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  max-width: 640px;
-}
-.settings section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.settings h3 {
-  font-size: 13px;
-  font-weight: 600;
-}
-.settings p {
-  color: var(--sub);
-}
-.update-preference {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-}
 .keys {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
