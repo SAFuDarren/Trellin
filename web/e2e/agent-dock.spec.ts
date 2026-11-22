@@ -331,12 +331,9 @@ for (const colorScheme of ["light", "dark"] as const) {
     const inspector = page.locator("#review");
     const input = dock.getByRole("textbox", { name: "Write a message" });
     const starters = dock.getByRole("group", { name: "Message starters", exact: true });
-    const inCanvas = page
-      .locator(".workbench-agent-chat-slot")
-      .getByRole("region", { name: "Agent chat", exact: true });
     const claimStarter = "Explain this claim and its assumptions.";
     await expect(starters.getByRole("button", { name: claimStarter })).toBeVisible();
-    await expect(inCanvas).toBeVisible();
+    await expect(dock).toHaveCSS("position", "fixed");
     await expect(dock.getByText("Only this draft will be sent", { exact: true })).toBeVisible();
     await expect(dock.getByText(/^Context ·/)).toHaveCount(0);
     await starters.getByRole("button", { name: claimStarter }).click();
@@ -345,7 +342,7 @@ for (const colorScheme of ["light", "dark"] as const) {
     await input.clear();
     await inspector.getByRole("button", { name: "Open proof", exact: true }).click();
     const proof = page.locator(".main-proof-graph");
-    await proof.getByRole("button", { name: /^Proof obligation 2/ }).click();
+    await proof.getByRole("button", { name: /^Proof obligation 2/ }).press("Enter");
     for (const text of [
       "Why is this proof obligation blocked?",
       "Which existing results could prove this obligation?",
@@ -360,9 +357,9 @@ for (const colorScheme of ["light", "dark"] as const) {
       inspector.boundingBox(),
       zoom.boundingBox(),
     ]);
-    expect(dockBox!.height).toBeLessThan(310);
+    expect(dockBox!.height).toBeLessThan(340);
     expect(dockBox!.x + dockBox!.width).toBeLessThanOrEqual(inspectorBox!.x);
-    expect(zoomBox!.y + zoomBox!.height).toBeLessThanOrEqual(dockBox!.y);
+    expect(dockBox!.y + dockBox!.height).toBeLessThanOrEqual(zoomBox!.y);
     await zoom.getByRole("button", { name: "Zoom in", exact: true }).click();
 
     await inspector.getByRole("button", { name: "Ask an Agent", exact: true }).click();

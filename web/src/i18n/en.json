@@ -145,6 +145,12 @@
     "title": "Agent chat",
     "activity": "Agent activity",
     "close": "Collapse Agent panel",
+    "maximize": "Maximize Agent chat",
+    "restoreSize": "Restore chat size",
+    "resize": {
+      "width": "Resize chat width",
+      "height": "Resize chat height"
+    },
     "chooseAgent": "Choose an Agent",
     "searchAgents": "Search Agents",
     "noAgents": "No matching Agents.",

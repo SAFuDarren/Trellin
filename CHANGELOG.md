@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.89
+
+- Agent chat opens in the same lower-right floating panel across work areas, clear of the inspector and canvas controls. Resize its edges or corner, use the keyboard, or maximize and restore. Trellin remembers your preferred size.
+
 ## 1.0.88
 
 - Agent work, Claims and Review have separate destinations in the rail. Agent work includes the project activity list, and task details scroll below their header. Existing Agent work links still open the same task.
