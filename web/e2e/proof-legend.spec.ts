@@ -34,7 +34,9 @@ test("the compact legend opens named counts for the keyboard and expands when th
   await page.setViewportSize({ width: 640, height: 460 });
   await page.goto("/#session=fixture");
   await openProof(page);
-  await page.locator("#review").getByRole("button", { name: "Collapse review column" }).click();
+  const inspector = page.locator("#review");
+  // Home no longer takes a navigation column. Keep the inspector open to exercise the compact legend.
+  await expect(inspector).toBeVisible();
   const graph = page.locator(".main-proof-graph");
   const trigger = graph.getByRole("button", { name: "Proof status counts" });
   const status = graph.getByRole("status", { name: "Proof status counts" });
@@ -61,6 +63,7 @@ test("the compact legend opens named counts for the keyboard and expands when th
   await expect(graph).toBeVisible();
 
   await page.setViewportSize({ width: 1024, height: 768 });
+  await inspector.getByRole("button", { name: "Collapse review column" }).click();
   await expect(trigger).toHaveCount(0);
   await expect(status.getByText("Needs review", { exact: true })).toBeInViewport();
 });
