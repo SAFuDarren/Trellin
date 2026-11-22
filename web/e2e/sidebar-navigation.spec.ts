@@ -99,7 +99,6 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   await page.setViewportSize({ width: 540, height: 460 });
   await page.goto("/#session=fixture");
   const rail = page.locator("nav.rail");
-  const workbenchSidebar = page.locator("#sidebar");
   const utilities = rail.getByRole("button", { name: "Settings and help", exact: true });
   await expect(utilities).toBeInViewport();
   const utilityMenu = await openMenu(utilities);
@@ -107,10 +106,9 @@ test("compact navigation keeps utilities, claim search, and Library filters reac
   await expect(utilityMenu.getByRole("menuitem", { name: "Settings", exact: true })).toBeInViewport({ ratio: 1 });
   await page.keyboard.press("Escape");
   await expect(utilities).toBeFocused();
-  await expect(workbenchSidebar.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+  await expect(page.locator(".section-nav")).toHaveCount(0);
   await page.getByRole("button", { name: "Find claim", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Search claims on map" })).toBeVisible();
-  await expect(workbenchSidebar.getByRole("searchbox")).toHaveCount(0);
   await openDestination(page, "Library");
   const navigation = page.locator(".section-nav");
   const needsRecheck = navigation.getByRole("link", { name: /^Needs recheck/ });
@@ -132,7 +130,7 @@ test("proof activity opens with the keyboard and dark navigation uses Navy selec
   await expect(page.locator(".inspector-activity")).toHaveAttribute("open", "");
 
   await openDestination(page, "Claims");
-  const home = railSpace(page, "Home");
+  const work = railSpace(page, "Work");
   const claims = page.locator("nav.section-nav").getByRole("link", { name: "Claims", exact: true });
   const selectedTint = await page.evaluate(() => {
     const probe = document.createElement("span");
@@ -143,7 +141,7 @@ test("proof activity opens with the keyboard and dark navigation uses Navy selec
     probe.remove();
     return color;
   });
-  for (const selected of [home, claims]) {
+  for (const selected of [work, claims]) {
     await expect(selected).toHaveAttribute("aria-current", "page");
     await expect(selected).toHaveCSS("background-color", selectedTint);
     await expect(selected).toHaveCSS("box-shadow", "none");

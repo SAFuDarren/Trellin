@@ -21,10 +21,10 @@ for (const theme of ["light", "dark"] as const) {
       await expect(item).toHaveCSS("box-shadow", "none");
     };
     await openDestination(page, "Claims");
-    const claims = railSpace(page, "Home");
+    const work = railSpace(page, "Work");
     const allClaims = sidebar.getByRole("link", { name: "Claims", exact: true });
     const otherClaimView = sidebar.locator('.nav-item:not([aria-current="page"])').first();
-    await expectSelected(claims);
+    await expectSelected(work);
     await expectSelected(allClaims);
     const defaultFill = await otherClaimView.evaluate((item) => getComputedStyle(item).backgroundColor);
     await otherClaimView.hover();
@@ -44,7 +44,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(firstRow.locator("td").first()).toHaveCSS("box-shadow", "none");
 
     await rail.getByRole("link", { name: "Chats", exact: true }).click();
-    const chat = page.locator(".chats-sidebar .chat-list-item").first();
+    const chat = sidebar.locator(".chat-list-item").first();
     await chat.click();
     await expect(chat).toHaveAttribute("aria-current", "page");
     await expectSelected(chat);

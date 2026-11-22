@@ -273,9 +273,12 @@ test("Claims, Agent work and Review each have one active rail link, including le
   const sidebar = page.locator(".section-nav");
   const activeRail = rail.locator('[aria-current="page"]');
 
-  await openDestination(page, "Claims");
+  await page.goto("/#claims");
+  await page.reload();
   await expect(activeRail).toHaveCount(1);
-  await expect(activeRail).toHaveAccessibleName("Home");
+  await expect(activeRail).toHaveAccessibleName(/^Work/);
+  const claims = sidebar.getByRole("link", { name: "Claims", exact: true });
+  await expect(claims).toHaveAttribute("aria-current", "page");
   await expect(sidebar.getByRole("link", { name: "Agent work", exact: true })).toHaveCount(0);
 
   for (const sub of ["", "/waiting", "%2Fnew%2Fagent%2F" + savedAgents[0]!.id]) {
@@ -286,7 +289,8 @@ test("Claims, Agent work and Review each have one active rail link, including le
     await expect(page).toHaveURL(new RegExp(canonical + "$"));
     await expect(activeRail).toHaveCount(1);
     await expect(activeRail).toHaveAccessibleName(/^Work/);
-    await expect(sidebar.getByRole("link", { name: "Claims", exact: true })).toHaveCount(0);
+    await expect(claims).toBeVisible();
+    await expect(claims).not.toHaveAttribute("aria-current", "page");
   }
 
   await sidebar.getByRole("link", { name: "Agent activity", exact: true }).click();

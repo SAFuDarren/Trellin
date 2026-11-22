@@ -209,7 +209,7 @@ test("the # prefix searches claims and exact proof references with the keyboard"
 
   const original = mapClaim(page, FIXTURE_CLAIM_TITLE);
   await choose(page, "OTHER-02", "OTHER-02");
-  await expect(page.locator(".claim-heading h1")).toHaveText("Other claim");
+  await expect(page.locator(".proof-path h1")).toHaveText("Other claim");
   await page.keyboard.press("Escape");
   await expect(original).toHaveAttribute("aria-pressed", "true");
   await expect(original).toBeFocused();
@@ -217,7 +217,7 @@ test("the # prefix searches claims and exact proof references with the keyboard"
   await page.getByRole("button", { name: "Collapse review column" }).click();
   await openDestination(page, "Library");
   await choose(page, "OTHER-02", "OTHER-02");
-  await expect(page.locator(".claim-heading h1")).toHaveText("Other claim");
+  await expect(page.locator(".proof-path h1")).toHaveText("Other claim");
   await page.locator(".proof-return").click();
   await expect(original).toHaveAttribute("aria-pressed", "true");
   await expect(original).toBeFocused();

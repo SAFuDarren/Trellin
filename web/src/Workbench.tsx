@@ -21,14 +21,13 @@ import type { FloatingGroup, FloatingOption } from "./components/FloatingControl
 import { ProjectCanvas } from "./components/ProjectCanvas";
 import { ProjectActions } from "./components/project/ProjectActions";
 import { ReviewPanel } from "./components/ReviewPanel";
-import { Sidebar } from "./components/Sidebar";
-import { ProjectHeading, useDesktopProjectList } from "./components/SidebarProjects";
+import { PageHead } from "./components/SectionLayout";
 import { Splitter } from "./components/Splitter";
 import { href } from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
 import type { InboxItem } from "./api/sections";
 import type { ClaimProgress } from "./workbench/claimProgress";
-import { desktopPosition, desktopProjectName, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
+import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
 import { buildGraph, liveWork, type Graph, type View } from "./workbench/graph";
 import { nodeTitle } from "./workbench/text";
 import type { ActivitySnapshot, GraphNode, ImpactPreview } from "./workbench/types";
@@ -122,16 +121,8 @@ export function Workbench({
   const [copyNotice, setCopyNotice] = useState<{ id: number; copied: boolean }>();
   const [linkFeedback, setLinkFeedback] = useState<{ session: string; removed: ResearchLink | null }>();
   const copySequence = useRef(0);
-  const [live, setLive] = useState<{ side?: number; right?: number }>({});
+  const [liveRight, setLiveRight] = useState<number>();
   const canvas = useProjectCanvas(session, true);
-  const projects = useDesktopProjectList();
-  // The sidebar is the Home space's panel (#289). It opens by default only where the map keeps room beside it.
-  const sidebarOpen = sizes.sidebarOpen ?? layout.sidebarOpen;
-  const projectName =
-    projects.data?.projects.find(({ id }) => id.toLowerCase() === projects.data?.activeId)?.name.trim() ||
-    desktopProjectName() ||
-    t("projects.current");
-
   const claims = useClaims(session);
   const atlas = useAtlas(session, mapAtlasOpen);
 
@@ -543,81 +534,56 @@ export function Workbench({
           statement: goal.formalization,
         }
       : null;
-  const side = live.side ?? clamped.side;
-  const right = live.right ?? clamped.right;
-  const resize = (key: "side" | "right", value: number) =>
-    setLive((current) => ({ ...current, [key]: clampSize(key, value, layout.windowHeight) }));
-  const commit = (key: "side" | "right", value: number) => {
-    setLive((current) => ({ ...current, [key]: undefined }));
-    layout.update({ [key]: clampSize(key, value, layout.windowHeight) });
-  };
+  const right = liveRight ?? clamped.right;
+  const proofHeading = (
+    <nav className="resource-path proof-path" aria-label={t("navigation.resourcePath")}>
+      <button
+        ref={proofReturn}
+        aria-label={t("canvasShell.map")}
+        title={t("canvasShell.map")}
+        type="button"
+        className="conversation-text-action proof-return"
+        onClick={() => closeProof()}
+      >
+        <span aria-hidden="true">‹</span> <span className="proof-return-label">{t("canvasShell.map")}</span>
+      </button>
+      <h1 title={graph?.claim.title ?? undefined} aria-current={proofPathNode ? undefined : "page"}>
+        {proofPathNode && goal ? (
+          <button type="button" className="resource-path-hop" onClick={() => selectNode(goal.id)}>
+            {graph?.claim.title || t("graph.label")}
+          </button>
+        ) : (
+          graph?.claim.title || t("graph.label")
+        )}
+      </h1>
+      {proofPathNode && (
+        <>
+          <Chevron />
+          <span
+            className="resource-path-current"
+            aria-current="page"
+            title={nodeTitle(t, proofPathNode, { full: true })}
+          >
+            {nodeTitle(t, proofPathNode)}
+          </span>
+        </>
+      )}
+    </nav>
+  );
 
   return (
     <div
       className="app"
       id="workbench"
-      data-sidebar={sidebarOpen ? "open" : "collapsed"}
       data-review={showReview ? "open" : "collapsed"}
       data-view={proofOpen ? "proof" : "project"}
-      style={{ "--side-w": `${side}px`, "--right-w": `${right}px` } as React.CSSProperties}
+      style={{ "--right-w": `${right}px` } as React.CSSProperties}
     >
-      <Sidebar
-        open={sidebarOpen}
-        workspaceState={workspaceState}
-        onToggle={() => layout.update({ sidebarOpen: !sidebarOpen })}
-      />
-      <Splitter
-        name="side"
-        value={side}
-        label={t("splitter.side")}
-        onResize={(value) => resize("side", value)}
-        onCommit={(value) => commit("side", value)}
-      />
       <main className="main">
-        <header className="toolbar">
-          <div className="claim-heading">
-            {proofOpen ? (
-              <nav className="resource-path proof-path" aria-label={t("navigation.resourcePath")}>
-                <button
-                  ref={proofReturn}
-                  aria-label={t("canvasShell.map")}
-                  title={t("canvasShell.map")}
-                  type="button"
-                  className="conversation-text-action proof-return"
-                  onClick={() => closeProof()}
-                >
-                  <span aria-hidden="true">‹</span> <span className="proof-return-label">{t("canvasShell.map")}</span>
-                </button>
-                <h1 title={graph?.claim.title ?? undefined} aria-current={proofPathNode ? undefined : "page"}>
-                  {proofPathNode && goal ? (
-                    <button type="button" className="resource-path-hop" onClick={() => selectNode(goal.id)}>
-                      {graph?.claim.title || t("graph.label")}
-                    </button>
-                  ) : (
-                    graph?.claim.title || t("graph.label")
-                  )}
-                </h1>
-                {proofPathNode && (
-                  <>
-                    <Chevron />
-                    <span
-                      className="resource-path-current"
-                      aria-current="page"
-                      title={nodeTitle(t, proofPathNode, { full: true })}
-                    >
-                      {nodeTitle(t, proofPathNode)}
-                    </span>
-                  </>
-                )}
-              </nav>
-            ) : (
-              <>
-                <ProjectHeading name={projectName} />
-                <span className="claim-meta">{t("canvasShell.map")}</span>
-              </>
-            )}
-          </div>
-          <div className="project-toolbar-actions">
+        <PageHead
+          heading={proofOpen ? proofHeading : <h1>{t("canvasShell.map")}</h1>}
+          note={proofOpen ? undefined : t("canvasShell.mapNote")}
+          actions={
             <ProjectActions
               session={session}
               claimId={(projectAction === "proof-task" ? claimId : actionsClaim?.id) ?? null}
@@ -639,8 +605,8 @@ export function Workbench({
               onGoalRecorded={showRecordedGoal}
               onOpenReference={openReference}
             />
-          </div>
-        </header>
+          }
+        />
         {notice && (
           <p className="notice" role="status" data-error={String(claims.isError)}>
             {notice}
@@ -673,6 +639,7 @@ export function Workbench({
                 <ProjectCanvas
                   claims={mapClaims}
                   claimProgress={claimProgress}
+                  status={workspaceState}
                   selected={mapSelection}
                   onSelect={inspectClaim}
                   onOpenProof={openProof}
@@ -825,8 +792,11 @@ export function Workbench({
             name="right"
             value={right}
             label={t("splitter.right")}
-            onResize={(value) => resize("right", value)}
-            onCommit={(value) => commit("right", value)}
+            onResize={(value) => setLiveRight(clampSize("right", value, layout.windowHeight))}
+            onCommit={(value) => {
+              setLiveRight(undefined);
+              layout.update({ right: clampSize("right", value, layout.windowHeight) });
+            }}
           />
           <ReviewPanel
             graph={graph}

@@ -31,7 +31,7 @@ test("the rail tile opens the project switcher without folder actions", async ({
   await page.goto("/#session=fixture");
   const switcher = tile(page, project.name);
   await expect(switcher).toHaveText("O");
-  await expect(page.locator("#sidebar").getByRole("region", { name: "Projects" })).toHaveCount(0);
+  await expect(page.locator(".section-nav")).toHaveCount(0);
   await switcher.press("Enter");
   const dialog = page.getByRole("dialog", { name: `Switch project, ${project.name}` });
   await expect(dialog.getByRole("button", { name: project.name })).toHaveAttribute("aria-current", "page");
@@ -39,8 +39,8 @@ test("the rail tile opens the project switcher without folder actions", async ({
   await expect(dialog.getByRole("button", { name: "Open project folder" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(switcher).toBeFocused();
-  // The map heading names the project but no longer repeats the switcher.
-  await expect(page.getByRole("heading", { name: project.name, exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("heading", { name: "Project map", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: project.name, exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: `Switch project, ${project.name}` })).toHaveCount(1);
 });
 
@@ -98,10 +98,12 @@ test("the rail tile lists and opens registered desktop projects", async ({ page 
     .toEqual([{ action: "open", id: second.id }, { action: "open", id: second.id }, { action: "new" }]);
 });
 
-test("the map heading falls back to the name of the opened project directory", async ({ page }) => {
+test("the rail tile uses the opened directory name for a project outside the library", async ({ page }) => {
+  await stubLibrary(page, () => ({ projects: [] }));
   await page.addInitScript(() => Object.defineProperty(window, "trellinProjectName", { value: "My opened research" }));
   await page.goto("/#session=fixture");
-  await expect(page.getByRole("heading", { name: "My opened research", exact: true })).toBeVisible();
+  await expect(tile(page, "My opened research")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("heading", { name: "Project map", exact: true })).toBeVisible();
 });
 
 test("an empty desktop library keeps New project and can recover from a list error", async ({ page }) => {
@@ -145,11 +147,8 @@ test("a workbench without the native bridge shows the brand and the Home space",
   await page.goto("/#settings");
   await expect(page.getByRole("button", { name: "Open Folder…" })).toHaveCount(0);
   await page.goto("/#workbench");
-  const sidebar = page.locator("#sidebar");
-  const expand = sidebar.getByRole("button", { name: "Expand sidebar", exact: true });
-  if (await expand.isVisible()) await expand.click();
-  await expect(sidebar.getByRole("link", { name: "Project map", exact: true })).toHaveAttribute("aria-current", "page");
-  await expect(sidebar.getByRole("link", { name: "Claims", exact: true })).toBeVisible();
+  await expect(page.locator(".section-nav")).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("heading", { name: "Project map", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Find claim", exact: true }).click();
   const search = page.getByRole("combobox", { name: "Search claims on map" });
   await search.fill("单射");

@@ -218,6 +218,7 @@
   },
   "canvasShell": {
     "map": "项目图谱",
+    "mapNote": "排列课题并建立关联",
     "details": "详情",
     "researchActions": "研究操作",
     "proofOverview": "显示证明概览",
@@ -723,7 +724,7 @@
     "workActor": "{{agent}} · {{model}}"
   },
   "splitter": {
-    "side": "拖动调整课题栏宽度",
+    "side": "调整导航栏宽度",
     "right": "拖动调整审阅栏宽度",
     "chat": "拖动调整对话区高度"
   },
@@ -1398,7 +1399,7 @@
     "controls": "常用操作",
     "moveCard": "焦点在画布上时，方向键用来平移。要移动卡片，先从卡片菜单选择「移动卡片」，再用方向键预览位置。按 {{confirm}} 保存，或按 {{cancel}} 取消。",
     "guides": "科研指南",
-    "openMap": "打开工作台",
+    "openMap": "打开项目图谱",
     "openAgents": "打开团队 Agent",
     "openAgentWork": "打开 Agent 任务",
     "openClaims": "打开课题看板",
@@ -1424,8 +1425,8 @@
       }
     },
     "spaces": {
-      "home": "项目地图：整理、连接课题，打开课题的证明。「课题」按状态列出同一批课题。",
-      "work": "所有要处理的事：收件箱、待审阅的结果、交给 Agent 的任务，以及记录在案的定理库。",
+      "home": "项目图谱。排列课题、建立关联并打开证明。",
+      "work": "打开收件箱、审阅、课题、Agent 任务或定理库。",
       "chat": "与 Agent 对话、切换对话或查看证明动态。",
       "team": "设置 Agent 和模型连接，查看任务、用量和运行环境。",
       "automation": "查看推进证明的规则，并跟进它们的运行。"

@@ -127,7 +127,7 @@ test("saved wide side panels leave room for proof controls when the window shrin
   const stage = proof.locator(".stage");
   const selected = proof.locator('.graph-node[aria-pressed="true"]');
   const review = page.locator("#review");
-  const toolbar = page.locator(".toolbar");
+  const toolbar = page.locator("#workbench .page-head");
   const lenses = page.locator(".proof-lenses");
   for (const viewport of [...viewports].reverse()) {
     await page.setViewportSize(viewport);

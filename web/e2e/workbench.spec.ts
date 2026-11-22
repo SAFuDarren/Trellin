@@ -330,7 +330,7 @@ test("a blocked proof node keeps a private draft across reopen", async ({ page }
   expect(sent).toEqual([]);
 });
 
-test("zoom, splitters and sidebar are remembered", async ({ page }) => {
+test("the map zooms and navigation panel width is remembered across spaces", async ({ page }) => {
   await open(page);
   await page.locator(".proof-return").click();
   const zoom = page.locator(".project-canvas").getByRole("group", { name: "Zoom" });
@@ -338,17 +338,20 @@ test("zoom, splitters and sidebar are remembered", async ({ page }) => {
   const before = await level.textContent();
   await zoom.getByRole("button", { name: "Zoom in" }).click();
   await expect(level).not.toHaveText(before ?? "");
-  // The Home panel opens by default in a wide window (#289).
-  await expect(page.getByRole("button", { name: "Collapse sidebar", exact: true })).toBeVisible();
-  const splitter = page.locator('.splitter[data-split="side"]');
-  await splitter.focus();
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
+  const panel = page.locator(".section-nav");
+  await expect(panel).toHaveCount(0);
+  await openDestination(page, "Claims");
+  const splitter = page.getByRole("separator", { name: "Resize navigation panel", exact: true });
+  await expect(splitter).toHaveAttribute("aria-valuenow", "240");
+  await splitter.press("ArrowRight");
+  await splitter.press("ArrowRight");
   await expect(splitter).toHaveAttribute("aria-valuenow", "272");
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(panel).toHaveCSS("width", "272px");
+  await goToSection(page, "Team");
+  await expect(panel).toHaveCSS("width", "272px");
   await page.reload();
-  await expect(page.locator("#workbench")).toHaveAttribute("data-sidebar", "collapsed");
-  await expect(page.locator('.splitter[data-split="side"]')).toHaveAttribute("aria-valuenow", "272");
+  await expect(splitter).toHaveAttribute("aria-valuenow", "272");
+  await expect(panel).toHaveCSS("width", "272px");
 });
 
 test("the global map can be moved and resized", async ({ page }) => {
@@ -416,7 +419,7 @@ test("every section opens through the rail or a navigation menu without errors",
   const errors = await open(page);
   const sections: [string, string][] = [
     ["Review", "Work"],
-    ["Claims", "Home"],
+    ["Claims", "Work"],
     ["Library", "Work"],
     ["Chats", "Chats"],
     ["Team", "Team"],
@@ -436,12 +439,12 @@ test("every section opens through the rail or a navigation menu without errors",
 test("Work shows review counts and the rail keeps Team and utilities reachable", async ({ page }) => {
   await open(page);
   // The rail sits beside the page, not above it.
+  await openDestination(page, "Review");
   const railBox = await rail(page).boundingBox();
-  const sidebarBox = await page.locator(".sidebar").boundingBox();
+  const sidebarBox = await page.locator(".section-nav").boundingBox();
   expect(railBox?.height ?? 0).toBeGreaterThan(800);
   expect(sidebarBox?.x ?? 0).toBeGreaterThanOrEqual((railBox?.x ?? 0) + (railBox?.width ?? 0) - 1);
   await expect(railSpace(page, "Work")).toHaveAccessibleName(/2 waiting for you$/);
-  await openDestination(page, "Review");
   const review = page.locator("nav.section-nav").getByRole("link", { name: /^Review/ });
   await expect(review.getByText("2", { exact: true })).toBeVisible();
   await expect(rail(page).getByLabel("2 running")).toBeVisible();

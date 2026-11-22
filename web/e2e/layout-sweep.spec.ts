@@ -1,8 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { SECTIONS } from "../src/shell/route";
 import { formatViolations, layoutViolations } from "./layout-invariants";
 import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
-import { openDestination } from "./navigation";
+import { openDestination, railSpace } from "./navigation";
 
 // #283: every destination, plus the screens that open from it, keeps the layout invariants
 // at three window sizes and in both themes. A new destination is covered by adding it to
@@ -75,6 +75,99 @@ for (const theme of THEMES) {
     });
   }
 }
+
+async function titleFont(title: Locator) {
+  return title.evaluate((element) => {
+    const { fontFamily, fontSize, fontWeight, lineHeight } = getComputedStyle(element);
+    return { fontFamily, fontSize, fontWeight, lineHeight };
+  });
+}
+
+async function panelGeometry(panel: Locator) {
+  const selected = panel.locator('.nav-item[aria-current="page"]');
+  await expect(selected).toBeVisible();
+  return {
+    panel: await panel.evaluate((element) => {
+      const { left, width } = element.getBoundingClientRect();
+      return { left, width };
+    }),
+    titleFont: await titleFont(panel.locator(".section-nav-header h1")),
+    selection: await selected.evaluate((element) => {
+      const { left, width } = element.getBoundingClientRect();
+      const { paddingInlineStart, borderRadius } = getComputedStyle(element);
+      return { left, width, paddingInlineStart, borderRadius };
+    }),
+  };
+}
+
+test("spaces share panel and header geometry and Home gives the map the full width", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await page.route("**/api/team-agents", (route) =>
+    route.fulfill({
+      json: {
+        agents: [
+          {
+            id: "a9a3cb02-fa5c-40f4-bc2e-591c368e754e",
+            revision: 1,
+            connection_id: "9a33cb02-fa5c-40f4-bc2e-591c368e754e",
+            name: "Geometry Agent",
+            description: "Fixture for an active Chats row",
+            avatar: "compass",
+            instructions: "",
+            starters: [],
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/#session=fixture");
+  const panel = page.locator("nav.section-nav");
+  const header = page.locator("main .page-head");
+  const heading = header.getByRole("heading");
+  const rail = page.locator("nav.rail");
+  const map = page.locator(".project-map-area");
+  const footer = map.locator(".canvas-footer");
+
+  await expect(heading).toHaveText("Project map");
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("separator", { name: "Resize navigation panel", exact: true })).toHaveCount(0);
+  await expect(footer.getByRole("status")).toHaveText(/^Connected · \d+ claims?$/);
+  const status = (await footer.getByRole("status").boundingBox())!;
+  const zoom = (await footer.getByRole("group", { name: "Zoom", exact: true }).boundingBox())!;
+  expect(status.x + status.width).toBeLessThanOrEqual(zoom.x);
+  const railBox = (await rail.boundingBox())!;
+  const mapBox = (await map.boundingBox())!;
+  expect(mapBox.x).toBeCloseTo(railBox.x + railBox.width, 0);
+  expect(mapBox.x + mapBox.width).toBeCloseTo(1440, 0);
+  const pageFont = await titleFont(heading);
+  const pageHeight = (await header.boundingBox())!.height;
+
+  await railSpace(page, "Work").click();
+  await expect(panel).toHaveAccessibleName("Work");
+  await expect(panel.locator(".space-entries .label")).toHaveText([
+    "Inbox",
+    "Review",
+    "Claims",
+    "Agent tasks",
+    "Library",
+  ]);
+  const workPanel = await panelGeometry(panel);
+  expect(workPanel.panel.left).toBeCloseTo(railBox.x + railBox.width, 0);
+  expect(await titleFont(heading)).toEqual(pageFont);
+  expect((await header.boundingBox())!.height).toBe(pageHeight);
+
+  for (const space of ["Chats", "Team", "Automation"]) {
+    await railSpace(page, space).click();
+    await expect(panel).toHaveAccessibleName(space);
+    if (space === "Chats") {
+      await panel.getByRole("link", { name: /^Geometry Agent/ }).click();
+    }
+    expect(await panelGeometry(panel), `${space} panel`).toEqual(workPanel);
+    expect(await titleFont(heading), `${space} page title`).toEqual(pageFont);
+    expect((await header.boundingBox())!.height, `${space} page header height`).toBe(pageHeight);
+  }
+});
 
 // Selection must never move rows: a Shift-click aimed at a row must land on that row (#272).
 for (const layout of ["List", "Table"] as const) {

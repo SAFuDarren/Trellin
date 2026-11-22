@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.108
+
+- **Home** opens a full-width project map with connection status beside the zoom controls. **Claims** is under **Work**, and existing Claims links still work.
+- Space panels and page headers use the same layout. Resize the navigation panel once and its width carries across spaces.
+
 ## 1.0.107
 
 - The left rail now has five spaces, as in Multica: **Home** (project map and Claims), **Work** (Inbox, Review, Agent tasks and the Library), **Chats**, **Team** and **Automation**. Each space's panel lists its pages, and pages no longer repeat an entry the panel already has.

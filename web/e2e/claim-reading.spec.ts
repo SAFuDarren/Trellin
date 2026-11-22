@@ -34,7 +34,7 @@ test("a claim expands and collapses in place with its recorded statement", async
   await expect(card).toHaveAttribute("aria-expanded", "false");
   await card.click();
   await expect(card).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator("#section-title")).toHaveText("Home");
+  await expect(page.locator("#section-title")).toHaveText("Work");
   await expect(page.getByText(WORDING, { exact: true })).toBeVisible();
   await expect(page.getByText(FORMALIZATION, { exact: true })).toBeVisible();
   await card.click();
