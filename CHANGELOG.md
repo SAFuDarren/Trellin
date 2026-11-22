@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.92
+
+- Navigation, project and chat selections and selected Library rows now use a soft background fill. Keyboard focus keeps its own outline.
+
 ## 1.0.91
 
 - In narrow proof windows, the withdrawal inspector gives affected records room to show their full names and places the count below the heading. The preview bar stays above the graph.
