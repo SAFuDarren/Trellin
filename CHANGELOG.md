@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.105
+
+- Trellin no longer stops at "Cannot open the Trellin library" when the last project cannot be reopened, for example a project saved by another Trellin installation. It opens your library instead and shows a short notice with **Open Project…**. The last project is now reopened by its ID through the active library.
+
 ## 1.0.104
 
 - The project sidebar starts folded when there is only one project or the window is narrower than 1,200 px, so the map keeps room beside the inspector. Opening the inspector refits the map until you pan or zoom.

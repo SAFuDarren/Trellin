@@ -45,8 +45,10 @@
 "projects.name" = "Project name";
 "projects.create" = "Create";
 "projects.empty" = "The library has no registered projects.";
-"library.title" = "Cannot open the Trellin library";
-"library.detail" = "Check the active library location in Settings, then try again.";
+"library.title" = "Trellin could not prepare its library";
+"library.detail" = "Trellin keeps your projects in a library on this Mac. Check that the disk has free space, then try again.";
+"reopen.notice" = "Your last project could not be reopened, so Trellin opened your library.";
+"notice.dismiss" = "Dismiss";
 "project.title" = "Project unavailable";
 "project.detail" = "Check the project folder or choose another project. New project names can use up to 120 printable characters.";
 "storage.title" = "Storage";
