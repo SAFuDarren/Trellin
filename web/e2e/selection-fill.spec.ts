@@ -19,6 +19,8 @@ for (const theme of ["light", "dark"] as const) {
       await expect(item).toHaveCSS("background-color", selectedFill);
       await expect(item).toHaveCSS("box-shadow", "none");
     };
+    // A browser session has one project, so the project sidebar starts folded (#283).
+    await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
     await expectSelected(page.locator('.sidebar-projects-row[aria-current="page"]'));
 
     const claims = rail.getByRole("link", { name: "Claims", exact: true });

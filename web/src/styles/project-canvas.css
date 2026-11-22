@@ -281,8 +281,8 @@
 .project-canvas-link-handle {
   position: absolute;
   z-index: 2;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -297,7 +297,7 @@
 
 .project-canvas-link-handle::before {
   position: absolute;
-  inset: 4px;
+  inset: 7px;
   border: 1.5px solid var(--accent);
   border-radius: 50%;
   background: var(--node);

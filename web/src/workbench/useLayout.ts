@@ -31,6 +31,8 @@ export const DEFAULT_SIZES: Sizes = {
   atlas: null,
   cards: {},
 };
+// Rail 56 + sidebar 240 + inspector 340 + a canvas of at least 560 for three columns of cards.
+export const SIDEBAR_AUTO_OPEN_WIDTH = 1200;
 export const LIMITS: Record<SizeKey, [number, number]> = { side: [180, 420], right: [280, 640], chat: [140, 640] };
 
 function entries(value: unknown): [string, unknown][] {
@@ -135,7 +137,9 @@ export function useLayout() {
     save(DEFAULT_SIZES);
   }, [save]);
   // Without a saved choice, side panels fold away on narrow windows so the columns stay side by side.
-  const sidebarOpen = sizes.sidebarOpen ?? windowSize.width >= 900;
+  // The project sidebar opens by default only when the rail, the sidebar, the inspector and a
+  // readable canvas fit together (#283).
+  const sidebarOpen = sizes.sidebarOpen ?? windowSize.width >= SIDEBAR_AUTO_OPEN_WIDTH;
   const reviewOpen = sizes.reviewOpen ?? windowSize.width >= 760;
   const clamped = {
     side: clampSize("side", sizes.side, windowSize.height),

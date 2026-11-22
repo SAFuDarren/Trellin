@@ -166,7 +166,7 @@ Deprecations warn for at least one minor release before removal.
 | `offline` | Python only | Every pull request | CLI parsing, offline briefs, replay, pure logic, server request validation |
 | `postgres` | Disposable PostgreSQL with pgvector | Every pull request | Migrations from empty and from the previous release, invariants, workflows, API routes, row-level security (after P3.1) |
 | `lean` | Pinned Lean and Mathlib | Scheduled, and before every release | Lean verification, replay, upgrade paths |
-| `web` | Node | Every pull request touching `web/` or the API | Vitest units, Playwright parity and section flows against the fixture server |
+| `web` | Node | Every pull request touching `web/` or the API | Vitest units, Playwright parity and section flows against the fixture server, and the layout sweep (`web/e2e/layout-sweep.spec.ts`), which checks every destination at three window sizes in both themes for page scroll, clipped text, cards outside or under canvas controls, a narrow canvas, underlined link buttons and small targets. A new destination is covered by adding it to `SECTIONS`. |
 | `plugins` | Per-plugin environments | Every pull request touching the runner or plugins | Conformance suite for reference plugins |
 | package smoke | Built wheel on Linux, macOS and Windows | Every pull request | Installation and first-use commands from an installed wheel (existing) |
 

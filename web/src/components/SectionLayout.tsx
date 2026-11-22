@@ -74,7 +74,11 @@ export function PageHead({ title, note, actions }: { title: string; note?: strin
     <header className="page-head">
       <div className="heading">
         <h2>{title}</h2>
-        {note && <span className="note">{note}</span>}
+        {note && (
+          <span className="note" title={note}>
+            {note}
+          </span>
+        )}
       </div>
       {actions && <div className="page-actions">{actions}</div>}
     </header>

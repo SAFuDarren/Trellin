@@ -169,7 +169,7 @@
 | `offline` | 只需要 Python | 每个 PR | CLI 参数解析、离线研究简报、重放、纯逻辑、服务端的输入校验 |
 | `postgres` | 一个用完即弃、装有 pgvector 的 PostgreSQL | 每个 PR | 从空库执行迁移、从上一个发布版本升级、不变量、各类流程、API 接口、行级安全（P3.1 之后） |
 | `lean` | 固定版本的 Lean 和 Mathlib | 定时运行，并在每次发布前运行 | Lean 核验、重放、升级流程 |
-| `web` | Node | 改动涉及 `web/` 或 API 的 PR | Vitest 单元测试；用 Playwright 在测试服务器上测功能对齐和各分区的操作流程 |
+| `web` | Node | 改动涉及 `web/` 或 API 的 PR | Vitest 单元测试；用 Playwright 在测试服务器上测功能对齐和各分区的操作流程；版面巡检（`web/e2e/layout-sweep.spec.ts`）在三种窗口尺寸和浅色、深色下检查每个导航入口：页面横向滚动、文字被截断、卡片跑出画布或被画布控件遮挡、画布过窄、按钮样式的链接带下划线、点击区域过小。新增入口只要加进 `SECTIONS` 就会被覆盖。 |
 | `plugins` | 每个插件自己的环境 | 改动涉及运行器或插件的 PR | 参考插件的一致性测试 |
 | 安装包冒烟测试 | 构建好的安装包，在 Linux、macOS、Windows 上运行 | 每个 PR | 从安装包运行安装和首次使用的命令（现已有） |
 
