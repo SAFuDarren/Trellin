@@ -116,6 +116,19 @@ struct WorkbenchProcessTests {
         let missingReady = try JSONDecoder().decode(WorkbenchReadiness.self, from: resolved)
         precondition(matchingReady.matches(launch) && !missingReady.matches(launch))
         precondition(!matchingReady.matches(.registered(UUID(), canonical)))
+
+        // #285: a remembered project that could not be reopened falls back to the library's default project.
+        let fallback = try JSONSerialization.data(withJSONObject: [
+            "version": 1, "status": "ready", "project_id": UUID().uuidString, "reopen_failed": "storage-project",
+        ])
+        let fallbackReady = try JSONDecoder().decode(WorkbenchReadiness.self, from: fallback)
+        precondition(fallbackReady.reopenedLibrary && fallbackReady.matches(launch))
+        let unidentified = try JSONSerialization.data(withJSONObject: [
+            "version": 1, "status": "ready", "reopen_failed": "storage-project",
+        ])
+        let unidentifiedReady = try JSONDecoder().decode(WorkbenchReadiness.self, from: unidentified)
+        precondition(!unidentifiedReady.reopenedLibrary && !unidentifiedReady.matches(launch))
+        precondition(!matchingReady.reopenedLibrary)
     }
 
     private static func projectPositions() throws {

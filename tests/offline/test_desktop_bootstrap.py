@@ -18,6 +18,7 @@ from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workbench import desktop
 from research_multiplier.workbench.server import _MissingSchema
 from research_multiplier.workflows import desktop_workspace
+from research_multiplier.workflows.desktop_library import LibraryError
 
 
 pytestmark = pytest.mark.offline
@@ -253,9 +254,87 @@ def test_registered_launch_rejects_a_different_identity_before_loading_credentia
             assert identifier == str(project_id)
             return bound_workspace
 
+        def open_default(self):
+            # The mismatch falls back to the library; stop there to see what the first attempt did.
+            raise LibraryError("storage-busy")
+
     monkeypatch.setattr(desktop, "_configure_database", _unexpected_start)
     output = StringIO()
     assert desktop.run(None, BytesIO(), output, library=Library(), project_id=project_id) == 2
+    assert json.loads(output.getvalue()) == {"version": 1, "status": "error", "code": "storage-busy"}
+
+
+@pytest.mark.parametrize("code, falls_back", [
+    ("storage-project", True), ("storage-unavailable", True), ("storage-invalid", True), ("workspace", True),
+    ("unbound", True), ("login-missing", True), ("storage-busy", False), ("postgres", False), ("schema", False),
+])
+def test_a_project_that_cannot_be_reopened_opens_the_library_instead(monkeypatch, tmp_path, code, falls_back):
+    remembered, default = tmp_path / "remembered", tmp_path / "default"
+    project_id = str(uuid4())
+
+    class Library:
+        anchor = tmp_path
+
+        def resolve_existing(self, path):
+            if code.startswith("storage-"):
+                raise LibraryError(code)
+            return remembered
+
+        def open_default(self):
+            return default
+
+        def describe(self, path):
+            assert path == default
+            return {"id": project_id, "name": "Library"}
+
+    class Server:
+        launch_url = "test"
+
+        def __init__(self, workspace):
+            self.workspace = workspace
+
+        def serve_forever(self, *, poll_interval):
+            pass
+
+        def shutdown(self):
+            pass
+
+    def open_project(path, _resources, *, expected_project):
+        if Path(path) == remembered:
+            raise desktop._StartError(code)
+        return Server(Path(path))
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "credentials"))
+    monkeypatch.setattr(desktop, "_open", open_project)
+    monkeypatch.setattr(desktop, "workspace_registration", lambda path: (tmp_path, "slot"))
+    monkeypatch.setattr(desktop.shutil, "which", lambda _: "/fixture/lean")
+    output = StringIO()
+    result = desktop.run(str(remembered), BytesIO(), output, library=Library())
+    reply = json.loads(output.getvalue())
+    if falls_back:
+        assert result == 0
+        assert reply == {
+            "version": 1, "status": "ready", "workspace": str(default), "name": "Library",
+            "project_id": project_id, "reopen_failed": code, "url": "test", "warnings": [],
+        }
+    else:
+        assert result == 2
+        assert reply == {"version": 1, "status": "error", "code": code}
+
+
+def test_a_folder_the_researcher_chose_does_not_fall_back(monkeypatch, tmp_path):
+    class Library:
+        anchor = tmp_path
+
+        def resolve_existing(self, path):
+            raise LibraryError("storage-project")
+
+        def open_default(self):
+            pytest.fail("A chosen folder that cannot open must be reported, not replaced.")
+
+    monkeypatch.setattr(desktop, "select_workspace", lambda path: Path(path))
+    output = StringIO()
+    assert desktop.run(str(tmp_path), BytesIO(), output, select=True, library=Library()) == 2
     assert json.loads(output.getvalue()) == {"version": 1, "status": "error", "code": "storage-project"}
 
 

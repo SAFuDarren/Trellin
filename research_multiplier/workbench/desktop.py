@@ -112,7 +112,42 @@ def _stop_on_disconnect(server, lifetime):
         server.shutdown()
 
 
+class _Failed(Exception):
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
+
+
+# A remembered project that cannot be reopened is not an error the researcher
+# has to fix: open the library instead. Database, schema and installation
+# problems still stop, because the library would hit them too.
+_REOPEN_FALLBACK = {"workspace", "unbound", "login-missing", "login-invalid"}
+
+
+def _reopen_falls_back(code):
+    return code in _REOPEN_FALLBACK or (code.startswith("storage-") and code != "storage-busy")
+
+
 def run(workspace_path, lifetime, output, *, select=False, library=None, new_name=None, project_id=None):
+    reopening = (library is not None and not select and new_name is None
+                 and (workspace_path is not None or project_id is not None))
+    try:
+        return _session(workspace_path, lifetime, output, select=select, library=library,
+                        new_name=new_name, project_id=project_id)
+    except _Failed as failure:
+        if not (reopening and _reopen_falls_back(failure.code)):
+            _reply(output, "error", code=failure.code)
+            return 2
+        missed = failure.code
+    try:
+        return _session(None, lifetime, output, library=library, reopen_failed=missed)
+    except _Failed as failure:
+        _reply(output, "error", code=failure.code)
+        return 2
+
+
+def _session(workspace_path, lifetime, output, *, select=False, library=None, new_name=None, project_id=None,
+             reopen_failed=None):
     try:
         if library is not None and project_id is not None:
             workspace_path = library.resolve_project(str(project_id))
@@ -127,14 +162,11 @@ def run(workspace_path, lifetime, output, *, select=False, library=None, new_nam
         elif library is not None:
             workspace_path = library.resolve_existing(workspace_path)
     except WorkspaceCreationError as error:
-        _reply(output, "error", code=error.args[0])
-        return 2
+        raise _Failed(error.args[0]) from None
     except LibraryError as error:
-        _reply(output, "error", code=error.code)
-        return 2
+        raise _Failed(error.code) from None
     except Exception:
-        _reply(output, "error", code="create-failed" if select else "startup")
-        return 2
+        raise _Failed("create-failed" if select else "startup") from None
     with ExitStack() as resources:
         try:
             server = _open(str(workspace_path), resources, expected_project=project_id)
@@ -158,21 +190,19 @@ def run(workspace_path, lifetime, output, *, select=False, library=None, new_nam
                 legacy = credentials.directory().parent / "release-updates.sqlite3"
                 if not legacy.exists():
                     server.release_updates = release_updates.ReleaseUpdates(library.anchor / "Settings" / legacy.name)
+            if reopen_failed is not None:
+                selection["reopen_failed"] = reopen_failed
             warnings = [] if shutil.which("lean") else ["lean"]
         except _StartError as error:
-            _reply(output, "error", code=error.args[0])
-            return 2
+            raise _Failed(error.args[0]) from None
         except _MissingAssets:
-            _reply(output, "error", code="install")
-            return 2
+            raise _Failed("install") from None
         except LibraryError as error:
-            _reply(output, "error", code=error.code)
-            return 2
+            raise _Failed(error.code) from None
         except Exception:
             # Driver paths, SQL responses and other diagnostics may contain
             # credentials or research data. Only send a fixed code.
-            _reply(output, "error", code="startup")
-            return 2
+            raise _Failed("startup") from None
 
         _reply(output, "ready", url=server.launch_url, warnings=warnings, **selection)
         Thread(target=_stop_on_disconnect, args=(server, lifetime), daemon=True).start()

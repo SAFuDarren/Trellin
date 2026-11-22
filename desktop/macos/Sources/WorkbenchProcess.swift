@@ -46,14 +46,18 @@ struct WorkbenchReadiness: Decodable {
     let workspace: String?
     let name: String?
     let project_id: UUID?
+    /// The remembered project could not be reopened, so the library opened instead (#285).
+    let reopen_failed: String?
 
     var workspaceURL: URL? {
         localDirectoryURL(workspace)
     }
 
     func matches(_ launch: WorkbenchLaunch) -> Bool {
-        launch.projectId == nil || project_id == launch.projectId
+        launch.projectId == nil || project_id == launch.projectId || (launch.isRestore && reopenedLibrary)
     }
+
+    var reopenedLibrary: Bool { reopen_failed != nil && project_id != nil }
 
     var failure: WorkbenchStartFailure {
         guard version == 1, status == "error", let code else { return .startup }

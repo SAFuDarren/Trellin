@@ -30,6 +30,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     private var requestedLaunch: WorkbenchLaunch = .library
     private var child: WorkbenchProcess?
     private var webView: WKWebView?
+    private var noticeView: NSView?
     private var serverURL: URL?
     private var starting = false
     private var movingStorage = false
@@ -78,8 +79,11 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
            let saved = try? JSONDecoder().decode([String: WorkbenchPosition].self, from: data) {
             positions = saved
         }
-        if let saved = localDirectoryURL(last?.path) { open(.restore(saved)) }
-        else { open(.library) }
+        // Reopen by project ID so the active library decides where the project is. A path
+        // from another library home or an older install then falls back to the library (#285).
+        if let saved = localDirectoryURL(last?.path) {
+            open(last?.projectId.map { .registered($0, saved) } ?? .restore(saved))
+        } else { open(.library) }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -329,13 +333,16 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
                 guard let self, let process, self.child === process else { return }
                 self.starting = false
                 if let result, result.matches(launch), let url = result.sessionURL, let opened = result.workspaceURL {
+                    let reopened = result.reopenedLibrary
                     self.requested = opened
-                    self.requestedLaunch = launch.projectId.map { .registered($0, opened) } ?? .restore(opened)
+                    self.requestedLaunch = (reopened ? result.project_id : launch.projectId)
+                        .map { .registered($0, opened) } ?? .restore(opened)
                     self.last = LastWorkspace.opened(opened, projectId: result.project_id, previous: self.last,
-                                                     restoredFrom: launch.isRestore ? launch.location : nil,
+                                                     restoredFrom: launch.isRestore && !reopened ? launch.location : nil,
                                                      positions: self.positions)
                     self.showWorkbench(url: url, workspace: opened, name: result.name,
                                        leanMissing: result.warnings?.contains("lean") == true)
+                    if reopened { self.showReopenNotice() }
                 } else {
                     self.stop()
                     let failure = result?.failure ?? .startup
@@ -397,6 +404,61 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         web.load(URLRequest(url: url))
     }
 
+    /// A quiet notice over the workbench: the last project could not be reopened, so the library opened.
+    private func showReopenNotice() {
+        guard let web = webView else { return }
+        noticeView?.removeFromSuperview()
+        let symbol = NSImageView(image: NSImage(systemSymbolName: "arrow.uturn.backward.circle",
+                                                accessibilityDescription: nil) ?? NSImage())
+        symbol.contentTintColor = .secondaryLabelColor
+        symbol.symbolConfiguration = .init(pointSize: 15, weight: .regular)
+        let text = NSTextField(wrappingLabelWithString: localized("reopen.notice"))
+        text.font = .systemFont(ofSize: 13)
+        text.textColor = .labelColor
+        text.preferredMaxLayoutWidth = 380
+        let open = NSButton(title: localized("projects.open"), target: self, action: #selector(chooseProject))
+        open.bezelStyle = .rounded
+        let dismiss = NSButton(image: NSImage(systemSymbolName: "xmark", accessibilityDescription: localized("notice.dismiss"))
+                               ?? NSImage(), target: self, action: #selector(dismissNotice))
+        dismiss.isBordered = false
+        dismiss.contentTintColor = .secondaryLabelColor
+        dismiss.toolTip = localized("notice.dismiss")
+        let row = NSStackView(views: [symbol, text, open, dismiss])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 10
+        row.edgeInsets = NSEdgeInsets(top: 10, left: 14, bottom: 10, right: 10)
+        row.translatesAutoresizingMaskIntoConstraints = false
+        let banner = NSVisualEffectView()
+        banner.material = .popover
+        banner.state = .active
+        banner.wantsLayer = true
+        banner.layer?.cornerRadius = 10
+        banner.layer?.masksToBounds = true
+        banner.translatesAutoresizingMaskIntoConstraints = false
+        banner.setAccessibilityRole(.group)
+        banner.setAccessibilityLabel(localized("reopen.notice"))
+        banner.addSubview(row)
+        web.addSubview(banner)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: banner.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: banner.trailingAnchor),
+            row.topAnchor.constraint(equalTo: banner.topAnchor),
+            row.bottomAnchor.constraint(equalTo: banner.bottomAnchor),
+            banner.centerXAnchor.constraint(equalTo: web.centerXAnchor),
+            banner.bottomAnchor.constraint(equalTo: web.bottomAnchor, constant: -20),
+            banner.widthAnchor.constraint(lessThanOrEqualTo: web.widthAnchor, constant: -32),
+        ])
+        noticeView = banner
+        NSAccessibility.post(element: banner, notification: .announcementRequested,
+                             userInfo: [.announcement: localized("reopen.notice"), .priority: NSAccessibilityPriorityLevel.high.rawValue])
+    }
+
+    @objc private func dismissNotice() {
+        noticeView?.removeFromSuperview()
+        noticeView = nil
+    }
+
     private func saveLast() {
         guard let last else { return }
         let encoder = JSONEncoder()
@@ -420,6 +482,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: projectsBridge, contentWorld: .page)
         webView?.stopLoading()
         webView = nil
+        noticeView = nil
     }
 
     func webView(_ web: WKWebView, decidePolicyFor action: WKNavigationAction,

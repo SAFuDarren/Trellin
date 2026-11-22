@@ -1,5 +1,6 @@
 """The default library and checked move must preserve project identity."""
 
+from io import BytesIO, StringIO
 import json
 import os
 from pathlib import Path
@@ -315,3 +316,47 @@ def test_missing_location_cannot_activate_retained_copy(library, tmp_path):
         pytest.fail("A retained copy must remain inactive when the control pointer is missing.")
     with pytest.raises(LibraryError, match="storage-invalid"):
         library.open_default()
+
+
+def test_a_project_from_another_library_home_opens_a_new_default_library(monkeypatch, library, tmp_path):
+    # #285: a trial build with the same bundle identifier saved a project of its own library home.
+    monkeypatch.setenv("RM_TRELLIN_HOME", str(tmp_path / "trial home"))
+    other = desktop_library.Library().open_default()
+    monkeypatch.setenv("RM_TRELLIN_HOME", str(library.anchor))
+    assert not library.anchor.exists()
+
+    opened = []
+
+    class Server:
+        launch_url = "test"
+
+        def __init__(self, workspace):
+            self.workspace = Path(workspace)
+
+        def serve_forever(self, *, poll_interval):
+            pass
+
+        def shutdown(self):
+            pass
+
+    def open_project(path, _resources, *, expected_project):
+        opened.append(Path(path))
+        return Server(path)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "credentials"))
+    monkeypatch.setattr(desktop, "_open", open_project)
+    monkeypatch.setattr(desktop.shutil, "which", lambda _: "/fixture/lean")
+    failures = []
+    for launch in ({"workspace_path": str(other)}, {"workspace_path": None, "project_id": paths.workspace_id(other)}):
+        output = StringIO()
+        assert desktop.run(lifetime=BytesIO(), output=output, library=desktop_library.Library(), **launch) == 0
+        reply = json.loads(output.getvalue())
+        default = Path(desktop_library.Library().status()["projects"][0]["path"])
+        assert default.parent == library.anchor / "Library" / "Workspaces"
+        assert (reply["workspace"], reply["name"]) == (str(default), "Library")
+        failures.append(reply["reopen_failed"])
+    # First launch: the library did not exist yet. Second: it exists but does not hold that project.
+    assert failures == ["storage-unavailable", "storage-project"]
+    assert other not in opened
+    # The trial library is left as it was.
+    assert desktop_library.Library(tmp_path / "trial home").status()["projects"][0]["path"] == str(other)
