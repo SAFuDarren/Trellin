@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.111
+
+- Contributors' local information stays out of the public repository. `scripts/check_privacy.py` finds local paths, temporary directories, personal email addresses and your own private terms in files, issue or PR text and commits. CI scans every tracked file, and the owner merge preflight refuses a PR that fails the scan. The rule is in `AGENTS.md`, `CONTRIBUTING.md` and the engineering guide.
+
 ## 1.0.109
 
 - Settings changes things in place and no longer sends you to other pages: model connections and runtimes stay in **Team**, automation rules in **Automation**. The gear opens Settings in one click, and **Help** has its own icon at the bottom of the rail. Storage notes say "on this Mac" in the app.
