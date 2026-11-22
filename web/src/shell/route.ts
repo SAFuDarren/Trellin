@@ -16,6 +16,8 @@ export const SECTIONS = [
 export type Section = (typeof SECTIONS)[number];
 export type Route = { section: Section; sub: string };
 
+export const EMPLOYEE_CHAT_PATH = "employee/";
+
 export function parseRoute(hash: string): Route {
   const [head = "", ...rest] = hash.replace(/^#/, "").split("/");
   const section = (SECTIONS as readonly string[]).includes(head) ? (head as Section) : "workbench";

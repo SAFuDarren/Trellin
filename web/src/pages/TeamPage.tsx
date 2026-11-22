@@ -7,6 +7,7 @@ import { useTeam, type Doctor, type Job, type Team } from "../api/sections";
 import { Clock, Mark, Spin } from "../components/Icons";
 import { ModelConnections } from "../components/ModelConnections";
 import { PageHead, SectionLayout } from "../components/SectionLayout";
+import { TeamAgentDetail } from "../components/TeamAgentDetail";
 import { TeamAgentProfiles } from "../components/TeamAgentProfiles";
 import { href } from "../shell/route";
 import { harnessName, modelName, prettyModel, timeText } from "../workbench/text";
@@ -113,6 +114,7 @@ export function TeamPage({
   const { t } = useTranslation();
   const team = useTeam(session);
   const page: Page = (PAGES as readonly string[]).includes(sub) ? (sub as Page) : "agents";
+  const agentId = sub.startsWith("agent/") ? sub.slice("agent/".length) : "";
   const data = team.data;
   const running = data?.jobs.filter((job) => job.state === "running").length ?? 0;
   const entry = (key: Page, count?: number) => ({
@@ -134,11 +136,13 @@ export function TeamPage({
         { name: t("team.groups.resources"), entries: [entry("runtimes"), entry("usage")] },
       ]}
     >
-      <PageHead title={t(`team.pages.${page}`)} note={t(`team.notes.${page}`)} />
+      {!agentId && <PageHead title={t(`team.pages.${page}`)} note={t(`team.notes.${page}`)} />}
       {page === "models" ? (
         <div className="page-body team-body">
           <ModelConnections session={session} />
         </div>
+      ) : agentId ? (
+        <TeamAgentDetail key={`${session}/${agentId}`} session={session} id={agentId} onOpenProof={onOpen} />
       ) : page === "agents" ? (
         <>
           <TeamAgentProfiles key={session} session={session} />

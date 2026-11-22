@@ -1165,6 +1165,11 @@
     }
   },
   "teamAgents": {
+    "profileMissing": "This Agent could not be found.",
+    "openChat": "Chat",
+    "workActivity": "Agent activity",
+    "instructionsEmpty": "No instructions have been added.",
+    "connection": "Model connection",
     "title": "Saved agents",
     "add": "Add agent",
     "edit": "Edit",

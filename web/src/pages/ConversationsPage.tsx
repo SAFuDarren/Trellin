@@ -19,12 +19,11 @@ import { Chevron, Clock } from "../components/Icons";
 import { NewConversation } from "../components/NewConversation";
 import { Empty, PageHead } from "../components/SectionLayout";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
-import { href } from "../shell/route";
+import { EMPLOYEE_CHAT_PATH, href } from "../shell/route";
 import { proofActivityKey } from "../shell/workspaceActivity";
 import { nodeTitle, timeText } from "../workbench/text";
 import "../styles/chats-page.css";
 
-const EMPLOYEE_ROUTE = "employee/";
 const HISTORY_ROUTE = "history";
 const NEW_ROUTE = "new";
 const DIRECT_ROUTE = "new/model";
@@ -64,7 +63,7 @@ export function ConversationsPage({
     const employeeTasks = thread.agent_id ? tasksByEmployee.get(thread.agent_id) : undefined;
     (employeeTasks ?? history).push(thread);
   }
-  const employeeId = sub.startsWith(EMPLOYEE_ROUTE) ? sub.slice(EMPLOYEE_ROUTE.length) : undefined;
+  const employeeId = sub.startsWith(EMPLOYEE_CHAT_PATH) ? sub.slice(EMPLOYEE_CHAT_PATH.length) : undefined;
   const historyView = sub === HISTORY_ROUTE;
   const newView = sub === NEW_ROUTE || sub === DIRECT_ROUTE;
   const showProof = sub.includes("|");
@@ -98,7 +97,7 @@ export function ConversationsPage({
     const previous = lastTask.current.get(profile.id);
     const matches = tasksByEmployee.get(profile.id) ?? [];
     const thread = matches.find((item) => item.id === previous) ?? matches[0];
-    return href("chat", thread?.id ?? EMPLOYEE_ROUTE + profile.id);
+    return href("chat", thread?.id ?? EMPLOYEE_CHAT_PATH + profile.id);
   }
 
   async function create(agent?: TeamAgent, title = t("conversations.defaultTitle")) {
@@ -380,7 +379,7 @@ export function ConversationsPage({
             }}
             onRemove={() => {
               window.location.hash = employee
-                ? href("chat", tasks.find((task) => task.id !== current.id)?.id ?? EMPLOYEE_ROUTE + employee.id)
+                ? href("chat", tasks.find((task) => task.id !== current.id)?.id ?? EMPLOYEE_CHAT_PATH + employee.id)
                 : href("chat", employees.length ? HISTORY_ROUTE : "");
             }}
             header={({ remove, removeDisabled, triggerRef }) =>
