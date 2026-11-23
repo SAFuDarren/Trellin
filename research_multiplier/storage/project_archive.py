@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 from datetime import datetime, timezone
 from uuid import UUID
 
-from research_multiplier.storage import paths
+from research_multiplier.storage import paths, pg_client
 from .artifacts import write_json
 
 
@@ -79,12 +79,11 @@ def _connect(dsn):
         raise ValueError("The configured database backup or restore login is unavailable.") from None
 
 
-def _pg_tool(tool, arguments, dsn, pg_bin):
+def _pg_tool(tool, arguments, dsn, pg_bin, server_version):
     from psycopg.conninfo import conninfo_to_dict
 
-    executable = shutil.which(str(Path(pg_bin) / tool) if pg_bin else tool)
-    if not executable:
-        raise ValueError(f"Install a PostgreSQL client with {tool} or provide --pg-bin.")
+    # #321: use a client that can work with this server, not merely the first one on PATH.
+    executable = pg_client.resolve(tool, pg_client.server_major(server_version), pg_bin)
     try:
         settings = conninfo_to_dict(dsn)
     except Exception:
@@ -161,7 +160,8 @@ def backup(destination=None, *, pg_bin=None):
                 files = _project_files(root)
                 recorded = _copy(files, staging)
                 dump = staging / "database.dump"
-                _pg_tool("pg_dump", ["--format=custom", "--snapshot", snapshot, "--file", str(dump)], dsn, pg_bin)
+                _pg_tool("pg_dump", ["--format=custom", "--snapshot", snapshot, "--file", str(dump)], dsn, pg_bin,
+                         connection.info.server_version)
                 latest = _project_files(root)
                 if set(latest) != set(recorded) or any(
                     _fingerprint(file) != recorded[name] for name, file in latest.items()
@@ -283,6 +283,7 @@ def restore(source, workspace, *, pg_bin=None):
         """).fetchone()
         if existing:
             raise ValueError("Restore into a fresh PostgreSQL database without existing user tables.")
+        server_version = connection.info.server_version
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with TemporaryDirectory(dir=target.parent, prefix=".rm-restore-") as directory:
         staging = paths.initialize_workspace(Path(directory) / "project")
@@ -298,7 +299,7 @@ def restore(source, workspace, *, pg_bin=None):
         if _fingerprint(dump) != manifest["files"]["database.dump"]:
             raise ValueError("The database dump changed before it could be restored.")
         _pg_tool("pg_restore", ["--single-transaction", "--exit-on-error", "--no-owner", str(dump)],
-                 dsn, pg_bin)
+                 dsn, pg_bin, server_version)
         with _connect(dsn) as connection:
             restored, = connection.execute("SELECT rm.current_database_id()").fetchone()
             if str(restored) != manifest["database_id"]:
