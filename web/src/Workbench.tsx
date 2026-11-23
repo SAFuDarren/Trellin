@@ -23,13 +23,7 @@ import { ProjectActions } from "./components/project/ProjectActions";
 import { ReviewPanel } from "./components/ReviewPanel";
 import { PageHead } from "./components/SectionLayout";
 import { Splitter } from "./components/Splitter";
-import {
-  href,
-  parseWorkbenchAddress,
-  workbenchSub,
-  type AddressMode,
-  type WorkbenchAddress,
-} from "./shell/route";
+import { href, parseWorkbenchAddress, workbenchSub, type AddressMode, type WorkbenchAddress } from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
 import type { InboxItem } from "./api/sections";
 import type { ClaimProgress } from "./workbench/claimProgress";

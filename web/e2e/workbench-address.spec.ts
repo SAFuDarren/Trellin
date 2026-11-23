@@ -7,7 +7,9 @@ const OTHER = "aaaaaaaa-0000-4000-8000-000000000001";
 const OTHER_TITLE = "单射映射的复合";
 const MISSING = "99999999-9999-4999-8999-999999999999";
 const at = (claim: string, node?: string) =>
-  new RegExp(`#workbench/claim/${claim}${node ? "/node/" + encodeURIComponent(node).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : ""}$`);
+  new RegExp(
+    `#workbench/claim/${claim}${node ? "/node/" + encodeURIComponent(node).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : ""}$`,
+  );
 // The map is the bare page or #workbench: the launch token leaves the address without a section.
 const MAP = /\/(#workbench)?$/;
 const proof = (page: Page) => page.locator(".main-proof-graph");
