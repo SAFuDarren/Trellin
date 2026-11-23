@@ -64,7 +64,7 @@ In List or Table, use the checkboxes to select items. Shift-click a checkbox to 
 
 Team opens on **Agents**. Add installed models from [Team → Runtimes](project-intake.md#connect-a-model), where **Environment check** has its own section. For a managed installation with tools outside the standard locations, the Trellin launch environment can supply colon-separated absolute directories through `RM_DESKTOP_TOOL_PATH`.
 
-If **Proof activity** needs a newer database, choose **Back up and upgrade**. Confirm the project path in the Mac dialog. Trellin verifies a local archive containing the project files and PostgreSQL snapshot before it upgrades the selected database, then reopens the project. Keep the archive for recovery. The dialog requires this project’s saved database owner login.
+If **Proof activity** needs a newer database, choose **Back up and upgrade**. Confirm the project path in the Mac dialog. Trellin verifies a local archive containing the project files and PostgreSQL snapshot before it upgrades the selected database, then reopens the project. Keep the archive for recovery. The dialog requires this project’s saved database owner login. The backup uses PostgreSQL client tools at least as new as the server, found on `PATH` or in the usual install locations such as Homebrew's `postgresql@N`. If none is installed, the message names the version to install.
 
 ## Manage storage
 

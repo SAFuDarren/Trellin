@@ -11,7 +11,7 @@ import subprocess
 import sys
 from tempfile import TemporaryDirectory
 
-from research_multiplier.storage import credentials, paths
+from research_multiplier.storage import credentials, paths, pg_client
 
 
 OK, WARN, FAIL, SKIP = "ok", "warn", "fail", "skip"
@@ -262,22 +262,16 @@ class Doctor:
 
     def client_tools(self):
         group, title = "Database", "Backup tools (pg_dump, pg_restore)"
-        found = {tool: shutil.which(tool) for tool in ("pg_dump", "pg_restore")}
-        missing = [tool for tool, location in found.items() if location is None]
-        if missing:
-            self.add("pg-tools", group, title, WARN, f"Not on PATH: {', '.join(missing)}.",
-                     "Install the PostgreSQL client tools, or pass --pg-bin to backup and restore commands.")
+        # #321: report the same clients that backup, restore and the desktop upgrade will choose.
+        try:
+            found = {tool: pg_client.resolve(tool, self.server_major) for tool in ("pg_dump", "pg_restore")}
+        except ValueError as error:
+            server = f"PostgreSQL {self.server_major} " if self.server_major else "PostgreSQL "
+            self.add("pg-tools", group, title, WARN, str(error),
+                     f"Install the {server}client tools, or pass --pg-bin to backup and restore commands.")
             return
-        completed = _run([found["pg_dump"], "--version"], timeout=10)
-        reported = re.search(r"\)\s*(\d+)", completed.stdout) if completed and completed.returncode == 0 else None
-        client = int(reported.group(1)) if reported else None
-        detail = f"{found['pg_dump']} (major version {client})"
-        if self.server_major and client and client < self.server_major:
-            self.add("pg-tools", group, title, WARN,
-                     f"{detail} is older than the PostgreSQL {self.server_major} server; backups will fail.",
-                     f"Put the PostgreSQL {self.server_major} client tools first on PATH, or pass --pg-bin.")
-        else:
-            self.add("pg-tools", group, title, OK, detail)
+        client = pg_client.client_major(found["pg_dump"])
+        self.add("pg-tools", group, title, OK, f"{found['pg_dump']} (major version {client})")
         if self.status("connections") != OK:
             self.add("migration-dsn", group, "Migration login", SKIP, "Needs working role connections.")
         elif not os.environ.get("RM_MIGRATION_DSN"):

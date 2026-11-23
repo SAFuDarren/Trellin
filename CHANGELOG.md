@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.122
+
+- Project backups, restores and the desktop **Back up and upgrade** pick `pg_dump` and `pg_restore` by the server's major version instead of using the first ones on `PATH`. They look on `PATH` and in the usual install locations, such as Homebrew `postgresql@N` and Postgres.app, so an older client earlier on `PATH` or a Finder-launched app no longer makes the backup fail. When no suitable client exists, the message names the installed and required versions. `doctor` reports the client that will be used.
+
 ## 1.0.121
 
 - `research withdraw-claim CLAIM_ID --actor --reason` withdraws an open claim that cannot proceed, and `--superseded-by CLAIM_ID` links the corrected claim that replaces it. Withdrawn claims leave the project map and claim lists; their contract, evidence and decisions stay in history. `research withdrawn-claims` lists them and `research restore-claim` brings one back. Migration `0084` adds the withdraw and restore decisions; Trellin offers the project upgrade.
