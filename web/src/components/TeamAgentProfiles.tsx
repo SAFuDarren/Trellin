@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/client";
@@ -10,6 +10,7 @@ import {
   type ModelConnection,
 } from "../api/modelConnections";
 import { AGENT_AVATARS, useSaveTeamAgent, useTeamAgents, type TeamAgent } from "../api/teamAgents";
+import { AgentTemplateList, agentDraft } from "./AgentTemplates";
 import { href } from "../shell/route";
 import { ModelConnections } from "./ModelConnections";
 import { TeamAgentAvatar } from "./TeamAgentAvatar";
@@ -54,16 +55,7 @@ export function TeamAgentProfiles({ session }: { session: string }) {
   function addAgent(button: HTMLButtonElement) {
     returnFocus.current = button;
     setNotice("");
-    setEditing({
-      id: crypto.randomUUID(),
-      revision: 0,
-      connection_id: "",
-      name: "",
-      description: "",
-      avatar: "initials",
-      instructions: "",
-      starters: [],
-    });
+    setEditing(agentDraft(t));
   }
 
   return (
@@ -177,7 +169,7 @@ export function TeamAgentProfiles({ session }: { session: string }) {
         <TeamAgentWizard
           session={session}
           initial={editing}
-          initialStep={editing.revision ? "details" : "runtime"}
+          initialStep={editing.revision ? "details" : "role"}
           onClose={() => {
             setEditing(null);
             returnFocus.current?.focus();
@@ -192,6 +184,8 @@ export function TeamAgentProfiles({ session }: { session: string }) {
   );
 }
 
+type WizardStep = "role" | "runtime" | "details";
+
 export function TeamAgentWizard({
   session,
   initial,
@@ -201,7 +195,8 @@ export function TeamAgentWizard({
 }: {
   session: string;
   initial: TeamAgent;
-  initialStep: "runtime" | "details";
+  /** A new Agent starts with the role choice; a template opens on details with a working connection chosen. */
+  initialStep: WizardStep;
   onSaved: (agent: TeamAgent) => void;
   onClose: () => void;
 }) {
@@ -235,9 +230,25 @@ export function TeamAgentWizard({
     setFailure("");
   }
 
-  function changeStep(next: "runtime" | "details") {
+  function changeStep(next: WizardStep) {
     setFailure("");
     setStep(next);
+  }
+
+  // #323: a new Agent uses the first working connection, so a template needs only a review and Save.
+  // Without one, the connection step explains how to add it.
+  const firstAvailable = available[0]?.id;
+  const loaded = connections.isSuccess;
+  useEffect(() => {
+    if (step !== "details" || initial.revision || draft.connection_id || !loaded) return;
+    if (firstAvailable) setDraft((current) => ({ ...current, connection_id: firstAvailable }));
+    else setStep("runtime");
+  }, [step, initial.revision, draft.connection_id, loaded, firstAvailable]);
+
+  function chooseTemplate(template?: Parameters<typeof agentDraft>[1]) {
+    const filled = agentDraft(t, template);
+    setDraft((current) => ({ ...filled, id: current.id, connection_id: current.connection_id }));
+    changeStep("details");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -287,12 +298,28 @@ export function TeamAgentWizard({
       >
         <header className="project-entry-head">
           <h2 ref={heading} id={title} tabIndex={-1}>
-            {t(step === "runtime" ? "teamAgents.chooseRuntime" : "teamAgents.configure")}
+            {t(
+              step === "role"
+                ? "agentTemplates.chooseRole"
+                : step === "runtime"
+                  ? "teamAgents.chooseRuntime"
+                  : "teamAgents.configure",
+            )}
           </h2>
           {step === "details" && draft.name.trim() && <TeamAgentAvatar avatar={draft.avatar} name={draft.name} />}
         </header>
         <form className="project-entry-body project-entry-form" onSubmit={(event) => void submit(event)}>
-          {step === "runtime" ? (
+          {step === "role" ? (
+            <>
+              <p className="project-entry-note">{t("agentTemplates.intro")}</p>
+              <AgentTemplateList onChoose={chooseTemplate} />
+              <div className="choices">
+                <button type="button" className="button" onClick={() => chooseTemplate()}>
+                  {t("agentTemplates.blank")}
+                </button>
+              </div>
+            </>
+          ) : step === "runtime" ? (
             <>
               {connections.isPending && <p aria-live="polite">{t("common.loading")}</p>}
               {connections.isError && <p role="alert">{t("teamAgents.runtimesFailed")}</p>}
@@ -423,6 +450,11 @@ export function TeamAgentWizard({
                 {t("teamAgents.back")}
               </button>
             )}
+            {step === "runtime" && !initial.revision && (
+              <button className="button" type="button" onClick={() => changeStep("role")}>
+                {t("teamAgents.back")}
+              </button>
+            )}
             <span className="team-agent-footer-spacer" />
             <button
               className="button"
@@ -434,7 +466,7 @@ export function TeamAgentWizard({
             >
               {t("common.cancel")}
             </button>
-            {step === "runtime" ? (
+            {step === "role" ? null : step === "runtime" ? (
               <button
                 className="button primary"
                 type="button"

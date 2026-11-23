@@ -18,7 +18,9 @@ import { Menu } from "../components/FloatingControls";
 import { Chevron, Clock } from "../components/Icons";
 import { NewConversation } from "../components/NewConversation";
 import { Empty, PageHead, SectionFrame, SectionPanel } from "../components/SectionLayout";
+import { AgentTemplateList, agentDraft } from "../components/AgentTemplates";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
+import { TeamAgentWizard } from "../components/TeamAgentProfiles";
 import { EMPLOYEE_CHAT_PATH, href } from "../shell/route";
 import { proofActivityKey } from "../shell/workspaceActivity";
 import { nodeTitle, timeText } from "../workbench/text";
@@ -51,6 +53,7 @@ export function ConversationsPage({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<{ route: string; message: string; named: boolean }>();
   const [employeeQuery, setEmployeeQuery] = useState("");
+  const [templateDraft, setTemplateDraft] = useState<TeamAgent | null>(null);
   const lastTask = useRef(new Map<string, string>());
   const taskSwitcher = useRef<HTMLButtonElement>(null);
   const refocusTaskSwitcher = useRef(false);
@@ -191,9 +194,12 @@ export function ConversationsPage({
   const search = employeeQuery.trim().toLocaleLowerCase(i18n.language);
   const visibleEmployees = employees.filter((agent) => agent.name.toLocaleLowerCase(i18n.language).includes(search));
   const error = createError?.route === sub ? createError : undefined;
+  // With no saved Agents the panel leads with the templates, so an empty direct history needs no note.
+  const quietEmpty = profiles.isSuccess && employees.length === 0;
   const historyList = (
     <History
       rows={history}
+      quietEmpty={quietEmpty}
       pending={direct.isPending || profiles.isPending}
       error={direct.isError ? conversationErrorText(t, direct.error) : undefined}
       renderRow={row}
@@ -203,7 +209,7 @@ export function ConversationsPage({
     />
   );
 
-  function compose(initialRecipient?: string) {
+  function compose(initialRecipient?: string, focus = newView) {
     return (
       <NewConversation
         session={session}
@@ -211,7 +217,7 @@ export function ConversationsPage({
         agentsPending={profiles.isPending}
         agentsError={profiles.isError}
         initialRecipient={initialRecipient}
-        focusComposer={newView}
+        focusComposer={focus}
         onCreated={(thread) => {
           if (window.location.hash === currentHash) window.location.hash = href("chat", thread.id);
         }}
@@ -338,6 +344,11 @@ export function ConversationsPage({
                       <TeamAgentAvatar avatar={profile.avatar} name={profile.name} />
                       <span className="employee-chat-person-label">
                         <strong title={profile.name}>{profile.name}</strong>
+                        {profile.description && (
+                          <span className="employee-chat-person-role" title={profile.description}>
+                            {profile.description}
+                          </span>
+                        )}
                         {direct.isSuccess && <EmployeeStatus tasks={tasksByEmployee.get(profile.id) ?? []} />}
                       </span>
                     </a>
@@ -349,9 +360,30 @@ export function ConversationsPage({
             )}
           </>
         ) : (
-          historyList
+          <>
+            {profiles.isSuccess && (
+              // #323: with no saved Agents, Chats offers the role templates instead of an empty list.
+              <section className="chat-agent-templates" aria-labelledby="chat-agent-templates-title">
+                <h3 id="chat-agent-templates-title">{t("agentTemplates.chatsTitle")}</h3>
+                <p>{t("agentTemplates.chatsIntro")}</p>
+                <AgentTemplateList compact onChoose={(template) => setTemplateDraft(agentDraft(t, template))} />
+              </section>
+            )}
+            {historyList}
+          </>
         )}
       </div>
+      {templateDraft && (
+        <TeamAgentWizard
+          session={session}
+          initial={templateDraft}
+          initialStep="details"
+          onClose={() => setTemplateDraft(null)}
+          onSaved={(agent) => {
+            window.location.hash = href("chat", EMPLOYEE_CHAT_PATH + agent.id);
+          }}
+        />
+      )}
     </SectionPanel>
   );
   return (
@@ -406,7 +438,8 @@ export function ConversationsPage({
         <>
           {employeeHeader(employee, back)}
           {direct.isError && <Empty>{conversationErrorText(t, direct.error)}</Empty>}
-          {compose(employee.id)}
+          {/* #323: opening an Agent from the panel is ready to type to it. */}
+          {compose(employee.id, true)}
         </>
       ) : !sub || newView ? (
         <>
@@ -447,7 +480,9 @@ function History({
   proofRows,
   selectedProof,
   runningByProofNode,
+  quietEmpty = false,
 }: {
+  quietEmpty?: boolean;
   rows: ConversationSummary[];
   pending: boolean;
   error?: string;
@@ -470,7 +505,7 @@ function History({
       ) : rows.length ? (
         <ul aria-label={t("conversations.threads")}>{rows.map(renderRow)}</ul>
       ) : (
-        <p className="chat-list-note">{t("conversations.noConversations")}</p>
+        !quietEmpty && <p className="chat-list-note">{t("conversations.noConversations")}</p>
       )}
       {proofRows.length > 0 && (
         <section className="chat-proof-list" aria-label={t("conversations.proofActivity")}>
