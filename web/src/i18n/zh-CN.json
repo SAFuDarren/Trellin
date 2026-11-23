@@ -1322,9 +1322,7 @@
       "stopped": "已停止"
     },
     "note": "你不在时系统做什么",
-    "explain": "推进规则让 worker 在你批准的预算内继续搜索证明。规则只负责排队任务；记录结果、新增假设和调用外部模型仍然需要你确认。",
     "none": "还没有推进规则。",
-    "summary": "目标：{{metric}} · 每轮最多 {{rounds}} 次模型尝试",
     "state": {
       "active": "运行中",
       "proposed": "待批准",
@@ -1338,8 +1336,7 @@
     "never": "还没运行过",
     "approved": "批准",
     "notApproved": "尚未批准",
-    "stopped": "停止",
-    "cli": "规则目前在命令行里提议和批准："
+    "stopped": "停止"
   },
   "modelConnections": {
     "title": "模型连接",
@@ -1695,6 +1692,80 @@
       "review": "审阅",
       "agentTasks": "Agent 任务",
       "library": "定理库"
+    }
+  },
+  "automation": {
+    "new": "新建自动化",
+    "chooseTemplate": "要自动运行什么？",
+    "chooseClaim": "选择课题",
+    "noClaims": "还没有课题。请先在项目图谱中添加定理。",
+    "review": "检查并批准",
+    "reviewIntro": "批准这条规则之前，什么都不会运行。",
+    "reviewAndApprove": "检查并批准",
+    "templates": {
+      "lean-reuse": {
+        "name": "复用与归约 Lean 证明",
+        "summary": "在已确认的课题上尝试现成的 Lean 归约和可复用的证明，不调用模型。",
+        "when": "批准后立即运行一次，之后每次处理时继续，直到课题完成或你停止它。",
+        "needs": "需要已确认的准确 Lean 命题。"
+      },
+      "observe": {
+        "name": "跟踪已验证的证据",
+        "summary": "根据课题已验证的证据记录进展，不运行其他操作，也不改动任何内容。",
+        "when": "批准后立即检查一次，之后每次处理时继续，直到你停止它。",
+        "needs": "需要已确认的起始依据。"
+      }
+    },
+    "missing": {
+      "basis": "请先确认它的起始依据",
+      "questions": "请先回答它的待定问题",
+      "lean_statement": "请先确认它的准确 Lean 命题"
+    },
+    "fields": {
+      "claim": "课题",
+      "what": "运行内容",
+      "when": "运行时机",
+      "actions": "允许的操作",
+      "models": "模型调用",
+      "budget": "时间预算"
+    },
+    "actionsLean": "Lean 归约及复用已核验的证明",
+    "actionsObserve": "仅观察",
+    "modelsNone": "无",
+    "modelRounds_one": "每次最多 {{count}} 轮模型调用",
+    "modelRounds_other": "每次最多 {{count}} 轮模型调用",
+    "budgetNone": "不尝试证明",
+    "budgetSeconds_one": "最多 {{count}} 秒",
+    "budgetSeconds_other": "最多 {{count}} 秒",
+    "reason": "批准理由",
+    "reasonDefault": "在选定的课题上运行这条规则。",
+    "approve": "批准并运行",
+    "approving": "正在批准…",
+    "run": {
+      "started": "已批准，第一次运行已经开始。",
+      "waiting": "已批准，当前证明工作结束后开始运行。",
+      "failed": "已批准，但 Trellin 没能启动第一次运行。"
+    },
+    "stop": "停止",
+    "stopReason": "停止理由",
+    "stopDefault": "不再需要。",
+    "stopNote": "停止后，已有结果和运行记录都会保留。",
+    "stopConfirm": "停止规则",
+    "empty": {
+      "title": "还没有自动化",
+      "body": "自动化会在你批准的范围内持续处理一个课题。记录结果和添加假设仍需你来决定。"
+    },
+    "errors": {
+      "stale": "这条规则已经变化，请重新检查。",
+      "stopped": "这条完全相同的规则之前已停止。请换一个课题或模板。",
+      "worker_unavailable": "此项目还缺少运行自动化所需的登录信息。请先修复项目设置。",
+      "unavailable_basis": "请先确认课题的起始依据。",
+      "unavailable_questions": "请先回答课题的待定问题。",
+      "unavailable_lean_statement": "请先确认课题的准确 Lean 命题。",
+      "missing": "该课题或规则已不存在。",
+      "reason": "请填写理由。",
+      "invalid": "无法保存规则，请重试。",
+      "unavailable": "无法保存规则，请重试。"
     }
   }
 }

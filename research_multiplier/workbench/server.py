@@ -20,14 +20,11 @@ from research_multiplier.proof.lean_watch import LakeWatch
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.runtime_updates import RuntimeUpdates
-from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates, research_progress,
-                                          workbench_activity, workbench_agent_work, workbench_agents, workbench_clarification,
-                                          workbench_conversations, workbench_goal_review,
-                                          workbench_guidance, workbench_library,
-                                          workbench_intake, workbench_lemma_plans, workbench_premises,
-                                          workbench_project_canvas, workbench_proof_drafts, workbench_proof_tasks,
-                                          workbench_review, workbench_sections,
-                                          workbench_theorems, workspace_events)
+from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates,
+    research_progress, workbench_activity, workbench_agent_work, workbench_agents, workbench_automation,
+    workbench_clarification, workbench_conversations, workbench_goal_review, workbench_guidance, workbench_intake,
+    workbench_lemma_plans, workbench_library, workbench_premises, workbench_project_canvas, workbench_proof_drafts,
+    workbench_proof_tasks, workbench_review, workbench_sections, workbench_theorems, workspace_events)
 
 
 # The interface is built from web/ into the package (docs/engineering.md); only its exact files are served.
@@ -94,6 +91,9 @@ _PROJECT_CANVAS_ERRORS = {
 }
 _INTAKE_PUBLIC = ("/api/project-intake/public-preview", "/api/project-intake/public-draft")
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
+# #94: create, approve and stop automation rules from the workbench.
+_AUTOMATION_ROUTE = "/api/automation"
+_AUTOMATION_WRITES = {_AUTOMATION_ROUTE + "/propose", _AUTOMATION_ROUTE + "/approve", _AUTOMATION_ROUTE + "/stop"}
 _PROOF_DRAFT_ROUTE = "/api/proof-drafts"
 _PROOF_DRAFT_DISCARD = "/api/proof-drafts/discard"
 _PROOF_DRAFT_ERRORS = {
@@ -434,17 +434,29 @@ class WorkbenchServer(ThreadingHTTPServer):
             if self._running_policy is not None:
                 raise workbench_proof_tasks.ProofTaskError("proof_task.busy")
             result = self.write(workbench_proof_tasks.start, document)
-            identifier = str(result["policy_id"])
-            self._running_policy = identifier
-            self._failed_policy = None
-            try:
-                threading.Thread(target=self._work_on_proof, args=(identifier, "public_model" in document),
-                                 daemon=True).start()
-            except RuntimeError:
-                self._running_policy = None
-                self._failed_policy = identifier
-                raise workbench_proof_tasks.ProofTaskError("proof_task.worker_failed") from None
+            if not self._start_worker(str(result["policy_id"]), "public_model" in document):
+                raise workbench_proof_tasks.ProofTaskError("proof_task.worker_failed")
             return result
+
+    def _start_worker(self, identifier, connected_model=False):
+        """Work on one approved policy in the background. The caller holds the proof task lock."""
+        self._running_policy = identifier
+        self._failed_policy = None
+        try:
+            threading.Thread(target=self._work_on_proof, args=(identifier, connected_model), daemon=True).start()
+        except RuntimeError:
+            self._running_policy = None
+            self._failed_policy = identifier
+            return False
+        return True
+
+    def approve_automation(self, document):
+        """Approve the reviewed rule, then give it a first run when the project's worker slot is free (#94)."""
+        with self._proof_task_lock:
+            result = self.write(workbench_automation.approve, document)
+            if self._running_policy is not None:
+                return {**result, "run": "waiting"}
+            return {**result, "run": "started" if self._start_worker(result["policy_id"]) else "failed"}
 
     def _work_on_proof(self, identifier, connected_model):
         failed = True
@@ -605,6 +617,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self.server.read(_activity, *_uuid_parameters(route.query, "claim"))
         if route.path == "/api/proof-task":
             return self.server.proof_task(*_uuid_parameters(route.query, "claim"))
+        if route.path == _AUTOMATION_ROUTE:
+            if route.query:
+                raise _BadRequest("This endpoint does not take parameters.")
+            return self.server.read(workbench_automation.templates)
         if route.path == "/api/claim-code":
             return self.server.read(claim_references.resolve, _reference_parameter(route.query))
         return None
@@ -995,6 +1011,12 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.start_proof_task(self._body()))
             elif self.path == "/api/proof-task/stop":
                 self._json(HTTPStatus.OK, self.server.write(workbench_proof_tasks.stop, self._body()))
+            elif self.path == _AUTOMATION_ROUTE + "/propose":
+                self._json(HTTPStatus.OK, self.server.write(workbench_automation.propose, self._body()))
+            elif self.path == _AUTOMATION_ROUTE + "/approve":
+                self._json(HTTPStatus.OK, self.server.approve_automation(self._body()))
+            elif self.path == _AUTOMATION_ROUTE + "/stop":
+                self._json(HTTPStatus.OK, self.server.write(workbench_automation.stop, self._body()))
             elif self.path == _LEMMA_PLAN_ROUTE:
                 document = self._body(workbench_lemma_plans.MAX_REQUEST_BYTES)
                 self._json(HTTPStatus.OK, self.server.verify_lemma_plan(document))
@@ -1053,6 +1075,9 @@ class _Handler(BaseHTTPRequestHandler):
         except workbench_proof_tasks.ProofTaskError as error:
             status = HTTPStatus.BAD_REQUEST if error.code == "proof_task.invalid" else HTTPStatus.CONFLICT
             self._error(status, error.code)
+        except workbench_automation.AutomationError as error:
+            invalid = error.code in {"automation.invalid", "automation.reason"}
+            self._error(HTTPStatus.BAD_REQUEST if invalid else HTTPStatus.CONFLICT, error.code)
         except workbench_lemma_plans.LemmaPlanError as error:
             self._error(_LEMMA_PLAN_ERRORS[str(error)], str(error))
         except workbench_premises.PremiseError as error:
@@ -1085,6 +1110,9 @@ class _Handler(BaseHTTPRequestHandler):
             elif self.path in _PROOF_WRITES:
                 status = HTTPStatus.SERVICE_UNAVAILABLE if error.retryable else HTTPStatus.CONFLICT
                 self._error(status, "proof_task.unavailable" if error.retryable else "proof_task.stale")
+            elif self.path in _AUTOMATION_WRITES:
+                status = HTTPStatus.SERVICE_UNAVAILABLE if error.retryable else HTTPStatus.CONFLICT
+                self._error(status, "automation.unavailable" if error.retryable else "automation.stale")
             elif self.path == _LEMMA_PLAN_ROUTE:
                 changed = error.state in {"P0002", "23514"}
                 self._error(HTTPStatus.CONFLICT if changed else HTTPStatus.SERVICE_UNAVAILABLE,
@@ -1116,6 +1144,8 @@ class _Handler(BaseHTTPRequestHandler):
                 message = "proof_draft_unavailable"
             elif self.path in _PROOF_WRITES:
                 message = "proof_task.unavailable"
+            elif self.path in _AUTOMATION_WRITES:
+                message = "automation.unavailable"
             elif self.path == _LEMMA_PLAN_ROUTE:
                 message = "lemmaPlan.unavailable"
             elif self.path in _PREMISE_WRITES:

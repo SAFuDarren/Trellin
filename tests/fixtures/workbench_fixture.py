@@ -169,9 +169,15 @@ TEAM = {
 }
 PROGRESS = {"policies": [
     {"id": "pol-1", "claim_id": CLAIM, "claim_title": "自然数加零的对称性", "state": "waiting_review",
+     "policy_sha256": "b" * 64,
      "policy": {"metric": "exact-closure", "max_rounds": 0, "budget_seconds": 0, "lean": {"model_rounds": 2}},
      "proposed_at": at(600), "approved_by": "Fixture reviewer", "approved_at": at(590), "stopped_at": None, "stop_reason": None,
      "last_run_at": at(30), "last_status": "awaiting_evidence_review", "last_reason": None},
+]}
+# #94: automation templates and the claims each can run on.
+AUTOMATION = {"templates": [
+    {"id": "lean-reuse", "claims": [{"claim_id": CLAIM, "title": "自然数加零的对称性", "missing": None}]},
+    {"id": "observe", "claims": [{"claim_id": CLAIM, "title": "自然数加零的对称性", "missing": None}]},
 ]}
 THREADS = {"threads": [
     {"claim_id": CLAIM, "claim_title": "自然数加零的对称性", "node_id": O2,
@@ -247,7 +253,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/model-connections/native": {"providers": [{"provider": "codex-cli", "status": "signed_in"}]},
                 "/api/team-agents": {"agents": []},
                 "/api/conversations": {"threads": []}, "/api/agent-work": {"available": True, "tasks": []},
-                "/api/team": TEAM, "/api/progress": PROGRESS, "/api/threads": THREADS, "/api/doctor": DOCTOR}.get(route.path)
+                "/api/team": TEAM, "/api/progress": PROGRESS, "/api/automation": AUTOMATION, "/api/threads": THREADS, "/api/doctor": DOCTOR}.get(route.path)
         if data is None:
             self.send(b'{"error": "Page unavailable."}', "application/json", 404)
             return

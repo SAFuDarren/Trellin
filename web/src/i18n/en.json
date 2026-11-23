@@ -1322,9 +1322,7 @@
       "stopped": "Stopped"
     },
     "note": "What runs while you are away",
-    "explain": "An automation rule lets workers keep searching for a proof within a budget you approved. Rules only queue work; recording results, adding assumptions and calling external models still need you.",
     "none": "No automation rules yet.",
-    "summary": "Goal: {{metric}} · up to {{rounds}} model rounds per pass",
     "state": {
       "active": "Running",
       "proposed": "Waiting for approval",
@@ -1338,8 +1336,7 @@
     "never": "Not run yet",
     "approved": "Approved",
     "notApproved": "Not approved yet",
-    "stopped": "Stopped",
-    "cli": "Rules are proposed and approved from the command line for now:"
+    "stopped": "Stopped"
   },
   "modelConnections": {
     "title": "Model connections",
@@ -1695,6 +1692,80 @@
       "review": "Review",
       "agentTasks": "Agent tasks",
       "library": "Library"
+    }
+  },
+  "automation": {
+    "new": "New automation",
+    "chooseTemplate": "What should run?",
+    "chooseClaim": "Choose a claim",
+    "noClaims": "No claims yet. Add a theorem on the project map first.",
+    "review": "Review and approve",
+    "reviewIntro": "Nothing runs until you approve this exact rule.",
+    "reviewAndApprove": "Review and approve",
+    "templates": {
+      "lean-reuse": {
+        "name": "Reuse and reduce Lean proofs",
+        "summary": "Tries ready Lean reductions and proofs you can reuse on a confirmed claim. Makes no model calls.",
+        "when": "Runs once when you approve it, then on each later pass until the claim is closed or you stop it.",
+        "needs": "Needs a confirmed exact Lean statement."
+      },
+      "observe": {
+        "name": "Watch verified evidence",
+        "summary": "Records progress from evidence already verified for a claim. Runs nothing else and changes nothing.",
+        "when": "Checks once when you approve it, then on each later pass until you stop it.",
+        "needs": "Needs a confirmed starting basis."
+      }
+    },
+    "missing": {
+      "basis": "Confirm its starting basis first",
+      "questions": "Answer its open questions first",
+      "lean_statement": "Confirm its exact Lean statement first"
+    },
+    "fields": {
+      "claim": "Claim",
+      "what": "What runs",
+      "when": "When",
+      "actions": "Allowed actions",
+      "models": "Model calls",
+      "budget": "Time budget"
+    },
+    "actionsLean": "Lean reductions and reuse of checked proofs",
+    "actionsObserve": "Observe only",
+    "modelsNone": "None",
+    "modelRounds_one": "Up to {{count}} model round per pass",
+    "modelRounds_other": "Up to {{count}} model rounds per pass",
+    "budgetNone": "No proof attempts",
+    "budgetSeconds_one": "Up to {{count}} second",
+    "budgetSeconds_other": "Up to {{count}} seconds",
+    "reason": "Why approve this rule",
+    "reasonDefault": "Run this rule on the selected claim.",
+    "approve": "Approve and run",
+    "approving": "Approving…",
+    "run": {
+      "started": "Approved. The first run has started.",
+      "waiting": "Approved. It runs when the current proof work finishes.",
+      "failed": "Approved, but Trellin could not start the first run."
+    },
+    "stop": "Stop",
+    "stopReason": "Why stop this rule",
+    "stopDefault": "No longer needed.",
+    "stopNote": "Stopping keeps its results and run history.",
+    "stopConfirm": "Stop rule",
+    "empty": {
+      "title": "No automations yet",
+      "body": "An automation keeps working on a claim within limits you approve. Recording results and adding assumptions still need you."
+    },
+    "errors": {
+      "stale": "This rule changed. Review it again.",
+      "stopped": "This exact rule was stopped earlier. Choose another claim or template.",
+      "worker_unavailable": "This project cannot run automations yet because its worker logins are missing. Repair the project setup first.",
+      "unavailable_basis": "Confirm the claim's starting basis first.",
+      "unavailable_questions": "Answer the claim's open questions first.",
+      "unavailable_lean_statement": "Confirm the claim's exact Lean statement first.",
+      "missing": "That claim or rule no longer exists.",
+      "reason": "Give a reason.",
+      "invalid": "Could not save the rule. Try again.",
+      "unavailable": "Could not save the rule. Try again."
     }
   }
 }
