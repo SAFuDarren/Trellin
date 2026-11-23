@@ -56,7 +56,17 @@
     "opening": "正在打开项目…",
     "listFailed": "无法读取已登记的项目。",
     "actionFailed": "无法打开项目，请重试。",
-    "retry": "重新加载项目"
+    "retry": "重新加载项目",
+    "manage": "管理「{{name}}」",
+    "rename": "重命名",
+    "renameLabel": "项目名称",
+    "save": "保存",
+    "cancel": "取消",
+    "remove": "从列表中移除",
+    "removeConfirm": "将「{{name}}」从列表中移除？项目文件夹和数据库仍保留在这台 Mac 上，可用「打开文件夹…」重新添加。",
+    "removeCurrent": "请先切换到其他项目，再移除此项目。",
+    "defaultName": "我的研究",
+    "manageFailed": "无法更改项目列表，请重试。"
   },
   "sidebar": {
     "label": "课题",

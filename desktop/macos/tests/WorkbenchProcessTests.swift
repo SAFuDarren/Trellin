@@ -135,6 +135,14 @@ struct WorkbenchProcessTests {
         precondition(DesktopProjectsRequest(message: ["action": "open", "id": "/Studies/Project"]) == nil)
         precondition(DesktopProjectsRequest(message: ["action": "open", "id": token, "path": "/Studies/Project"]) == nil)
         precondition(DesktopProjectsRequest(message: ["action": "new", "id": token]) == nil)
+        precondition(DesktopProjectsRequest(message: ["action": "remove", "id": token]) == .remove(id))
+        precondition(DesktopProjectsRequest(message: ["action": "remove"]) == nil)
+        precondition(DesktopProjectsRequest(message: ["action": "rename", "id": token, "name": " Thesis "])
+            == .rename(id, "Thesis"))
+        precondition(DesktopProjectsRequest(message: ["action": "rename", "id": token, "name": "  "]) == nil)
+        precondition(DesktopProjectsRequest(message: ["action": "rename", "id": token]) == nil)
+        precondition(StorageCommand.rename(id, "Thesis").arguments.suffix(3) == ["--storage-rename", token, "Thesis"])
+        precondition(StorageCommand.remove(id).arguments.suffix(2) == ["--storage-remove", token])
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("trellin-project-\(UUID())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -145,6 +153,16 @@ struct WorkbenchProcessTests {
         precondition(projects[0].sidebarEntry["available"] as? Bool == true)
         precondition(projects[1].sidebarEntry["available"] as? Bool == false)
         precondition(Set(projects[0].sidebarEntry.keys) == ["id", "name", "available"])
+        let other = UUID()
+        let flagged = [
+            ["id": token, "name": "My research", "path": folder.path, "default": true, "hidden": true] as [String: Any],
+            ["id": other.uuidString, "name": "Thesis", "path": folder.path, "default": false, "hidden": false],
+        ]
+        let flaggedData = try JSONSerialization.data(withJSONObject: ["version": 1, "status": "ready", "projects": flagged])
+        let listed = try JSONDecoder().decode(StorageReply.self, from: flaggedData).projects!
+        precondition(StorageProject.listed(listed, active: other).map(\.name) == ["Thesis"])
+        precondition(StorageProject.listed(listed, active: id).map(\.name) == ["My research", "Thesis"])
+        precondition(listed[0].sidebarEntry["default"] as? Bool == true && listed[1].sidebarEntry["default"] == nil)
 
         let resolved = try JSONSerialization.data(withJSONObject: ["version": 1, "status": "ready", "workspace": folder.path])
         let reply = try JSONDecoder().decode(StorageReply.self, from: resolved)

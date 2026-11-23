@@ -116,3 +116,63 @@
   width: 268px;
   padding: 5px;
 }
+/* The switcher is a popover, so it can give the list room for an open rename or remove panel. */
+.project-switcher-panel .sidebar-projects-list {
+  max-height: min(360px, 60vh);
+}
+
+/* #302: each project row has a manage button that opens rename and remove in place. */
+.sidebar-projects-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.sidebar-projects-item > .sidebar-projects-row {
+  flex: 1;
+}
+.sidebar-projects-more {
+  flex-shrink: 0;
+  color: var(--sub);
+  opacity: 0;
+}
+.sidebar-projects-more svg {
+  stroke-width: 3;
+}
+.sidebar-projects-item:hover > .sidebar-projects-more,
+.sidebar-projects-more:focus-visible,
+.sidebar-projects-more[aria-expanded="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sidebar-projects-more {
+    opacity: 1;
+  }
+}
+.sidebar-projects-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 8px 8px;
+}
+.sidebar-projects-manage p {
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+  overflow-wrap: anywhere;
+}
+.sidebar-projects-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sidebar-projects-manage input {
+  height: var(--field-h);
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--node-line);
+  border-radius: var(--radius-control);
+  background: var(--main);
+  color: var(--ink);
+}
+.sidebar-projects-manage .button.danger {
+  color: var(--crit);
+}
