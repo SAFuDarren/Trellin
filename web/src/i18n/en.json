@@ -141,6 +141,10 @@
       "finished": "Finished {{time}}"
     }
   },
+  "workbenchAddress": {
+    "missingClaim": "That claim is no longer in this project, so the project map is shown.",
+    "missingNode": "That proof node is no longer in this claim, so its goal is shown."
+  },
   "agentDock": {
     "title": "Agent chat",
     "activity": "Agent activity",

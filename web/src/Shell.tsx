@@ -30,7 +30,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { TeamPage } from "./pages/TeamPage";
 import { ConversationEditors } from "./shell/ConversationEditors";
 import { usePaletteResults } from "./shell/paletteResults";
-import { useRoute } from "./shell/route";
+import { useRoute, workbenchSub } from "./shell/route";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
 import { buildWorkspaceActivity, type ActivityState } from "./shell/workspaceActivity";
 import { useWorkspaceInbox, workspaceInboxScope } from "./shell/workspaceInbox";
@@ -44,7 +44,7 @@ import { resetLayout } from "./workbench/useLayout";
 /** The function rail on the left and the page it selects. */
 export function Shell({ session }: { session: string }) {
   const { t } = useTranslation();
-  const [route, go] = useRoute();
+  const [route, go, setWorkbenchAddress] = useRoute();
   const { section, sub } = route;
   const showsClaims = section === "claims";
   const showsActivity = section === "agent-work" && sub === "activity";
@@ -173,11 +173,13 @@ export function Shell({ session }: { session: string }) {
   }, [session, workspace, head, comprehensive, live, sessionConnection, queries]);
   const open = (claimId: string, nodeId?: string, proof?: boolean) => {
     setFocus({ claimId, nodeId, proof, nonce: Date.now() });
-    go("workbench");
+    // #274: a proof opens at its own address, so Back returns to the page it was opened from.
+    go("workbench", proof || nodeId ? workbenchSub({ claimId, nodeId }) : "");
   };
   const runProjectAction = (request: ProjectActionRequest) => {
     setProjectAction({ session, request });
-    go("workbench");
+    // Stay at the current workbench address: an action does not close the open proof.
+    if (section !== "workbench") go("workbench");
   };
   const claimMetadata = useClaims(session, paletteOpen);
   const claimId = position?.claimId;
@@ -318,6 +320,8 @@ export function Shell({ session }: { session: string }) {
                   onChatStarterScope={saveChatStarterScope}
                   actionRequest={projectAction?.session === session ? projectAction.request : undefined}
                   onActionHandled={clearProjectAction}
+                  address={sub}
+                  onAddress={setWorkbenchAddress}
                 />
               )}
             </SpaceCounts.Provider>

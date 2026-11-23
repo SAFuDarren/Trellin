@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { api } from "./api/client";
+import { api, ApiError } from "./api/client";
 import type { ConversationAnchor } from "./api/conversations";
 import { useFallbackInterval } from "./api/liveUpdates";
 import {
@@ -23,7 +23,13 @@ import { ProjectActions } from "./components/project/ProjectActions";
 import { ReviewPanel } from "./components/ReviewPanel";
 import { PageHead } from "./components/SectionLayout";
 import { Splitter } from "./components/Splitter";
-import { href } from "./shell/route";
+import {
+  href,
+  parseWorkbenchAddress,
+  workbenchSub,
+  type AddressMode,
+  type WorkbenchAddress,
+} from "./shell/route";
 import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
 import type { InboxItem } from "./api/sections";
 import type { ClaimProgress } from "./workbench/claimProgress";
@@ -72,6 +78,8 @@ export function Workbench({
   onChatStarterScope,
   actionRequest,
   onActionHandled,
+  address = "",
+  onAddress,
 }: {
   session: string;
   claimProgress: ReadonlyMap<string, ClaimProgress>;
@@ -84,28 +92,36 @@ export function Workbench({
   onChatStarterScope: (scope: ConversationStarterScope) => void;
   actionRequest?: ProjectActionRequest;
   onActionHandled: () => void;
+  /** #274: the workbench part of the URL hash, and the call that records the open proof there. */
+  address?: string;
+  onAddress?: (address: WorkbenchAddress | null, mode: AddressMode) => void;
 }) {
   const { t } = useTranslation();
   const queries = useQueryClient();
   const layout = useLayout();
   const { sizes, clamped } = layout;
   const [desktop] = useState(() => desktopPosition());
+  // A claim address opens that proof, like a focus request from another page.
+  const [launch] = useState<Focus | null | undefined>(() => {
+    const addressed = parseWorkbenchAddress(address);
+    return focus ?? (addressed && { ...addressed, proof: true, nonce: 0 });
+  });
   const [selection, setSelection] = useState<Selection | undefined>(
-    focus ? { ...focus, referenced: true } : (returnTo ?? (desktop && { ...desktop, referenced: true })),
+    launch ? { ...launch, referenced: true } : (returnTo ?? (desktop && { ...desktop, referenced: true })),
   );
-  const pendingLaunch = useRef(!focus && !returnTo && !desktop);
-  const [detailsOpen, setDetailsOpen] = useState(Boolean(focus || (returnTo?.detailsOpen ?? desktop)));
+  const pendingLaunch = useRef(!launch && !returnTo && !desktop);
+  const [detailsOpen, setDetailsOpen] = useState(Boolean(launch || (returnTo?.detailsOpen ?? desktop)));
   const [proofOpen, setProofOpen] = useState(
     Boolean(
-      focus
-        ? focus.proof || focus.nodeId
+      launch
+        ? launch.proof || launch.nodeId
         : (returnTo?.proofOpen ?? (desktop?.nodeId && desktop.nodeId !== `goal:${desktop.claimId}`)),
     ),
   );
   const proofReturn = useRef<HTMLButtonElement>(null);
   const beforeProof = useRef<MapReturn | null>(
     returnTo?.mapReturn ??
-      (returnTo && !returnTo.proofOpen && (focus?.proof || focus?.nodeId)
+      (returnTo && !returnTo.proofOpen && (launch?.proof || launch?.nodeId)
         ? { detailsOpen: returnTo.detailsOpen, selection: returnTo }
         : null),
   );
@@ -358,6 +374,69 @@ export function Workbench({
   useEffect(() => {
     if (proofOpen) proofReturn.current?.focus({ preventScroll: true });
   }, [proofOpen]);
+
+  // #274: the open proof lives in the address. Opening a claim, or a node after the claim's goal, adds a
+  // history entry; choosing another node in the same proof replaces it. Back and forward reopen the address.
+  const [addressNotice, setAddressNotice] = useState<"missingClaim" | "missingNode" | null>(null);
+  const addressed = parseWorkbenchAddress(address);
+  const addressKey = workbenchSub(addressed);
+  // Archived claims can still be opened by reference, so the graph request, not the map's list, decides.
+  const knownClaim = !(
+    snapshot.isError &&
+    snapshot.error instanceof ApiError &&
+    (snapshot.error.status === 404 || snapshot.error.status === 400)
+  );
+  const shownNode = graph ? (selected && selected !== goal?.id ? selected : undefined) : target;
+  const stateKey = workbenchSub(
+    proofOpen && claimId && knownClaim
+      ? { claimId, nodeId: shownNode && shownNode !== `goal:${claimId}` ? shownNode : undefined }
+      : null,
+  );
+  const writtenState = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = writtenState.current;
+    if (previous === stateKey) return;
+    writtenState.current = stateKey;
+    if (!onAddress || stateKey === addressKey) return;
+    const from = parseWorkbenchAddress(addressKey);
+    const to = parseWorkbenchAddress(stateKey);
+    const opens = !from !== !to || from?.claimId !== to?.claimId || (!from?.nodeId && Boolean(to?.nodeId));
+    onAddress(to, previous !== null && knownClaim && opens ? "push" : "replace");
+  }, [stateKey, addressKey, knownClaim, onAddress]);
+  const readAddress = useRef(addressKey);
+  useEffect(() => {
+    if (readAddress.current === addressKey) return;
+    readAddress.current = addressKey;
+    if (addressKey === stateKey) return;
+    setAddressNotice(null);
+    if (!addressed) {
+      closeProof();
+      return;
+    }
+    if (!proofOpen) rememberMap();
+    if (addressed.claimId !== claimId) {
+      setActivityOpen(false);
+      setView("proof");
+      setAssumption(null);
+      setRecordedGoal(null);
+    }
+    setSelection({ ...addressed, referenced: true });
+    setDetailsOpen(true);
+    setProofOpen(true);
+  }, [addressKey, addressed, stateKey, claimId, proofOpen, closeProof, rememberMap]);
+  // An address can outlive its claim or node: show what still exists and say why.
+  useEffect(() => {
+    if (!proofOpen || knownClaim) return;
+    beforeProof.current = null;
+    setProofOpen(false);
+    setDetailsOpen(false);
+    setSelection(undefined);
+    setAddressNotice("missingClaim");
+  }, [proofOpen, knownClaim]);
+  const addressedNode = addressed?.nodeId;
+  useEffect(() => {
+    if (graph && target && target === addressedNode && !graph.nodes.has(target)) setAddressNotice("missingNode");
+  }, [graph, target, addressedNode]);
   useEffect(() => {
     if (!proofOpen && !showReview) return;
     function escape(event: KeyboardEvent) {
@@ -765,6 +844,12 @@ export function Workbench({
         )}
         <div className="workbench-action-feedback" aria-live="polite">
           <div className="workbench-action-feedback-stack">
+            {addressNotice && (
+              <ActionFeedback
+                message={t(`workbenchAddress.${addressNotice}`)}
+                onDismiss={() => setAddressNotice(null)}
+              />
+            )}
             {copyNotice && (
               <ActionFeedback
                 key={copyNotice.id}

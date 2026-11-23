@@ -165,11 +165,14 @@ test("Work → Review and Home restore the selected claim and proof node", async
   await expect(page.locator("#section-title")).toHaveText("Work");
   await expect(page.locator("#node-detail")).toHaveCount(0);
   await home.click();
-  await expect(page).toHaveURL(/#workbench$/);
   await expect(proof).toBeVisible();
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
+  // #274: the restored proof writes its claim and node back into the address.
+  const node = encodeURIComponent((await chosen.getAttribute("data-node"))!);
+  await expect(page).toHaveURL(new RegExp(`#workbench/claim/aaaaaaaa-0000-4000-8000-000000000001/node/${node}$`));
   await expect(home).toHaveAttribute("aria-current", "page");
   await page.locator(".proof-return").click();
+  await expect(page).toHaveURL(/#workbench$/);
   await expect(mapClaim(page, "单射映射的复合")).toHaveAttribute("aria-pressed", "true");
 });
 

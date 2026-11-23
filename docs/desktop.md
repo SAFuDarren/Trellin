@@ -24,6 +24,8 @@ Open **Help** at the bottom of the rail for short guides to the project map, Age
 
 The proof header shows the path from the project map to the claim and selected node. Choose the claim name to select its goal, or the map control to return to the canvas. In Agent tasks, a handoff task links to its source delivery in the task path.
 
+The open claim and node are part of the address, as `#workbench/claim/<claim-id>/node/<node-id>`. Use the browser's Back and Forward to move between the map, the claim and the claim you opened before, or copy the address to come back to the same proof. Choosing another node in the same proof updates the address without adding a Back step. If the claim or node no longer exists, the map or the claim's goal opens with a notice.
+
 Arrow keys pan when the canvas has focus. To move a focused card, open its context menu with **⇧F10** (**Shift+F10** on other platforms) and choose **Move card**. Use the arrow keys to preview the new position. Hold **Shift** for larger steps. Press **Enter** to save the position or **Escape** to cancel.
 
 Open a proof to start at a readable zoom on the main canvas. **Fit to window** shows the whole graph. Select a node to read its full formula and Lean statement in the inspector. Hover over an activity count or check the inspector to see the recorded Agent and model. The footer shows labelled proof counts. In a narrow window, **Status** opens the full list when the labels run out of space. **Edge styles** opens the legend for the current view. Switch to **References** to see recorded uses, allowed premises and planned steps distinguished by line style.
