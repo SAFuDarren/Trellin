@@ -60,6 +60,11 @@ test("the Team wizard preserves drafts, retries the same create, and reopens the
   const description = wizard.getByRole("textbox", { name: "Description", exact: true });
   const instructions = wizard.getByRole("textbox", { name: "Instructions", exact: true });
   const connect = async () => {
+    // #323: a new Agent starts with the role choice; Start blank opens the details with the working connection.
+    await expect(wizard.getByRole("heading", { name: "Choose a role", exact: true })).toBeVisible();
+    await wizard.getByRole("button", { name: "Start blank", exact: true }).click();
+    await expect(wizard.getByRole("heading", { name: "Configure agent", exact: true })).toBeVisible();
+    await wizard.getByRole("button", { name: "Back", exact: true }).click();
     await expect(wizard.getByRole("heading", { name: "Choose runtime", exact: true })).toBeVisible();
     await wizard.getByRole("radio", { name: /Research Codex/ }).check();
     await next.click();
@@ -158,6 +163,8 @@ test("an unavailable runtime cannot be used to create an agent", async ({ page }
 
   await openAgents(page);
   await page.getByRole("button", { name: "Add agent", exact: true }).click();
+  // With no working connection, a role still leads to the connection step that explains how to add one.
+  await page.getByRole("dialog").getByRole("button", { name: "Lean prover", exact: false }).click();
   const wizard = page.getByRole("dialog", { name: "Choose runtime" });
   await expect(wizard.getByText(/No available connections/)).toBeVisible();
   await expect(wizard.getByRole("radio", { name: /Unavailable runtime/ })).toBeDisabled();

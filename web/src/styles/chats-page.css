@@ -271,3 +271,28 @@
 .employee-chat-dialog {
   width: min(400px, calc(100% - 32px));
 }
+.employee-chat-person-role {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+
+/* #323: an empty Chats panel offers the Agent role templates. */
+.chat-agent-templates {
+  display: grid;
+  gap: 6px;
+  padding: 4px 8px 12px;
+}
+.chat-agent-templates h3 {
+  margin: 0;
+  font-size: var(--type-body-size);
+  font-weight: var(--type-semibold);
+}
+.chat-agent-templates > p {
+  margin: 0 0 4px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}

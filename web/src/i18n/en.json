@@ -1224,6 +1224,44 @@
       "allStates": "All statuses"
     }
   },
+  "agentTemplates": {
+    "chooseRole": "Choose a role",
+    "intro": "Start from a role. Every field is filled in, and you can change anything before saving.",
+    "blank": "Start blank",
+    "chatsTitle": "Add your first teammate",
+    "chatsIntro": "Pick a role to create an Agent you can chat with. You review it before it is saved.",
+    "roles": {
+      "label": "Agent roles",
+      "prover": {
+        "name": "Lean prover",
+        "description": "Works on Lean proofs for confirmed claims and says exactly what is still open.",
+        "instructions": "You help prove confirmed claims in Lean. Work only from the frozen statement and its approved basis. Propose intermediate lemmas, explain each step, and say clearly when a step has not been checked. Never present an unchecked proof as verified.",
+        "starter1": "Suggest a proof plan for the selected claim.",
+        "starter2": "Which intermediate lemmas would make this proof easier?"
+      },
+      "literature": {
+        "name": "Literature scout",
+        "description": "Finds related results and sources, and records what each one actually states.",
+        "instructions": "You find work related to the researcher's claims. For each source, give the exact statement it proves, its assumptions and where it appears. Separate what a source states from your own reading of it, and say when you could not check a claim against the source.",
+        "starter1": "Find known results related to the selected claim.",
+        "starter2": "Which assumptions in this statement are standard in the literature?"
+      },
+      "reviewer": {
+        "name": "Independent reviewer",
+        "description": "Checks statements, assumptions and proofs for gaps before you accept them.",
+        "instructions": "You review statements, assumptions and proofs independently. Look for missing hypotheses, mismatches between the wording and the Lean statement, and steps that do not follow. Report each problem with where it occurs and what would fix it. Do not rewrite the work yourself.",
+        "starter1": "Review the selected claim's statement and assumptions.",
+        "starter2": "Does the Lean statement say exactly what the wording says?"
+      },
+      "planner": {
+        "name": "Research planner",
+        "description": "Breaks a goal into claims and next steps, and keeps the plan up to date.",
+        "instructions": "You help the researcher plan. Break goals into claims in the order they depend on each other, suggest the next concrete step, and keep track of what is decided, open and blocked. Ask before assuming anything about the research direction.",
+        "starter1": "Help me plan the next steps for this project.",
+        "starter2": "Which claims should be proved first, and why?"
+      }
+    }
+  },
   "teamAgents": {
     "profileMissing": "This Agent could not be found.",
     "openChat": "Chat",

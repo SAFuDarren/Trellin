@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.123
+
+- **Add agent** starts with a choice of roles: Lean prover, Literature scout, Independent reviewer and Research planner, or **Start blank**. A role fills in every field and selects the first working model connection, so a new Agent needs only a review and **Create agent**. With no saved Agents, **Chats** offers the same roles and opens the new Agent's chat with the composer ready. Saved Agents stay listed in **Chats** with their description, and opening one focuses the composer.
+
 ## 1.0.122
 
 - Project backups, restores and the desktop **Back up and upgrade** pick `pg_dump` and `pg_restore` by the server's major version instead of using the first ones on `PATH`. They look on `PATH` and in the usual install locations, such as Homebrew `postgresql@N` and Postgres.app, so an older client earlier on `PATH` or a Finder-launched app no longer makes the backup fail. When no suitable client exists, the message names the installed and required versions. `doctor` reports the client that will be used.
