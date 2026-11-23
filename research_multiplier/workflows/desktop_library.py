@@ -19,6 +19,11 @@ from research_multiplier.workflows.desktop_workspace import WorkspaceCreationErr
 
 
 _REGISTRY = "registry.json"
+# Managed projects removed from the list keep their folder; this records their name so Open Folder restores it.
+_REMOVED = "removed.json"
+DEFAULT_NAME = "My research"
+# Earlier releases named the default project after the library itself (#302).
+_LEGACY_DEFAULT_NAME = "Library"
 _ROOT_INFO = {"format_version", "default_id", "default_slot", "projects"}
 
 
@@ -146,6 +151,39 @@ def _destination(source, anchor, location):
     return target
 
 
+def _legacy_default(data):
+    default = data["default_id"]
+    return default is not None and any(
+        row["id"] == default and row["name"] == _LEGACY_DEFAULT_NAME for row in data["projects"]
+    )
+
+
+def _has_claims(row):
+    """Ask the project's database whether it records any claim. Unknown answers count as yes."""
+    try:
+        import psycopg
+
+        logins = credentials.read(row["id"])
+        with psycopg.connect(logins["RM_HUMAN_DSN"], connect_timeout=5,
+                             options="-c statement_timeout=5000 -c default_transaction_read_only=on") as connection:
+            # Any claim counts, archived ones included: a project with history is never hidden.
+            return connection.execute("SELECT EXISTS (SELECT 1 FROM rm.claims)").fetchone()[0] is not False
+    except Exception:
+        # Driver diagnostics can contain credentials. Never send them to the UI.
+        return True
+
+
+def _is_empty(root, row):
+    """A project with no inputs and no claims. Anything unreadable counts as not empty, so it stays listed."""
+    inputs = _workspace_path(root, row) / "inputs"
+    try:
+        if inputs.exists() and any(not entry.name.startswith(".") for entry in inputs.iterdir()):
+            return False
+    except OSError:
+        return False
+    return not _has_claims(row)
+
+
 class Library:
     """One local registry. Older projects remain at their own paths."""
 
@@ -239,13 +277,64 @@ class Library:
     def status(self):
         with self._locked(exclusive=False):
             if (self.anchor / LOCATION_FILE).exists():
-                return self._status(*self._state())
+                root, data = self._state()
+                if not _legacy_default(data):
+                    return self._status(root, data)
         with self._locked():
-            return self._status(*self._state(initialize=True))
+            root, data = self._state(initialize=True)
+            if _legacy_default(data):
+                self._project_row(data, data["default_id"])["name"] = DEFAULT_NAME
+                publish_metadata(root / _REGISTRY, data)
+            return self._status(root, data)
 
     def _status(self, root, data):
-        return {"root": str(root), "default_id": data["default_id"],
-                "projects": [self._project(root, row) for row in data["projects"]]}
+        projects = [self._project(root, row) | {"default": row["id"] == data["default_id"]}
+                    for row in data["projects"]]
+        for project, row in zip(projects, data["projects"]):
+            # The empty default stays the fallback but leaves the switcher once the researcher has a project.
+            project["hidden"] = project["default"] and len(projects) > 1 and _is_empty(root, row)
+        return {"root": str(root), "default_id": data["default_id"], "projects": projects}
+
+    def rename(self, identifier, name):
+        name = _name(name)
+        with self._locked():
+            root, data = self._state()
+            row = self._project_row(data, uuid_text(identifier))
+            row["name"] = name
+            publish_metadata(root / _REGISTRY, data)
+            return self._project(root, row)
+
+    def unregister(self, identifier):
+        """Remove a project from the list. Its folder and database stay where they are."""
+        with self._locked():
+            root, data = self._state()
+            row = self._project_row(data, uuid_text(identifier))
+            if row["id"] == data["default_id"]:
+                raise LibraryError("storage-project")
+            if "slot" in row:
+                removed = self._removed(root)
+                removed[row["slot"]] = {"id": row["id"], "name": row["name"]}
+                publish_metadata(root / _REMOVED, {"projects": removed})
+            data["projects"].remove(row)
+            publish_metadata(root / _REGISTRY, data)
+            return self._project(root, row)
+
+    @staticmethod
+    def _removed(root):
+        try:
+            data = read_metadata(root / _REMOVED)
+        except FileNotFoundError:
+            return {}
+        projects = data.get("projects") if set(data) == {"format_version", "projects"} else None
+        if not isinstance(projects, dict) or any(
+            not isinstance(entry, dict) or set(entry) != {"id", "name"} for entry in projects.values()
+        ):
+            raise LibraryError("storage-invalid")
+        for slot, entry in projects.items():
+            uuid_text(slot)
+            uuid_text(entry["id"])
+            _name(entry["name"])
+        return dict(projects)
 
     def _create(self, root, data, name, slot, *, default=False):
         workspace = root / "Workspaces" / slot
@@ -276,7 +365,7 @@ class Library:
             if data["default_id"] is not None:
                 return self._registered_path(root, self._project_row(data, data["default_id"]))
             self._recover_pending_default(root, data)
-            return self._create(root, data, "Library", data["default_slot"], default=True)
+            return self._create(root, data, DEFAULT_NAME, data["default_slot"], default=True)
 
     def _recover_pending_default(self, root, data):
         workspace = root / "Workspaces" / data["default_slot"]
@@ -370,10 +459,28 @@ class Library:
         registration = workspace_registration(workspace)
         if registration is None:
             return workspace
-        with self._locked(exclusive=False):
+        with self._locked():
             root, data = self._state()
+            self._restore_removed(root, data, workspace, registration)
             row = self._managed_row(data, workspace, registration)
             return self._registered_path(root, row)
+
+    def _restore_removed(self, root, data, workspace, registration):
+        """Opening a removed project's folder puts it back in the list under its last name."""
+        anchor, slot = registration
+        if anchor != self.anchor or any(row.get("slot") == slot for row in data["projects"]):
+            return
+        removed = self._removed(root)
+        entry = removed.get(slot)
+        if entry is None or workspace != canonical_path(root / "Workspaces" / slot):
+            return
+        identifier, database = _project_markers(workspace)
+        if identifier != entry["id"] or any(row["id"] == identifier for row in data["projects"]):
+            raise LibraryError("storage-verification")
+        data["projects"].append({"id": identifier, "database": database, "name": entry["name"], "slot": slot})
+        publish_metadata(root / _REGISTRY, data)
+        del removed[slot]
+        publish_metadata(root / _REMOVED, {"projects": removed})
 
     def describe(self, location):
         path = canonical_path(location)

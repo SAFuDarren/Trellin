@@ -61,7 +61,7 @@ def test_first_start_creates_one_minimal_default_and_keeps_old_folders(library, 
     assert state["default_id"] == str(paths.workspace_id(default))
     assert [
         (row["name"], row["path"], row["managed"]) for row in state["projects"]
-    ] == [("Library", str(default), True), ("legacy", str(legacy), False), ("Other theorem", str(named), True)]
+    ] == [("My research", str(default), True), ("legacy", str(legacy), False), ("Other theorem", str(named), True)]
     assert legacy_text.read_text() == "Existing research"
     assert not (legacy / MANAGED_FILE).exists()
     assert len({paths.database_id(workspace) for workspace in (default, legacy, named)}) == 3
@@ -265,7 +265,7 @@ def test_initialized_status_preview_and_describe_share_active_workspace_lease(li
     target = tmp_path / "moved"
     with paths.use_workspace(workspace, strict=True):
         state = library.status()
-        assert state["projects"] == [library.describe(workspace)]
+        assert state["projects"] == [library.describe(workspace) | {"default": True, "hidden": False}]
         assert library.preview(target)["project_count"] == 1
 
 
@@ -353,10 +353,103 @@ def test_a_project_from_another_library_home_opens_a_new_default_library(monkeyp
         reply = json.loads(output.getvalue())
         default = Path(desktop_library.Library().status()["projects"][0]["path"])
         assert default.parent == library.anchor / "Library" / "Workspaces"
-        assert (reply["workspace"], reply["name"]) == (str(default), "Library")
+        assert (reply["workspace"], reply["name"]) == (str(default), "My research")
         failures.append(reply["reopen_failed"])
     # First launch: the library did not exist yet. Second: it exists but does not hold that project.
     assert failures == ["storage-unavailable", "storage-project"]
     assert other not in opened
     # The trial library is left as it was.
     assert desktop_library.Library(tmp_path / "trial home").status()["projects"][0]["path"] == str(other)
+
+
+# #302: the default project has a name of its own, leaves the switcher while empty, and projects can be
+# renamed or removed from the list without touching their folders.
+
+def _registry(library):
+    return json.loads((library.anchor / "Library" / "registry.json").read_text())
+
+
+def test_an_older_default_named_library_is_renamed_on_the_next_launch(library):
+    default = library.open_default()
+    registry = _registry(library)
+    registry["projects"][0]["name"] = "Library"
+    (library.anchor / "Library" / "registry.json").write_text(json.dumps(registry))
+    assert [row["name"] for row in library.status()["projects"]] == ["My research"]
+    assert _registry(library)["projects"][0]["name"] == "My research"
+    # A researcher's own project named Library keeps its name.
+    library.create("Library")
+    assert [row["name"] for row in library.status()["projects"]] == ["My research", "Library"]
+    assert library.open_default() == default
+
+
+def test_the_empty_default_is_hidden_only_once_another_project_exists(library, tmp_path, monkeypatch):
+    monkeypatch.setattr(desktop_library, "_has_claims", lambda _row: False)
+    default = library.open_default()
+    assert [row["hidden"] for row in library.status()["projects"]] == [False]
+    library.create("Own research")
+    state = library.status()
+    assert [(row["name"], row["default"], row["hidden"]) for row in state["projects"]] == [
+        ("My research", True, True), ("Own research", False, False),
+    ]
+    # Inputs or claims make the default a project of its own again.
+    (default / "inputs").mkdir()
+    (default / "inputs" / "notes.md").write_text("Notes")
+    assert library.status()["projects"][0]["hidden"] is False
+    (default / "inputs" / "notes.md").unlink()
+    monkeypatch.setattr(desktop_library, "_has_claims", lambda _row: True)
+    assert library.status()["projects"][0]["hidden"] is False
+    # It stays the fallback either way.
+    assert library.open_default() == default
+
+
+def test_an_unreadable_database_keeps_the_default_listed(library, tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "no logins"))
+    library.open_default()
+    library.create("Own research")
+    # No saved login for this project: the claim check cannot answer, so nothing is hidden.
+    assert [row["hidden"] for row in library.status()["projects"]] == [False, False]
+
+
+def test_projects_are_renamed_and_removed_without_touching_their_folders(library, tmp_path):
+    default = library.open_default()
+    external = paths.initialize_workspace(tmp_path / "external")
+    paths.bind_database(external, uuid4())
+    outside = library.register_external(external)
+    managed = library.create("Draft")
+    managed_id = str(paths.workspace_id(managed))
+
+    assert library.rename(outside["id"], "  Field notes ")["name"] == "Field notes"
+    with pytest.raises(LibraryError, match="storage-project"):
+        library.rename(outside["id"], " ")
+    with pytest.raises(LibraryError, match="storage-project"):
+        library.rename(str(uuid4()), "Missing")
+
+    with pytest.raises(LibraryError, match="storage-project"):
+        library.unregister(str(paths.workspace_id(default)))
+    assert library.unregister(outside["id"])["name"] == "Field notes"
+    assert library.unregister(managed_id)["name"] == "Draft"
+    assert [row["name"] for row in library.status()["projects"]] == ["My research"]
+    assert external.is_dir() and paths.workspace_id(external) is not None
+    assert managed.is_dir() and workspace_registration(managed) is not None
+
+    # Opening a removed folder again puts it back in the list: the managed one under its last name.
+    assert library.resolve_existing(managed) == managed
+    assert library.register_external(external)["name"] == "external"
+    assert [row["name"] for row in library.status()["projects"]] == ["My research", "Draft", "external"]
+    assert library.unregister(managed_id)["name"] == "Draft"
+    library.resolve_existing(managed)
+    assert not json.loads((library.anchor / "Library" / "removed.json").read_text())["projects"]
+
+
+def test_storage_cli_renames_and_removes(library, monkeypatch, capsys):
+    library.open_default()
+    project = str(paths.workspace_id(library.create("Draft")))
+    monkeypatch.setattr(sys, "argv", ["desktop", "--storage-rename", project, "Thesis"])
+    assert desktop.main() == 0
+    assert json.loads(capsys.readouterr().out)["project"]["name"] == "Thesis"
+    monkeypatch.setattr(sys, "argv", ["desktop", "--storage-remove", project])
+    assert desktop.main() == 0
+    assert json.loads(capsys.readouterr().out)["project"]["id"] == project
+    monkeypatch.setattr(sys, "argv", ["desktop", "--storage-remove", project])
+    assert desktop.main() == 2
+    assert json.loads(capsys.readouterr().out) == {"version": 1, "status": "error", "code": "storage-project"}

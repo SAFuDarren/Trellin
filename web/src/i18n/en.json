@@ -56,7 +56,17 @@
     "opening": "Opening project…",
     "listFailed": "Could not load registered projects.",
     "actionFailed": "Could not open the project. Try again.",
-    "retry": "Reload projects"
+    "retry": "Reload projects",
+    "manage": "Manage {{name}}",
+    "rename": "Rename",
+    "renameLabel": "Project name",
+    "save": "Save",
+    "cancel": "Cancel",
+    "remove": "Remove from list",
+    "removeConfirm": "Remove “{{name}}” from the list? Its folder and database stay on this Mac. Open Folder… adds it back.",
+    "removeCurrent": "Switch to another project before removing this one.",
+    "defaultName": "My research",
+    "manageFailed": "Could not change the project list. Try again."
   },
   "sidebar": {
     "label": "Claims",

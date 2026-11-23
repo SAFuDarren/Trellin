@@ -221,6 +221,10 @@ def _storage(library, args, output):
             "root": plan["source"], "destination": plan["destination"], "confirmation": plan["sha256"],
             "project_count": plan["project_count"], "files": plan["files"], "bytes": plan["bytes"],
         }
+    elif len(args) == 3 and args[0] == "--storage-rename":
+        data = {"project": library.rename(args[1], args[2])}
+    elif len(args) == 2 and args[0] == "--storage-remove":
+        data = {"project": library.unregister(args[1])}
     elif len(args) == 3 and args[0] == "--storage-move":
         moved = library.move(args[1], args[2])
         data = {"root": moved["destination"], "backup": moved["backup"]}

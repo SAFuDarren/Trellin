@@ -1,7 +1,12 @@
 export type DesktopPosition = { claimId: string; nodeId: string };
-export type DesktopProject = { id: string; name: string; available: boolean };
+/** `default` marks the project Trellin created; its stored name is shown in the interface language (#302). */
+export type DesktopProject = { id: string; name: string; available: boolean; default?: boolean };
+export const DEFAULT_PROJECT_NAME = "My research";
 type DesktopProjectList = { projects: DesktopProject[]; activeId?: string };
-export type DesktopProjectAction = { action: "new" | "folder" | "storage" } | { action: "open"; id: string };
+export type DesktopProjectAction =
+  | { action: "new" | "folder" | "storage" }
+  | { action: "open" | "remove"; id: string }
+  | { action: "rename"; id: string; name: string };
 export type DesktopProjectLibrary = {
   list: () => Promise<DesktopProjectList>;
   act: (request: DesktopProjectAction) => Promise<void>;
@@ -49,7 +54,12 @@ function isProjectId(value: unknown): value is string {
 function isDesktopProject(value: unknown): value is DesktopProject {
   if (!value || typeof value !== "object") return false;
   const project = value as Partial<DesktopProject>;
-  return isProjectId(project.id) && typeof project.name === "string" && typeof project.available === "boolean";
+  return (
+    isProjectId(project.id) &&
+    typeof project.name === "string" &&
+    typeof project.available === "boolean" &&
+    (project.default === undefined || typeof project.default === "boolean")
+  );
 }
 
 export function desktopProjectLibrary(): DesktopProjectLibrary | undefined {
@@ -66,7 +76,8 @@ export function desktopProjectLibrary(): DesktopProjectLibrary | undefined {
       };
     },
     async act(request) {
-      if (request.action === "open" && !isProjectId(request.id)) throw new Error("Invalid desktop project ID");
+      if ("id" in request && !isProjectId(request.id)) throw new Error("Invalid desktop project ID");
+      if (request.action === "rename" && !request.name.trim()) throw new Error("Empty desktop project name");
       if ((await bridge.postMessage(request)) !== true) throw new Error("Desktop project action unavailable");
     },
   };

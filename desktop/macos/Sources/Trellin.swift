@@ -6,6 +6,11 @@ func localized(_ key: String) -> String {
     Bundle.main.localizedString(forKey: key, value: nil, table: nil)
 }
 
+/// The project Trellin creates keeps an English name on disk and is shown in the app's language (#302).
+func displayProjectName(_ name: String) -> String {
+    name == "My research" ? localized("project.default") : name
+}
+
 @main
 final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate,
                      WKScriptMessageHandler, WKScriptMessageHandlerWithReply, NSWindowDelegate {
@@ -341,7 +346,7 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         serverURL = url
         let folderName = workspace.lastPathComponent == "Trellin"
             ? workspace.deletingLastPathComponent().lastPathComponent : workspace.lastPathComponent
-        let projectName = name ?? folderName
+        let projectName = displayProjectName(name ?? folderName)
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(self, name: bridge)
@@ -554,7 +559,8 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
                     replyHandler(nil, unavailable)
                     return
                 }
-                var result: [String: Any] = ["projects": projects.map(\.sidebarEntry)]
+                let active = self.last?.projectId
+                var result: [String: Any] = ["projects": StorageProject.listed(projects, active: active).map(\.sidebarEntry)]
                 if let id = self.last?.projectId { result["activeId"] = id.uuidString.lowercased() }
                 replyHandler(result, nil)
             }
@@ -571,6 +577,27 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
                 }
                 replyHandler(true, nil)
                 self.open(.registered(id, workspace))
+            }
+        case let .rename(id, name):
+            StorageProcess.run(.rename(id, name), runtime: runtime) { [weak self, weak web] reply in
+                guard let self, let web, self.webView === web, reply?.isReady == true else {
+                    replyHandler(nil, unavailable)
+                    return
+                }
+                if self.last?.projectId == id, self.window.subtitle != localized("lean") {
+                    self.window.subtitle = displayProjectName(name)
+                }
+                replyHandler(true, nil)
+            }
+        case let .remove(id):
+            // The open project stays in the list; switch to another project first.
+            guard last?.projectId != id else { replyHandler(nil, unavailable); return }
+            StorageProcess.run(.remove(id), runtime: runtime) { [weak self, weak web] reply in
+                guard let self, let web, self.webView === web, reply?.isReady == true else {
+                    replyHandler(nil, unavailable)
+                    return
+                }
+                replyHandler(true, nil)
             }
         case .newProject, .folder, .storage:
             guard canPresent else { replyHandler(nil, unavailable); return }

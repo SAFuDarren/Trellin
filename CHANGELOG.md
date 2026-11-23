@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.119
+
+- The project Trellin creates is named **My research** (我的研究) instead of Library, and an earlier default named Library is renamed on the next launch. Once you have a project of your own, an empty **My research** leaves the project switcher; it still opens when nothing else can. Each project in the switcher has **⋯** to rename it or remove it from the list. Removing keeps the folder and database on this Mac, and **Open Folder…** adds it back under its last name.
+
 ## 1.0.118
 
 - The open claim and node are in the workbench address (`#workbench/claim/<id>/node/<id>`). Back and Forward move between the map, the claim and the claim opened before; another node in the same proof replaces the address instead of adding a step. A copied address opens the same proof in a new window or after reload, and an address whose claim or node is gone opens the map or the goal with a notice.
