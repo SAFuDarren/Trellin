@@ -141,6 +141,10 @@
       "finished": "{{time}}结束"
     }
   },
+  "workbenchAddress": {
+    "missingClaim": "该课题已不在此项目中，现显示项目图谱。",
+    "missingNode": "该证明节点已不在此课题中，现显示课题目标。"
+  },
   "agentDock": {
     "title": "Agent 对话",
     "activity": "Agent 活动",

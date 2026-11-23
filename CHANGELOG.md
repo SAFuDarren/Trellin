@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.118
+
+- The open claim and node are in the workbench address (`#workbench/claim/<id>/node/<id>`). Back and Forward move between the map, the claim and the claim opened before; another node in the same proof replaces the address instead of adding a step. A copied address opens the same proof in a new window or after reload, and an address whose claim or node is gone opens the map or the goal with a notice.
+
 ## 1.0.117
 
 - Agent tasks has one name everywhere; "Agent work" is gone from the interface. The Work → Inbox page shows only the Work entries, and the Agent tasks filters appear only on Agent tasks. Agent activity opens from the bottom bar, whose drawer now links to the full activity page; it no longer repeats as a Work entry. Team → Jobs stays, as the per-job table with model, provider and run time.
