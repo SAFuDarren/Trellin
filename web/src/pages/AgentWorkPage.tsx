@@ -61,13 +61,11 @@ export function AgentWorkPage({
   sub,
   activity,
   inbox,
-  inboxUnread,
 }: {
   session: string;
   sub: string;
   activity: ReactNode;
   inbox: ReactNode;
-  inboxUnread: number;
 }) {
   const { t } = useTranslation();
   const [layout, setLayout] = useWorkLayout("agent-work", "list");
@@ -89,33 +87,25 @@ export function AgentWorkPage({
     <SectionLayout
       space="work"
       title={t("agentWork.title")}
-      groups={[
-        {
-          entries: [
-            {
-              key: "inbox",
-              label: t("agentInbox.title"),
-              href: agentWorkHref("inbox"),
-              current: showingInbox,
-              count: inboxUnread || undefined,
-            },
-            { key: "all", label: t("agentWork.all"), href: agentWorkHref(), current: !path, count: tasks.length },
-            {
-              key: "waiting",
-              label: t("agentWork.waiting"),
-              href: agentWorkHref("waiting"),
-              current: filtered,
-              count: waiting.length,
-            },
-            {
-              key: "activity",
-              label: t("agentDock.activity"),
-              href: agentWorkHref("activity"),
-              current: showingActivity,
-            },
-          ],
-        },
-      ]}
+      // #294: the Inbox and the full activity page are their own destinations, so they show only the space group.
+      groups={
+        showingInbox || showingActivity
+          ? []
+          : [
+              {
+                entries: [
+                  { key: "all", label: t("agentWork.all"), href: agentWorkHref(), current: !path, count: tasks.length },
+                  {
+                    key: "waiting",
+                    label: t("agentWork.waiting"),
+                    href: agentWorkHref("waiting"),
+                    current: filtered,
+                    count: waiting.length,
+                  },
+                ],
+              },
+            ]
+      }
     >
       <div className="agent-work-view">
         <PageHead

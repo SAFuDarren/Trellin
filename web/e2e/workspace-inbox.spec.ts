@@ -23,6 +23,10 @@ async function openInbox(page: Page) {
   await openDestination(page, "Inbox");
   await expect(page.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Display", exact: true })).toHaveCount(0);
+  // #294: the Inbox shows only the Work space group, not the Agent tasks filters.
+  await expect(
+    page.locator("nav.section-nav").getByRole("link", { name: /^(All tasks|Awaiting review|Agent activity)/ }),
+  ).toHaveCount(0);
   return page.getByRole("region", { name: "Inbox", exact: true });
 }
 
@@ -30,7 +34,7 @@ for (const viewport of [
   { width: 1440, height: 900 },
   { width: 640, height: 460 },
 ]) {
-  test(`the Agent work inbox routes and triages records at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+  test(`the Work inbox routes and triages records at ${viewport.width}×${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.route("**/api/inbox", async (route) => {
       const response = await route.fetch();

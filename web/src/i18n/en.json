@@ -132,7 +132,7 @@
     "obligation": "Proof obligation {{index}}",
     "noMatches": "No activity with this status.",
     "showAll": "Show all",
-    "openWork": "Open Agent work",
+    "openWork": "Open Agent tasks",
     "time": {
       "started": "Started {{time}}",
       "queued": "Queued {{time}}",
@@ -156,6 +156,7 @@
     "noAgents": "No matching Agents.",
     "threads": "Conversations",
     "openChats": "Open full conversation",
+    "openActivity": "Open full activity",
     "newConversation": "New conversation",
     "anchor": "Context · {{title}}",
     "detach": "Clear context",
@@ -743,7 +744,7 @@
     "workbench": "Workbench",
     "review": "Review",
     "claims": "Claims",
-    "agent-work": "Agent work",
+    "agent-work": "Agent tasks",
     "library": "Library",
     "chat": "Chats",
     "team": "Team",
@@ -837,7 +838,7 @@
     "archive": "Archive"
   },
   "agentWork": {
-    "title": "Agent work",
+    "title": "Agent tasks",
     "all": "All tasks",
     "waiting": "Awaiting review",
     "assign": "Assign task",
@@ -921,7 +922,7 @@
       "returned": "Returned"
     },
     "errors": {
-      "load": "Could not load agent work. Try again.",
+      "load": "Could not load Agent tasks. Try again.",
       "loadTask": "This task could not be opened in the current project.",
       "invalid": "Enter a title, instructions, and acceptance criteria. Source tasks also need a checkout, full commit ID, and allowed files.",
       "preview": "Could not prepare the task. Check the agent and source scope.",
@@ -932,7 +933,7 @@
       "interrupted": "The run was interrupted. Review the original scope to start a new attempt.",
       "stale": "The saved scope or delivery changed. Reopen the task or preview it again.",
       "conflict": "This request conflicts with the current task. Reopen it to see the latest status.",
-      "unavailable": "Agent work is unavailable for this project or agent.",
+      "unavailable": "Agent tasks are unavailable for this project or agent.",
       "predecessor": "The original delivery is unavailable in the current project.",
       "predecessorUnavailable": "The delivery is unavailable or was returned. Choose a current delivery to review.",
       "deliveryUnavailable": "The recorded delivery could not be read. Open the task again to verify it.",
@@ -1385,14 +1386,14 @@
   },
   "help": {
     "basics": "Using Trellin",
-    "intro": "{{name}} brings your project map, proofs and Agent work together. Select a claim on the map to see its details while keeping the wider project in view.",
+    "intro": "{{name}} brings your project map, proofs and Agent tasks together. Select a claim on the map to see its details while keeping the wider project in view.",
     "sections": "Where to work",
     "controls": "Quick controls",
     "moveCard": "Arrow keys pan when the canvas has focus. To move a card, choose Move card from its menu, then preview with the arrows. Press {{confirm}} to save or {{cancel}} to cancel.",
     "guides": "Research guides",
     "openMap": "Open project map",
     "openAgents": "Open Team Agents",
-    "openAgentWork": "Open Agent work",
+    "openAgentWork": "Open Agent tasks",
     "openClaims": "Open Claims",
     "openLibrary": "Open Library",
     "guide": {
@@ -1405,7 +1406,7 @@
       "agents": {
         "title": "Coordinate Agents",
         "first": "In Team, save an Agent and choose its model connection. Record what you want that Agent to do.",
-        "second": "In Agent work, choose a task scope and preview what the Agent will receive before dispatching it.",
+        "second": "In Agent tasks, choose a task scope and preview what the Agent will receive before dispatching it.",
         "third": "Open a delivered result to review it or hand it off. Open Agent activity from any page to follow active work."
       },
       "proofs": {

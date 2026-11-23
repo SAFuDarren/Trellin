@@ -104,7 +104,7 @@ test("running proof jobs agree across Agent activity, Claims, Chats and the Team
   await expect(origin).toHaveAttribute("aria-pressed", "true");
 });
 
-test("an empty Agent activity panel offers a path to Agent work", async ({ page }) => {
+test("an empty Agent activity panel offers a path to Agent tasks", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 460 });
   await page.route("**/api/inbox", (route) => route.fulfill({ json: { items: [] } }));
   await page.route("**/api/team", async (route) => {
@@ -119,9 +119,9 @@ test("an empty Agent activity panel offers a path to Agent work", async ({ page 
   await expect(activity.getByText("No active work or results to review.", { exact: true })).toBeVisible();
   await expect(activity.getByRole("group", { name: "Filter activity", exact: true })).toHaveCount(0);
   expect((await activity.boundingBox())!.height).toBeLessThan(100);
-  const assignment = activity.getByRole("link", { name: "Open Agent work", exact: true });
+  const assignment = activity.getByRole("link", { name: "Open Agent tasks", exact: true });
   await expect(assignment).toBeInViewport({ ratio: 1 });
   await assignment.press("Enter");
   await expect(page).toHaveURL(/#agent-work$/);
-  await expect(page.getByRole("main").getByRole("heading", { name: "Agent work", exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("heading", { name: "Agent tasks", exact: true })).toBeVisible();
 });
