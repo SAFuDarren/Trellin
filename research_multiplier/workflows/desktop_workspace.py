@@ -10,7 +10,7 @@ from research_multiplier.workflows import agent_guide, workbench_agent_work
 from research_multiplier.workflows.setup import Setup
 
 
-_WORKBENCH_REVISION = "0083"
+_WORKBENCH_REVISION = "0084"
 _UPGRADABLE_REVISIONS = frozenset(f"{revision:04d}" for revision in range(70, int(_WORKBENCH_REVISION)))
 
 

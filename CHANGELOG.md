@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.121
+
+- `research withdraw-claim CLAIM_ID --actor --reason` withdraws an open claim that cannot proceed, and `--superseded-by CLAIM_ID` links the corrected claim that replaces it. Withdrawn claims leave the project map and claim lists; their contract, evidence and decisions stay in history. `research withdrawn-claims` lists them and `research restore-claim` brings one back. Migration `0084` adds the withdraw and restore decisions; Trellin offers the project upgrade.
+
 ## 1.0.120
 
 - `intake preview-target`, `intake freeze-target` and `intake draft` stop a Lean proposition that the statement audit would reject, before anything is frozen. The message names each construct, such as an instance binder `[Fintype X]`, `ℕ`, `|a - b|`, `∑` or `∈`, with an accepted rewrite. A statement frozen earlier that `lean draft-theory` rejects now gets the same explanation. The Lean guide lists the accepted syntax and the common rewrites. The audit itself is unchanged.

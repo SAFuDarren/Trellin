@@ -67,6 +67,8 @@ research-multiplier doctor
 
 [用已有的本机 Lean 项目验证自己确认过的命题](lean-core.md#check-a-goal-with-your-native-lean-project)。
 
+冻结后发现无法推进的课题（例如冻结时写错了），可以用 `research withdraw-claim CLAIM_ID --actor 姓名 --reason 原因` 撤回；若已有修正后的课题替代它，加上 `--superseded-by 新课题ID`，两者会在历史中关联。撤回的课题不再出现在项目图谱和课题列表中，合同、证据和决定记录都会保留。`research withdrawn-claims` 列出已撤回的课题，`research restore-claim` 可以恢复。项目数据库需要升级到 `0084`，Trellin 打开旧项目时会提示升级。[撤回无法推进的课题](research-foundation.md#withdraw-a-claim-that-cannot-proceed)
+
 使用 PostgreSQL URL 和新建的空库[恢复项目存档](research-foundation.md#recover-and-monitor)。若数据库导入后还有步骤失败，保留已导入的库和原存档，另选空库及尚未使用的目录重试。
 
 在所选项目运行 `research-multiplier research latest-backup`，可找到最近通过完整性校验的机器备份。默认查看 `backups/`，也可用 `--directory` 指定外部备份目录。按清单文件的修改时间排序。有恢复需求时，另用空库验证存档能正常还原。

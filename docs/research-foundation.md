@@ -112,6 +112,18 @@ research-multiplier research attach-item PACKET_ID VERSION_ID --reason "Applies 
 
 Opening a new version creates a separate immutable record. To withdraw an invalid version or a faulty checker, use `research retire-item` or `research retire-input checker REVISION_HASH`, with a reason. The system marks dependent evidence as `needs_recheck` and excludes it from usable results. The history remains available for inspection. A stale closed claim can be reopened for a replacement receipt with `research reopen`.
 
+### Withdraw a claim that cannot proceed
+
+An open claim that cannot proceed, for example because its statement was frozen with a mistake, can be withdrawn. Withdrawing keeps the claim's contract, evidence and decisions. It leaves the project map and the claim lists.
+
+```sh
+research-multiplier research withdraw-claim CLAIM_ID --actor "your name" --reason "Frozen with the wrong hypothesis" --superseded-by NEW_CLAIM_ID
+research-multiplier research withdrawn-claims
+research-multiplier research restore-claim CLAIM_ID --actor "your name" --reason "Still needed"
+```
+
+`--superseded-by` is optional. It names the frozen claim that replaces this one and records the link in its history. Without it, the claim is archived. `research withdrawn-claims` lists withdrawn claims with the reason and any replacement. `research restore-claim` returns a withdrawn claim to the open claims; the replacement link stays as history. Only open claims can be withdrawn. A proved or refuted claim keeps its verdict. The project database needs revision `0084`; Trellin offers the upgrade when it opens an older project.
+
 ## Submit and reuse a Lean proof
 
 For research goals confirmed in Lean, use the [general Lean checking commands](lean-core.md). The historical fixed-network proof queue uses `lean submit` and `lean work` with an explicitly selected external case project. Follow the guide in that case directory for its input format and setup.

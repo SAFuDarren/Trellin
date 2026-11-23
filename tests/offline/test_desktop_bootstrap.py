@@ -379,7 +379,7 @@ def test_project_upgrade_does_not_run_migration_without_a_verified_backup(
 
     monkeypatch.setattr(desktop_workspace, "_upgrade_status", status)
     monkeypatch.setattr(desktop_workspace.migrate, "migration_url", lambda dsn: dsn)
-    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0083")
+    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0084")
     monkeypatch.setattr(desktop_workspace.migrate, "upgrade", migration)
     monkeypatch.setattr(desktop_workspace.project_archive, "backup", lambda: {"directory": "/fixture/archive"})
     monkeypatch.setattr(desktop_workspace.project_archive, fails_at, backup_failure)
@@ -393,10 +393,10 @@ def test_project_upgrade_does_not_run_migration_without_a_verified_backup(
 def test_project_upgrade_from_proof_drafts_adds_agent_work_after_backup(monkeypatch, bound_workspace):
     owner = "postgresql://selected/fixture"
     monkeypatch.setenv("RM_MIGRATION_DSN", owner)
-    states = iter([("0082", False), ("0083", True)])
+    states = iter([("0082", False), ("0084", True)])
     monkeypatch.setattr(desktop_workspace, "_upgrade_status", lambda *_: next(states))
     monkeypatch.setattr(desktop_workspace.migrate, "migration_url", lambda dsn: dsn)
-    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0083")
+    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0084")
     steps = []
 
     def verify(archive):
@@ -405,7 +405,7 @@ def test_project_upgrade_from_proof_drafts_adds_agent_work_after_backup(monkeypa
         return {"schema_revision": "0082", "database_id": str(paths.database_id(bound_workspace))}
 
     def migrate(dsn, target):
-        assert (dsn, target) == (owner, "0083")
+        assert (dsn, target) == (owner, "0084")
         steps.append("upgraded")
 
     monkeypatch.setattr(desktop_workspace.project_archive, "backup", lambda: {"directory": "/fixture/archive"})
