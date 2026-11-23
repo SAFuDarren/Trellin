@@ -196,7 +196,10 @@ def run(args):
         from ..general_lean import propose
         from ..lake_scope import capture_draft
 
-        result = propose(args.packet_id, args.lean, mathlib_project=args.mathlib_project, modules=args.modules)
+        try:
+            result = propose(args.packet_id, args.lean, mathlib_project=args.mathlib_project, modules=args.modules)
+        except ValueError as error:
+            raise ValueError(lean_workflow.explain_statement_syntax(args.packet_id, error)) from error
         capture_draft(result, lean=args.lean, mathlib_project=args.mathlib_project)
     elif action == "check-theory":
         from ..workflows.lean_verification import check_goal

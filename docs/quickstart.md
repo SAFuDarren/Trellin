@@ -71,7 +71,7 @@ For a known path, use `research-multiplier research init-workspace "PATH"` to se
 
 ## Verify and reuse a first Lean proof
 
-Start with the small proof in the [Lean guide](lean-core.md). It shows how to confirm a statement and check it with zero model calls. The same guide covers replay and withdrawal. If you have a matching release bundle, check its `first-proof` archive against `SHA256SUMS`, unpack it outside the checkout, and follow `first-proof/README.md` for the complete walkthrough.
+Start with the small proof in the [Lean guide](lean-core.md). It shows how to confirm a statement and check it with zero model calls. The same guide covers replay and withdrawal. Lean propositions use a fixed set of Core syntax: write `Nat` for `ℕ`, `(iX : Fintype X)` for `[Fintype X]` and `abs (a - b)` for `|a - b|`. `intake preview-target` names anything else before you freeze it. [Accepted proposition syntax](lean-core.md#accepted-proposition-syntax) If you have a matching release bundle, check its `first-proof` archive against `SHA256SUMS`, unpack it outside the checkout, and follow `first-proof/README.md` for the complete walkthrough.
 
 For this walkthrough, use native Lean 4.19.0 and PostgreSQL 18 with pgvector on macOS or glibc Linux. Use a fresh project folder and an empty database for the example. Follow the setup guides to install PostgreSQL support and bind the workspace. [Database setup](research-foundation.md#set-up-the-workspace) · [Native Lean setup](lean-core.md)
 

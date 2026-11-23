@@ -30,6 +30,29 @@ The grammar supports introduction with `intro`, references to introduced variabl
 
 The verifier accepts a fixed set of Lean Core syntax for closed propositions, including basic logical connectives, quantifiers, arithmetic, and named Core declarations. It checks the syntax before elaboration. It then compiles the generated proof independently, checks its type and kernel dependencies, and records the theorem versions actually used. The evidence proceeds through human review.
 
+### Accepted proposition syntax
+
+Propositions, and the types of shared parameters, may use only this syntax, because other term elaborators can run code before the kernel checks anything:
+
+- Names, numbers, application and parentheses, type ascriptions `(x : T)`, `Prop`, `Type` and `Type u`.
+- `∀` and `∃` with explicit `(x : T)` and implicit `{x : T}` binders, and `→`.
+- `∧`, `∨`, `¬`, `↔`, `=`, `≠`, `<`, `≤`, `>`, `≥`, `+`, `-` (binary and unary), `*`, `/`, `%` and `^`.
+
+`intake preview-target`, `intake freeze-target` and `intake draft` stop a Lean proposition that uses other syntax before anything is frozen. The message names each construct and a rewrite. These are the common ones from Mathlib-style statements:
+
+| Written | Rewrite |
+| --- | --- |
+| `[Fintype X]` (instance binder) | `(iX : Fintype X)` |
+| `ℕ`, `ℤ`, `ℚ`, `ℝ` | `Nat`, `Int`, `Rat`, `Real` |
+| `\|a - b\|` | `abs (a - b)` |
+| `∑ C ∈ M, f C` | `Finset.sum M f`, or a named definition |
+| `x ∈ s`, `∃ C ∈ M, P` | `Membership.mem s x`, `∃ C, Membership.mem M C ∧ P` |
+| `∅`, `⊥`, `⊤` | `EmptyCollection.emptyCollection`, `Bot.bot`, `Top.top` |
+| `{α : Type*}` | `{α : Type}` |
+| `fun x => …`, `⟨a, b⟩`, `if … then … else …` | a named definition in your Lean project, or the constructor by name |
+
+Put definitions that need richer syntax in your own Lean project and refer to them by name. A statement frozen before this check that the audit later refuses makes `lean draft-theory` name the same constructs and rewrites.
+
 Use `lean check-theory STATEMENT_ID --model` with a configured [Lean author](model-adapters.md) to generate the proof document. The author gets the approved public proposition and its admissible basis. A basis version from a restricted or unclassified source needs separate authorization for model input. Review the exact version and record the decision with `research release-item VERSION_ID --hash VERSION_HASH --actor Researcher --reason REASON`. The candidate passes through the same independent checker.
 
 For a restricted goal, supply the structured proof file directly or use [`lean check-source`](#check-a-lean-source-file-or-compiled-declaration). Both use native Lean with zero model calls. Review and promotion use the same commands as for public goals. The theorem catalog exposes promoted public structured proofs.
