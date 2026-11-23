@@ -40,7 +40,8 @@ def frozen_claim(store, title, proposition):
     raw = json.dumps(target).encode()
     preview = intake.preview_target(store, raw)
     saved = intake.freeze_target(store, raw, preview["target_sha256"], "Fixture", REASON)
-    notes = {"items": [{"kind": "hypothesis", "natural": "The premise is true.",
+    # Each claim gets its own premise wording, so the library does not reuse an approved item.
+    notes = {"items": [{"kind": "hypothesis", "natural": f"The premise of the {title.lower()} is true.",
                         "formal": {"lean": {"proposition": "True"}}}]}
     draft = intake.draft(store, json.dumps(notes).encode(), target_id=saved["id"])
     intake.confirm(store, draft["id"], draft["intake_sha256"],
