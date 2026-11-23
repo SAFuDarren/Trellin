@@ -243,7 +243,6 @@ export function Shell({ session }: { session: string }) {
                 <AgentWorkPage
                   session={session}
                   sub={sub}
-                  inboxUnread={workspaceInbox.unread}
                   inbox={
                     showsInbox && (
                       <WorkspaceInbox

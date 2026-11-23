@@ -264,7 +264,7 @@ test("retrying an interrupted run requires fresh scope approval and resends the 
   expect(previews[0]?.action_id).toMatch(/^[0-9a-f-]{36}$/);
 });
 
-test("Claims, Agent work and Review each have one active rail link, including legacy Agent work links", async ({
+test("Claims, Agent tasks and Review each have one active rail link, including legacy Agent work links", async ({
   page,
 }) => {
   await fixture(page);
@@ -293,8 +293,17 @@ test("Claims, Agent work and Review each have one active rail link, including le
     await expect(claims).not.toHaveAttribute("aria-current", "page");
   }
 
-  await sidebar.getByRole("link", { name: "Agent activity", exact: true }).click();
+  // #294: Agent activity has one entry point, the bottom-bar drawer, which links to its full page.
+  await expect(sidebar.getByRole("link", { name: "Agent activity", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: /^Agent activity/ }).click();
+  await page
+    .getByRole("region", { name: "Agent activity", exact: true })
+    .getByRole("link", { name: "Open full activity", exact: true })
+    .click();
   await expect(page).toHaveURL(/#agent-work\/activity$/);
+  await expect(page.getByRole("region", { name: "Agent activity", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("heading", { name: "Agent activity", exact: true })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: /^All tasks/ })).toHaveCount(0);
   await expect(activeRail).toHaveAccessibleName(/^Work/);
   const activity = page.locator("main").getByRole("group", { name: "Filter activity" });
   await expect(activity).toBeVisible();

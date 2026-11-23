@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.117
+
+- Agent tasks has one name everywhere; "Agent work" is gone from the interface. The Work → Inbox page shows only the Work entries, and the Agent tasks filters appear only on Agent tasks. Agent activity opens from the bottom bar, whose drawer now links to the full activity page; it no longer repeats as a Work entry. Team → Jobs stays, as the per-job table with model, provider and run time.
+
 ## 1.0.114
 
 - Agent work resumes polling after a temporary connection error. Work that may have already run still follows its recorded lease and review history.

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import en from "../i18n/en.json";
+import zhCN from "../i18n/zh-CN.json";
 import { parseRoute, SECTIONS } from "./route";
 import { currentEntry, entryHref, SPACES, spaceOf, UTILITY_SECTIONS } from "./spaces";
 
@@ -43,5 +45,18 @@ describe("navigation spaces (#289)", () => {
     expect(entry("#review/some-item")).toBe("review");
     expect(entry("#library")).toBe("library");
     expect(spaceOf("progress")?.id).toBe("automation");
+  });
+
+  it("names Agent tasks one way in both catalogs (#294)", () => {
+    expect(JSON.stringify(en)).not.toMatch(/Agent work/i);
+    expect(JSON.stringify(zhCN)).not.toMatch(/Agent 派工|派工功能/);
+    expect(en.agentWork.title).toBe(en.spaces.entries.agentTasks);
+    expect(zhCN.agentWork.title).toBe(zhCN.spaces.entries.agentTasks);
+  });
+
+  it("gives Agent activity no panel entry: the drawer opens it and links to its full page (#294)", () => {
+    const destinations = SPACES.flatMap((space) => space.entries.map(entryHref));
+    expect(destinations).not.toContain("#agent-work/activity");
+    expect(currentEntry(parseRoute("#agent-work/activity"))?.key).toBe("agent-tasks");
   });
 });

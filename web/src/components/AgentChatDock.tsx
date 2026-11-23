@@ -274,6 +274,20 @@ export function AgentChatDock({
             </div>
           </>
         )}
+        {view === "activity" && (
+          // #294: the drawer is Agent activity's one entry point; this opens its full page.
+          <div className="agent-dock-heading-actions">
+            <a
+              className="conversation-text-action"
+              href={href("agent-work", "activity")}
+              onClick={(event) => {
+                if (!(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) setView(null);
+              }}
+            >
+              {t("agentDock.openActivity")}
+            </a>
+          </div>
+        )}
         {view === "chat" && (
           <button
             className="icon-button"
