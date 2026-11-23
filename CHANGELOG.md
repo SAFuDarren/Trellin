@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.120
+
+- `intake preview-target`, `intake freeze-target` and `intake draft` stop a Lean proposition that the statement audit would reject, before anything is frozen. The message names each construct, such as an instance binder `[Fintype X]`, `ℕ`, `|a - b|`, `∑` or `∈`, with an accepted rewrite. A statement frozen earlier that `lean draft-theory` rejects now gets the same explanation. The Lean guide lists the accepted syntax and the common rewrites. The audit itself is unchanged.
+
 ## 1.0.119
 
 - The project Trellin creates is named **My research** (我的研究) instead of Library, and an earlier default named Library is renamed on the next launch. Once you have a project of your own, an empty **My research** leaves the project switcher; it still opens when nothing else can. Each project in the switcher has **⋯** to rename it or remove it from the list. Removing keeps the folder and database on this Mac, and **Open Folder…** adds it back under its last name.

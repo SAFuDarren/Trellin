@@ -123,7 +123,10 @@ the explicit yes described in rule 1.
 
 1. **Target.** Write `inputs/target.json` with the title, domain (`lean-core` for
    Lean), sensitivity, statement and `formal.lean.proposition`. Run
-   `intake preview-target inputs/target.json` and show the proposition.
+   `intake preview-target inputs/target.json` and show the proposition. Use only
+   the accepted Core syntax (`Nat` not `ℕ`, `(iX : Fintype X)` not `[Fintype X]`,
+   `abs (a - b)` not `|a - b|`); preview names any other construct and its rewrite.
+   See docs/lean-core.md, "Accepted proposition syntax".
    *Researcher decides:* `intake freeze-target inputs/target.json --hash HASH --actor NAME --reason REASON`.
 2. **Assumptions.** Write the proposed items to `inputs/basis.json`. Run
    `intake draft inputs/basis.json --target TARGET_ID`, then `intake show INTAKE_ID`,

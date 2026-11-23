@@ -41,7 +41,7 @@ research-multiplier run inputs/question.json
 
 ## 首次核验和复用一个 Lean 证明
 
-先用 [Lean 指南](lean-core.md)的小例子确认和核验一个命题，全程无需模型。该指南也说明如何复用结果和撤回依据。已有匹配发行包时，用 `SHA256SUMS` 核对其中的 `first-proof` 压缩包，在软件目录外解压后查看完整教程 `first-proof/README.md`。
+先用 [Lean 指南](lean-core.md)的小例子确认和核验一个命题，全程无需模型。该指南也说明如何复用结果和撤回依据。Lean 命题只能使用一组固定的 Core 语法：`ℕ` 写成 `Nat`，`[Fintype X]` 写成 `(iX : Fintype X)`，`|a - b|` 写成 `abs (a - b)`，`∑ C ∈ M, f C` 写成 `Finset.sum M f`，`x ∈ s` 写成 `Membership.mem s x`，`∅`、`⊥` 写成 `EmptyCollection.emptyCollection`、`Bot.bot`，`Type*` 写成 `Type`。`intake preview-target` 会在冻结前指出其他写法和对应改写。需要更丰富语法的定义请放进自己的 Lean 项目，再按名称引用。[可接受的命题语法](lean-core.md#accepted-proposition-syntax)已有匹配发行包时，用 `SHA256SUMS` 核对其中的 `first-proof` 压缩包，在软件目录外解压后查看完整教程 `first-proof/README.md`。
 
 在 macOS 或 glibc Linux 上准备本机 Lean 4.19.0 和带 pgvector 的 PostgreSQL 18，选一个空项目目录及空数据库。按下面的设置指南安装 PostgreSQL 支持并绑定工作区。[数据库和项目设置](research-foundation.md#set-up-the-workspace)
 

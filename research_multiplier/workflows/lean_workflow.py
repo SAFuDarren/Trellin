@@ -46,6 +46,26 @@ def draft(packet_id, project_dir, lake=None):
                            packet_id, store.json(body))[0]
 
 
+def explain_statement_syntax(packet_id, error):
+    """Name the rejected constructs when the Lean audit refuses a frozen statement (#296)."""
+    message = str(error)
+    if "unsupported Lean Core syntax" not in message:
+        return message
+    from research_multiplier.general_lean import _target
+    from research_multiplier.proof.lean_statement_syntax import explain
+
+    try:
+        with Store() as store:
+            packet = formalization.read(store, "id", packet_id)
+            frozen = store.frozen(packet["claim_id"])
+        goal, hypotheses = _target(json.loads(frozen["contract_bytes"]))
+        texts = [goal, *hypotheses, *(row["type"] for row in hypotheses.parameters)]
+    except (ValueError, KeyError, TypeError):
+        return message
+    detail = explain(texts)
+    return f"{message} {detail} See 'Accepted proposition syntax' in docs/lean-core.md." if detail else message
+
+
 def _statement(store, role, identifier):
     rows = store.query(role, "SELECT * FROM rm.lean_statement_status WHERE id = %s", identifier)
     if not rows:

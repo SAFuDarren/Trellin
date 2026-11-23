@@ -174,7 +174,17 @@ def _consolidate(entries):
 def _read_target(raw):
     if len(raw) > MAX_TARGET_BYTES:
         raise ValueError("Research targets are limited to 65 KB.")
-    return json.loads(raw.decode("utf-8-sig"))
+    body = json.loads(raw.decode("utf-8-sig"))
+    _require_checkable(body, body.get("domain") if isinstance(body, dict) else None)
+    return body
+
+
+def _require_checkable(document, domain):
+    """Stop Lean propositions that the statement audit will reject before they are frozen or reviewed (#296)."""
+    if domain == "lean-core":
+        from research_multiplier.proof.lean_statement_syntax import require_supported
+
+        require_supported(document)
 
 
 def preview_target(store, raw):
@@ -222,6 +232,7 @@ def draft(store, raw, *, model=False, target_id=None, confirm_local=False, model
         if public_authorization is not None:
             call = {**call, "parameters": {**call["parameters"], "workbench_public_intake": public_authorization}}
         provenance["model"] = {"call": call, "transcript": objects.put(reply.transcript)}
+    _require_checkable({"items": items}, notes["domain"])
     body = {"format_version": 1, **{key: notes[key] for key in ("title", "domain", "objective", "sensitivity")},
             "notes": objects.put_bytes(raw), "items": _consolidate(items), **provenance}
     if frozen:
