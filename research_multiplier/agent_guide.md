@@ -57,7 +57,7 @@ This copy matches the Research Multiplier version that wrote it. Run
    strings or the saved login file.
 4. **Ask before changes that are hard to undo.** These are
    `research retire-item`, `research retire-input`, `research reopen`,
-   `research cancel`, `research restore-project`, schema upgrades, `advance stop`
+   `research withdraw-claim`, `research restore-claim`, `research cancel`, `research restore-project`, schema upgrades, `advance stop`
    and `plan cancel`. Ask, as with decisions.
 5. **Report exactly what the program says.** A checked proof is only evidence
    until the researcher approves it and it is promoted. Say `needs_review`,
@@ -153,7 +153,11 @@ the explicit yes described in rule 1.
    then, if they want to adopt it, `promote-evidence EVIDENCE_ID --reason REASON`.
 6. **Later.** `research resume` shows where things stand. Withdrawing a version
    (`research retire-item`) marks dependent results `needs_recheck`. Recheck them
-   with the proof commands, and ask before any `research reopen`.
+   with the proof commands, and ask before any `research reopen`. A claim that
+   cannot proceed, such as one frozen with a mistake, is withdrawn with
+   `research withdraw-claim CLAIM_ID --actor NAME --reason REASON`, adding
+   `--superseded-by NEW_CLAIM_ID` when a corrected claim replaces it. It leaves
+   the map; `research restore-claim` brings it back.
 
 Other entry points follow the same pattern: you read and prepare, and the
 researcher signs. They include conjecture exploration (`goal ...`,

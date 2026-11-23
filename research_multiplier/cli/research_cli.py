@@ -9,7 +9,7 @@ from uuid import UUID
 
 from research_multiplier.policy import basis, project_budget
 from research_multiplier.storage import paths, project_archive, workspace_archive
-from research_multiplier.workflows import research_followup, research_handoff, research_resume
+from research_multiplier.workflows import claim_withdrawal, research_followup, research_handoff, research_resume
 from research_multiplier.storage.postgres import Store, bind_workspace
 
 
@@ -130,6 +130,18 @@ def add_commands(commands):
     reopen.add_argument("claim_id")
     reopen.add_argument("--actor", required=True)
     reopen.add_argument("--reason", required=True)
+    withdraw = register(actions, "withdraw-claim",
+                        help="Withdraw an open claim that cannot proceed. It leaves the map; restore it any time.")
+    withdraw.add_argument("claim_id")
+    withdraw.add_argument("--actor", required=True)
+    withdraw.add_argument("--reason", required=True)
+    withdraw.add_argument("--superseded-by", metavar="CLAIM_ID",
+                          help="The frozen claim that replaces it; the two are linked in history.")
+    restore = register(actions, "restore-claim", help="Return a withdrawn claim to the open claims.")
+    restore.add_argument("claim_id")
+    restore.add_argument("--actor", required=True)
+    restore.add_argument("--reason", required=True)
+    register(actions, "withdrawn-claims", help="List withdrawn claims and why they were withdrawn.")
 
     time = register(actions, "log-time", help="Record actual researcher time spent on a task.")
     time.add_argument("claim_id")
@@ -196,6 +208,12 @@ def _query(args):
             store.query("human", "SELECT rm.retire_verification_input(%s,%s,%s)",
                         "verifier" if args.kind == "checker" else args.kind, args.checksum, args.reason)
             return {"retired": args.checksum, "kind": args.kind}
+        if action == "withdraw-claim":
+            return claim_withdrawal.withdraw(store, args.claim_id, args.actor, args.reason, args.superseded_by)
+        if action == "restore-claim":
+            return claim_withdrawal.restore(store, args.claim_id, args.actor, args.reason)
+        if action == "withdrawn-claims":
+            return {"claims": claim_withdrawal.withdrawn(store)}
         if action == "reopen":
             return store.query("human", "SELECT rm.reopen_stale_claim(%s,%s,%s) AS id",
                                args.claim_id, args.actor, args.reason)[0]
