@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.124
+
+- **Automation** starts from **New automation** and two templates backed by the existing rule engine: **Reuse and reduce Lean proofs** (zero model calls) and **Watch verified evidence**. Claims that are not ready say what is missing. Choosing a claim records a proposal for review; nothing runs until you approve that exact rule, and the first run starts when the project worker is free. Rules waiting for approval have **Review and approve**, and **Stop** keeps results and run history. The page no longer shows command-line instructions, and its filters appear once rules exist.
+
 ## 1.0.123
 
 - **Add agent** starts with a choice of roles: Lean prover, Literature scout, Independent reviewer and Research planner, or **Start blank**. A role fills in every field and selects the first working model connection, so a new Agent needs only a review and **Create agent**. With no saved Agents, **Chats** offers the same roles and opens the new Agent's chat with the composer ready. Saved Agents stay listed in **Chats** with their description, and opening one focuses the composer.

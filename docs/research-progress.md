@@ -7,6 +7,18 @@ metric, allowed actions, priority and maximum work budget. The researcher
 reviews and approves its exact hash. A worker never alters the claim or signs
 a review decision.
 
+In the workbench, open **Automation** and choose **New automation**. Pick a
+template: **Reuse and reduce Lean proofs** tries ready Lean reductions and
+reusable proofs with zero model calls, and **Watch verified evidence** records
+progress from evidence that is already verified. Then pick a claim; claims that
+are not ready say what is missing, such as a confirmed exact Lean statement.
+Choosing a claim records the proposal only. The review shows the claim, what
+runs, when, the allowed actions, model calls and budget, and nothing runs until
+you choose **Approve and run**. Approval is bound to the reviewed proposal, and
+the first run starts when the project's worker is free. **Stop** asks for a
+reason and keeps the rule's results and run history. Rules proposed with the
+commands below appear under **Waiting for approval** with **Review and approve**.
+
 ```json
 {
   "packet_id": "FORMALIZATION_PACKET_UUID",

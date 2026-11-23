@@ -1,0 +1,100 @@
+/* #94: Automation leads with one action and its templates, and rules can be approved and stopped in place. */
+.automation-empty {
+  display: grid;
+  gap: 12px;
+  max-width: 720px;
+  margin: 24px auto 0;
+}
+.automation-empty h2 {
+  margin: 0;
+  font-size: var(--type-section-size);
+  font-weight: var(--type-semibold);
+}
+.automation-empty > p {
+  margin: 0;
+  color: var(--sub);
+}
+.automation-empty-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+.automation-templates,
+.automation-claims {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.automation-templates {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.automation-template,
+.automation-claim {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: var(--main);
+  color: var(--ink);
+  text-align: start;
+}
+.automation-template:hover,
+.automation-claim:hover:not(:disabled) {
+  border-color: var(--node-line);
+  background: var(--state-hover);
+}
+.automation-template strong,
+.automation-claim strong {
+  font-size: var(--type-body-size);
+  font-weight: var(--type-semibold);
+}
+.automation-template span,
+.automation-claim span {
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+}
+.automation-template .automation-template-needs {
+  margin-top: 2px;
+}
+.automation-claim:disabled {
+  opacity: 0.7;
+}
+.automation-facts {
+  margin: 0;
+}
+.automation-notice {
+  margin: 0 0 12px;
+  color: var(--sub);
+}
+.automation-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.automation-stop {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.automation-stop input {
+  height: var(--field-h);
+  padding: 0 10px;
+  border: 1px solid var(--node-line);
+  border-radius: var(--radius-control);
+  background: var(--main);
+  color: var(--ink);
+}
+.automation-stop p {
+  margin: 0;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+.automation-stop .button.danger {
+  color: var(--crit);
+}

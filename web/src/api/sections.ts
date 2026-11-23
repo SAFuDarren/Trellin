@@ -85,7 +85,16 @@ export type Policy = {
   claim_id: string;
   claim_title: string | null;
   state: string | null;
-  policy: { metric?: string; max_rounds?: number; budget_seconds?: number; lean?: { model_rounds?: number } } | null;
+  policy: {
+    metric?: string;
+    actions?: string[];
+    max_rounds?: number;
+    budget_seconds?: number;
+    lean_model_rounds?: number;
+    lean?: { model_rounds?: number };
+  } | null;
+  /** #94: the exact proposal fingerprint a researcher approves. */
+  policy_sha256?: string;
   proposed_at: string;
   approved_by: string | null;
   approved_at: string | null;

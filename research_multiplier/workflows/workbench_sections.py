@@ -161,7 +161,8 @@ def team(store):
 
 
 _PROGRESS = """
-SELECT p.id, p.claim_id, c.title AS claim_title, p.state, p.policy, p.proposed_at, p.approved_by, p.approved_at,
+SELECT p.id, p.claim_id, c.title AS claim_title, p.state, p.policy, p.policy_sha256, p.proposed_at, p.approved_by,
+       p.approved_at,
        p.stopped_at, p.stop_reason, p.latest_round, p.progress, p.current_evidence_id,
        run.recorded_at AS last_run_at, run.result ->> 'status' AS last_status,
        left(run.result ->> 'reason', 600) AS last_reason
