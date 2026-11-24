@@ -1,8 +1,10 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { TeamAgent } from "../api/teamAgents";
+import { href } from "../shell/route";
 import type { TriageMark, WorkspaceInboxState } from "../shell/workspaceInbox";
 import { timeText } from "../workbench/text";
+import { EmptyState, type EmptyStateAction } from "./EmptyState";
 import { workspaceActivityDisplay } from "./WorkspaceActivity";
 import "../styles/workspace-inbox.css";
 
@@ -87,12 +89,23 @@ export function WorkspaceInbox({
   }
 
   if (!inbox.enabled) {
-    return (
+    return loading ? (
       <p className="page-empty" role="status">
-        {t(loading ? "common.loading" : "agentInbox.unavailable")}
+        {t("common.loading")}
       </p>
+    ) : (
+      // #328: say why, and send the researcher to where waiting items are still handled.
+      <EmptyState
+        title={t("agentInbox.unavailable")}
+        reason={t("agentInbox.unavailableReason")}
+        action={{ label: t("agentInbox.openReview"), href: href("review") }}
+      />
     );
   }
+  const emptyAction: EmptyStateAction =
+    filter === "all"
+      ? { label: t("agentWork.newTask"), href: href("agent-work", "new") }
+      : { label: t("agentInbox.showAll"), onClick: () => setFilter("all") };
 
   return (
     <section className="page-body workspace-inbox" aria-label={t("agentInbox.title")} onKeyDown={handleKey}>
@@ -142,10 +155,16 @@ export function WorkspaceInbox({
               );
             })}
           </ul>
-        ) : (
+        ) : loading ? (
           <p className="page-note" role="status">
-            {t(loading ? "common.loading" : `agentInbox.empty.${filter}`)}
+            {t("common.loading")}
           </p>
+        ) : (
+          <EmptyState
+            title={t(`agentInbox.empty.${filter}`)}
+            reason={t(`agentInbox.emptyReason.${filter}`)}
+            action={emptyAction}
+          />
         )}
         {selected && summary && (
           <aside ref={preview} className="inbox-record" aria-labelledby="inbox-record-title">

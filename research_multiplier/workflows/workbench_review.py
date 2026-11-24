@@ -8,9 +8,17 @@ class ReviewError(ValueError):
 
 
 def capability(store):
-    if store.local_identity_installed():
-        return {"review_identity": {"workspace_id": str(store.workspace_id) if store.workspace_id else None}}
-    return {}
+    """Tell the workbench who signs decisions, so it never asks the bound researcher for a name (#328)."""
+    if not store.local_identity_installed():
+        return {}
+    identity = {"workspace_id": str(store.workspace_id) if store.workspace_id else None}
+    try:
+        user = store.local_user()
+    except ValueError:
+        user = None
+    if user is not None and user.get("display_name"):
+        identity["display_name"] = user["display_name"]
+    return {"review_identity": identity}
 
 
 def _local_user(store):

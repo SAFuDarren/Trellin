@@ -159,7 +159,7 @@ export function useInbox(session: string, streamHealthy = false) {
       api<{
         items: InboxItem[];
         open_research_goals?: { id: string; title: string }[];
-        review_identity?: { workspace_id: string };
+        review_identity?: { workspace_id: string; display_name?: string };
         clarification_review?: {
           workspace_id: string;
           followups: { id: string; title: string; status: "answered" | "ready"; waiting_since: string }[];

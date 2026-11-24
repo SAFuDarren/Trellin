@@ -2231,6 +2231,29 @@ button.resource-path-hop {
   color: var(--sub);
   text-align: center;
 }
+/* #328: an empty or unavailable page gives its reason and one next step. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 22px;
+  text-align: center;
+}
+.empty-state p {
+  margin: 0;
+  max-width: 52ch;
+}
+.empty-state-title {
+  color: var(--ink);
+  font-weight: var(--type-semibold);
+}
+.empty-state-reason {
+  color: var(--sub);
+}
+.empty-state .button {
+  margin-top: 6px;
+}
 /* Links styled as buttons keep the button's look: no link underline (#283). */
 .button {
   height: 30px;
@@ -2845,6 +2868,11 @@ button.resource-path-hop {
 }
 .decision .reviewer {
   max-width: 260px;
+}
+.review-signer {
+  margin: 0;
+  color: var(--sub);
+  font-size: 12.5px;
 }
 .inline-note {
   color: var(--sub);

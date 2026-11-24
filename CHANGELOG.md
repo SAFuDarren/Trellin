@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.126
+
+- **Review**, **Add theorem** and the paper import confirmation record decisions as the project's local researcher and show **Recorded by** with that name, instead of asking for **Your name**. A project database without a local identity still asks. The inbox response's `review_identity` adds the researcher's `display_name`.
+- **Chats** opens on the most recent Agent conversation, or the first saved Agent's chat when there is none. The floating **Agent chat** starts a new conversation with the same Agent selected; the picker still changes it. A new conversation keeps its Agent while it is being created, so its draft and first message stay together.
+- Empty and unavailable pages in **Inbox**, **Agent tasks** and **Automation** say why and offer one next step: **Open Review**, **New task**, **Back up and upgrade** in the app, **Try again**, or a link back to all items.
+
 ## 1.0.125
 
 - Trellin now rebuilds a missing library registry or lock file from its managed workspaces' `.trellin-managed.json` markers, including after **Move Data…**. The last opened project and selected node are stored by project ID in the library's own settings instead of macOS preferences; existing `lastWorkspaceV1` values are migrated once and then ignored. `desktop/macos/build.sh` gives development and trial builds separate bundle identifiers (`org.researchmultiplier.trellin.dev` and `--trial`), reserving `org.researchmultiplier.trellin` for `--release`, and no error or notice text directs the researcher to Storage settings or a library location.

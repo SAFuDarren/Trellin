@@ -371,6 +371,7 @@
     "submitDecision": "记录决定",
     "chooseDecision": "请先选择批准或退回。",
     "reviewer": "你的名字",
+    "signedAs": "记录人：{{name}}",
     "reason": "理由",
     "reasonHint": "例如：范围一致，只用到了假设 H₁",
     "approve": "批准",
@@ -849,7 +850,15 @@
     "restore": "恢复",
     "markRead": "标为已读",
     "markUnread": "标为未读",
-    "archive": "归档"
+    "archive": "归档",
+    "unavailableReason": "这个项目的数据库还不能识别你，所以收件箱无法保留已读和归档状态。等你处理的条目仍在审阅中。",
+    "openReview": "打开审阅",
+    "showAll": "显示全部条目",
+    "emptyReason": {
+      "all": "Agent 的结果和需要你回答的问题会出现在这里。",
+      "unread": "这里的条目都已读。",
+      "archived": "归档的条目会移到这里。"
+    }
   },
   "agentWork": {
     "title": "Agent 任务",
@@ -860,7 +869,7 @@
     "newTask": "新建任务",
     "openTeam": "打开团队 Agent",
     "noAgents": "先在团队添加一个 Agent，再派工。",
-    "unavailable": "请通过 Trellin 启动器升级当前项目，再使用 Agent 任务。",
+    "unavailable": "这个项目的数据库早于 Agent 任务功能。备份并升级后即可给 Agent 分配工作。",
     "empty": "当前项目还没有 Agent 任务。",
     "emptyWaiting": "没有待验收的交付。",
     "agent": "Agent",
@@ -960,7 +969,12 @@
       "confirmation": "请重新预览任务，确认接收方和已批准的材料。"
     },
     "searchAgents": "搜索 Agent",
-    "searchDeliveries": "搜索交付成果"
+    "searchDeliveries": "搜索交付成果",
+    "unavailableTitle": "这个项目还不能使用 Agent 任务。",
+    "unavailableBrowser": "这个项目的数据库早于 Agent 任务功能。请在 Trellin 应用中打开项目并备份升级，然后重试。",
+    "emptyReason": "给 Agent 一个有明确边界的任务，进度和交付会出现在这里。",
+    "emptyWaitingReason": "需要你决定的交付会出现在这里。",
+    "showAll": "显示全部任务"
   },
   "libraryEdit": {
     "fixedScope": "现有 Lean 参数和前提",
@@ -1322,7 +1336,6 @@
       "stopped": "已停止"
     },
     "note": "你不在时系统做什么",
-    "none": "还没有推进规则。",
     "state": {
       "active": "运行中",
       "proposed": "待批准",
@@ -1336,7 +1349,17 @@
     "never": "还没运行过",
     "approved": "批准",
     "notApproved": "尚未批准",
-    "stopped": "停止"
+    "stopped": "停止",
+    "unavailable": "无法加载推进规则。",
+    "unavailableReason": "项目数据库没有响应。请确认项目已打开，然后重试。",
+    "noneIn": {
+      "all": "还没有推进规则。",
+      "active": "没有运行中的规则。",
+      "proposed": "没有待批准的规则。",
+      "stopped": "没有已停止的规则。"
+    },
+    "noneReason": "规则提出、批准和停止后，会出现在对应的视图里。",
+    "showAll": "显示全部规则"
   },
   "modelConnections": {
     "title": "模型连接",
