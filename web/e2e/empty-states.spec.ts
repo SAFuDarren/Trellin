@@ -102,7 +102,7 @@ test("Automation explains an unavailable list and an empty view, in Chinese too"
       : route.fulfill({ json: { policies: [] } }),
   );
   await go(page, "#progress/stopped", "zh-CN");
-  let state = emptyState(page);
+  const state = emptyState(page);
   await expect(state.getByRole("status")).toHaveText("无法加载推进规则。");
   await expect(state).toContainText("请确认项目已打开");
   fail = false;
