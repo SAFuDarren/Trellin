@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build a native Apple Silicon app for local review.
+# Build a native Apple Silicon app for local review or release.
 set -euo pipefail
 
 fail() {
@@ -7,10 +7,60 @@ fail() {
     exit 1
 }
 
-if [[ "${1:-}" == "--help" ]]; then
-    printf 'Usage: %s EXISTING_OUTPUT_DIRECTORY\n' "$0"
+usage() {
+    printf 'Usage: %s [--dev | --trial | --release | --bundle-id ID] [--print-bundle-id] EXISTING_OUTPUT_DIRECTORY\n' "$0"
+}
+
+bundle_id="org.researchmultiplier.trellin.dev"
+print_bundle_id=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --help)
+            usage
+            exit 0
+            ;;
+        --dev)
+            bundle_id="org.researchmultiplier.trellin.dev"
+            shift
+            ;;
+        --trial)
+            bundle_id="org.researchmultiplier.trellin.trial"
+            shift
+            ;;
+        --release)
+            bundle_id="org.researchmultiplier.trellin"
+            shift
+            ;;
+        --bundle-id)
+            [[ $# -ge 2 ]] || fail "missing value for --bundle-id"
+            bundle_id="$2"
+            shift 2
+            ;;
+        --print-bundle-id)
+            print_bundle_id=1
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            fail "unknown option: $1"
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [[ ! "$bundle_id" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]]; then
+    fail "invalid bundle identifier: $bundle_id"
+fi
+if [[ $print_bundle_id -eq 1 ]]; then
+    printf '%s\n' "$bundle_id"
     exit 0
 fi
+
 [[ $# -eq 1 ]] || fail "pass an existing output directory outside this checkout"
 case "$1" in
     /*) output_path="$1" ;;
@@ -91,6 +141,7 @@ if [[ -d "$desktop/Resources" ]]; then
 fi
 xcrun swift -module-cache-path "$stage/swift-modules" "$desktop/packaging/render-icon.swift" "$resources/Trellin.icns"
 cp "$desktop/packaging/Info.plist" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set CFBundleIdentifier $bundle_id" "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set CFBundleShortVersionString $version" "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set CFBundleVersion $version" "$app/Contents/Info.plist"
 xcrun swiftc -O -target arm64-apple-macos15.0 -module-cache-path "$stage/swift-modules" \

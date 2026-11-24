@@ -4,6 +4,7 @@ from io import BytesIO, StringIO
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 from uuid import uuid4
 
@@ -453,3 +454,188 @@ def test_storage_cli_renames_and_removes(library, monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["desktop", "--storage-remove", project])
     assert desktop.main() == 2
     assert json.loads(capsys.readouterr().out) == {"version": 1, "status": "error", "code": "storage-project"}
+
+
+def _stub_desktop_open(monkeypatch, tmp_path):
+    opened = []
+
+    class Server:
+        launch_url = "test"
+
+        def __init__(self, workspace):
+            self.workspace = Path(workspace)
+
+        def serve_forever(self, *, poll_interval):
+            pass
+
+        def shutdown(self):
+            pass
+
+    def open_project(path, _resources, *, expected_project):
+        opened.append(Path(path))
+        return Server(path)
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "credentials"))
+    monkeypatch.setattr(desktop, "_open", open_project)
+    monkeypatch.setattr(desktop.shutil, "which", lambda _: "/fixture/lean")
+    return opened
+
+
+def test_deleted_registry_and_lock_file_rebuild_all_managed_projects(library, tmp_path):
+    default = library.open_default()
+    second = library.create("Second theorem")
+    renamed = library.create("Initial title")
+    library.rename(str(paths.workspace_id(renamed)), "Field notes")
+    removed = library.create("Unregistered draft")
+    library.unregister(str(paths.workspace_id(removed)))
+
+    # Leave an incomplete folder without a managed marker; repair must preserve it untouched.
+    root = library.anchor / "Library"
+    incomplete = root / "Workspaces" / str(uuid4())
+    incomplete.mkdir()
+    (incomplete / "keep.txt").write_text("Pending")
+
+    (root / "registry.json").unlink()
+    (library.anchor / ".library.lock").unlink()
+
+    rebuilt = library.status()
+    assert rebuilt["default_id"] == str(paths.workspace_id(default))
+    assert {(row["id"], row["name"], row["path"], row["default"]) for row in rebuilt["projects"]} == {
+        (str(paths.workspace_id(default)), "My research", str(default), True),
+        (str(paths.workspace_id(second)), "Second theorem", str(second), False),
+        (str(paths.workspace_id(renamed)), "Field notes", str(renamed), False),
+    }
+    assert library.open_default() == default
+    assert library.resolve_project(str(paths.workspace_id(second))) == second
+    assert (incomplete / "keep.txt").read_text() == "Pending"
+
+
+def test_deleted_registry_rebuilds_legacy_three_field_markers(library):
+    default = library.open_default()
+    other = library.create("Legacy named")
+    for workspace in (default, other):
+        marker_file = workspace / MANAGED_FILE
+        marker = json.loads(marker_file.read_text())
+        marker_file.write_text(json.dumps({
+            "format_version": 1, "anchor": marker["anchor"], "slot": marker["slot"],
+        }))
+    (library.anchor / "Library" / "registry.json").unlink()
+
+    state = library.status()
+    assert len(state["projects"]) == 2
+    assert {row["id"] for row in state["projects"]} == {str(paths.workspace_id(default)), str(paths.workspace_id(other))}
+    assert state["default_id"] in {str(paths.workspace_id(default)), str(paths.workspace_id(other))}
+
+
+def test_last_project_and_position_restore_from_library_and_migrate_legacy_once(monkeypatch, library, tmp_path):
+    opened = _stub_desktop_open(monkeypatch, tmp_path)
+    default = library.open_default()
+    second = library.create("Second theorem")
+    second_id = str(paths.workspace_id(second))
+    claim_id = str(uuid4())
+    node_id = f"goal:{claim_id}"
+
+    # Opening second project records it in library settings; saving position persists by project ID.
+    output = StringIO()
+    assert desktop.run(None, BytesIO(), output, library=library, project_id=paths.workspace_id(second)) == 0
+    reply = json.loads(output.getvalue())
+    assert reply["project_id"] == second_id
+    assert "position" not in reply
+
+    saved_output = StringIO()
+    assert desktop._storage(library, ["--storage-save-position", second_id, claim_id, node_id], saved_output) == 0
+    assert json.loads(saved_output.getvalue())["position"] == {"claimId": claim_id, "nodeId": node_id}
+
+    # Reopen restores from the library's own settings and ignores any legacy macOS preference payload.
+    output = StringIO()
+    legacy = {"path": str(default), "projectId": str(paths.workspace_id(default))}
+    assert desktop.run(None, BytesIO(), output, library=library, reopen=True, legacy=legacy) == 0
+    reopened = json.loads(output.getvalue())
+    assert reopened["workspace"] == str(second)
+    assert reopened["project_id"] == second_id
+    assert reopened["position"] == {"claimId": claim_id, "nodeId": node_id}
+    assert "reopen_failed" not in reopened
+
+    # Corrupt settings never block startup: Trellin opens the default project cleanly.
+    (library.anchor / "Library" / "settings.json").write_text("{corrupt")
+    output = StringIO()
+    assert desktop.run(None, BytesIO(), output, library=library, reopen=True) == 0
+    recovered = json.loads(output.getvalue())
+    assert recovered["workspace"] == str(default)
+    assert "reopen_failed" not in recovered
+    assert opened[-1] == default
+
+
+def test_legacy_migration_from_another_library_home_creates_default_library(monkeypatch, library, tmp_path):
+    monkeypatch.setenv("RM_TRELLIN_HOME", str(tmp_path / "trial home"))
+    other = desktop_library.Library().open_default()
+    monkeypatch.setenv("RM_TRELLIN_HOME", str(library.anchor))
+    assert not library.anchor.exists()
+
+    opened = _stub_desktop_open(monkeypatch, tmp_path)
+    legacy = {"path": str(other), "projectId": str(paths.workspace_id(other))}
+    output = StringIO()
+    assert desktop.run(None, BytesIO(), output, library=desktop_library.Library(), reopen=True, legacy=legacy) == 0
+    reply = json.loads(output.getvalue())
+    default = Path(desktop_library.Library().status()["projects"][0]["path"])
+    assert reply["workspace"] == str(default)
+    assert reply["reopen_failed"] == "storage-project"
+    assert other not in opened
+
+
+def test_move_data_repairs_deleted_registry_and_restores_last_project_at_new_location(monkeypatch, library, tmp_path):
+    _stub_desktop_open(monkeypatch, tmp_path)
+    default = library.open_default()
+    second = library.create("Moved study")
+    second_id = str(paths.workspace_id(second))
+    claim_id = str(uuid4())
+    node_id = f"obligation:{claim_id}:1"
+
+    output = StringIO()
+    assert desktop.run(None, BytesIO(), output, library=library, project_id=paths.workspace_id(second)) == 0
+    library.save_position(second_id, claim_id, node_id)
+
+    destination = tmp_path / "other disk" / "Trellin Library"
+    destination.parent.mkdir()
+    preview = library.preview(destination)
+    library.move(destination, preview["sha256"])
+
+    # Delete registry and lock file at the new location after Move Data.
+    (destination / "registry.json").unlink()
+    (library.anchor / ".library.lock").unlink()
+
+    output = StringIO()
+    assert desktop.run(None, BytesIO(), output, library=desktop_library.Library(), reopen=True) == 0
+    reply = json.loads(output.getvalue())
+    expected_workspace = destination / "Workspaces" / second.name
+    assert reply["workspace"] == str(expected_workspace)
+    assert reply["name"] == "Moved study"
+    assert reply["project_id"] == second_id
+    assert reply["position"] == {"claimId": claim_id, "nodeId": node_id}
+    assert "reopen_failed" not in reply
+
+    state = desktop_library.Library().status()
+    assert state["root"] == str(destination)
+    assert {row["name"] for row in state["projects"]} == {"My research", "Moved study"}
+    assert library.open_default() == destination / "Workspaces" / default.name
+
+
+def test_build_script_uses_distinct_bundle_identifiers_for_dev_and_trial():
+    script = Path(__file__).resolve().parents[2] / "desktop" / "macos" / "build.sh"
+    assert subprocess.check_output(["bash", str(script), "--print-bundle-id"], text=True).strip() == (
+        "org.researchmultiplier.trellin.dev"
+    )
+    assert subprocess.check_output(["bash", str(script), "--dev", "--print-bundle-id"], text=True).strip() == (
+        "org.researchmultiplier.trellin.dev"
+    )
+    assert subprocess.check_output(["bash", str(script), "--trial", "--print-bundle-id"], text=True).strip() == (
+        "org.researchmultiplier.trellin.trial"
+    )
+    assert subprocess.check_output(["bash", str(script), "--release", "--print-bundle-id"], text=True).strip() == (
+        "org.researchmultiplier.trellin"
+    )
+    assert subprocess.check_output(
+        ["bash", str(script), "--bundle-id", "org.researchmultiplier.trellin.review", "--print-bundle-id"], text=True,
+    ).strip() == "org.researchmultiplier.trellin.review"
+    invalid = subprocess.run(["bash", str(script), "--bundle-id", "bad id", "--print-bundle-id"], capture_output=True)
+    assert invalid.returncode != 0

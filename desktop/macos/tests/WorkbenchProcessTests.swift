@@ -13,10 +13,11 @@ struct WorkbenchProcessTests {
         try storageReplyBounds()
         try position()
         try projectPositions()
+        try legacyPreferencesMigration()
         environment()
         releaseNotesLinks()
         try statusScreens()
-        print("13 Trellin native boundary checks passed.")
+        print("14 Trellin native boundary checks passed.")
     }
 
     /// #286: every status screen uses one component, and each problem offers an action that leads out of it.
@@ -55,6 +56,24 @@ struct WorkbenchProcessTests {
         for strings in [english, chinese] {
             for key in ["library.open", "details.show", "details.hide", "details.copy", "details.code", "retry", "choose", "quit"] {
                 precondition(strings[key] != nil, "missing \(key)")
+            }
+        }
+        // #285: no error or notice text mentions the library location or Storage settings.
+        let errorKeys = Set(
+            WorkbenchStartFailure.allCases.flatMap { ["\($0.rawValue).title", "\($0.rawValue).detail"] }
+                + ["reopen.notice"]
+                + english.keys.filter { $0.hasPrefix("storage.error.") || $0.contains("Error.") }
+        )
+        let forbiddenEnglish = ["storage", "library location", "registered location"]
+        let forbiddenChinese = ["存储", "库位置", "已登记的位置"]
+        for key in errorKeys {
+            let enValue = english[key]!.lowercased()
+            let zhValue = chinese[key]!
+            for term in forbiddenEnglish {
+                precondition(!enValue.contains(term), "error/notice key \(key) mentions '\(term)'")
+            }
+            for term in forbiddenChinese {
+                precondition(!zhValue.contains(term), "error/notice key \(key) mentions '\(term)'")
             }
         }
     }
@@ -214,6 +233,58 @@ struct WorkbenchProcessTests {
         precondition(returned.position == restored.position)
         let replaced = LastWorkspace.opened(moved, projectId: otherId, previous: returned, restoredFrom: moved, positions: positions)
         precondition(replaced.position == nil)
+    }
+
+    /// #285: last project is restored from the library; legacy lastWorkspaceV1 is migrated once and then ignored.
+    private static func legacyPreferencesMigration() throws {
+        let suite = "org.researchmultiplier.trellin.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        precondition(WorkbenchLaunch.reopen.arguments.suffix(1) == ["--reopen"])
+        precondition(WorkbenchLaunch.reopen.isRestore && WorkbenchLaunch.reopen.location == nil)
+        guard case .reopen = LegacyPreferencesMigration.initialLaunch(from: defaults) else {
+            preconditionFailure("Fresh defaults should launch with --reopen")
+        }
+
+        let projectId = UUID(uuidString: "89ba7968-41d4-4b75-b00d-21e8ec00f7be")!
+        let claimId = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+        let nodeId = "goal:\(claimId.uuidString.lowercased())"
+        let position = WorkbenchPosition(message: ["claimId": claimId.uuidString.lowercased(), "nodeId": nodeId])!
+        precondition(StorageCommand.savePosition(projectId, position).arguments.suffix(4) == [
+            "--storage-save-position", projectId.uuidString.lowercased(), claimId.uuidString.lowercased(), nodeId,
+        ])
+        let readyWithPosition = try JSONSerialization.data(withJSONObject: [
+            "version": 1, "status": "ready", "project_id": projectId.uuidString.lowercased(),
+            "position": ["claimId": claimId.uuidString.lowercased(), "nodeId": nodeId],
+        ])
+        let decodedReady = try JSONDecoder().decode(WorkbenchReadiness.self, from: readyWithPosition)
+        precondition(decodedReady.position == position)
+
+        let legacyLast = LastWorkspace(path: "/Studies/Legacy", projectId: projectId, position: position)
+        defaults.set(try JSONEncoder().encode(legacyLast), forKey: LegacyPreferencesMigration.lastKey)
+        defaults.set(try JSONEncoder().encode([projectId.uuidString.lowercased(): position]),
+                     forKey: LegacyPreferencesMigration.positionsKey)
+
+        let first = LegacyPreferencesMigration.initialLaunch(from: defaults)
+        guard case let .reopenLegacy(payload) = first else {
+            preconditionFailure("Unmigrated lastWorkspaceV1 should trigger one-time migration")
+        }
+        precondition(first.isRestore && first.arguments.suffix(2) == ["--reopen-legacy", payload])
+        let decoded = try JSONSerialization.jsonObject(with: Data(payload.utf8)) as! [String: Any]
+        precondition(decoded["projectId"] as? String == projectId.uuidString.lowercased())
+        precondition(decoded["path"] as? String == "/Studies/Legacy")
+
+        LegacyPreferencesMigration.complete(in: defaults)
+        precondition(defaults.bool(forKey: LegacyPreferencesMigration.migratedKey))
+        precondition(defaults.data(forKey: LegacyPreferencesMigration.lastKey) == nil)
+        precondition(defaults.data(forKey: LegacyPreferencesMigration.positionsKey) == nil)
+
+        // Even if lastWorkspaceV1 is written again later, migrated apps ignore it.
+        defaults.set(try JSONEncoder().encode(legacyLast), forKey: LegacyPreferencesMigration.lastKey)
+        guard case .reopen = LegacyPreferencesMigration.initialLaunch(from: defaults) else {
+            preconditionFailure("Migrated app must ignore lastWorkspaceV1")
+        }
     }
 
     private static func storageDestinationAliases() throws {

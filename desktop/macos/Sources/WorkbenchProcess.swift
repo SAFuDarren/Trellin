@@ -37,6 +37,50 @@ struct LastWorkspace: Codable {
     }
 }
 
+struct LegacyPreferencesMigration {
+    static let migratedKey = "migratedLibraryPreferencesV1"
+    static let lastKey = "lastWorkspaceV1"
+    static let positionsKey = "workspacePositionsV1"
+
+    /// Read legacy macOS preferences once, if not yet migrated, and return the launch to run (#285).
+    static func initialLaunch(from defaults: UserDefaults) -> WorkbenchLaunch {
+        guard !defaults.bool(forKey: migratedKey) else { return .reopen }
+        let legacyLast = defaults.data(forKey: lastKey).flatMap {
+            try? JSONDecoder().decode(LastWorkspace.self, from: $0)
+        }
+        let legacyPositions = defaults.data(forKey: positionsKey).flatMap {
+            try? JSONDecoder().decode([String: WorkbenchPosition].self, from: $0)
+        }
+        guard legacyLast != nil || (legacyPositions?.isEmpty == false) else { return .reopen }
+        var payload: [String: Any] = [:]
+        if let legacyLast {
+            if let path = localDirectoryURL(legacyLast.path)?.path { payload["path"] = path }
+            if let id = legacyLast.projectId { payload["projectId"] = id.uuidString.lowercased() }
+            if let pos = legacyLast.position {
+                payload["position"] = ["claimId": pos.claimId.uuidString.lowercased(), "nodeId": pos.nodeId]
+            }
+        }
+        if let legacyPositions, !legacyPositions.isEmpty {
+            var encoded: [String: [String: String]] = [:]
+            for (key, pos) in legacyPositions {
+                encoded[key.lowercased()] = ["claimId": pos.claimId.uuidString.lowercased(), "nodeId": pos.nodeId]
+            }
+            payload["positions"] = encoded
+        }
+        guard !payload.isEmpty,
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else { return .reopen }
+        return .reopenLegacy(json)
+    }
+
+    /// Mark legacy preferences migrated and remove old keys so subsequent launches ignore lastWorkspaceV1.
+    static func complete(in defaults: UserDefaults) {
+        defaults.set(true, forKey: migratedKey)
+        defaults.removeObject(forKey: lastKey)
+        defaults.removeObject(forKey: positionsKey)
+    }
+}
+
 struct WorkbenchReadiness: Decodable {
     let version: Int
     let status: String
@@ -46,6 +90,7 @@ struct WorkbenchReadiness: Decodable {
     let workspace: String?
     let name: String?
     let project_id: UUID?
+    let position: WorkbenchPosition?
     /// The remembered project could not be reopened, so the library opened instead (#285).
     let reopen_failed: String?
 
@@ -98,6 +143,8 @@ func localDirectoryURL(_ path: String?) -> URL? {
 enum WorkbenchLaunch {
     case restore(URL)
     case registered(UUID, URL)
+    case reopen
+    case reopenLegacy(String)
     case select(URL)
     case library
     case newManaged(String)
@@ -108,6 +155,8 @@ enum WorkbenchLaunch {
         switch self {
         case let .restore(workspace): return Self.prefix + [workspace.path]
         case let .registered(id, _): return Self.prefix + ["--registered-project", id.uuidString.lowercased()]
+        case .reopen: return Self.prefix + ["--reopen"]
+        case let .reopenLegacy(payload): return Self.prefix + ["--reopen-legacy", payload]
         case let .select(folder): return Self.prefix + ["--select", folder.path]
         case .library: return Self.prefix + ["--library"]
         case let .newManaged(name): return Self.prefix + ["--new-managed", name]
@@ -118,14 +167,14 @@ enum WorkbenchLaunch {
         switch self {
         case let .restore(url), let .registered(_, url), let .select(url):
             return url.standardizedFileURL.resolvingSymlinksInPath()
-        case .library, .newManaged:
+        case .reopen, .reopenLegacy, .library, .newManaged:
             return nil
         }
     }
 
     var isRestore: Bool {
         switch self {
-        case .restore, .registered: return true
+        case .restore, .registered, .reopen, .reopenLegacy: return true
         case .select, .library, .newManaged: return false
         }
     }

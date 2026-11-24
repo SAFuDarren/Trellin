@@ -16,8 +16,6 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
                      WKScriptMessageHandler, WKScriptMessageHandlerWithReply, NSWindowDelegate {
     private static let windowSurface = WorkbenchTokens.rail
     private let defaults = UserDefaults.standard
-    private let lastKey = "lastWorkspaceV1"
-    private let positionsKey = "workspacePositionsV1"
     private let bridge = "trellinPosition"
     private let upgradeBridge = "trellinUpgradeProject"
     private let projectsBridge = "trellinProjects"
@@ -27,9 +25,8 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable],
                                   backing: .buffered, defer: false)
     private var last: LastWorkspace?
-    private var positions: [String: WorkbenchPosition] = [:]
     private var requested: URL?
-    private var requestedLaunch: WorkbenchLaunch = .library
+    private var requestedLaunch: WorkbenchLaunch = .reopen
     private var child: WorkbenchProcess?
     private var webView: WKWebView?
     private var noticeView: NSView?
@@ -74,18 +71,8 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         window.delegate = self
         window.center()
         window.setFrameAutosaveName("TrellinWorkbench")
-        if let data = defaults.data(forKey: lastKey) {
-            last = try? JSONDecoder().decode(LastWorkspace.self, from: data)
-        }
-        if let data = defaults.data(forKey: positionsKey),
-           let saved = try? JSONDecoder().decode([String: WorkbenchPosition].self, from: data) {
-            positions = saved
-        }
-        // Reopen by project ID so the active library decides where the project is. A path
-        // from another library home or an older install then falls back to the library (#285).
-        if let saved = localDirectoryURL(last?.path) {
-            open(last?.projectId.map { .registered($0, saved) } ?? .restore(saved))
-        } else { open(.library) }
+        // Restore from the library's own settings; migrate legacy macOS preferences once (#285).
+        open(LegacyPreferencesMigration.initialLaunch(from: defaults))
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -309,12 +296,10 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
                 self.starting = false
                 if let result, result.matches(launch), let url = result.sessionURL, let opened = result.workspaceURL {
                     let reopened = result.reopenedLibrary
+                    LegacyPreferencesMigration.complete(in: self.defaults)
                     self.requested = opened
-                    self.requestedLaunch = (reopened ? result.project_id : launch.projectId)
-                        .map { .registered($0, opened) } ?? .restore(opened)
-                    self.last = LastWorkspace.opened(opened, projectId: result.project_id, previous: self.last,
-                                                     restoredFrom: launch.isRestore && !reopened ? launch.location : nil,
-                                                     positions: self.positions)
+                    self.requestedLaunch = result.project_id.map { .registered($0, opened) } ?? .restore(opened)
+                    self.last = LastWorkspace(path: opened.path, projectId: result.project_id, position: result.position)
                     self.showWorkbench(url: url, workspace: opened, name: result.name,
                                        leanMissing: result.warnings?.contains("lean") == true)
                     if reopened { self.showReopenNotice() }
@@ -342,7 +327,6 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     }
 
     private func showWorkbench(url: URL, workspace: URL, name: String?, leanMissing: Bool) {
-        saveLast()
         serverURL = url
         let folderName = workspace.lastPathComponent == "Trellin"
             ? workspace.deletingLastPathComponent().lastPathComponent : workspace.lastPathComponent
@@ -432,17 +416,6 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
     @objc private func dismissNotice() {
         noticeView?.removeFromSuperview()
         noticeView = nil
-    }
-
-    private func saveLast() {
-        guard let last else { return }
-        let encoder = JSONEncoder()
-        if let id = last.projectId, let position = last.position {
-            positions[id.uuidString.lowercased()] = position
-            if let data = try? encoder.encode(positions) { defaults.set(data, forKey: positionsKey) }
-        }
-        guard let data = try? encoder.encode(last) else { return }
-        defaults.set(data, forKey: lastKey)
     }
 
     private func stop() {
@@ -540,7 +513,9 @@ final class Trellin: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUI
         guard message.name == bridge, let position = WorkbenchPosition(message: message.body),
               last?.position != position else { return }
         last?.position = position
-        saveLast()
+        if let projectId = last?.projectId, let runtime {
+            StorageProcess.run(.savePosition(projectId, position), runtime: runtime) { _ in }
+        }
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage,

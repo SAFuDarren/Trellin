@@ -22,10 +22,11 @@ enum StorageCommand {
     case upgrade(URL)
     case rename(UUID, String)
     case remove(UUID)
+    case savePosition(UUID, WorkbenchPosition)
 
     var timeout: TimeInterval {
         switch self {
-        case .information, .resolve, .rename, .remove: return 15
+        case .information, .resolve, .rename, .remove, .savePosition: return 15
         case .preview: return 300
         case .move, .upgrade: return 1_800
         }
@@ -41,6 +42,9 @@ enum StorageCommand {
         case let .upgrade(workspace): options = ["--upgrade-project", workspace.path]
         case let .rename(id, name): options = ["--storage-rename", id.uuidString.lowercased(), name]
         case let .remove(id): options = ["--storage-remove", id.uuidString.lowercased()]
+        case let .savePosition(id, position):
+            options = ["--storage-save-position", id.uuidString.lowercased(),
+                       position.claimId.uuidString.lowercased(), position.nodeId]
         }
         return WorkbenchLaunch.prefix + options
     }

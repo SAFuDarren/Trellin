@@ -1,6 +1,6 @@
 """Private launcher protocol between Trellin and its local workbench process."""
 
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, suppress
 import json
 import os
 from pathlib import Path
@@ -128,12 +128,45 @@ def _reopen_falls_back(code):
     return code in _REOPEN_FALLBACK or (code.startswith("storage-") and code != "storage-busy")
 
 
-def run(workspace_path, lifetime, output, *, select=False, library=None, new_name=None, project_id=None):
+def _legacy_target(legacy):
+    if not isinstance(legacy, dict):
+        return None, None, None
+    project_id = None
+    raw_id = legacy.get("projectId")
+    if isinstance(raw_id, str):
+        with suppress(LibraryError, ValueError):
+            project_id = UUID(uuid_text(raw_id))
+    workspace_path = None
+    if project_id is None:
+        raw_path = legacy.get("path")
+        if isinstance(raw_path, str) and raw_path.startswith("/") and "\x00" not in raw_path:
+            workspace_path = raw_path
+    position = legacy.get("position") if isinstance(legacy.get("position"), dict) else None
+    return project_id, workspace_path, position
+
+
+def run(workspace_path, lifetime, output, *, select=False, library=None, new_name=None, project_id=None,
+        reopen=False, legacy=None):
+    legacy_position = None
+    if reopen and library is not None:
+        try:
+            # Every launch ensures the default library exists and is repaired before restore (#285).
+            library.ensure_ready()
+            saved = library.settings()
+        except LibraryError as error:
+            _reply(output, "error", code=error.code)
+            return 2
+        if saved["last_project_id"] is not None:
+            project_id = UUID(saved["last_project_id"])
+        elif isinstance(legacy, dict):
+            with suppress(LibraryError):
+                library.import_legacy_positions(legacy.get("positions"))
+            project_id, workspace_path, legacy_position = _legacy_target(legacy)
     reopening = (library is not None and not select and new_name is None
                  and (workspace_path is not None or project_id is not None))
     try:
         return _session(workspace_path, lifetime, output, select=select, library=library,
-                        new_name=new_name, project_id=project_id)
+                        new_name=new_name, project_id=project_id, legacy_position=legacy_position)
     except _Failed as failure:
         if not (reopening and _reopen_falls_back(failure.code)):
             _reply(output, "error", code=failure.code)
@@ -147,7 +180,7 @@ def run(workspace_path, lifetime, output, *, select=False, library=None, new_nam
 
 
 def _session(workspace_path, lifetime, output, *, select=False, library=None, new_name=None, project_id=None,
-             reopen_failed=None):
+             reopen_failed=None, legacy_position=None):
     try:
         if library is not None and project_id is not None:
             workspace_path = library.resolve_project(str(project_id))
@@ -185,6 +218,20 @@ def _session(workspace_path, lifetime, output, *, select=False, library=None, ne
                 if project is not None:
                     selection["name"] = project["name"]
                     selection["project_id"] = project["id"]
+                    if hasattr(library, "remember_project"):
+                        try:
+                            position = library.remember_project(project["id"])
+                            if position is None and isinstance(legacy_position, dict):
+                                with suppress(LibraryError, KeyError, TypeError):
+                                    position = library.save_position(
+                                        project["id"], legacy_position["claimId"], legacy_position["nodeId"],
+                                    )
+                        except LibraryError as error:
+                            if error.code not in {"storage-busy", "storage-unavailable", "storage-invalid"}:
+                                raise
+                            position = None
+                        if position is not None:
+                            selection["position"] = position
                 # Keep a recorded update preference from an earlier install.
                 # Fresh native profiles store this setting in the app home.
                 legacy = credentials.directory().parent / "release-updates.sqlite3"
@@ -225,6 +272,8 @@ def _storage(library, args, output):
         data = {"project": library.rename(args[1], args[2])}
     elif len(args) == 2 and args[0] == "--storage-remove":
         data = {"project": library.unregister(args[1])}
+    elif len(args) == 4 and args[0] == "--storage-save-position":
+        data = {"position": library.save_position(args[1], args[2], args[3])}
     elif len(args) == 3 and args[0] == "--storage-move":
         moved = library.move(args[1], args[2])
         data = {"root": moved["destination"], "backup": moved["backup"]}
@@ -242,6 +291,13 @@ def main():
             return _upgrade_project(args[1], sys.stdout)
         if args and args[0].startswith("--storage-"):
             return _storage(Library(), args, sys.stdout)
+        if args == ["--reopen"]:
+            return run(None, sys.stdin.buffer, sys.stdout, library=Library(), reopen=True)
+        if len(args) == 2 and args[0] == "--reopen-legacy":
+            legacy = None
+            with suppress(ValueError):
+                legacy = json.loads(args[1])
+            return run(None, sys.stdin.buffer, sys.stdout, library=Library(), reopen=True, legacy=legacy)
         if args == ["--library"]:
             return run(None, sys.stdin.buffer, sys.stdout, library=Library())
         if len(args) == 2 and args[0] == "--registered-project":

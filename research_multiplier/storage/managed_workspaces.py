@@ -100,17 +100,38 @@ def library_root(anchor, *, required=False):
     return root
 
 
-def workspace_registration(workspace):
+_MANAGED_REQUIRED = {"format_version", "anchor", "slot"}
+_MANAGED_OPTIONAL = {"name", "default"}
+
+
+def workspace_marker(workspace):
     try:
         marker = read_metadata(Path(workspace) / MANAGED_FILE)
     except FileNotFoundError:
         return None
-    if set(marker) != {"format_version", "anchor", "slot"}:
+    keys = set(marker)
+    if not (_MANAGED_REQUIRED <= keys <= (_MANAGED_REQUIRED | _MANAGED_OPTIONAL)):
         raise LibraryError("storage-invalid")
     anchor = canonical_path(marker["anchor"])
     if str(anchor) != marker["anchor"]:
         raise LibraryError("storage-invalid")
-    return anchor, uuid_text(marker["slot"])
+    slot = uuid_text(marker["slot"])
+    name = marker.get("name")
+    if name is not None:
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 120 or not name.isprintable():
+            raise LibraryError("storage-invalid")
+        name = name.strip()
+    default = marker.get("default", False)
+    if type(default) is not bool:
+        raise LibraryError("storage-invalid")
+    return {"anchor": anchor, "slot": slot, "name": name, "default": default}
+
+
+def workspace_registration(workspace):
+    marker = workspace_marker(workspace)
+    if marker is None:
+        return None
+    return marker["anchor"], marker["slot"]
 
 
 @contextmanager

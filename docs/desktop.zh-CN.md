@@ -72,7 +72,7 @@ Agent 对话悬浮在内容区右下，避开详情栏和图谱控件。拖动�
 
 默认位置无需任何操作。迁移库是高级功能，例如要把库放到另一块磁盘时使用。从 macOS 菜单点「Trellin → 设置… → 存储」，或按 **⌘,**，查看当前库的位置并在 Finder 中打开。点「迁移数据…」选择新位置的上级文件夹。Trellin 会在预览显示当前路径和新建的 **Trellin Library** 目录。确认后先复制并核对文件、课题 ID 和数据库绑定，再切换登记位置。旧库保留为恢复副本，迁移中断或校验失败时原库继续可用。已管理课题的新路径可从「打开课题…」进入。
 
-迁移覆盖库和其中集中管理的课题文件。外置课题和显式导出的文件保留在原位置。PostgreSQL 继续使用原有数据位置和绑定。应用支持目录保存精简的位置记录和应用设置，macOS 偏好按 ID 保存上次打开的课题，由当前库决定它的位置，数据库登录保留在受保护的配置中。
+迁移覆盖库、库自身设置和其中集中管理的课题文件。外置课题和显式导出的文件保留在原位置。PostgreSQL 继续使用原有数据位置和绑定。应用支持目录保存精简的位置记录和应用设置。上次打开的课题和选中的节点按课题 ID 保存在库自身的设置文件中，随库一并迁移；旧版的 macOS 偏好（`lastWorkspaceV1`）只迁移一次，之后不再读取。若库的注册表或锁文件缺失，Trellin 会在打开前根据已管理工作区的 `.trellin-managed.json` 标记自动重建（迁移数据后同样生效）。数据库登录保留在受保护的配置中。
 
 已有的[课题备份](research-foundation.md#recover-and-monitor)可同时保全课题文件和 PostgreSQL 快照。备份应用设置时，另外保存应用偏好及已登记的库位置。课题归档也可以恢复为独立课题。
 
@@ -88,7 +88,7 @@ Agent 对话悬浮在内容区右下，避开详情栏和图谱控件。拖动�
 desktop/macos/build.sh /absolute/path/to/local-review
 ```
 
-输出经过本地临时签名的 `Trellin.app`。在源码目录运行桌面自动检查和既有离线回归：
+输出经过本地临时签名的 `Trellin.app`。`build.sh` 默认为开发构建分配独立的 Bundle ID（`org.researchmultiplier.trellin.dev`，传 `--trial` 可用 `org.researchmultiplier.trellin.trial`），避免本地审阅或试用版本与日常安装版混用偏好；构建正式安装版时传入 `--release`（使用 `org.researchmultiplier.trellin`）。在源码目录运行桌面自动检查和既有离线回归：
 
 ```sh
 python -m pytest -m offline
