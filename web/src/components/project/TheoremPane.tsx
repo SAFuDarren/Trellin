@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { normalizeReferenceCode } from "../../workbench/text";
 import { ReviewFields } from "./ReviewFields";
-import { reviewIdentity } from "./review";
+import { reviewIdentity, useReviewSigner } from "./review";
 
 type DraftTheorem = { id: string; sha256: string; title: string; wording: string; lean: string; source: string };
 type AddedTheorem =
@@ -13,6 +13,7 @@ type AddedTheorem =
 
 export function TheoremPane({ session, onRecorded }: { session: string; onRecorded: (claimId?: string) => void }) {
   const { t } = useTranslation();
+  const signer = useReviewSigner(session);
   const queries = useQueryClient();
   const [kind, setKind] = useState<"goal" | "library">("goal");
   const [active, setActive] = useState<DraftTheorem | null>(null);
@@ -95,7 +96,7 @@ export function TheoremPane({ session, onRecorded }: { session: string; onRecord
           <pre className="code-block">{active.lean}</pre>
           {active.source && <p className="project-entry-note">{active.source}</p>}
           <p className="project-entry-note">{t("projectEntry.theorem.libraryReview")}</p>
-          <ReviewFields />
+          <ReviewFields signer={signer} />
           <div className="project-entry-buttons">
             <button className="button" type="button" disabled={confirm.isPending} onClick={() => setActive(null)}>
               {t("projectEntry.theorem.back")}
@@ -160,7 +161,7 @@ export function TheoremPane({ session, onRecorded }: { session: string; onRecord
                 <input name="confirmed" type="checkbox" required />
                 {t("projectEntry.theorem.goalReview")}
               </label>
-              <ReviewFields />
+              <ReviewFields signer={signer} />
             </>
           )}
           <div className="project-entry-buttons">

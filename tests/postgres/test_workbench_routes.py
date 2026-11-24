@@ -609,7 +609,8 @@ def test_versioned_review_records_the_bound_local_user_and_is_idempotent(workben
     inbox = _request(server, "GET", "/api/inbox")
     reviewed_claim = next(item["claim_id"] for item in inbox["items"] if item["item_id"] == evidence_id)
     starting_cursor = inbox["workspace_events"]["cursor"]
-    assert inbox["review_identity"] == {"workspace_id": str(workspace_id)}
+    # #328: the workbench signs decisions with the bound researcher instead of asking for a name.
+    assert inbox["review_identity"] == {"workspace_id": str(workspace_id), "display_name": "Local researcher"}
     endpoint = f"/api/v1/workspaces/{workspace_id}/evidence/{evidence_id}/reviews"
     headers = {"Idempotency-Key": str(uuid4())}
     review = {"decision": "approve", "reason": REASON}

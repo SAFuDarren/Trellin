@@ -306,7 +306,7 @@ test("the task picker and legacy history are reachable in a narrow window", asyn
   const assigned = task("aa000000-0000-4000-8000-000000000005", longTitle, analyst.id, "running");
   const legacy = task("aa000000-0000-4000-8000-000000000006", "Unbound research chat", null, "answered");
   const { creates, previews, sends } = await openChats(page, [assigned, legacy]);
-  await page.getByRole("link", { name: /Research Analyst/ }).click();
+  // #328: Chats opens on the latest Agent conversation, even where the list and the chat cannot sit side by side.
   const picker = page.getByRole("button", { name: "Switch task: " + longTitle });
   await expect(picker).toBeVisible();
   await picker.click();

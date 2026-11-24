@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useStopAutomation, type AutomationApproval, type AutomationTemplateId } from "../api/automation";
 import { useProgress, type Policy } from "../api/sections";
 import { AutomationDialog, AutomationTemplateCards, automationError } from "../components/AutomationDialog";
+import { EmptyState } from "../components/EmptyState";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
 import { statusText, timeText } from "../workbench/text";
@@ -82,7 +83,12 @@ export function ProgressPage({
           </p>
         )}
         {progress.isError ? (
-          <Empty>{progress.error.message}</Empty>
+          // #328: an unavailable list says so and can be retried.
+          <EmptyState
+            title={t("progressPage.unavailable")}
+            reason={t("progressPage.unavailableReason")}
+            action={{ label: t("agentWork.retry"), onClick: () => void progress.refetch() }}
+          />
         ) : progress.isPending ? (
           <Empty>{t("common.loading")}</Empty>
         ) : empty ? (
@@ -93,7 +99,11 @@ export function ProgressPage({
             <div className="automation-empty-actions">{newButton}</div>
           </section>
         ) : shown.length === 0 ? (
-          <Empty>{t("progressPage.none")}</Empty>
+          <EmptyState
+            title={t(`progressPage.noneIn.${filter}`)}
+            reason={t("progressPage.noneReason")}
+            action={{ label: t("progressPage.showAll"), href: href("progress") }}
+          />
         ) : (
           <div className="policy-cards">
             {shown.map((policy) => (

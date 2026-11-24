@@ -65,7 +65,7 @@ Some projects have no Lean statement for a record. The workbench shows its recor
 
 In **Work → Claims**, use the Board, List or Table view to browse claims by status. **Work → Library** shows theorems and hypotheses and where they are used. **Help** and **Settings** sit at the bottom of the rail.
 
-On database revision `0073` or later, **Review** records the local researcher's ID from the bound workspace for each new evidence decision. Enter the reason and choose **Approve** or **Return**. Workspaces with an older database still use the earlier review form. Previous decisions retain their recorded names.
+On database revision `0073` or later, **Review** records the local researcher's ID from the bound workspace for each new evidence decision and shows **Recorded by** with their name, so you do not type a name. **Add theorem** and the paper import confirmation sign the same way. Enter the reason and choose **Approve** or **Return**. Workspaces with an older database still use the earlier review form, which asks for your name. Previous decisions retain their recorded names.
 
 Database revision `0077` also records the bound researcher's ID on new clarification decisions, plan cancellations, literature confirmations, and other human-authored records. Entries made before the upgrade retain their existing attribution.
 

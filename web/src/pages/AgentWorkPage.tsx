@@ -17,6 +17,7 @@ import {
 } from "../api/agentWork";
 import { ApiError } from "../api/client";
 import { useTeamAgents } from "../api/teamAgents";
+import { EmptyState } from "../components/EmptyState";
 import { Chevron } from "../components/Icons";
 import { Picker } from "../components/FloatingControls";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
@@ -31,6 +32,7 @@ import {
 } from "../components/WorkDisplay";
 import { WorkSelectionArea, WorkSelectionCheckbox, useWorkItemSelection } from "../components/WorkItemSelection";
 import { href } from "../shell/route";
+import { desktopProjectUpgrade } from "../workbench/desktop";
 import { harnessName, timeText } from "../workbench/text";
 import "../styles/project-entry.css";
 import "../styles/agent-work.css";
@@ -82,6 +84,7 @@ export function AgentWorkPage({
   const candidates = tasks.filter(eligibleInput);
   const predecessor = target === "delivery" ? candidates.find((task) => task.id === originId) : undefined;
   const visible = filtered ? waiting : tasks;
+  const upgrade = desktopProjectUpgrade();
 
   return (
     <SectionLayout
@@ -152,7 +155,16 @@ export function AgentWorkPage({
               </div>
             </div>
           ) : !work.data?.available ? (
-            <Empty>{t("agentWork.unavailable")}</Empty>
+            // #328: name the cause and offer the upgrade where the app can run it.
+            <EmptyState
+              title={t("agentWork.unavailableTitle")}
+              reason={t(upgrade ? "agentWork.unavailable" : "agentWork.unavailableBrowser")}
+              action={
+                upgrade
+                  ? { label: t("composer.upgrade"), onClick: upgrade }
+                  : { label: t("agentWork.retry"), onClick: () => void work.refetch() }
+              }
+            />
           ) : creating && target === "delivery" && !predecessor ? (
             <Empty>{t("agentWork.errors.predecessor")}</Empty>
           ) : creating ? (
@@ -172,8 +184,18 @@ export function AgentWorkPage({
               layout={layout}
               label={t(filtered ? "agentWork.waiting" : "agentWork.all")}
             />
+          ) : filtered ? (
+            <EmptyState
+              title={t("agentWork.emptyWaiting")}
+              reason={t("agentWork.emptyWaitingReason")}
+              action={{ label: t("agentWork.showAll"), href: agentWorkHref() }}
+            />
           ) : (
-            <Empty>{t(filtered ? "agentWork.emptyWaiting" : "agentWork.empty")}</Empty>
+            <EmptyState
+              title={t("agentWork.empty")}
+              reason={t("agentWork.emptyReason")}
+              action={{ label: t("agentWork.newTask"), href: agentWorkHref("new") }}
+            />
           )}
         </div>
       </div>

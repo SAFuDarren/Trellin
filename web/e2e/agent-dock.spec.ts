@@ -111,7 +111,8 @@ test("Agent chat keeps map context explicit and preserves the selected Agent and
   await expect(proof).toBeVisible();
   await expect(node).toHaveAttribute("aria-pressed", "true");
   expect(created).toHaveLength(0);
-  const initial = dock.getByRole("textbox", { name: "Write a message" });
+  // #328: with saved Agents and no conversation yet, the panel starts with the first Agent by name.
+  const initial = dock.getByRole("textbox", { name: "Message Lean Reviewer" });
   await expect(initial).toBeFocused();
   await initial.press("@");
   const recipients = page.getByRole("combobox", { name: "Search Agents" });

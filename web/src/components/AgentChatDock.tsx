@@ -1,6 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import type { ConversationSummary } from "../api/conversations";
+import { defaultAgentId, type ConversationSummary } from "../api/conversations";
+import { useStickyValue } from "../hooks/useStickyValue";
 import { useTeamAgents } from "../api/teamAgents";
 import {
   DEFAULT_CHAT_SIZE,
@@ -60,6 +61,8 @@ export function AgentChatDock({
   const [anchor, setAnchor] = useState<AgentChatAnchor | null>(null);
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [initialRecipient, setInitialRecipient] = useState<string>();
+  // Each new conversation picks its default Agent once (#328); see useStickyValue.
+  const [newConversation, setNewConversation] = useState(0);
   const [focusComposer, setFocusComposer] = useState(false);
   const launcher = useRef<HTMLButtonElement>(null);
   const footer = useRef<HTMLElement>(null);
@@ -95,6 +98,7 @@ export function AgentChatDock({
   const agentsById = new Map(agents.map((profile) => [profile.id, profile]));
   const thread = threads.find(({ id }) => id === chosenId);
   const agent = agentsById.get(thread?.agent_id ?? "");
+  const defaultRecipient = useStickyValue(defaultAgentId(threads, agents, i18n.language), String(newConversation));
   const { running, queued, review, attention } = activity.counts;
   const onlyReview =
     review === 1 ? activity.rows.find((row) => row.source === "review" && row.state === "review") : undefined;
@@ -105,6 +109,7 @@ export function AgentChatDock({
     setAnchor(anchored);
     setChosenId(null);
     setInitialRecipient(undefined);
+    setNewConversation((count) => count + 1);
     setFocusComposer(true);
     if (route.section !== "chat") setView("chat");
   }
@@ -167,6 +172,7 @@ export function AgentChatDock({
   }
 
   function startNew(recipient?: string) {
+    setNewConversation((count) => count + 1);
     setChosenId(null);
     setAnchor(null);
     setInitialRecipient(recipient);
@@ -354,7 +360,8 @@ export function AgentChatDock({
               anchor={anchor}
               starterScope={starterScope}
               onDetach={() => setAnchor(null)}
-              initialRecipient={initialRecipient}
+              // #328: a new conversation starts with the latest Agent, so its draft is that Agent's draft.
+              initialRecipient={initialRecipient ?? defaultRecipient}
               onCreated={(item) => {
                 setChosenId(item.id);
                 setFocusComposer(true);

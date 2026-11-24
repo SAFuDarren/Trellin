@@ -27,6 +27,37 @@ export type ConversationSummary = {
   } | null;
 };
 
+/**
+ * #328: Chats and the floating panel start with an Agent. The most recently active conversation
+ * with a saved Agent leads; without one, the first saved Agent in the given order does.
+ */
+export function recentAgentConversation(
+  threads: readonly ConversationSummary[],
+  agentIds: readonly string[],
+): ConversationSummary | undefined {
+  const saved = new Set(agentIds);
+  let recent: ConversationSummary | undefined;
+  for (const thread of threads) {
+    if (!thread.agent_id || !saved.has(thread.agent_id)) continue;
+    if (!recent || thread.updated_at > recent.updated_at) recent = thread;
+  }
+  return recent;
+}
+
+export function defaultAgentId(
+  threads: readonly ConversationSummary[],
+  agents: readonly { id: string; name: string }[],
+  locale: string,
+): string | undefined {
+  const recent = recentAgentConversation(
+    threads,
+    agents.map(({ id }) => id),
+  );
+  if (recent?.agent_id) return recent.agent_id;
+  // The first Agent in the order Chats lists them.
+  return [...agents].sort((a, b) => a.name.localeCompare(b.name, locale))[0]?.id;
+}
+
 export type ConversationMessage = {
   id: string;
   role: "user" | "assistant";

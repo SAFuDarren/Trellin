@@ -371,6 +371,7 @@
     "submitDecision": "Record decision",
     "chooseDecision": "Choose Approve or Return first.",
     "reviewer": "Your name",
+    "signedAs": "Recorded by {{name}}",
     "reason": "Reason",
     "reasonHint": "For example: the scope matches, and the only premise used is H₁",
     "approve": "Approve",
@@ -849,7 +850,15 @@
     "restore": "Restore",
     "markRead": "Mark as read",
     "markUnread": "Mark as unread",
-    "archive": "Archive"
+    "archive": "Archive",
+    "unavailableReason": "This project's database does not identify you yet, so Inbox cannot keep read and archived marks. Items waiting for you are still in Review.",
+    "openReview": "Open Review",
+    "showAll": "Show all items",
+    "emptyReason": {
+      "all": "Agent results and questions that need you appear here.",
+      "unread": "Everything here has been read.",
+      "archived": "Items you archive move here."
+    }
   },
   "agentWork": {
     "title": "Agent tasks",
@@ -860,7 +869,7 @@
     "newTask": "New task",
     "openTeam": "Open Team agents",
     "noAgents": "Add a saved agent in Team to assign a task.",
-    "unavailable": "Upgrade this project from the Trellin launcher to assign agent tasks.",
+    "unavailable": "This project's database predates Agent tasks. Back up and upgrade it to assign work to Agents.",
     "empty": "No agent tasks in this project yet.",
     "emptyWaiting": "No deliveries awaiting your decision.",
     "agent": "Agent",
@@ -960,7 +969,12 @@
       "confirmation": "Preview the task again and confirm the destination and approved inputs."
     },
     "searchAgents": "Search Agents",
-    "searchDeliveries": "Search deliveries"
+    "searchDeliveries": "Search deliveries",
+    "unavailableTitle": "Agent tasks are not available in this project yet.",
+    "unavailableBrowser": "This project's database predates Agent tasks. Open the project in the Trellin app to back it up and upgrade it, then try again.",
+    "emptyReason": "Give an Agent a task with clear limits. Its progress and delivery appear here.",
+    "emptyWaitingReason": "Deliveries that need your decision appear here.",
+    "showAll": "Show all tasks"
   },
   "libraryEdit": {
     "fixedScope": "Existing Lean parameters and prerequisites",
@@ -1322,7 +1336,6 @@
       "stopped": "Stopped"
     },
     "note": "What runs while you are away",
-    "none": "No automation rules yet.",
     "state": {
       "active": "Running",
       "proposed": "Waiting for approval",
@@ -1336,7 +1349,17 @@
     "never": "Not run yet",
     "approved": "Approved",
     "notApproved": "Not approved yet",
-    "stopped": "Stopped"
+    "stopped": "Stopped",
+    "unavailable": "Automations could not be loaded.",
+    "unavailableReason": "The project database did not answer. Check that the project is open, then try again.",
+    "noneIn": {
+      "all": "No automation rules yet.",
+      "active": "No rules are running.",
+      "proposed": "No rules are waiting for approval.",
+      "stopped": "No rules have been stopped."
+    },
+    "noneReason": "Rules appear in each view as they are proposed, approved and stopped.",
+    "showAll": "Show all rules"
   },
   "modelConnections": {
     "title": "Model connections",

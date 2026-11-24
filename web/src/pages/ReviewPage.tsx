@@ -5,6 +5,8 @@ import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
 import { ClarificationReview } from "../components/ClarificationReview";
 import { GoalReview } from "../components/GoalReview";
+import { ReviewSigner } from "../components/project/ReviewFields";
+import { rememberReviewer, savedReviewer } from "../components/project/review";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { href } from "../shell/route";
 import { GOAL_REVIEW_ROUTE, reviewItemHref, reviewItemKindLabel, reviewResultName } from "../shell/reviewItems";
@@ -13,17 +15,8 @@ import { nodeFormula, nodeTitle, statusText, timeText } from "../workbench/text"
 import type { GraphSnapshot } from "../workbench/types";
 import "../styles/evidence-review.css";
 
-const REVIEWER_KEY = "research-multiplier-reviewer";
 const DECISIONS = ["approve", "return"] as const;
 const GOAL_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-
-function readReviewer(): string {
-  try {
-    return window.localStorage.getItem(REVIEWER_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
 
 export function ReviewPage({
   session,
@@ -146,6 +139,7 @@ export function ReviewPage({
           session={session}
           item={selected}
           reviewWorkspace={inbox.data?.review_identity?.workspace_id}
+          signer={inbox.data?.review_identity?.display_name || undefined}
           onOpen={onOpen}
           onDecided={setNotice}
         />
@@ -160,12 +154,14 @@ function EvidenceReview({
   session,
   item,
   reviewWorkspace,
+  signer,
   onOpen,
   onDecided,
 }: {
   session: string;
   item: InboxItem;
   reviewWorkspace?: string;
+  signer?: string;
   onOpen: (claimId: string, nodeId?: string) => void;
   onDecided: (message: string) => void;
 }) {
@@ -187,7 +183,9 @@ function EvidenceReview({
         .data!.edges.filter((edge) => edge.source === node.id)
         .map((edge) => graph.data!.nodes.find((entry) => entry.id === edge.target))
     : [];
-  const [reviewer, setReviewer] = useState(() => (reviewWorkspace ? "" : readReviewer()));
+  const [reviewer, setReviewer] = useState(() => (reviewWorkspace ? "" : savedReviewer()));
+  // #328: only a database without a local identity asks who is deciding.
+  const asksName = !reviewWorkspace && !signer;
   const [reason, setReason] = useState("");
   const [choice, setChoice] = useState<(typeof DECISIONS)[number] | null>(null);
   const [state, setState] = useState<{ sending?: boolean; message?: string; error?: boolean }>({});
@@ -195,10 +193,10 @@ function EvidenceReview({
   const decide = async () => {
     if (state.sending) return;
     const action = choice;
-    const actor = reviewer.trim();
+    const actor = signer ?? reviewer.trim();
     const rationale = reason.trim();
-    if (!rationale || (!reviewWorkspace && !actor)) {
-      setState({ message: t(reviewWorkspace ? "review.needReason" : "review.needNameAndReason"), error: true });
+    if (!rationale || (asksName && !actor)) {
+      setState({ message: t(asksName ? "review.needNameAndReason" : "review.needReason"), error: true });
       return;
     }
     if (!action) {
@@ -217,11 +215,7 @@ function EvidenceReview({
           idempotencyKey: key,
         });
       } else {
-        try {
-          window.localStorage.setItem(REVIEWER_KEY, actor);
-        } catch {
-          // The name still applies to this decision.
-        }
+        if (asksName) rememberReviewer(actor);
         await api(session, "/api/review", {
           data: { evidence_id: item.item_id, action, actor, reason: rationale },
         });
@@ -291,7 +285,9 @@ function EvidenceReview({
               if (!event.repeat) event.currentTarget.requestSubmit();
             }}
           >
-            {!reviewWorkspace && (
+            {signer ? (
+              <ReviewSigner name={signer} />
+            ) : asksName ? (
               <>
                 <label className="field-label" htmlFor="reviewer">
                   {t("review.reviewer")}
@@ -304,7 +300,7 @@ function EvidenceReview({
                   onChange={(event) => setReviewer(event.target.value)}
                 />
               </>
-            )}
+            ) : null}
             <fieldset className="evidence-decision-choice" disabled={state.sending}>
               <legend className="field-label">{t("review.decisionLabel")}</legend>
               {DECISIONS.map((action) => (

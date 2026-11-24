@@ -12,7 +12,7 @@ import {
 import { Picker } from "../FloatingControls";
 import { href } from "../../shell/route";
 import { ReviewFields } from "./ReviewFields";
-import { reviewIdentity } from "./review";
+import { reviewIdentity, useReviewSigner } from "./review";
 
 const MAX_NOTES_BYTES = 18000;
 
@@ -58,6 +58,7 @@ function formalText(value: Candidate["formal"]): string {
 
 export function IntakePane({ session, onRecorded }: { session: string; onRecorded: () => void }) {
   const { t } = useTranslation();
+  const signer = useReviewSigner(session);
   const [notes, setNotes] = useState("");
   const [modelChoice, setModelChoice] = useState<string | null>(null);
   const [active, setActive] = useState<IntakeDraft | null>(null);
@@ -226,7 +227,7 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
           ) : (
             <p className="project-entry-note">{t("projectEntry.intake.noCandidates")}</p>
           )}
-          {active.items.length > 0 && <ReviewFields />}
+          {active.items.length > 0 && <ReviewFields signer={signer} />}
           <div className="project-entry-buttons">
             <button className="button" type="button" disabled={confirm.isPending} onClick={() => setActive(null)}>
               {t("projectEntry.intake.back")}

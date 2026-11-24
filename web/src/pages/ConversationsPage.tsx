@@ -4,6 +4,8 @@ import { ApiError } from "../api/client";
 import {
   conversationErrorText,
   conversationRecipientLabel,
+  defaultAgentId,
+  recentAgentConversation,
   useConversationActions,
   useConversations,
   type ConversationSummary,
@@ -21,6 +23,7 @@ import { Empty, PageHead, SectionFrame, SectionPanel } from "../components/Secti
 import { AgentTemplateList, agentDraft } from "../components/AgentTemplates";
 import { TeamAgentAvatar } from "../components/TeamAgentAvatar";
 import { TeamAgentWizard } from "../components/TeamAgentProfiles";
+import { useStickyValue } from "../hooks/useStickyValue";
 import { EMPLOYEE_CHAT_PATH, href } from "../shell/route";
 import { proofActivityKey } from "../shell/workspaceActivity";
 import { nodeTitle, timeText } from "../workbench/text";
@@ -86,6 +89,30 @@ export function ConversationsPage({
       {t(backToHistory ? "employeeChats.history" : "conversations.backToList")}
     </a>
   );
+
+  // #328: a new conversation keeps the Agent it started with while it is being created.
+  const defaultRecipient = useStickyValue(defaultAgentId(conversations, employees, i18n.language), sub);
+  // #328: with saved Agents, Chats opens on the latest Agent conversation, or the first Agent's chat.
+  const landing =
+    !sub && profiles.isSuccess && !direct.isPending && employees.length > 0
+      ? href(
+          "chat",
+          recentAgentConversation(
+            conversations,
+            employees.map(({ id }) => id),
+          )?.id ?? EMPLOYEE_CHAT_PATH + employees[0]!.id,
+        )
+      : undefined;
+  // Only arriving at Chats lands on an Agent; going back to the list from inside Chats stays on the list.
+  const landed = useRef(false);
+  useEffect(() => {
+    if (sub) landed.current = true;
+  }, [sub]);
+  useEffect(() => {
+    if (!landing || landed.current) return;
+    landed.current = true;
+    window.location.replace(landing);
+  }, [landing]);
 
   useEffect(() => {
     if (currentEmployeeId && currentId) lastTask.current.set(currentEmployeeId, currentId);
@@ -210,13 +237,16 @@ export function ConversationsPage({
   );
 
   function compose(initialRecipient?: string, focus = newView) {
+    const recipient = initialRecipient ?? defaultRecipient;
     return (
       <NewConversation
+        // Each Agent's composer is its own, so switching Agents focuses the new one.
+        key={recipient ?? ""}
         session={session}
         agents={employees}
         agentsPending={profiles.isPending}
         agentsError={profiles.isError}
-        initialRecipient={initialRecipient}
+        initialRecipient={recipient}
         focusComposer={focus}
         onCreated={(thread) => {
           if (window.location.hash === currentHash) window.location.hash = href("chat", thread.id);
