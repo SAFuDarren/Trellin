@@ -3,6 +3,7 @@
 from contextlib import contextmanager, suppress
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 from tempfile import TemporaryDirectory
@@ -12,7 +13,7 @@ from research_multiplier.protocol.serialization import fingerprint
 from research_multiplier.storage import credentials, paths
 from research_multiplier.storage.managed_workspaces import (
     LibraryError, LOCATION_FILE, MANAGED_FILE, application_home, canonical_path, library_lock, library_root,
-    publish_metadata, read_metadata, uuid_text, workspace_registration,
+    publish_metadata, read_metadata, uuid_text, workspace_marker, workspace_registration,
 )
 from research_multiplier.storage.project_archive import _fingerprint
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace
@@ -21,10 +22,12 @@ from research_multiplier.workflows.desktop_workspace import WorkspaceCreationErr
 _REGISTRY = "registry.json"
 # Managed projects removed from the list keep their folder; this records their name so Open Folder restores it.
 _REMOVED = "removed.json"
+_SETTINGS = "settings.json"
 DEFAULT_NAME = "My research"
 # Earlier releases named the default project after the library itself (#302).
 _LEGACY_DEFAULT_NAME = "Library"
 _ROOT_INFO = {"format_version", "default_id", "default_slot", "projects"}
+_NODE_ID = re.compile(r"^[a-z-]+:[0-9a-f:-]+$")
 
 
 def _name(value):
@@ -184,6 +187,42 @@ def _is_empty(root, row):
     return not _has_claims(row)
 
 
+def _position(value):
+    if not isinstance(value, dict) or set(value) != {"claimId", "nodeId"}:
+        raise LibraryError("storage-invalid")
+    claim_id = uuid_text(value["claimId"])
+    node_id = value["nodeId"]
+    if not isinstance(node_id, str) or len(node_id.encode("utf-8")) > 100 or _NODE_ID.fullmatch(node_id) is None:
+        raise LibraryError("storage-invalid")
+    return {"claimId": claim_id, "nodeId": node_id}
+
+
+def _read_settings(root):
+    """Saved preferences are a hint for what to open, never a condition for opening (#285)."""
+    empty = {"last_project_id": None, "positions": {}}
+    try:
+        raw = read_metadata(root / _SETTINGS)
+    except (FileNotFoundError, LibraryError):
+        return empty
+    if not (set(raw) <= {"format_version", "last_project_id", "positions"}):
+        return empty
+    last_id = None
+    if raw.get("last_project_id") is not None:
+        with suppress(LibraryError):
+            last_id = uuid_text(raw["last_project_id"])
+    positions = {}
+    raw_positions = raw.get("positions")
+    if isinstance(raw_positions, dict):
+        for key, value in raw_positions.items():
+            with suppress(LibraryError):
+                positions[uuid_text(key)] = _position(value)
+    return {"last_project_id": last_id, "positions": positions}
+
+
+def _write_settings(root, data):
+    publish_metadata(root / _SETTINGS, {"last_project_id": data["last_project_id"], "positions": data["positions"]})
+
+
 class Library:
     """One local registry. Older projects remain at their own paths."""
 
@@ -205,7 +244,67 @@ class Library:
         except OSError:
             raise LibraryError("storage-unavailable") from None
 
-    def _state(self, *, initialize=False):
+    def _write_managed_marker(self, workspace, slot, name, *, default=False):
+        publish_metadata(
+            workspace / MANAGED_FILE,
+            {"anchor": str(self.anchor), "slot": slot, "name": name, "default": bool(default)},
+        )
+
+    def _rebuild_registry(self, root):
+        """Rebuild a missing registry from managed workspaces' .trellin-managed.json markers (#285)."""
+        _directory(root)
+        projects_dir = root / "Workspaces"
+        _directory(projects_dir)
+        removed = self._removed(root)
+        discovered = []
+        seen_ids = set()
+        for entry in sorted(projects_dir.iterdir(), key=lambda item: item.name):
+            info = entry.lstat()
+            if not stat.S_ISDIR(info.st_mode):
+                continue
+            marker = workspace_marker(entry)
+            if marker is None:
+                continue
+            if marker["anchor"] != self.anchor or marker["slot"] != entry.name:
+                raise LibraryError("storage-invalid")
+            if marker["slot"] in removed:
+                continue
+            identifier, database = _project_markers(entry)
+            if identifier in seen_ids:
+                raise LibraryError("storage-invalid")
+            seen_ids.add(identifier)
+            discovered.append((info.st_mtime_ns, marker["slot"], marker, identifier, database))
+
+        default_item = None
+        if discovered:
+            flagged = [item for item in discovered if item[2]["default"]]
+            if flagged:
+                named = [item for item in flagged if item[2]["name"] in (DEFAULT_NAME, _LEGACY_DEFAULT_NAME)]
+                default_item = min(named or flagged, key=lambda item: (item[0], item[1]))
+            else:
+                named = [item for item in discovered if item[2]["name"] in (DEFAULT_NAME, _LEGACY_DEFAULT_NAME)]
+                default_item = named[0] if len(named) == 1 else min(discovered, key=lambda item: (item[0], item[1]))
+
+        ordered = sorted(discovered, key=lambda item: (item is not default_item, item[0], item[1]))
+        projects = []
+        for _, slot, marker, identifier, database in ordered:
+            is_default = default_item is not None and slot == default_item[1]
+            name = marker["name"]
+            if is_default:
+                name = DEFAULT_NAME if name in (None, _LEGACY_DEFAULT_NAME) else name
+            elif name is None:
+                name = f"Project {slot[:8]}"
+            projects.append({"id": identifier, "database": database, "name": _name(name), "slot": slot})
+
+        document = {
+            "default_id": default_item[3] if default_item is not None else None,
+            "default_slot": default_item[1] if default_item is not None else str(uuid4()),
+            "projects": projects,
+        }
+        publish_metadata(root / _REGISTRY, document)
+        return self._read(root)
+
+    def _state(self, *, initialize=False, repair=False):
         root = library_root(self.anchor, required=not initialize)
         if initialize and not (self.anchor / LOCATION_FILE).exists():
             if root != self.anchor / "Library" or root.is_symlink():
@@ -230,6 +329,8 @@ class Library:
                 raise LibraryError("storage-invalid")
             publish_metadata(self.anchor / LOCATION_FILE, {"root": str(root)})
             return root, registry
+        if repair and not (root / _REGISTRY).exists():
+            return root, self._rebuild_registry(root)
         return root, self._read(root)
 
     def _read(self, root):
@@ -277,15 +378,82 @@ class Library:
     def status(self):
         with self._locked(exclusive=False):
             if (self.anchor / LOCATION_FILE).exists():
-                root, data = self._state()
-                if not _legacy_default(data):
-                    return self._status(root, data)
+                root = library_root(self.anchor, required=True)
+                if (root / _REGISTRY).exists():
+                    data = self._read(root)
+                    if not _legacy_default(data):
+                        return self._status(root, data)
         with self._locked():
-            root, data = self._state(initialize=True)
+            root, data = self._state(initialize=True, repair=True)
             if _legacy_default(data):
-                self._project_row(data, data["default_id"])["name"] = DEFAULT_NAME
+                row = self._project_row(data, data["default_id"])
+                row["name"] = DEFAULT_NAME
+                if "slot" in row:
+                    self._write_managed_marker(_workspace_path(root, row), row["slot"], DEFAULT_NAME, default=True)
                 publish_metadata(root / _REGISTRY, data)
             return self._status(root, data)
+
+    def ensure_ready(self):
+        """Create the default library if missing and repair a deleted registry before restore (#285)."""
+        return self.status()
+
+    def settings(self):
+        """Read the library's remembered project ID and saved node positions (#285)."""
+        with self._locked(exclusive=False):
+            if not (self.anchor / LOCATION_FILE).exists():
+                return {"last_project_id": None, "positions": {}}
+            root = library_root(self.anchor, required=True)
+            if (root / _REGISTRY).exists():
+                self._read(root)
+                return _read_settings(root)
+        with self._locked():
+            root, _ = self._state(repair=True)
+            return _read_settings(root)
+
+    def remember_project(self, identifier):
+        """Record the active project ID in the library's own settings and return its saved position."""
+        project_id = uuid_text(identifier)
+        with self._locked():
+            root, data = self._state(repair=True)
+            self._project_row(data, project_id)
+            saved = _read_settings(root)
+            if saved["last_project_id"] != project_id:
+                saved["last_project_id"] = project_id
+                _write_settings(root, saved)
+            return saved["positions"].get(project_id)
+
+    def save_position(self, identifier, claim_id, node_id):
+        """Save a project's selected graph node in the library's own settings."""
+        project_id = uuid_text(identifier)
+        position = _position({"claimId": claim_id, "nodeId": node_id})
+        with self._locked():
+            root, data = self._state(repair=True)
+            self._project_row(data, project_id)
+            saved = _read_settings(root)
+            if saved["positions"].get(project_id) != position:
+                saved["positions"][project_id] = position
+                _write_settings(root, saved)
+            return position
+
+    def import_legacy_positions(self, positions):
+        """Migrate valid UUID-keyed legacy positions into library settings without overwriting existing ones."""
+        if not isinstance(positions, dict) or not positions:
+            return
+        with self._locked():
+            root, _ = self._state(initialize=True, repair=True)
+            saved = _read_settings(root)
+            changed = False
+            for key, value in positions.items():
+                try:
+                    project_id = uuid_text(key)
+                    position = _position(value)
+                except LibraryError:
+                    continue
+                if project_id not in saved["positions"]:
+                    saved["positions"][project_id] = position
+                    changed = True
+            if changed:
+                _write_settings(root, saved)
 
     def _status(self, root, data):
         projects = [self._project(root, row) | {"default": row["id"] == data["default_id"]}
@@ -298,16 +466,20 @@ class Library:
     def rename(self, identifier, name):
         name = _name(name)
         with self._locked():
-            root, data = self._state()
+            root, data = self._state(repair=True)
             row = self._project_row(data, uuid_text(identifier))
             row["name"] = name
+            if "slot" in row:
+                self._write_managed_marker(
+                    _workspace_path(root, row), row["slot"], name, default=row["id"] == data["default_id"],
+                )
             publish_metadata(root / _REGISTRY, data)
             return self._project(root, row)
 
     def unregister(self, identifier):
         """Remove a project from the list. Its folder and database stay where they are."""
         with self._locked():
-            root, data = self._state()
+            root, data = self._state(repair=True)
             row = self._project_row(data, uuid_text(identifier))
             if row["id"] == data["default_id"]:
                 raise LibraryError("storage-project")
@@ -317,6 +489,10 @@ class Library:
                 publish_metadata(root / _REMOVED, {"projects": removed})
             data["projects"].remove(row)
             publish_metadata(root / _REGISTRY, data)
+            saved = _read_settings(root)
+            if saved["last_project_id"] == row["id"]:
+                saved["last_project_id"] = None
+                _write_settings(root, saved)
             return self._project(root, row)
 
     @staticmethod
@@ -352,7 +528,7 @@ class Library:
             except WorkspaceCreationError as error:
                 raise LibraryError(str(error)) from None
             identifier, database = _project_markers(workspace)
-        publish_metadata(workspace / MANAGED_FILE, {"anchor": str(self.anchor), "slot": slot})
+        self._write_managed_marker(workspace, slot, name, default=default)
         data["projects"].append({"id": identifier, "database": database, "name": name, "slot": slot})
         if default:
             data["default_id"] = identifier
@@ -361,7 +537,7 @@ class Library:
 
     def open_default(self):
         with self._locked():
-            root, data = self._state(initialize=True)
+            root, data = self._state(initialize=True, repair=True)
             if data["default_id"] is not None:
                 return self._registered_path(root, self._project_row(data, data["default_id"]))
             self._recover_pending_default(root, data)
@@ -393,7 +569,7 @@ class Library:
     def create(self, name):
         name = _name(name)
         with self._locked():
-            root, data = self._state(initialize=True)
+            root, data = self._state(initialize=True, repair=True)
             return self._create(root, data, name, str(uuid4()))
 
     def register_external(self, path):
@@ -402,7 +578,7 @@ class Library:
             return
         identifier, database = _project_markers(workspace)
         with self._locked():
-            root, data = self._state(initialize=True)
+            root, data = self._state(initialize=True, repair=True)
             if workspace.is_relative_to(root):
                 raise LibraryError("storage-project")
             known = next((row for row in data["projects"] if row["id"] == identifier), None)
@@ -436,14 +612,21 @@ class Library:
             raise LibraryError("storage-verification")
         return workspace
 
+    def _resolve_in_state(self, root, data, identifier, *, verify_database=False):
+        row = self._project_row(data, uuid_text(identifier))
+        workspace = self._registered_path(root, row)
+        if verify_database:
+            _check_binding(workspace, row)
+        return workspace
+
     def resolve_project(self, identifier, *, verify_database=False):
         with self._locked(exclusive=False):
-            root, data = self._state()
-            row = self._project_row(data, uuid_text(identifier))
-            workspace = self._registered_path(root, row)
-            if verify_database:
-                _check_binding(workspace, row)
-            return workspace
+            root = library_root(self.anchor, required=True)
+            if (root / _REGISTRY).exists():
+                return self._resolve_in_state(root, self._read(root), identifier, verify_database=verify_database)
+        with self._locked():
+            root, data = self._state(repair=True)
+            return self._resolve_in_state(root, data, identifier, verify_database=verify_database)
 
     def _managed_row(self, data, workspace, registration):
         anchor, slot = registration
@@ -460,7 +643,7 @@ class Library:
         if registration is None:
             return workspace
         with self._locked():
-            root, data = self._state()
+            root, data = self._state(repair=True)
             self._restore_removed(root, data, workspace, registration)
             row = self._managed_row(data, workspace, registration)
             return self._registered_path(root, row)
@@ -477,22 +660,30 @@ class Library:
         identifier, database = _project_markers(workspace)
         if identifier != entry["id"] or any(row["id"] == identifier for row in data["projects"]):
             raise LibraryError("storage-verification")
+        self._write_managed_marker(workspace, slot, entry["name"], default=False)
         data["projects"].append({"id": identifier, "database": database, "name": entry["name"], "slot": slot})
         publish_metadata(root / _REGISTRY, data)
         del removed[slot]
         publish_metadata(root / _REMOVED, {"projects": removed})
 
+    def _describe_in_state(self, root, data, path, registration):
+        if registration is not None:
+            row = self._managed_row(data, path, registration)
+            self._registered_path(root, row)
+            return self._project(root, row)
+        row = next((entry for entry in data["projects"] if _workspace_path(root, entry) == path), None)
+        return self._project(root, row) if row is not None else None
+
     def describe(self, location):
         path = canonical_path(location)
         registration = workspace_registration(path)
         with self._locked(exclusive=False):
-            root, data = self._state()
-            if registration is not None:
-                row = self._managed_row(data, path, registration)
-                self._registered_path(root, row)
-                return self._project(root, row)
-            row = next((entry for entry in data["projects"] if _workspace_path(root, entry) == path), None)
-            return self._project(root, row) if row is not None else None
+            root = library_root(self.anchor, required=True)
+            if (root / _REGISTRY).exists():
+                return self._describe_in_state(root, self._read(root), path, registration)
+        with self._locked():
+            root, data = self._state(repair=True)
+            return self._describe_in_state(root, data, path, registration)
 
     @staticmethod
     def _preview(root, target, data, inventory):
@@ -509,13 +700,19 @@ class Library:
 
     def preview(self, destination):
         with self._locked(exclusive=False):
-            root, data = self._state()
+            root = library_root(self.anchor, required=True)
+            if (root / _REGISTRY).exists():
+                data = self._read(root)
+                target = _destination(root, self.anchor, destination)
+                return self._preview(root, target, data, _inventory(root))
+        with self._locked():
+            root, data = self._state(repair=True)
             target = _destination(root, self.anchor, destination)
             return self._preview(root, target, data, _inventory(root))
 
     def move(self, destination, sha256):
         with self._locked():
-            root, data = self._state()
+            root, data = self._state(repair=True)
             target = _destination(root, self.anchor, destination)
             inventory = _inventory(root)
             preview = self._preview(root, target, data, inventory)

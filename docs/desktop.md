@@ -70,7 +70,7 @@ If **Proof activity** needs a newer database, choose **Back up and upgrade**. Co
 
 The default location needs no action. Moving the library is an advanced tool, for example to keep it on another disk. Open **Trellin → Settings… → Storage** or press **⌘,** to see the active library location and open it in Finder. **Move Data…** lets you select the parent for a new **Trellin Library** folder. Review the exact old and new paths and confirm the move. Trellin copies the managed library, verifies its files, workspace IDs and existing database bindings, then switches the registered location. The original is retained as a recovery copy. An interrupted or failed check leaves the original library active. Open a managed project's new location from **Open Project…**.
 
-The move applies to the library and the managed project files under it. External projects and explicitly exported files stay at their chosen locations. PostgreSQL keeps its existing storage and database bindings. Trellin's application support directory retains the small location record and application settings. macOS preferences remember the last project by its ID, so the active library decides where it is, and database logins remain in their protected configuration.
+The move applies to the library, its settings and the managed project files under it. External projects and explicitly exported files stay at their chosen locations. PostgreSQL keeps its existing storage and database bindings. Trellin's application support directory retains the small location record and application settings. The library itself remembers the last opened project and selected node by project ID, so moving the library keeps that state with it; any earlier macOS preference (`lastWorkspaceV1`) is migrated once and then ignored. If the library's registry or lock file is missing, Trellin rebuilds it automatically from the managed workspaces' `.trellin-managed.json` markers before opening, including after Move Data. Database logins remain in their protected configuration.
 
 Use the existing [project backup workflow](research-foundation.md#recover-and-monitor) to preserve a project's files and PostgreSQL snapshot together. Keep app preferences and the registered library location separately when backing up Trellin's settings. A project archive can be restored as an independent project.
 
@@ -86,7 +86,7 @@ Use an Apple Silicon Mac with the Xcode Command Line Tools, Git and HTTPS access
 desktop/macos/build.sh /absolute/path/to/local-review
 ```
 
-The result is an ad hoc signed `Trellin.app` for local review. To run the automated desktop checks and existing offline tests from the checkout:
+The result is an ad hoc signed `Trellin.app` for local review. By default, `build.sh` gives development builds a separate bundle identifier (`org.researchmultiplier.trellin.dev`; pass `--trial` for `org.researchmultiplier.trellin.trial`) so local and trial builds never share preferences with an installed app. Pass `--release` to build with the installed bundle identifier (`org.researchmultiplier.trellin`). To run the automated desktop checks and existing offline tests from the checkout:
 
 ```sh
 python -m pytest -m offline

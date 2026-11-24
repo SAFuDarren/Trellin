@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.125
+
+- Trellin now rebuilds a missing library registry or lock file from its managed workspaces' `.trellin-managed.json` markers, including after **Move Data…**. The last opened project and selected node are stored by project ID in the library's own settings instead of macOS preferences; existing `lastWorkspaceV1` values are migrated once and then ignored. `desktop/macos/build.sh` gives development and trial builds separate bundle identifiers (`org.researchmultiplier.trellin.dev` and `--trial`), reserving `org.researchmultiplier.trellin` for `--release`, and no error or notice text directs the researcher to Storage settings or a library location.
+
 ## 1.0.124
 
 - **Automation** starts from **New automation** and two templates backed by the existing rule engine: **Reuse and reduce Lean proofs** (zero model calls) and **Watch verified evidence**. Claims that are not ready say what is missing. Choosing a claim records a proposal for review; nothing runs until you approve that exact rule, and the first run starts when the project worker is free. Rules waiting for approval have **Review and approve**, and **Stop** keeps results and run history. The page no longer shows command-line instructions, and its filters appear once rules exist.
