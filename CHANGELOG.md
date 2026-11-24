@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.126
+
+- Added `scripts/architecture_map.py` and the generated `docs/architecture-map.md` package dependency map (P1.7, decisions A1–A3). The offline boundary tests now reject new reverse entry imports, new kernel-to-Lean imports, new Lean-named modules in kernel packages, stale allowlist entries, and drift between `docs/architecture-map.md` and source imports. Engineering audits can query PR and commit change impact radius via `python scripts/architecture_map.py impact`.
+
 ## 1.0.125
 
 - Trellin now rebuilds a missing library registry or lock file from its managed workspaces' `.trellin-managed.json` markers, including after **Move Data…**. The last opened project and selected node are stored by project ID in the library's own settings instead of macOS preferences; existing `lastWorkspaceV1` values are migrated once and then ignored. `desktop/macos/build.sh` gives development and trial builds separate bundle identifiers (`org.researchmultiplier.trellin.dev` and `--trial`), reserving `org.researchmultiplier.trellin` for `--release`, and no error or notice text directs the researcher to Storage settings or a library location.

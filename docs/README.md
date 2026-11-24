@@ -25,7 +25,7 @@
 
 ## Development
 
-- [Architecture direction and design decisions](architecture.md) · [中文](architecture.zh-CN.md)
+- [Architecture direction and design decisions](architecture.md) · [中文](architecture.zh-CN.md) · [Package architecture map](architecture-map.md)
 - [Interface contracts](interfaces.md) · [中文](interfaces.zh-CN.md)
 - [Roadmap and acceptance criteria](roadmap.md) · [中文](roadmap.zh-CN.md)
 - [Engineering and project management](engineering.md) · [Repository layout](engineering.md#repository-layout) · [中文](engineering.zh-CN.md)
