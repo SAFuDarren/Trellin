@@ -68,19 +68,21 @@ export function SectionFrame({
   panel: ReactNode;
   children: ReactNode;
   chatThread?: boolean;
-  /** #326: a side panel laid over the page, beside the section panel. */
+  /** #326: a side panel beside the page, resized with its own border. */
   overlay?: ReactNode;
 }) {
   const { t } = useTranslation();
   const layout = useLayout();
   const [dragWidth, setDragWidth] = useState<number>();
+  const [peekDrag, setPeekDrag] = useState<number>();
   const side = dragWidth ?? layout.clamped.side;
+  const peek = peekDrag ?? layout.clamped.peek;
   const chat = chatThread !== undefined;
   return (
     <div
       className={chat ? "section chats-page" : "section"}
       data-thread={chatThread}
-      style={{ "--side-w": `${side}px` } as CSSProperties}
+      style={{ "--side-w": `${side}px`, "--peek-w": `${peek}px` } as CSSProperties}
     >
       {panel}
       <Splitter
@@ -96,7 +98,22 @@ export function SectionFrame({
       <main className={chat ? "section-main chats-main" : "section-main"} tabIndex={-1}>
         {children}
       </main>
-      {overlay}
+      {overlay && (
+        <>
+          {/* #326: the side panel sits beside the page and takes room from it; drag the border to resize. */}
+          <Splitter
+            name="peek"
+            value={peek}
+            label={t("splitter.peek")}
+            onResize={(width) => setPeekDrag(clampSize("peek", width, layout.windowHeight))}
+            onCommit={(width) => {
+              setPeekDrag(undefined);
+              layout.update({ peek: clampSize("peek", width, layout.windowHeight) });
+            }}
+          />
+          {overlay}
+        </>
+      )}
     </div>
   );
 }
@@ -134,45 +151,46 @@ export function SectionLayout({
   const spaceTargets = new Set(spaceGroup?.entries.map((entry) => entry.href));
   const pageGroups = groups.map((group, index) => ({
     ...group,
-    name: (spaceGroup || workPanel) && index === 0 && !group.name ? title : group.name,
+    // Under the Work panel a page's groups sit beneath its own entry, so the first needs no title.
+    name: spaceGroup && index === 0 && !group.name ? title : group.name,
     entries: group.entries.filter((entry) => !spaceTargets.has(entry.href)),
   }));
   const allGroups: NavGroup[] = spaceGroup ? [spaceGroup, ...pageGroups] : workPanel ? pageGroups : groups;
+  const groupNodes = allGroups
+    .filter((group) => group.entries.length || group.empty)
+    .map((group, position) => (
+      <div className={group.className ? `nav-group ${group.className}` : "nav-group"} key={group.name ?? position}>
+        {group.name && <span>{group.name}</span>}
+        {group.entries.length === 0 && group.empty && <p className="nav-empty">{group.empty}</p>}
+        {group.entries.map((entry) => (
+          <a
+            key={entry.key}
+            className="nav-item"
+            href={entry.href}
+            title={entry.sub ? `${entry.label}\n${entry.sub}` : entry.label}
+            aria-current={entry.current ? "page" : undefined}
+          >
+            <span className="nav-line">
+              {entry.dot === "live" ? (
+                <span className="status-dot" data-tone="live" aria-hidden="true" />
+              ) : entry.dot && entry.dot !== "none" ? (
+                <span className="status-dot" data-tone={entry.dot} aria-hidden="true" />
+              ) : null}
+              <span className="label">{entry.label}</span>
+              {entry.count !== undefined && entry.count !== "" && (
+                <span className="count" data-tone={entry.countTone}>
+                  {entry.count}
+                </span>
+              )}
+            </span>
+            {entry.sub && <span className="nav-sub">{entry.sub}</span>}
+          </a>
+        ))}
+      </div>
+    ));
   const panel = (
     <SectionPanel title={heading} actions={headerActions}>
-      {workPanel && <WorkPanelSections />}
-      {allGroups
-        .filter((group) => group.entries.length || group.empty)
-        .map((group, position) => (
-          <div className={group.className ? `nav-group ${group.className}` : "nav-group"} key={group.name ?? position}>
-            {group.name && <span>{group.name}</span>}
-            {group.entries.length === 0 && group.empty && <p className="nav-empty">{group.empty}</p>}
-            {group.entries.map((entry) => (
-              <a
-                key={entry.key}
-                className="nav-item"
-                href={entry.href}
-                title={entry.sub ? `${entry.label}\n${entry.sub}` : entry.label}
-                aria-current={entry.current ? "page" : undefined}
-              >
-                <span className="nav-line">
-                  {entry.dot === "live" ? (
-                    <span className="status-dot" data-tone="live" aria-hidden="true" />
-                  ) : entry.dot && entry.dot !== "none" ? (
-                    <span className="status-dot" data-tone={entry.dot} aria-hidden="true" />
-                  ) : null}
-                  <span className="label">{entry.label}</span>
-                  {entry.count !== undefined && entry.count !== "" && (
-                    <span className="count" data-tone={entry.countTone}>
-                      {entry.count}
-                    </span>
-                  )}
-                </span>
-                {entry.sub && <span className="nav-sub">{entry.sub}</span>}
-              </a>
-            ))}
-          </div>
-        ))}
+      {workPanel ? <WorkPanelSections pageGroups={groupNodes.length ? groupNodes : undefined} /> : groupNodes}
     </SectionPanel>
   );
   return (

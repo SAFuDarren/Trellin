@@ -747,7 +747,8 @@
   "splitter": {
     "side": "调整导航栏宽度",
     "right": "拖动调整审阅栏宽度",
-    "chat": "拖动调整对话区高度"
+    "chat": "拖动调整对话区高度",
+    "peek": "拖动调整侧边面板宽度"
   },
   "common": {
     "cancel": "取消",
@@ -1873,7 +1874,9 @@
     "more_other": "收件箱里还有 {{count}} 项",
     "views": "视图",
     "pinned": "置顶",
-    "records": "记录"
+    "records": "记录",
+    "foldGroups": "收起{{name}}的分组",
+    "unfoldGroups": "展开{{name}}的分组"
   },
   "workPeek": {
     "title": "条目",

@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.132
+
+- The Work side panel opens beside the board instead of over it: the board gives way, and the border between them resizes the panel by dragging or with the arrow keys. The width is remembered.
+- Each Work panel section folds from its heading and stays folded. A record page's own groups, such as Library's kinds and sources, hang indented under its entry and fold with it, so moving between records no longer changes the bottom of the panel. Views and records carry small icons.
+- A long Lean statement in a claim preview scrolls inside its box, and in the side panel it wraps in full, instead of running over the buttons below it.
+
 ## 1.0.131
 
 - The light theme is paper: the rail, panels, page and board use warm off-white tones, cards are paper white, and text uses the brand's ink. The dark theme is unchanged. Contrast, selection and focus colors still follow the same tokens and pass the existing checks.

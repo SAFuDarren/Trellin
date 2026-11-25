@@ -31,7 +31,7 @@ export function Splitter({
       const delta =
         name === "side"
           ? moveEvent.clientX - start.x
-          : name === "right"
+          : name === "right" || name === "peek"
             ? start.x - moveEvent.clientX
             : start.y - moveEvent.clientY;
       latest = start.value + delta;
@@ -54,6 +54,7 @@ export function Splitter({
     const grow = {
       side: ["ArrowRight", "ArrowLeft"],
       right: ["ArrowLeft", "ArrowRight"],
+      peek: ["ArrowLeft", "ArrowRight"],
       chat: ["ArrowUp", "ArrowDown"],
     }[name];
     const step = event.shiftKey ? 48 : 16;

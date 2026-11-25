@@ -31,6 +31,9 @@ const ICONS: Record<string, string> = {
   // #326: Work is a list of proof obligations; the first two bullets are filled (see FILLED).
   work: "M4.5 16h4l-1.2 2.5h-4zM11.5 6.75h9M11.5 12h9M11.5 17.25h6",
   filter: "M4 6h16M7 12h10M10 18h4",
+  inbox: "M4 13.5 6.5 5h11l2.5 8.5V19H4zM4 13.5h4.5l1 2h5l1-2H20",
+  running: "M12 3.5a8.5 8.5 0 1 1-8.5 8.5M10.2 9v6l4.8-3z",
+  blocked: "M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17ZM6 6l12 12",
   display: "M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4",
 };
 
