@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.133
+
+- Added workbench review endpoints `GET /api/intake-review?intake=<id>` and `POST /api/intake-review/confirm` so pending `confirm_intake` inbox items—including CLI/notes, model-assisted, and target-first drafts—can be inspected with matched reused library versions and frozen target scope, and confirmed directly through the existing human-reviewed intake workflow with bound local-researcher attribution.
+
 ## 1.0.132
 
 - The Work side panel opens beside the board instead of over it: the board gives way, and the border between them resizes the panel by dragging or with the arrow keys. The width is remembered.

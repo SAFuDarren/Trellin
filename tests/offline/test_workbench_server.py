@@ -776,3 +776,70 @@ def test_goal_related_search_stays_on_the_authenticated_read_path(server, monkey
     assert response.getheader("Cache-Control") == "no-store"
     assert json.loads(content) == {"matches": []}
     assert reads == [body]
+
+
+def test_intake_review_routes_enforce_session_origin_params_and_error_mapping(server, monkeypatch):
+    from uuid import UUID
+    from research_multiplier.storage.postgres import DatabaseOperationError
+    from research_multiplier.workflows import workbench_intake
+
+    intake_id = "13f1a082-cd6b-436c-a601-61cef26eb943"
+    detail_route = f"/api/intake-review?intake={intake_id}"
+    confirm_route = "/api/intake-review/confirm"
+    reads, writes = [], []
+
+    def read(action, identifier):
+        assert action is workbench_intake.review_detail
+        reads.append(identifier)
+        return {"id": str(identifier), "status": "pending", "items": []}
+
+    def write(action, document):
+        assert action is workbench_intake.review_confirm
+        writes.append(document)
+        return {"id": intake_id, "goal_id": intake_id, "claim_id": None, "confirmed": True}
+
+    monkeypatch.setattr(server, "read", read)
+    monkeypatch.setattr(server, "write", write)
+
+    assert request(server, "GET", detail_route, session=False)[0].status == 403
+    assert request(server, "GET", "/api/intake-review")[0].status == 400
+    assert request(server, "GET", "/api/intake-review?intake=not-a-uuid")[0].status == 400
+    assert request(server, "POST", confirm_route, body={}, session=False)[0].status == 403
+    assert request(server, "POST", confirm_route, body={}, origin=False)[0].status == 403
+    assert request(server, "POST", confirm_route, body={}, headers={"Origin": "https://foreign.test"})[0].status == 403
+    assert request(server, "GET", confirm_route)[0].status == 404
+    assert not reads and not writes
+
+    response, content = request(server, "GET", detail_route)
+    assert response.status == 200
+    assert response.getheader("Cache-Control") == "no-store"
+    assert json.loads(content) == {"id": intake_id, "status": "pending", "items": []}
+    assert reads == [UUID(intake_id)]
+
+    confirm_body = {"id": intake_id, "sha256": "a" * 64, "reason": "Reviewed", "decisions": {}}
+    response, content = request(server, "POST", confirm_route, body=confirm_body)
+    assert response.status == 200
+    assert json.loads(content) == {"id": intake_id, "goal_id": intake_id, "claim_id": None, "confirmed": True}
+    assert writes == [confirm_body]
+
+    for code, expected in (
+        ("intakeReview.invalid", 400),
+        ("intakeReview.identity", 403),
+        ("intakeReview.missing", 404),
+        ("intakeReview.stale", 409),
+        ("intakeReview.unavailable", 503),
+    ):
+        monkeypatch.setattr(server, "write", lambda *_, error=code: (_ for _ in ()).throw(
+            workbench_intake.IntakeReviewError(error)))
+        response, content = request(server, "POST", confirm_route, body=confirm_body)
+        assert response.status == expected and json.loads(content) == {"error": code}
+
+    monkeypatch.setattr(server, "read", lambda *_: (_ for _ in ()).throw(
+        DatabaseOperationError("human", "08006", "connection lost")))
+    response, content = request(server, "GET", detail_route)
+    assert response.status == 503 and json.loads(content) == {"error": "intakeReview.unavailable"}
+
+    monkeypatch.setattr(server, "write", lambda *_: (_ for _ in ()).throw(
+        DatabaseOperationError("human", "08006", "connection lost")))
+    response, content = request(server, "POST", confirm_route, body=confirm_body)
+    assert response.status == 503 and json.loads(content) == {"error": "intakeReview.unavailable"}
