@@ -55,8 +55,8 @@ def project_claims(server):
 
 def frozen(title, proposition, sensitivity):
     target = {"title": title, "domain": "lean-core", "sensitivity": sensitivity,
-              "statement": "A synthetic statement.", "formal": {"lean": {"proposition": proposition}}}
-    # Each claim gets its own premise wording, so the library does not share an item between them.
+              "statement": f"The {title.lower()} holds.", "formal": {"lean": {"proposition": proposition}}}
+    # Each claim has its own wording, so neither the library nor the frozen-target guard confuses the two.
     notes = {"items": [{"kind": "hypothesis", "natural": f"The premise of the {title.lower()} is true.",
                         "formal": {"lean": {"proposition": "True"}}}]}
     with Store() as store:
