@@ -48,6 +48,12 @@ export function boardColumns(statuses: readonly string[]): string[] {
   return [...known, ...extra];
 }
 
+/** Columns the domain rows show: In progress and Proved always, other statuses only while a claim has them. */
+export function laneColumns(columns: readonly string[], statuses: readonly string[]): string[] {
+  const present = new Set(statuses);
+  return columns.filter((status) => status === "open" || status === "proved" || present.has(status));
+}
+
 export type Lane<T> = { key: string; claims: T[] };
 
 /** Claims grouped by domain, in name order, with the unnamed group last. */

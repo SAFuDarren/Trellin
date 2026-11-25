@@ -125,13 +125,20 @@
 }
 
 .research-lanes {
+  /* The domain names stay at the left when the board scrolls sideways; narrow windows give them less room. */
+  --lane-label-w: clamp(124px, 14vw, 176px);
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior-x: contain;
   background: var(--canvas);
 }
+/* As wide as the columns need up to the window, so a board that fits never scrolls sideways;
+   a narrower window keeps each column's minimum and scrolls. */
 .lanes-scroll {
-  min-width: max-content;
+  box-sizing: border-box;
+  width: fit-content;
+  min-width: 100%;
   padding: 0 22px 22px;
 }
 .lanes-head,
@@ -142,15 +149,34 @@
 .lanes-head {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
   padding: 12px 0 8px;
   background: var(--canvas);
 }
+/* The corner above the domain names and the names themselves move together, so cards slide under one edge. */
+.lanes-corner,
+.lane-grid > .lane-toggle {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  align-self: stretch;
+  margin-left: -22px;
+  padding-left: 22px;
+  background: var(--canvas);
+  transition: box-shadow 0.15s;
+}
+.research-lanes[data-scrolled="true"] :is(.lanes-corner, .lane-grid > .lane-toggle) {
+  box-shadow: 10px 0 14px -14px rgb(0 0 0 / 35%);
+}
 .lanes-column {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 7px;
   font-weight: var(--type-semibold);
+}
+.lanes-column > .lanes-dot {
+  flex: 0 0 auto;
+  align-self: center;
 }
 .lanes-count {
   color: var(--sub);
@@ -185,13 +211,6 @@
 .lane-grid[data-collapsed="true"] {
   align-items: center;
   padding-bottom: 12px;
-}
-.lane-grid > .lane-toggle {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  align-self: stretch;
-  background: var(--canvas);
 }
 .lane-toggle {
   display: flex;

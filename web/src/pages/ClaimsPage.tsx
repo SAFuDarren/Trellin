@@ -13,7 +13,7 @@ import { WorkStatusColumn, WorkTable } from "../components/WorkDisplay";
 import { WorkSelectionArea, WorkSelectionCheckbox, useWorkItemSelection } from "../components/WorkItemSelection";
 import { href } from "../shell/route";
 import type { ClaimProgress } from "../workbench/claimProgress";
-import { boardColumns, matchesSearch } from "../workbench/claimBoard";
+import { boardColumns, laneColumns, matchesSearch } from "../workbench/claimBoard";
 import { claimCode, statusText } from "../workbench/text";
 import type { AtlasClaim, GraphSnapshot } from "../workbench/types";
 
@@ -308,7 +308,11 @@ export function ClaimsPage({
       ) : layout === "lanes" ? (
         <ResearchLanes
           claims={shown}
-          columns={columns}
+          // #326: empty statuses other than In progress and Proved take no width in the domain rows.
+          columns={laneColumns(
+            columns,
+            shown.map((claim) => claim.status),
+          )}
           display={display}
           collapsed={collapsed}
           onToggleLane={toggleLane}
