@@ -132,6 +132,15 @@ _GOAL_REVIEW_ERRORS = {
     "goalReview.stale": HTTPStatus.CONFLICT,
     "goalReview.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
 }
+_INTAKE_REVIEW_ROUTE = "/api/intake-review"
+_INTAKE_REVIEW_CONFIRM_ROUTE = "/api/intake-review/confirm"
+_INTAKE_REVIEW_ERRORS = {
+    "intakeReview.invalid": HTTPStatus.BAD_REQUEST,
+    "intakeReview.identity": HTTPStatus.FORBIDDEN,
+    "intakeReview.missing": HTTPStatus.NOT_FOUND,
+    "intakeReview.stale": HTTPStatus.CONFLICT,
+    "intakeReview.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
+}
 _CONVERSATION_CREATE = "/api/conversations/create"
 _CONVERSATION_ARCHIVE = "/api/conversations/archive"
 _CONVERSATION_WRITES = {_CONVERSATION_CREATE, _CONVERSATION_ARCHIVE}
@@ -604,6 +613,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self.server.read(proof_graph.impact, *_uuid_parameters(route.query, "claim", "basis"))
         if route.path == _GOAL_REVIEW_ROUTE:
             return self.server.read(workbench_goal_review.detail, *_uuid_parameters(route.query, "goal"))
+        if route.path == _INTAKE_REVIEW_ROUTE:
+            return self.server.read(workbench_intake.review_detail, *_uuid_parameters(route.query, "intake"))
         if route.path == _PROOF_DRAFT_ROUTE:
             try:
                 parameters = parse_qs(route.query, keep_blank_values=True, strict_parsing=True, max_num_fields=2)
@@ -672,6 +683,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._conversation_error(error.code)
         except workbench_goal_review.GoalReviewError as error:
             self._error(_GOAL_REVIEW_ERRORS[str(error)], str(error))
+        except workbench_intake.IntakeReviewError as error:
+            self._error(_INTAKE_REVIEW_ERRORS[str(error)], str(error))
         except workbench_library.LibraryError as error:
             self._error(_LIBRARY_ERRORS[str(error)], str(error))
         except claim_references.ClaimCodeError as error:
@@ -681,6 +694,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "proof_draft_unavailable")
             elif self.path.startswith(_GOAL_REVIEW_ROUTE):
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "goalReview.unavailable")
+            elif self.path.startswith(_INTAKE_REVIEW_ROUTE):
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "intakeReview.unavailable")
             elif self.path == _PROJECT_CANVAS_CLAIMS:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "project_canvas.unavailable")
             elif error.state in _SCHEMA_SQLSTATES:
@@ -1026,6 +1041,9 @@ class _Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.server.write(workbench_goal_review.select, self._body(12_000)))
             elif self.path == _GOAL_RELATED_ROUTE:
                 self._json(HTTPStatus.OK, self.server.read(workbench_goal_review.related, self._body(6000)))
+            elif self.path == _INTAKE_REVIEW_CONFIRM_ROUTE:
+                self._json(HTTPStatus.OK, self.server.write(workbench_intake.review_confirm,
+                                                            self._body(_MAX_PROJECT_BYTES)))
             elif self.path == "/api/claim-code":
                 self._json(HTTPStatus.OK, self.server.write(claim_references.rename, self._body()))
             elif self.path == "/api/release-updates":
@@ -1092,6 +1110,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(_PROJECT_CANVAS_ERRORS[str(error)], str(error))
         except workbench_conversations.ConversationError as error:
             self._conversation_error(error.code)
+        except workbench_intake.IntakeReviewError as error:
+            self._error(_INTAKE_REVIEW_ERRORS[str(error)], str(error))
         except (workbench_intake.IntakeError, workbench_theorems.TheoremError) as error:
             self._error(HTTPStatus.CONFLICT, str(error))
         except workbench_goal_review.GoalReviewError as error:
@@ -1124,6 +1144,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._error(_PREMISE_ERRORS[message], message)
             elif self.path in {_GOAL_SELECT_ROUTE, _GOAL_RELATED_ROUTE}:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "goalReview.unavailable")
+            elif self.path == _INTAKE_REVIEW_CONFIRM_ROUTE:
+                self._error(HTTPStatus.SERVICE_UNAVAILABLE, "intakeReview.unavailable")
             elif self.path == _PROJECT_CANVAS_ROUTE:
                 self._error(HTTPStatus.SERVICE_UNAVAILABLE, "project_canvas.unavailable")
             elif self.path == "/api/claim-code":
@@ -1152,6 +1174,8 @@ class _Handler(BaseHTTPRequestHandler):
                 message = "premise.unavailable"
             elif self.path in {_GOAL_SELECT_ROUTE, _GOAL_RELATED_ROUTE}:
                 message = "goalReview.unavailable"
+            elif self.path == _INTAKE_REVIEW_CONFIRM_ROUTE:
+                message = "intakeReview.unavailable"
             elif self.path == _PROJECT_CANVAS_ROUTE:
                 message = "project_canvas.unavailable"
             elif self.path == "/api/claim-code":
