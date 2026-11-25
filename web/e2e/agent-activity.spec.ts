@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { Team } from "../src/api/sections";
 import { mockWorkspaceEvents } from "./workspace-events";
 import { openDestination } from "./navigation";
+import { startOnStatusBoard } from "./claims-display";
 
 const WORKSPACE = "11111111-2222-4333-8444-555555555555";
 const CLAIM_ID = "11111111-1111-4111-8111-111111111111";
@@ -9,6 +10,7 @@ const CLAIM_TITLE = "自然数加零的对称性";
 const EVIDENCE_ID = "77777777-7777-4777-8777-777777777777";
 
 test("running proof jobs agree across Agent activity, Claims, Chats and the Team badge", async ({ page, request }) => {
+  await startOnStatusBoard(page);
   await request.post("/__reset", { data: {} });
   const emitEvent = await mockWorkspaceEvents(page, WORKSPACE);
   let finished = false;

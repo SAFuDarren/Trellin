@@ -281,6 +281,7 @@ export function Shell({ session }: { session: string }) {
                   claimReviews={activity.reviewItemsByClaim}
                   atlasClaims={atlas.data?.claims}
                   running={activity.runningByClaim}
+                  onNewClaim={() => runProjectAction({ id: "add-theorem" })}
                 />
               ) : section === "library" ? (
                 <LibraryPage session={session} sub={sub} onOpen={open} />

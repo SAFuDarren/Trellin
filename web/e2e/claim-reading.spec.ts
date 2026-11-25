@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import type { GraphSnapshot } from "../src/workbench/types";
 import { openProof } from "./project-map";
 import { openDestination, railSpace } from "./navigation";
+import { startOnStatusBoard } from "./claims-display";
 
 const CLAIM_TITLE = "自然数加零的对称性";
 const LONG_TITLE = "Symmetry of equality on the natural numbers";
@@ -28,6 +29,7 @@ async function open(page: Page, singleGoal = false) {
 }
 
 test("a claim expands and collapses in place with its recorded statement", async ({ page }) => {
+  await startOnStatusBoard(page);
   await open(page);
   await openDestination(page, "Claims");
   const card = page.locator(".board").getByRole("button", { name: new RegExp(CLAIM_TITLE) });

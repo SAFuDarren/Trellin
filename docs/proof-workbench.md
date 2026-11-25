@@ -17,7 +17,7 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 ## Switch between the graph and Review
 
-The rail has five spaces: **Home**, **Work**, **Chats**, **Team** and **Automation**. **Home** opens the **Project map** beside the rail. The **Work** panel lists **Inbox**, **Review**, **Claims**, **Agent tasks** and **Library**. Choose **Work → Review** for items awaiting review. The **Work** badge shows how many are waiting, and the graph keeps its selected claim and node while you switch.
+The rail has five spaces: **Home**, **Work**, **Chats**, **Team** and **Automation**. **Home** opens the **Project map** beside the rail. **Work** opens on the claims board, and its panel lists **Claims**, **Inbox**, **Review**, **Agent tasks** and **Library**. Choose **Work → Review** for items awaiting review. The **Work** badge shows how many are waiting, and the graph keeps its selected claim and node while you switch.
 
 In the Mac app, use the project tile at the top of the rail to switch projects. The **Project map** shows the project's claims on one canvas. Click a card or choose **Find claim** to select it and read its statement, Lean text, and review items in the right-hand details panel. Use **Details** to toggle the panel. Double-click a card, press Enter while it has focus, or choose **Open proof** in the inspector to show the proof graph on the main canvas. **Proof task** appears first in the inspector. The **More inspector actions** menu holds actions that cannot fit beside it. Use **Proof**, **References** and **If withdrawn** to explore the graph, then select a node to read its details. In a narrow window, Escape first closes the details drawer. Press Escape again or click **Project map** to return to the same map position and selection. The map footer shows the connection status next to the zoom controls.
 
@@ -63,7 +63,7 @@ Review the target, approved starting basis, and proposed premise before recordin
 
 Some projects have no Lean statement for a record. The workbench shows its recorded wording and indicates the Lean text is unavailable. It does not invent a formula or infer a mathematical field from the checker name.
 
-In **Work → Claims**, use the Board, List or Table view to browse claims by status. **Work → Library** shows theorems and hypotheses and where they are used. **Help** and **Settings** sit at the bottom of the rail.
+In **Work → Claims**, browse claims by domain and status, or choose **Display → Status board**, **List** or **Table**. **Work → Library** shows theorems and hypotheses and where they are used. **Help** and **Settings** sit at the bottom of the rail.
 
 On database revision `0073` or later, **Review** records the local researcher's ID from the bound workspace for each new evidence decision and shows **Recorded by** with their name, so you do not type a name. **Add theorem** and the paper import confirmation sign the same way. Enter the reason and choose **Approve** or **Return**. Workspaces with an older database still use the earlier review form, which asks for your name. Previous decisions retain their recorded names.
 

@@ -6,6 +6,7 @@ import type { AtlasClaim, GraphSnapshot } from "../src/workbench/types";
 import { mapClaim } from "./project-map";
 import { mockWorkspaceEvents } from "./workspace-events";
 import { openDestination } from "./navigation";
+import { startOnStatusBoard } from "./claims-display";
 
 const WORKSPACE = "11111111-2222-4333-8444-555555555555";
 const WAITING_SINCE = "2026-11-21T00:00:00Z";
@@ -234,6 +235,7 @@ async function expectProgress(surface: Locator, label: string, tone: string, cou
 }
 
 test("exact obligation totals and waiting states agree on the map, inspector and Claims page", async ({ page }) => {
+  await startOnStatusBoard(page);
   const { proofTaskReads } = await fixture(page);
   await page.goto("/#session=fixture");
   const atlasToggle = page.getByRole("button", { name: "Global map", exact: true });
@@ -355,6 +357,7 @@ test("a committed workspace event updates proof progress on the open canvas and 
 });
 
 test("a proved claim keeps its status and opens either recorded result by identity", async ({ page }) => {
+  await startOnStatusBoard(page);
   const proved: ProjectClaim = {
     ...claim(6, "A result already proved", "proved"),
     obligations: { verified: 0, total: 0 },

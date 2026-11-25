@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { AgentWorkTask } from "../src/api/agentWork";
 import { openDestination } from "./navigation";
+import { startOnStatusBoard } from "./claims-display";
 
 const CLAIM = "自然数加零的对称性";
 const COUNT = "1 of 2 obligations verified";
@@ -43,6 +44,7 @@ async function section(page: Page, name: "Claims" | "Agent work") {
 }
 
 test("Claims preserves progress, review links and previews in Board, List and Table", async ({ page }) => {
+  await startOnStatusBoard(page);
   await page.setViewportSize({ width: 640, height: 460 });
   await page.goto("/#session=fixture");
   await section(page, "Claims");
@@ -55,7 +57,10 @@ test("Claims preserves progress, review links and previews in Board, List and Ta
 
   await display(page).press("ArrowDown");
   const menu = page.getByRole("menu", { name: "Display" });
-  await expect(menu.getByRole("menuitemradio", { name: "Board" })).toHaveAttribute("aria-checked", "true");
+  await expect(menu.getByRole("menuitemradio", { name: "Status board" })).toHaveAttribute("aria-checked", "true");
+  // The menu opens on its first layout, By domain; Status board and then List follow.
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitemradio", { name: "Status board" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(menu.getByRole("menuitemradio", { name: "List" })).toBeFocused();
   await page.keyboard.press("Enter");
@@ -85,7 +90,7 @@ test("Claims preserves progress, review links and previews in Board, List and Ta
   await expect(filtered.getByRole("rowheader")).toHaveText("固定网络最大流");
   await page.reload();
   await expect(filtered).toBeVisible();
-  await layout(page, "Board");
+  await layout(page, "Status board");
   await expect(page.locator(".board article")).toHaveCount(1);
 });
 
@@ -136,8 +141,9 @@ test("Agent work remembers its layout separately and opens the same handoff reco
   await expect(page.getByRole("heading", { name: delivered.title })).toBeVisible();
   await expect(page.getByRole("button", { name: "Accept delivery" })).toBeDisabled();
 
+  // #326: Claims keeps its own layout, which starts by domain.
   await section(page, "Claims");
-  await expect(page.locator(".board article").filter({ hasText: CLAIM })).toBeVisible();
+  await expect(page.locator(".research-lanes").getByRole("button", { name: new RegExp(CLAIM) })).toBeVisible();
   await section(page, "Agent work");
   await expect(table).toBeVisible();
   await page.reload();
