@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.135
+
+- A starting scope waiting in **Needs you** or **Review** is confirmed in the workbench. It shows the title, objective, sensitivity, starting statement and each outstanding item with its wording, Lean and status; choose **Confirm** or **Omit** for each, add a Lean proposition where a confirmed item has none, and record one reason. Items matching the Library are listed as reused, with their version. Drafts from the workbench, the command line, an Agent or a frozen target all open here.
+- Review items that the workbench cannot record yet say so instead of showing a command, and no longer show raw checksums. Every review item kind has an English and Chinese name, and **Needs you** marks scopes, statements and sources to confirm as **To confirm** rather than as questions.
+- On the **Review** page, **Handle** in **Needs you** opens the item in the page instead of a second copy in the side panel.
+
 ## 1.0.134
 
 - Work cards show how each claim was established: **Lean-checked**, **Certificate-checked**, **Audited proof** or **Counterexample**, with a check when Review approved that evidence, and **Numeric support** on an open claim that only a numeric check supports. The marks come from recorded evidence; nothing new is stored.

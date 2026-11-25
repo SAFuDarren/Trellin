@@ -5,6 +5,7 @@ import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
 import { ClarificationReview } from "../components/ClarificationReview";
 import { GoalReview } from "../components/GoalReview";
+import { IntakeReview } from "../components/IntakeReview";
 import { ReviewSigner } from "../components/project/ReviewFields";
 import { rememberReviewer, savedReviewer } from "../components/project/review";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
@@ -132,6 +133,15 @@ export function ReviewPage({
           workspace={clarification.workspace_id}
           id={selected.item_id}
           onConfirmed={(kind) => setNotice(t(`clarifications.confirmed.${kind}`))}
+        />
+      ) : selected.kind === "confirm_intake" ? (
+        <IntakeReview
+          key={selected.item_id}
+          session={session}
+          item={selected}
+          signer={inbox.data?.review_identity?.display_name || undefined}
+          onOpen={onOpen}
+          onDecided={setNotice}
         />
       ) : selected.kind === "review_evidence" && selected.claim_id ? (
         <EvidenceReview
@@ -381,8 +391,9 @@ export function EvidenceReview({
 
 export function OtherItem({ item, onOpen }: { item: InboxItem; onOpen: (claimId: string, nodeId?: string) => void }) {
   const { t, i18n } = useTranslation();
-  const details = Object.entries(item.detail ?? {}).filter(([, value]) =>
-    ["string", "number", "boolean"].includes(typeof value),
+  // #340: checksums identify the record for software, not for the researcher deciding it.
+  const details = Object.entries(item.detail ?? {}).filter(
+    ([key, value]) => !key.includes("sha256") && ["string", "number", "boolean"].includes(typeof value),
   );
   return (
     <>
@@ -410,8 +421,7 @@ export function OtherItem({ item, onOpen }: { item: InboxItem; onOpen: (claimId:
             ))}
           </dl>
         )}
-        <p className="inline-note">{t("review.cliNote")}</p>
-        <pre className="code-block">{"research-multiplier review inbox"}</pre>
+        <p className="inline-note">{t("review.notInApp")}</p>
       </div>
     </>
   );

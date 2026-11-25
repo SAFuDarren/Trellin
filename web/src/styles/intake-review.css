@@ -1,0 +1,115 @@
+/* #340: confirming a starting research scope in Review and the Work side panel. */
+.intake-review {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+.intake-review h3 {
+  margin: 0 0 8px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-semibold);
+}
+.intake-target p {
+  margin: 0 0 8px;
+  font-family: var(--math);
+}
+.intake-closed {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-card);
+  background: var(--warn-soft);
+}
+.intake-items {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.intake-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--node-line);
+  border-radius: var(--radius-card);
+  background: var(--node);
+}
+.intake-item[data-choice="omit"] {
+  background: transparent;
+}
+.intake-item[data-choice="omit"] blockquote,
+.intake-item[data-choice="omit"] .code-block {
+  opacity: 0.55;
+}
+.intake-item header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+.intake-status {
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+.intake-status[data-status="formalization_required"],
+.intake-status[data-status="clarify"] {
+  color: color-mix(in srgb, var(--warn) 85%, var(--ink));
+}
+.intake-item blockquote {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--edge-soft);
+  font-family: var(--math);
+  overflow-wrap: anywhere;
+}
+.intake-question {
+  margin: 0;
+  color: var(--sub);
+}
+.intake-item .evidence-decision-choice {
+  margin: 0;
+}
+.intake-item .evidence-decision-choice input {
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+.intake-lean {
+  display: grid;
+  gap: 4px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+.intake-lean textarea {
+  font: 12px/1.6 var(--mono);
+}
+.intake-reused summary {
+  color: var(--sub);
+  cursor: pointer;
+}
+.intake-reused ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.intake-reused li {
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+}
+.intake-reused small {
+  color: var(--sub);
+}
+.intake-stale {
+  color: color-mix(in srgb, var(--warn) 85%, var(--ink));
+  font-style: normal;
+  font-size: var(--type-meta-size);
+}

@@ -32,3 +32,13 @@ export function savedReviewer(): string {
 export function useReviewSigner(session: string): string | undefined {
   return useInbox(session).data?.review_identity?.display_name || undefined;
 }
+
+/** A formal statement as the researcher reads it: the Lean proposition alone, or the recorded form in full. */
+export function formalText(value: Record<string, unknown> | null | undefined): string {
+  if (!value) return "";
+  if (Object.keys(value).length === 1) {
+    const lean = value.lean as { proposition?: unknown } | undefined;
+    if (typeof lean?.proposition === "string" && Object.keys(lean).length === 1) return lean.proposition;
+  }
+  return JSON.stringify(value, null, 2);
+}

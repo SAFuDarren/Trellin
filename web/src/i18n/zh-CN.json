@@ -367,7 +367,12 @@
       "decide_condition": "待决定的条件",
       "checker_hold": "待审阅的核验器变更",
       "review_formalpedia_basis": "待审阅的定理库前提",
-      "review_lean_scope_change": "待审阅的 Lean 范围变更"
+      "review_lean_scope_change": "待审阅的 Lean 范围变更",
+      "confirm_intake": "待确认的起始范围",
+      "confirm_formalization": "待确认的形式化",
+      "confirm_goal": "待确认的研究目标",
+      "confirm_lean_statement": "待确认的 Lean 陈述",
+      "confirm_literature_source": "待确认的文献来源"
     },
     "evidenceExplain": "批准会将此核验结果记录为课题已接受的证据。如果需要修改，请附上理由退回。",
     "goalEvidenceExplain": "批准会记录对这个课题的 Lean 陈述已有的核验证明。课题的证明状态由单独的流程确认。",
@@ -387,7 +392,7 @@
     "needReason": "请先填写理由。",
     "context": "上下文",
     "status": "状态",
-    "cliNote": "这类事项目前在命令行里处理："
+    "notInApp": "这类决定暂时还不能在工作台里记录。列在这里，是为了让你知道它在等待处理。"
   },
   "goalReview": {
     "objective": "研究目标",
@@ -735,7 +740,14 @@
     "claim_code.missing": "此工作区中没有对应短码的命题或节点。",
     "claim_code.upgrade_required": "升级课题数据库后即可使用稳定的研究编号。",
     "claim_code.save_failed": "无法保存短码，请检查本机连接后重试。",
-    "claim_code.conflict": "此目标已有其他短码，请从「研究引用」修改。"
+    "claim_code.conflict": "此目标已有其他短码，请从「研究引用」修改。",
+    "intakeReview": {
+      "invalid": "请检查每一项的决定和理由，然后重试。",
+      "identity": "请以本机研究者身份打开这个项目后再确认。",
+      "missing": "这个起始范围已不存在。",
+      "stale": "打开后它有了变更。请按当前版本审阅后重新确认。",
+      "unavailable": "无法读取或保存这个起始范围。请刷新后重试。"
+    }
   },
   "graph": {
     "projectClaims": "项目内的其他命题",
@@ -1885,7 +1897,8 @@
       "review": "批准结果",
       "question": "回答问题",
       "failed": "检查失败",
-      "delivery": "Agent 交付"
+      "delivery": "Agent 交付",
+      "confirm": "待确认"
     },
     "handle": "处理",
     "openPage": "打开页面",
@@ -1916,5 +1929,40 @@
     "unpin": "取消置顶",
     "uses": "依赖",
     "usedBy": "被引用"
+  },
+  "intakeReview": {
+    "explain": "选择哪些条目进入这项研究的起始范围。确认的条目会成为证明课题所依据的前提，略去的条目不纳入。与定理库完全一致的条目会原样复用。",
+    "domain": "领域",
+    "objective": "研究目标",
+    "sensitivity": "公开范围",
+    "target": "起始陈述",
+    "toDecide_one": "{{count}} 项待决定",
+    "toDecide_other": "{{count}} 项待决定",
+    "itemLabel": "{{index}}. {{kind}}",
+    "decisionFor": "{{item}}的决定",
+    "accept": "确认",
+    "omit": "略去",
+    "leanFor": "{{item}}的 Lean 命题",
+    "status": {
+      "clarify": "有待澄清的问题",
+      "confirm_scope": "由模型提出",
+      "confirm_meaning": "请核对表述",
+      "formalization_required": "需要 Lean 命题",
+      "reuse": "与定理库一致"
+    },
+    "reused_one": "{{count}} 项复用定理库",
+    "reused_other": "{{count}} 项复用定理库",
+    "version": "第 {{version}} 版",
+    "changed": "起草后已有变更",
+    "reasonHint": "例如：这些前提与论文的设定一致",
+    "submit": "确认起始范围",
+    "needDecisions": "请先为每一项选择「确认」或「略去」。",
+    "needLean": "确认的条目如果还没有 Lean 命题，请补上。",
+    "confirmed": "起始范围已确认。",
+    "closed": {
+      "confirmed": "这个起始范围已经确认过了。",
+      "superseded": "已有更新的起始范围取代了它，这里无需再确认。",
+      "stale": "它复用的定理库条目在起草后有了变更。请在项目图谱里重新整理笔记，按最新版本审阅。"
+    }
   }
 }

@@ -25,6 +25,12 @@ function KindMark({ kind }: { kind: WaitingKind }) {
           <path d="m8.5 12.2 2.4 2.4 4.8-5" />
         </>
       )}
+      {kind === "confirm" && (
+        <>
+          <rect x="5" y="4" width="14" height="16" rx="2" />
+          <path d="m8.8 12.4 2.2 2.2 4.2-4.6" />
+        </>
+      )}
       {kind === "question" && (
         <>
           <circle cx="12" cy="12" r="9" />
@@ -58,16 +64,20 @@ function WaitingRow({
   const kindLabel = t(`workPanel.kinds.${item.kind}`);
   // The first detail names the claim or Agent; a detail that repeats the kind adds nothing.
   const detail = details.find((entry) => entry && entry !== kindLabel && entry !== title);
-  const meta = [kindLabel, detail, when].filter(Boolean).join(" · ");
+  // #340: a detail that already says the kind, such as "Starting scope to confirm", replaces it.
+  const repeats = Boolean(detail?.toLocaleLowerCase().includes(kindLabel.toLocaleLowerCase()));
+  const meta = [repeats ? null : kindLabel, detail, when].filter(Boolean).join(" · ");
   const open = work.peek?.kind === "waiting" && work.peek.id === item.id;
+  // #340: on the Review page a review item opens in the page, not as a second copy beside it.
+  const handle = () => {
+    if (item.row.source === "review" && currentRoute().section === "review") {
+      work.setPeek(null);
+      window.location.hash = url;
+    } else work.setPeek({ kind: "waiting", id: item.id, index });
+  };
   return (
     <li className="waiting-row" data-open={open}>
-      <button
-        type="button"
-        className="waiting-main"
-        aria-haspopup="dialog"
-        onClick={() => work.setPeek({ kind: "waiting", id: item.id, index })}
-      >
+      <button type="button" className="waiting-main" aria-haspopup="dialog" onClick={handle}>
         <KindMark kind={item.kind} />
         <span className="waiting-text">
           <strong title={title}>{title}</strong>
@@ -75,11 +85,7 @@ function WaitingRow({
         </span>
       </button>
       <span className="waiting-actions">
-        <button
-          type="button"
-          className="waiting-action primary"
-          onClick={() => work.setPeek({ kind: "waiting", id: item.id, index })}
-        >
+        <button type="button" className="waiting-action primary" onClick={handle}>
           {t("workPanel.handle")}
         </button>
         <a className="waiting-action" href={url}>

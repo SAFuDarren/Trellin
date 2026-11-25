@@ -117,6 +117,8 @@ For free-text public notes, set `sensitivity` to `public`, put the text in `note
 
 ## Confirm outstanding items
 
+In the desktop app, open the intake from **Needs you** or **Review**. It shows the title, objective, starting statement and each outstanding item: choose **Confirm** or **Omit** for each one, add a Lean proposition where a confirmed item has none, and record one reason. Items that match the Library exactly are listed as reused. The steps below do the same from the command line.
+
 Read the draft and keep its exact `intake_sha256`. Save only the outstanding decisions in a JSON object keyed by the displayed item IDs. An accepted ambiguous item needs the clarified formal statement. An omitted item needs a specific reason.
 
 ```json
