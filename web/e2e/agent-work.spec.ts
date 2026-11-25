@@ -277,7 +277,7 @@ test("Claims, Agent tasks and Review each have one active rail link, including l
   await page.reload();
   await expect(activeRail).toHaveCount(1);
   await expect(activeRail).toHaveAccessibleName(/^Work/);
-  const claims = sidebar.getByRole("link", { name: "Claims", exact: true });
+  const claims = sidebar.getByRole("link", { name: /^All claims( \d+)?$/ });
   await expect(claims).toHaveAttribute("aria-current", "page");
   await expect(sidebar.getByRole("link", { name: "Agent work", exact: true })).toHaveCount(0);
 

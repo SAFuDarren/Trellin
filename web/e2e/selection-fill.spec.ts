@@ -22,7 +22,7 @@ for (const theme of ["light", "dark"] as const) {
     };
     await openDestination(page, "Claims");
     const work = railSpace(page, "Work");
-    const allClaims = sidebar.getByRole("link", { name: "Claims", exact: true });
+    const allClaims = sidebar.getByRole("link", { name: /^All claims( \d+)?$/ });
     const otherClaimView = sidebar.locator('.nav-item:not([aria-current="page"])').first();
     await expectSelected(work);
     await expectSelected(allClaims);

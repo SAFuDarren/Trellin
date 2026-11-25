@@ -45,6 +45,7 @@ export function ResearchLanes({
   expandedClaim,
   onToggleClaim,
   renderPreview,
+  opensPanel = false,
 }: {
   claims: readonly BoardClaim[];
   columns: readonly string[];
@@ -58,6 +59,8 @@ export function ResearchLanes({
   expandedClaim: string | null;
   onToggleClaim: (claimId: string) => void;
   renderPreview: (claimId: string, id: string) => ReactNode;
+  /** #326: a card opens the side panel instead of a preview in place. */
+  opensPanel?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [openCells, setOpenCells] = useState<ReadonlySet<string>>(new Set());
@@ -85,12 +88,13 @@ export function ResearchLanes({
     const asRow = display.proved === "rows" && claim.status === "proved";
     if (asRow) {
       return (
-        <li key={claim.id} className="lane-row">
+        <li key={claim.id} className="lane-row" data-open={expanded}>
           <button
             type="button"
             className="lane-row-toggle"
             aria-expanded={expanded}
-            aria-controls={expanded ? previewId : undefined}
+            aria-haspopup={opensPanel ? "dialog" : undefined}
+            aria-controls={expanded && !opensPanel ? previewId : undefined}
             onClick={() => onToggleClaim(claim.id)}
           >
             <svg className="lane-row-mark" viewBox="0 0 24 24" aria-hidden="true">
@@ -100,17 +104,18 @@ export function ResearchLanes({
             <span className="lane-code">{code}</span>
             <span className="lane-row-title">{name}</span>
           </button>
-          {expanded && renderPreview(claim.id, previewId)}
+          {expanded && !opensPanel && renderPreview(claim.id, previewId)}
         </li>
       );
     }
     return (
-      <li key={claim.id} className="lane-card" data-live={live > 0}>
+      <li key={claim.id} className="lane-card" data-live={live > 0} data-open={expanded}>
         <button
           type="button"
           className="lane-card-toggle"
           aria-expanded={expanded}
-          aria-controls={expanded ? previewId : undefined}
+          aria-haspopup={opensPanel ? "dialog" : undefined}
+          aria-controls={expanded && !opensPanel ? previewId : undefined}
           onClick={() => onToggleClaim(claim.id)}
         >
           <span className="lane-card-head">
@@ -139,7 +144,7 @@ export function ResearchLanes({
             <ClaimReviewLinks items={items} />
           </div>
         )}
-        {expanded && renderPreview(claim.id, previewId)}
+        {expanded && !opensPanel && renderPreview(claim.id, previewId)}
       </li>
     );
   }

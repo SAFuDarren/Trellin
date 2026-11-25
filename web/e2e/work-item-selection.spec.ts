@@ -75,7 +75,9 @@ test("Claims selects a range in visible order, copies IDs and resets when the la
   await expect(actions).toHaveCount(0);
   await rows.first().check();
   await expect(actions.getByText("1 selected", { exact: true })).toBeVisible();
-  await page.locator(".section-nav").getByRole("link", { name: /^flow/ }).click();
+  // #326: domains are a Filter on the board, no longer panel entries.
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "flow", exact: true }).click();
   const filtered = page.getByRole("region", { name: "Select items in flow" });
   const filteredRows = filtered.getByRole("checkbox");
   await expect(filteredRows).toHaveCount(1);

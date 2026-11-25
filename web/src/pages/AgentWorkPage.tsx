@@ -725,7 +725,7 @@ function AgentWorkApproval({
   );
 }
 
-function AgentWorkDetail({ session, id, tasks }: { session: string; id: string; tasks: AgentWorkSummary[] }) {
+export function AgentWorkDetail({ session, id, tasks }: { session: string; id: string; tasks: AgentWorkSummary[] }) {
   const { t, i18n } = useTranslation();
   const result = useAgentWorkTask(session, id);
   if (result.isPending) return <Empty>{t("common.loading")}</Empty>;

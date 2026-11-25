@@ -12,14 +12,21 @@ import { ResearchLanes } from "../components/ResearchLanes";
 import { WorkStatusColumn, WorkTable } from "../components/WorkDisplay";
 import { WorkSelectionArea, WorkSelectionCheckbox, useWorkItemSelection } from "../components/WorkItemSelection";
 import { href } from "../shell/route";
+import { useWork } from "../shell/workContext";
 import type { ClaimProgress } from "../workbench/claimProgress";
-import { boardColumns, laneColumns, matchesSearch } from "../workbench/claimBoard";
+import {
+  boardColumns,
+  CLAIM_VIEWS,
+  inClaimView,
+  laneColumns,
+  laneGroups,
+  matchesSearch,
+  type ClaimView,
+} from "../workbench/claimBoard";
 import { claimCode, statusText } from "../workbench/text";
 import type { AtlasClaim, GraphSnapshot } from "../workbench/types";
 
-const FILTERS = ["all", "review", "blocked", "running"] as const;
-
-function ClaimPreview({
+export function ClaimPreview({
   session,
   claimId,
   id,
@@ -87,7 +94,7 @@ export function ClaimsPage({
   /** #326: New claim opens the project's Add theorem entry. */
   onNewClaim?: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [expandedClaim, setExpandedClaim] = useState<string | null>(null);
   const [display, setDisplay] = useBoardDisplay();
   const [collapsed, toggleLane] = useCollapsedLanes();
@@ -98,30 +105,25 @@ export function ClaimsPage({
   const counts = new Map((atlasClaims ?? []).map((claim) => [claim.id, claim]));
   const list = claims.data?.claims ?? [];
   const domains = [...new Set(list.map((claim) => claim.domain || t("sidebar.uncategorized")))].sort();
-  const [filter, domain] = sub.startsWith("domain:")
-    ? ["all", sub.slice(7)]
-    : [FILTERS.includes(sub as never) ? sub : "all", ""];
+  const domain = sub.startsWith("domain:") ? sub.slice(7) : "";
+  const filter: ClaimView = domain ? "all" : (CLAIM_VIEWS.find((view) => view === sub) ?? "all");
+  const blocked = new Map([...counts].map(([id, record]) => [id, record.blocked ?? 0]));
   const shown = list.filter((claim) => {
-    const record = counts.get(claim.id);
     if (domain && (claim.domain || t("sidebar.uncategorized")) !== domain) return false;
     if (statuses.size && !statuses.has(claim.status)) return false;
     if (!matchesSearch(claim, claimCode(claim), search)) return false;
-    if (filter === "review") return Boolean(claimReviews.get(claim.id)?.length);
-    if (filter === "blocked") return (record?.blocked ?? 0) > 0;
-    if (filter === "running") return (running.get(claim.id) ?? 0) > 0;
-    return true;
+    return inClaimView(filter, claim.id, claimReviews, blocked, running);
   });
-  const filterCount = (key: (typeof FILTERS)[number]) =>
-    list.filter((claim) =>
-      key === "all"
-        ? true
-        : key === "review"
-          ? Boolean(claimReviews.get(claim.id)?.length)
-          : key === "blocked"
-            ? (counts.get(claim.id)?.blocked ?? 0) > 0
-            : (running.get(claim.id) ?? 0) > 0,
-    ).length;
   const columns = boardColumns(list.map((claim) => claim.status));
+  const work = useWork();
+  const shownColumns = laneColumns(
+    columns,
+    shown.map((claim) => claim.status),
+  );
+  // The side panel moves through claims in the order the domain rows show them.
+  const boardOrder = laneGroups(shown, i18n.language).flatMap((lane) =>
+    shownColumns.flatMap((status) => lane.claims.filter((claim) => claim.status === status).map(({ id }) => id)),
+  );
   const routeFor = (nextDomain: string) =>
     href("claims", nextDomain ? "domain:" + nextDomain : filter === "all" ? "" : filter);
   const filters = {
@@ -258,28 +260,8 @@ export function ClaimsPage({
     <SectionLayout
       space="work"
       title={t("rail.claims")}
-      groups={[
-        {
-          entries: FILTERS.map((key) => ({
-            key,
-            label: t(`claimsPage.filter.${key}`),
-            href: href("claims", key === "all" ? "" : key),
-            current: !domain && filter === key,
-            count: filterCount(key),
-            countTone: key === "running" && filterCount(key) ? "live" : undefined,
-          })),
-        },
-        {
-          name: t("claimsPage.domains"),
-          entries: domains.map((name) => ({
-            key: name,
-            label: name,
-            href: href("claims", "domain:" + name),
-            current: domain === name,
-            count: list.filter((claim) => (claim.domain || t("sidebar.uncategorized")) === name).length,
-          })),
-        },
-      ]}
+      // #326: views, pins and records live in the Work panel; domains are a filter.
+      groups={[]}
     >
       <PageHead
         title={title}
@@ -309,10 +291,7 @@ export function ClaimsPage({
         <ResearchLanes
           claims={shown}
           // #326: empty statuses other than In progress and Proved take no width in the domain rows.
-          columns={laneColumns(
-            columns,
-            shown.map((claim) => claim.status),
-          )}
+          columns={shownColumns}
           display={display}
           collapsed={collapsed}
           onToggleLane={toggleLane}
@@ -320,8 +299,13 @@ export function ClaimsPage({
           progress={claimProgress}
           reviews={claimReviews}
           running={running}
-          expandedClaim={expandedClaim}
-          onToggleClaim={(id) => setExpandedClaim(expandedClaim === id ? null : id)}
+          expandedClaim={work ? (work.peek?.kind === "claim" ? work.peek.id : null) : expandedClaim}
+          opensPanel={Boolean(work)}
+          onToggleClaim={(id) => {
+            if (!work) setExpandedClaim(expandedClaim === id ? null : id);
+            else if (work.peek?.kind === "claim" && work.peek.id === id) work.setPeek(null);
+            else work.setPeek({ kind: "claim", id, order: boardOrder });
+          }}
           renderPreview={(id, previewId) => (
             <ClaimPreview session={session} claimId={id} id={previewId} onOpen={() => onOpen(id)} />
           )}

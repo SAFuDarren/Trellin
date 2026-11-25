@@ -127,7 +127,7 @@ test("proof activity opens with the keyboard and dark navigation uses Navy selec
 
   await openDestination(page, "Claims");
   const work = railSpace(page, "Work");
-  const claims = page.locator("nav.section-nav").getByRole("link", { name: "Claims", exact: true });
+  const claims = page.locator("nav.section-nav").getByRole("link", { name: /^All claims( \d+)?$/ });
   const selectedTint = await page.evaluate(() => {
     const probe = document.createElement("span");
     probe.hidden = true;

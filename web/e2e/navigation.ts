@@ -38,8 +38,10 @@ export async function openDestination(page: Page, destination: Destination) {
   await expect(space).toHaveAttribute("aria-current", "page");
   if (destination === "Project map") return;
   const panel = page.locator("nav.section-nav");
+  // #326: Work's panel reaches Claims through its "All claims" view.
+  const label = destination === "Claims" ? "All claims" : destination;
   // An entry with a count is named with it ("Review 2").
-  const entry = panel.getByRole("link", { name: new RegExp(`^${destination}( \\d+)?$`) });
+  const entry = panel.getByRole("link", { name: new RegExp(`^${label}( \\d+)?$`) });
   await entry.click();
   await expect(entry).toHaveAttribute("aria-current", "page");
 }

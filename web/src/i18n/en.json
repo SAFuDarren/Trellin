@@ -43,7 +43,12 @@
     "previewMove": "Preview a position in Move card mode",
     "saveMove": "Save card position",
     "cancelMove": "Cancel card move",
-    "menuActions": "With a menu or the palette open"
+    "menuActions": "With a menu or the palette open",
+    "work": "Work",
+    "workOpen": "Open the focused card or item large",
+    "workNext": "Next item in the side panel",
+    "workPrevious": "Previous item in the side panel",
+    "workClose": "Close the side panel"
   },
   "projects": {
     "title": "Projects",
@@ -1847,6 +1852,40 @@
     "laneRunning_other": " · {{count}} running",
     "cell": "{{lane}}, {{status}}",
     "showMore_one": "Show {{count}} more",
-    "showMore_other": "Show {{count}} more"
+    "showMore_other": "Show {{count}} more",
+    "segmentsLabel": "{{done}} of {{total}} obligations verified"
+  },
+  "workPanel": {
+    "kinds": {
+      "review": "Result to approve",
+      "question": "Question to answer",
+      "failed": "Check failed",
+      "delivery": "Agent delivery"
+    },
+    "handle": "Handle",
+    "openPage": "Open page",
+    "waiting_one": "Needs you · {{count}}",
+    "waiting_other": "Needs you · {{count}}",
+    "waitingLabel": "Needs you",
+    "handleAll": "Go through",
+    "nothingWaiting": "Nothing is waiting for you.",
+    "more_one": "{{count}} more in Inbox",
+    "more_other": "{{count}} more in Inbox",
+    "views": "Views",
+    "pinned": "Pinned",
+    "records": "Records"
+  },
+  "workPeek": {
+    "title": "Item",
+    "gone": "This claim is no longer on the board.",
+    "allDone": "Nothing else is waiting for you.",
+    "allDoneReason": "Decisions you record stay in Review records.",
+    "claims": "Claims",
+    "position": "{{index}} of {{count}}",
+    "previous": "Previous (K)",
+    "next": "Next (J)",
+    "close": "Close (Esc)",
+    "pin": "Pin",
+    "unpin": "Unpin"
   }
 }

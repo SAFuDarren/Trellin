@@ -80,3 +80,20 @@ export function visibleCards<T>(cards: readonly T[], limit: number, expanded: bo
   if (expanded || limit <= 0 || cards.length <= limit) return { shown: [...cards], hidden: 0 };
   return { shown: cards.slice(0, limit), hidden: cards.length - limit };
 }
+
+export const CLAIM_VIEWS = ["all", "review", "running", "blocked"] as const;
+export type ClaimView = (typeof CLAIM_VIEWS)[number];
+
+/** Whether a claim belongs to a Work view; the panel counts and the Claims page filter use the same rule. */
+export function inClaimView(
+  view: ClaimView,
+  claimId: string,
+  reviews: ReadonlyMap<string, readonly unknown[]>,
+  blocked: ReadonlyMap<string, number>,
+  running: ReadonlyMap<string, number>,
+): boolean {
+  if (view === "review") return Boolean(reviews.get(claimId)?.length);
+  if (view === "blocked") return (blocked.get(claimId) ?? 0) > 0;
+  if (view === "running") return (running.get(claimId) ?? 0) > 0;
+  return true;
+}
