@@ -15,7 +15,8 @@ from research_multiplier.workbench.server import WorkbenchServer
 from research_multiplier.workflows import intake, lean_workflow
 from tests._native_db import disposable_project_logins
 
-pytestmark = pytest.mark.postgres
+# Proving the origin claim needs the pinned Lean toolchain, so this runs in the Lean lane with PostgreSQL.
+pytestmark = pytest.mark.lean
 REASON = "Reviewed the synthetic fixture."
 
 
