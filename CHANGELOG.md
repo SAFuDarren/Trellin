@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.134
+
+- Work cards show how each claim was established: **Lean-checked**, **Certificate-checked**, **Audited proof** or **Counterexample**, with a check when Review approved that evidence, and **Numeric support** on an open claim that only a numeric check supports. The marks come from recorded evidence; nothing new is stored.
+- Cards list the claims a claim's current formalization relies on and how many claims rely on it. Pointing at or selecting a card highlights both sides and dims the rest; the side panel lists them under **Relies on** and **Used by** and opens each in place.
+- A **Ready to advance** view lists open claims whose prerequisites are all proved.
+- `/api/project-canvas/claims` adds `assurance` (decisive evidence kind and review status, and other verified evidence kinds) and `uses` to each claim, derived from existing records with no migration.
+
 ## 1.0.133
 
 - Added workbench review endpoints `GET /api/intake-review?intake=<id>` and `POST /api/intake-review/confirm` so pending `confirm_intake` inbox items—including CLI/notes, model-assisted, and target-first drafts—can be inspected with matched reused library versions and frozen target scope, and confirmed directly through the existing human-reviewed intake workflow with bound local-researcher attribution.

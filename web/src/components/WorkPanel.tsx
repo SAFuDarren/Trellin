@@ -146,7 +146,13 @@ function SectionHead({
   );
 }
 
-const VIEW_ICONS: Record<string, string> = { all: "work", review: "review", running: "running", blocked: "blocked" };
+const VIEW_ICONS: Record<string, string> = {
+  all: "work",
+  review: "review",
+  running: "running",
+  blocked: "blocked",
+  advance: "advance",
+};
 const RECORD_ICONS: Record<string, string> = {
   inbox: "inbox",
   review: "review",

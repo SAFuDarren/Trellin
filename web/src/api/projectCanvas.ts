@@ -6,7 +6,9 @@ type Point = { x: number; y: number };
 export type ResearchLink = { source: string; target: string };
 export type ProjectCanvasLayout = { positions: Record<string, Point>; links: ResearchLink[] };
 export type ObligationCount = { verified: number; total: number };
-export type ProjectClaim = Claim & { obligations?: ObligationCount };
+/** #342: the decisive evidence kind and its review, and the kinds of other verified evidence, as recorded. */
+export type ClaimAssurance = { kind: string | null; review: string | null; supporting: string[] };
+export type ProjectClaim = Claim & { obligations?: ObligationCount; assurance?: ClaimAssurance; uses?: string[] };
 export type ProjectCanvasOperation =
   | ({ action: "move"; id: string } & Point)
   | ({ action: "link" | "unlink" } & ResearchLink);

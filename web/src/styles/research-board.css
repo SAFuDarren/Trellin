@@ -423,7 +423,7 @@
 }
 .lane-row-title {
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 4em;
   overflow: hidden;
   font-family: var(--math);
   font-size: 14px;
@@ -443,4 +443,91 @@
 .lane-more:hover {
   border-color: var(--edge-soft);
   color: var(--ink);
+}
+
+/* #342: how a claim was established, and the claims it relies on. */
+.trust-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--good) 45%, transparent);
+  border-radius: var(--radius-pill);
+  color: color-mix(in srgb, var(--good) 80%, var(--ink));
+  font-size: 11px;
+  font-weight: var(--type-medium);
+  line-height: 16px;
+  white-space: nowrap;
+}
+.trust-badge[data-reviewed="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--good) 16%, transparent);
+}
+.trust-badge[data-mark="counterexample"] {
+  border-color: color-mix(in srgb, var(--crit) 45%, transparent);
+  color: color-mix(in srgb, var(--crit) 80%, var(--ink));
+}
+.trust-badge[data-mark="counterexample"][data-reviewed="true"] {
+  border-color: transparent;
+  background: var(--crit-soft);
+}
+.trust-badge[data-mark="numeric"] {
+  border-style: dashed;
+  border-color: var(--edge-soft);
+  color: var(--sub);
+}
+.lane-row-toggle .trust-badge {
+  flex: none;
+  margin-left: auto;
+}
+.lane-deps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+.lane-deps > span + span::before {
+  content: "·";
+  margin-right: 10px;
+}
+.lane-card,
+.lane-row {
+  transition:
+    opacity var(--duration-base) var(--ease),
+    border-color var(--duration-base) var(--ease);
+}
+.research-lanes[data-tracing="true"] [data-relation="other"] {
+  opacity: 0.38;
+}
+.research-lanes[data-tracing="true"] [data-relation="self"] {
+  border-color: var(--accent);
+}
+.research-lanes[data-tracing="true"] [data-relation="uses"],
+.research-lanes[data-tracing="true"] [data-relation="usedBy"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--node-line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lane-card,
+  .lane-row {
+    transition: none;
+  }
+}
+.lane-row-toggle .lane-deps {
+  flex: none;
+  margin-left: auto;
+}
+.lane-row-toggle .lane-deps + .trust-badge {
+  margin-left: 0;
+}
+.trust-check {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

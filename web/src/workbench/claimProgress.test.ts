@@ -106,4 +106,29 @@ describe("claim progress", () => {
     expect(state({ claim_id: "c", state: "blocked", blocker: "proof_task.lean_unconfirmed" })).toBeUndefined();
     expect(state({ claim_id: "c", state: "stopped", can_start: true })).toBeUndefined();
   });
+
+  it("links each claim to the visible claims it uses and that use it, and says which open claims can advance", () => {
+    const related = (id: string, status: string, uses: string[]): ProjectClaim => ({ ...claim(id, status), uses });
+    const progress = buildClaimProgress({
+      claims: [
+        { ...related("base", "proved", []), assurance: { kind: "lean", review: "approved", supporting: [] } },
+        related("middle", "open", ["base"]),
+        related("top", "open", ["base", "middle", "withdrawn", "top"]),
+        related("alone", "open", []),
+        related("done", "proved", ["middle"]),
+        claim("legacy"),
+      ],
+    });
+    expect(progress.get("base")).toEqual({
+      assurance: { kind: "lean", review: "approved", supporting: [] },
+      usedBy: ["middle", "top"],
+    });
+    expect(progress.get("middle")).toEqual({ uses: ["base"], usedBy: ["top", "done"], canAdvance: true });
+    // Claims off the map and the claim itself are not dependencies.
+    expect(progress.get("top")).toEqual({ uses: ["base", "middle"], canAdvance: false });
+    expect(progress.get("alone")).toEqual({ canAdvance: true });
+    expect(progress.get("done")).toEqual({ uses: ["middle"] });
+    // A server without the relation fields leaves the claim unclassified.
+    expect(progress.has("legacy")).toBe(false);
+  });
 });

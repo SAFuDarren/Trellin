@@ -2,7 +2,14 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { InboxItem } from "../api/sections";
 import { claimCode, statusText } from "../workbench/text";
-import { laneGroups, obligationSegments, segmentSummary, visibleCards, type Segment } from "../workbench/claimBoard";
+import {
+  laneGroups,
+  obligationSegments,
+  segmentSummary,
+  trustMark,
+  visibleCards,
+  type Segment,
+} from "../workbench/claimBoard";
 import type { ClaimProgress } from "../workbench/claimProgress";
 import type { AtlasClaim } from "../workbench/types";
 import type { BoardDisplay } from "./BoardControls";
@@ -32,6 +39,58 @@ export function Segments({ segments, label }: { segments: readonly Segment[]; la
   );
 }
 
+/** #342: how a claim was established, with a reviewed mark when its decisive evidence was approved. */
+export function TrustBadge({ status, progress }: { status: string; progress: ClaimProgress | undefined }) {
+  const { t } = useTranslation();
+  const trust = trustMark(status, progress?.assurance);
+  if (!trust) return null;
+  const mark = t(`researchBoard.trust.${trust.mark}`);
+  const title = t(`researchBoard.trustTitle.${trust.mark}`);
+  return (
+    <span
+      className="trust-badge"
+      data-mark={trust.mark}
+      data-reviewed={trust.reviewed}
+      title={trust.reviewed ? t("researchBoard.trustTitleReviewed", { title }) : title}
+    >
+      {mark}
+      {trust.reviewed && (
+        <>
+          <svg className="trust-check" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m5.5 12.5 4 4 9-9.5" />
+          </svg>
+          <span className="sr-only">{t("researchBoard.trustReviewed")}</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** #342: which claims the claim relies on, by code, and how many rely on it. */
+export function DependencyLine({
+  progress,
+  codeOf,
+  usedByOnly = false,
+}: {
+  progress: ClaimProgress | undefined;
+  codeOf: (claimId: string) => string;
+  /** A one-line proved row shows only how many claims rely on it. */
+  usedByOnly?: boolean;
+}) {
+  const { t } = useTranslation();
+  const uses = usedByOnly ? [] : (progress?.uses ?? []);
+  const usedBy = progress?.usedBy?.length ?? 0;
+  if (!uses.length && !usedBy) return null;
+  return (
+    <span className="lane-deps">
+      {uses.length > 0 && <span>{t("researchBoard.uses", { codes: uses.map(codeOf).join(", ") })}</span>}
+      {usedBy > 0 && <span>{t("researchBoard.usedBy", { count: usedBy })}</span>}
+    </span>
+  );
+}
+
+type Relation = "self" | "uses" | "usedBy" | "other";
+
 export function ResearchLanes({
   claims,
   columns,
@@ -46,6 +105,7 @@ export function ResearchLanes({
   onToggleClaim,
   renderPreview,
   opensPanel = false,
+  codes,
 }: {
   claims: readonly BoardClaim[];
   columns: readonly string[];
@@ -61,11 +121,36 @@ export function ResearchLanes({
   renderPreview: (claimId: string, id: string) => ReactNode;
   /** #326: a card opens the side panel instead of a preview in place. */
   opensPanel?: boolean;
+  /** Codes of claims the board may not show, for the dependency line. */
+  codes?: ReadonlyMap<string, string>;
 }) {
   const { t, i18n } = useTranslation();
   const [openCells, setOpenCells] = useState<ReadonlySet<string>>(new Set());
   // The edge under the pinned domain names shows only once cards have slid beneath it.
   const [scrolled, setScrolled] = useState(false);
+  // #342: pointing at or selecting a card traces what it relies on and what relies on it; the rest dims.
+  const [pointed, setPointed] = useState<string | null>(null);
+  const anchor = pointed ?? expandedClaim;
+  const anchorUses = new Set(anchor ? (progress.get(anchor)?.uses ?? []) : []);
+  const anchorUsedBy = new Set(anchor ? (progress.get(anchor)?.usedBy ?? []) : []);
+  const tracing = anchorUses.size + anchorUsedBy.size > 0;
+  const relationOf = (claimId: string): Relation =>
+    claimId === anchor ? "self" : anchorUses.has(claimId) ? "uses" : anchorUsedBy.has(claimId) ? "usedBy" : "other";
+  const boardCodes = new Map(claims.map((claim) => [claim.id, claimCode(claim)]));
+  const codeOf = (claimId: string) => boardCodes.get(claimId) ?? codes?.get(claimId) ?? claimCode({ id: claimId });
+  const tracedProps = (claimId: string) => ({
+    "data-relation": tracing ? relationOf(claimId) : undefined,
+    onMouseEnter: () => setPointed(claimId),
+    onMouseLeave: () => setPointed((current) => (current === claimId ? null : current)),
+    onFocus: () => setPointed(claimId),
+    onBlur: () => setPointed((current) => (current === claimId ? null : current)),
+  });
+  const relationNote = (claimId: string) => {
+    const relation = tracing ? relationOf(claimId) : "other";
+    return relation === "uses" || relation === "usedBy" ? (
+      <span className="sr-only">{t(`researchBoard.relation.${relation}`)}</span>
+    ) : null;
+  };
   const lanes = laneGroups(claims, i18n.language);
   // Columns share the width up to a comfortable card width, so a wide window leaves space rather than stretching cards.
   const grid = { gridTemplateColumns: `var(--lane-label-w) repeat(${columns.length}, minmax(200px, 340px))` };
@@ -88,7 +173,7 @@ export function ResearchLanes({
     const asRow = display.proved === "rows" && claim.status === "proved";
     if (asRow) {
       return (
-        <li key={claim.id} className="lane-row" data-open={expanded}>
+        <li key={claim.id} className="lane-row" data-open={expanded} {...tracedProps(claim.id)}>
           <button
             type="button"
             className="lane-row-toggle"
@@ -103,13 +188,16 @@ export function ResearchLanes({
             </svg>
             <span className="lane-code">{code}</span>
             <span className="lane-row-title">{name}</span>
+            <DependencyLine progress={progress.get(claim.id)} codeOf={codeOf} usedByOnly />
+            <TrustBadge status={claim.status} progress={progress.get(claim.id)} />
+            {relationNote(claim.id)}
           </button>
           {expanded && !opensPanel && renderPreview(claim.id, previewId)}
         </li>
       );
     }
     return (
-      <li key={claim.id} className="lane-card" data-live={live > 0} data-open={expanded}>
+      <li key={claim.id} className="lane-card" data-live={live > 0} data-open={expanded} {...tracedProps(claim.id)}>
         <button
           type="button"
           className="lane-card-toggle"
@@ -120,6 +208,7 @@ export function ResearchLanes({
         >
           <span className="lane-card-head">
             <span className="lane-code">{code}</span>
+            <TrustBadge status={claim.status} progress={progress.get(claim.id)} />
             {live > 0 && (
               <span className="lane-live">
                 <span aria-hidden="true" />
@@ -138,6 +227,8 @@ export function ResearchLanes({
               </span>
             </span>
           )}
+          <DependencyLine progress={progress.get(claim.id)} codeOf={codeOf} />
+          {relationNote(claim.id)}
         </button>
         {items && items.length > 0 && (
           <div className="lane-card-tags">
@@ -154,6 +245,7 @@ export function ResearchLanes({
       className="research-lanes"
       data-density={display.density}
       data-scrolled={scrolled}
+      data-tracing={tracing}
       onScroll={(event) => setScrolled(event.currentTarget.scrollLeft > 0)}
     >
       <div className="lanes-scroll">

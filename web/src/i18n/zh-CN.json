@@ -826,7 +826,8 @@
       "all": "全部课题",
       "review": "有待审阅",
       "blocked": "有卡点",
-      "running": "运行中的工作"
+      "running": "运行中的工作",
+      "advance": "现在可推进"
     },
     "domains": "领域",
     "byStatus": "按状态分组",
@@ -1854,7 +1855,30 @@
     "cell": "{{lane}}，{{status}}",
     "showMore_one": "再显示 {{count}} 项",
     "showMore_other": "再显示 {{count}} 项",
-    "segmentsLabel": "{{total}} 条义务中已核验 {{done}} 条"
+    "segmentsLabel": "{{total}} 条义务中已核验 {{done}} 条",
+    "trust": {
+      "lean": "Lean 核验",
+      "certificate": "证书核验",
+      "audited": "审计证明",
+      "counterexample": "反例",
+      "numeric": "数值支持"
+    },
+    "trustReviewed": "，已审阅",
+    "trustTitle": {
+      "lean": "由 Lean 检查证明",
+      "certificate": "由精确证书证明",
+      "audited": "由审计过的证明确立",
+      "counterexample": "由已核验的反例否定",
+      "numeric": "尚未证明，有数值检查支持"
+    },
+    "trustTitleReviewed": "{{title}}，已在审阅中批准",
+    "uses": "依赖 {{codes}}",
+    "usedBy_one": "被 {{count}} 项引用",
+    "usedBy_other": "被 {{count}} 项引用",
+    "relation": {
+      "uses": "所选课题依赖它",
+      "usedBy": "它依赖所选课题"
+    }
   },
   "workPanel": {
     "kinds": {
@@ -1889,6 +1913,8 @@
     "next": "下一项（J）",
     "close": "关闭（Esc）",
     "pin": "置顶",
-    "unpin": "取消置顶"
+    "unpin": "取消置顶",
+    "uses": "依赖",
+    "usedBy": "被引用"
   }
 }
