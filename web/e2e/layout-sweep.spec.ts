@@ -145,14 +145,8 @@ test("spaces share panel and header geometry and Home gives the map the full wid
 
   await railSpace(page, "Work").click();
   await expect(panel).toHaveAccessibleName("Work");
-  // #326: Work opens on the claims board, so Claims leads its panel.
-  await expect(panel.locator(".space-entries .label")).toHaveText([
-    "Claims",
-    "Inbox",
-    "Review",
-    "Agent tasks",
-    "Library",
-  ]);
+  // #326: Work opens on the claims board; its panel's records lead to the other Work pages.
+  await expect(panel.locator(".space-entries .label")).toHaveText(["Inbox", "Review", "Agent tasks", "Library"]);
   const workPanel = await panelGeometry(panel);
   expect(workPanel.panel.left).toBeCloseTo(railBox.x + railBox.width, 0);
   expect(await titleFont(heading)).toEqual(pageFont);

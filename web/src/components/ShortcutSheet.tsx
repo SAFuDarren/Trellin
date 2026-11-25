@@ -86,6 +86,15 @@ export function ShortcutSheet({ open, onClose }: { open: boolean; onClose: () =>
       <div className="shortcut-sheet-body" role="region" tabIndex={0} aria-label={t("shortcuts.list")}>
         <ShortcutGroup title={t("shortcuts.navigation")} rows={navigationShortcutRows(t)} />
         <ShortcutGroup
+          title={t("shortcuts.work")}
+          rows={[
+            { id: "work-open", label: t("shortcuts.workOpen"), keys: ["Space", SHORTCUTS.enter] },
+            { id: "work-next", label: t("shortcuts.workNext"), keys: ["J"] },
+            { id: "work-previous", label: t("shortcuts.workPrevious"), keys: ["K"] },
+            { id: "work-close", label: t("shortcuts.workClose"), keys: [SHORTCUTS.escape] },
+          ]}
+        />
+        <ShortcutGroup
           title={t("shortcuts.canvas")}
           rows={[
             { id: "pan", label: t("shortcuts.pan"), keys: SHORTCUTS.arrows },

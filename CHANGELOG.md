@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.130
+
+- The **Work** panel starts with **Needs you**: results to approve, questions to answer, failed checks and Agent deliveries, newest first, each in one row whose **Handle** and **Open page** actions appear when you point at it or focus it. **Views** count all claims, claims waiting for review, running work and blocked claims; **Pinned** keeps the claims you pin on this device; **Records** opens Inbox, Review, Agent tasks and Library. Domains moved from the panel to **Filter**.
+- **Handle**, **Go through** or a claim card opens a side panel beside the board, which stays where it was. Waiting items open in the existing review, question and delivery forms; recording a decision moves on to the next item. A claim shows its code, status, obligations, statement and Lean, and can be pinned. **J** and **K** move through the list, **Esc** closes the panel, and the shortcut sheet lists them.
+
 ## 1.0.129
 
 - The **Work** board fits the window: columns share the width up to a comfortable card width, and statuses with no claims other than In progress and Proved no longer take a column, so a typical window shows the whole board without scrolling sideways. In a narrow window the domain names and the corner above them stay at the left together, cards slide under a soft edge that appears only while scrolled, and nothing covers a card's code. Column counts stay beside their status name.

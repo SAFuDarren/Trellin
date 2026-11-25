@@ -84,7 +84,9 @@ test("Claims preserves progress, review links and previews in Board, List and Ta
 
   await section(page, "Claims");
   await expect(table).toBeVisible();
-  await page.locator(".section-nav").getByRole("link", { name: /^flow/ }).click();
+  // #326: domains are a Filter on the board, no longer panel entries.
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "flow", exact: true }).click();
   const filtered = page.getByRole("table", { name: "flow" });
   await expect(filtered.getByRole("rowheader")).toHaveCount(1);
   await expect(filtered.getByRole("rowheader")).toHaveText("固定网络最大流");

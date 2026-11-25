@@ -15,6 +15,7 @@ import type { ConversationStarterScope } from "./components/ConversationRecipien
 import { CommandPalette } from "./components/CommandPalette";
 import { Rail } from "./components/Rail";
 import { SpaceCounts } from "./components/SectionLayout";
+import { WorkPeek } from "./components/WorkPeek";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
 import { ShortcutSheet } from "./components/ShortcutSheet";
 import { WorkspaceActivityList } from "./components/WorkspaceActivity";
@@ -30,7 +31,17 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { TeamPage } from "./pages/TeamPage";
 import { ConversationEditors } from "./shell/ConversationEditors";
 import { usePaletteResults } from "./shell/paletteResults";
-import { useRoute, workbenchSub } from "./shell/route";
+import { href, useRoute, workbenchSub } from "./shell/route";
+import { spaceOf } from "./shell/spaces";
+import {
+  usePinnedClaims,
+  waitingItems,
+  WorkContext,
+  type PeekTarget,
+  type WorkContextValue,
+} from "./shell/workContext";
+import { CLAIM_VIEWS, inClaimView } from "./workbench/claimBoard";
+import { claimCode } from "./workbench/text";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
 import { buildWorkspaceActivity, type ActivityState } from "./shell/workspaceActivity";
 import { useWorkspaceInbox, workspaceInboxScope } from "./shell/workspaceInbox";
@@ -49,7 +60,9 @@ export function Shell({ session }: { session: string }) {
   const showsClaims = section === "claims";
   const showsActivity = section === "agent-work" && sub === "activity";
   const showsInbox = section === "agent-work" && sub === "inbox";
-  const showsClaimProgress = section === "workbench" || showsClaims;
+  // #326: every Work page shows the Work panel, which counts claims and lists what waits for you.
+  const inWork = spaceOf(section)?.id === "work";
+  const showsClaimProgress = section === "workbench" || showsClaims || inWork;
   const releaseUpdates = useReleaseUpdates(session);
   const queries = useQueryClient();
   const [connection, setConnection] = useState<WorkspaceConnection | null>(null);
@@ -63,7 +76,7 @@ export function Shell({ session }: { session: string }) {
   const team = useTeam(session, live);
   const agentWorkList = useAgentWork(session, live);
   const conversations = useConversations(session, undefined, live);
-  const activityAgents = useTeamAgents(session, showsActivity || showsInbox);
+  const activityAgents = useTeamAgents(session, showsActivity || showsInbox || inWork);
   const [activityFilter, setActivityFilter] = useState<ActivityState | "all">("all");
   const activityLoading = team.isPending || agentWorkList.isPending || conversations.isPending || inbox.isPending;
   const activityUnavailable = team.isError || agentWorkList.isError || conversations.isError || inbox.isError;
@@ -80,7 +93,10 @@ export function Shell({ session }: { session: string }) {
   );
   const inboxScope = workspaceInboxScope(session, workspace, inbox.data?.review_identity?.workspace_id);
   const workspaceInbox = useWorkspaceInbox(inboxScope, activity.rows);
-  const atlas = useAtlas(session, showsClaims);
+  const atlas = useAtlas(session, showsClaims || inWork);
+  const workClaims = useClaims(session, inWork);
+  const [pinnedIds, togglePin] = usePinnedClaims();
+  const [peekState, setPeekState] = useState<{ session: string; target: PeekTarget } | null>(null);
   const projectClaims = useProjectCanvasClaims(session, showsClaimProgress);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [chatRequest, setChatRequest] = useState<{ session: string; value: AgentChatRequest } | null>(null);
@@ -214,6 +230,51 @@ export function Shell({ session }: { session: string }) {
     ],
   };
   const pendingReviews = inbox.data ? activity.inboxCount : undefined;
+  // #326: the Work panel and its side panel read one snapshot built here.
+  const workAgents = new Map(activityAgents.data?.agents?.map((agent) => [agent.id, agent]));
+  const archived = new Set(
+    workspaceInbox.rows.filter(({ mark }) => mark === "archived").map(({ record }) => record.id),
+  );
+  const workClaimList = workClaims.data?.claims ?? [];
+  const atlasById = new Map((atlas.data?.claims ?? []).map((claim) => [claim.id, claim]));
+  const blockedByClaim = new Map([...atlasById].map(([id, claim]) => [id, claim.blocked ?? 0]));
+  const peek = inWork && peekState?.session === session ? peekState.target : null;
+  const work: WorkContextValue = {
+    agents: workAgents,
+    waiting: waitingItems(activity.rows, archived),
+    views: CLAIM_VIEWS.map((key) => ({
+      key,
+      href: href("claims", key === "all" ? "" : key),
+      count: workClaimList.filter((claim) =>
+        inClaimView(key, claim.id, activity.reviewItemsByClaim, blockedByClaim, activity.runningByClaim),
+      ).length,
+    })),
+    pinned: pinnedIds.flatMap((id) => {
+      const claim = workClaimList.find((entry) => entry.id === id);
+      return claim ? [{ id, title: claim.title, code: claimCode(claim) }] : [];
+    }),
+    isPinned: (id) => pinnedIds.includes(id),
+    togglePin,
+    peek,
+    setPeek: (target) => setPeekState(target ? { session, target } : null),
+    renderPeek: () => (
+      <WorkPeek
+        key={peek?.kind === "claim" ? "claims" : "waiting"}
+        session={session}
+        claims={workClaimList}
+        atlas={atlasById}
+        progress={claimProgress}
+        reviews={activity.reviewItemsByClaim}
+        running={activity.runningByClaim}
+        tasks={agentWorkList.data?.tasks ?? []}
+        reviewWorkspace={inbox.data?.review_identity?.workspace_id}
+        signer={inbox.data?.review_identity?.display_name || undefined}
+        clarificationWorkspace={inbox.data?.clarification_review?.workspace_id}
+        onOpen={(claimId, nodeId) => open(claimId, nodeId, true)}
+      />
+    ),
+  };
+
   return (
     <LiveWorkspaceUpdates.Provider value={live}>
       <ConversationEditors key={session} session={session}>
@@ -238,94 +299,96 @@ export function Shell({ session }: { session: string }) {
               }}
               onSearch={openPalette}
             />
-            <SpaceCounts.Provider value={{ inbox: workspaceInbox.unread, review: pendingReviews }}>
-              {section === "review" ? (
-                <ReviewPage session={session} sub={sub} onOpen={open} />
-              ) : section === "agent-work" ? (
-                <AgentWorkPage
-                  session={session}
-                  sub={sub}
-                  inbox={
-                    showsInbox && (
-                      <WorkspaceInbox
-                        key={inboxScope ?? session}
-                        inbox={workspaceInbox}
-                        agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
-                        loading={inbox.isPending || team.isPending || agentWorkList.isPending}
-                        unavailable={inbox.isError || team.isError || agentWorkList.isError}
-                        onOpenProof={(id, nodeId) => open(id, nodeId, true)}
-                      />
-                    )
-                  }
-                  activity={
-                    showsActivity && (
-                      <WorkspaceActivityList
-                        activity={activity}
-                        agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
-                        selectedFilter={activityFilter}
-                        onFilter={setActivityFilter}
-                        loading={activityLoading}
-                        unavailable={activityUnavailable}
-                        onOpenProof={(id, nodeId) => open(id, nodeId, true)}
-                        onOpenThread={(thread) => go("chat", thread.id)}
-                      />
-                    )
-                  }
-                />
-              ) : section === "claims" ? (
-                <ClaimsPage
-                  session={session}
-                  sub={sub}
-                  onOpen={open}
-                  claimProgress={claimProgress}
-                  claimReviews={activity.reviewItemsByClaim}
-                  atlasClaims={atlas.data?.claims}
-                  running={activity.runningByClaim}
-                  onNewClaim={() => runProjectAction({ id: "add-theorem" })}
-                />
-              ) : section === "library" ? (
-                <LibraryPage session={session} sub={sub} onOpen={open} />
-              ) : section === "chat" ? (
-                <ConversationsPage
-                  session={session}
-                  sub={sub}
-                  onOpen={open}
-                  runningByProofNode={activity.runningByProofNode}
-                />
-              ) : section === "team" ? (
-                <TeamPage session={session} sub={sub} onOpen={open} />
-              ) : section === "progress" ? (
-                <ProgressPage session={session} sub={sub} onOpen={open} />
-              ) : section === "settings" ? (
-                <SettingsPage
-                  sub={sub}
-                  onResetLayout={resetLayout}
-                  onShowShortcuts={() => setShortcutSheetOpen(true)}
-                  updates={releaseUpdates}
-                />
-              ) : section === "help" ? (
-                <HelpPage sub={sub} onShowShortcuts={() => setShortcutSheetOpen(true)} />
-              ) : (
-                <Workbench
-                  key={session}
-                  session={session}
-                  claimProgress={claimProgress}
-                  claimReviews={activity.reviewItemsByClaim}
-                  focus={focus}
-                  onFocusHandled={setFocus}
-                  returnTo={position}
-                  onPositionChange={saveWorkbench}
-                  onChatAnchor={(anchor, title, starterScope) =>
-                    setChatRequest({ session, value: { anchor, title, starterScope } })
-                  }
-                  onChatStarterScope={saveChatStarterScope}
-                  actionRequest={projectAction?.session === session ? projectAction.request : undefined}
-                  onActionHandled={clearProjectAction}
-                  address={sub}
-                  onAddress={setWorkbenchAddress}
-                />
-              )}
-            </SpaceCounts.Provider>
+            <WorkContext.Provider value={work}>
+              <SpaceCounts.Provider value={{ inbox: workspaceInbox.unread, review: pendingReviews }}>
+                {section === "review" ? (
+                  <ReviewPage session={session} sub={sub} onOpen={open} />
+                ) : section === "agent-work" ? (
+                  <AgentWorkPage
+                    session={session}
+                    sub={sub}
+                    inbox={
+                      showsInbox && (
+                        <WorkspaceInbox
+                          key={inboxScope ?? session}
+                          inbox={workspaceInbox}
+                          agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
+                          loading={inbox.isPending || team.isPending || agentWorkList.isPending}
+                          unavailable={inbox.isError || team.isError || agentWorkList.isError}
+                          onOpenProof={(id, nodeId) => open(id, nodeId, true)}
+                        />
+                      )
+                    }
+                    activity={
+                      showsActivity && (
+                        <WorkspaceActivityList
+                          activity={activity}
+                          agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
+                          selectedFilter={activityFilter}
+                          onFilter={setActivityFilter}
+                          loading={activityLoading}
+                          unavailable={activityUnavailable}
+                          onOpenProof={(id, nodeId) => open(id, nodeId, true)}
+                          onOpenThread={(thread) => go("chat", thread.id)}
+                        />
+                      )
+                    }
+                  />
+                ) : section === "claims" ? (
+                  <ClaimsPage
+                    session={session}
+                    sub={sub}
+                    onOpen={open}
+                    claimProgress={claimProgress}
+                    claimReviews={activity.reviewItemsByClaim}
+                    atlasClaims={atlas.data?.claims}
+                    running={activity.runningByClaim}
+                    onNewClaim={() => runProjectAction({ id: "add-theorem" })}
+                  />
+                ) : section === "library" ? (
+                  <LibraryPage session={session} sub={sub} onOpen={open} />
+                ) : section === "chat" ? (
+                  <ConversationsPage
+                    session={session}
+                    sub={sub}
+                    onOpen={open}
+                    runningByProofNode={activity.runningByProofNode}
+                  />
+                ) : section === "team" ? (
+                  <TeamPage session={session} sub={sub} onOpen={open} />
+                ) : section === "progress" ? (
+                  <ProgressPage session={session} sub={sub} onOpen={open} />
+                ) : section === "settings" ? (
+                  <SettingsPage
+                    sub={sub}
+                    onResetLayout={resetLayout}
+                    onShowShortcuts={() => setShortcutSheetOpen(true)}
+                    updates={releaseUpdates}
+                  />
+                ) : section === "help" ? (
+                  <HelpPage sub={sub} onShowShortcuts={() => setShortcutSheetOpen(true)} />
+                ) : (
+                  <Workbench
+                    key={session}
+                    session={session}
+                    claimProgress={claimProgress}
+                    claimReviews={activity.reviewItemsByClaim}
+                    focus={focus}
+                    onFocusHandled={setFocus}
+                    returnTo={position}
+                    onPositionChange={saveWorkbench}
+                    onChatAnchor={(anchor, title, starterScope) =>
+                      setChatRequest({ session, value: { anchor, title, starterScope } })
+                    }
+                    onChatStarterScope={saveChatStarterScope}
+                    actionRequest={projectAction?.session === session ? projectAction.request : undefined}
+                    onActionHandled={clearProjectAction}
+                    address={sub}
+                    onAddress={setWorkbenchAddress}
+                  />
+                )}
+              </SpaceCounts.Provider>
+            </WorkContext.Provider>
             <ReleaseUpdateNotice updates={releaseUpdates} />
           </div>
           <AgentChatDock

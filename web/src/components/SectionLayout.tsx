@@ -1,8 +1,10 @@
 import { createContext, useContext, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { currentEntry, currentRoute, entryHref, SPACES, type SpaceId } from "../shell/spaces";
+import { useWork } from "../shell/workContext";
 import { clampSize, useLayout } from "../workbench/useLayout";
 import { Splitter } from "./Splitter";
+import { WorkPanelSections } from "./WorkPanel";
 
 export type NavEntry = {
   key: string;
@@ -61,10 +63,13 @@ export function SectionFrame({
   panel,
   children,
   chatThread,
+  overlay,
 }: {
   panel: ReactNode;
   children: ReactNode;
   chatThread?: boolean;
+  /** #326: a side panel laid over the page, beside the section panel. */
+  overlay?: ReactNode;
 }) {
   const { t } = useTranslation();
   const layout = useLayout();
@@ -91,6 +96,7 @@ export function SectionFrame({
       <main className={chat ? "section-main chats-main" : "section-main"} tabIndex={-1}>
         {children}
       </main>
+      {overlay}
     </div>
   );
 }
@@ -110,7 +116,11 @@ export function SectionLayout({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const spaceGroup = useSpaceGroup(space);
+  const work = useWork();
+  // #326: Work has its own panel — waiting items, views, pins and records — above the page's own groups.
+  const workPanel = space === "work" && work !== null;
+  const defaultSpaceGroup = useSpaceGroup(space);
+  const spaceGroup = workPanel ? undefined : defaultSpaceGroup;
   const spaceCounts = useContext(SpaceCounts);
   const definition = SPACES.find((candidate) => candidate.id === space);
   const heading = definition ? t(definition.labelKey) : title;
@@ -124,12 +134,13 @@ export function SectionLayout({
   const spaceTargets = new Set(spaceGroup?.entries.map((entry) => entry.href));
   const pageGroups = groups.map((group, index) => ({
     ...group,
-    name: spaceGroup && index === 0 && !group.name ? title : group.name,
+    name: (spaceGroup || workPanel) && index === 0 && !group.name ? title : group.name,
     entries: group.entries.filter((entry) => !spaceTargets.has(entry.href)),
   }));
-  const allGroups: NavGroup[] = spaceGroup ? [spaceGroup, ...pageGroups] : groups;
+  const allGroups: NavGroup[] = spaceGroup ? [spaceGroup, ...pageGroups] : workPanel ? pageGroups : groups;
   const panel = (
     <SectionPanel title={heading} actions={headerActions}>
+      {workPanel && <WorkPanelSections />}
       {allGroups
         .filter((group) => group.entries.length || group.empty)
         .map((group, position) => (
@@ -164,7 +175,11 @@ export function SectionLayout({
         ))}
     </SectionPanel>
   );
-  return <SectionFrame panel={panel}>{children}</SectionFrame>;
+  return (
+    <SectionFrame panel={panel} overlay={workPanel && work.peek ? work.renderPeek() : undefined}>
+      {children}
+    </SectionFrame>
+  );
 }
 
 export function PageHead({

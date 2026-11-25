@@ -150,7 +150,7 @@ export function ReviewPage({
   );
 }
 
-function EvidenceReview({
+export function EvidenceReview({
   session,
   item,
   reviewWorkspace,
@@ -379,7 +379,7 @@ function EvidenceReview({
   );
 }
 
-function OtherItem({ item, onOpen }: { item: InboxItem; onOpen: (claimId: string, nodeId?: string) => void }) {
+export function OtherItem({ item, onOpen }: { item: InboxItem; onOpen: (claimId: string, nodeId?: string) => void }) {
   const { t, i18n } = useTranslation();
   const details = Object.entries(item.detail ?? {}).filter(([, value]) =>
     ["string", "number", "boolean"].includes(typeof value),

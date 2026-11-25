@@ -43,7 +43,12 @@
     "previewMove": "在移动卡片模式中预览位置",
     "saveMove": "保存卡片位置",
     "cancelMove": "取消卡片移动",
-    "menuActions": "在菜单或命令面板打开时"
+    "menuActions": "在菜单或命令面板打开时",
+    "work": "工作",
+    "workOpen": "放大看当前选中的卡片或条目",
+    "workNext": "侧边面板里的下一项",
+    "workPrevious": "侧边面板里的上一项",
+    "workClose": "关闭侧边面板"
   },
   "projects": {
     "title": "项目",
@@ -1847,6 +1852,40 @@
     "laneRunning_other": " · {{count}} 项运行中",
     "cell": "{{lane}}，{{status}}",
     "showMore_one": "再显示 {{count}} 项",
-    "showMore_other": "再显示 {{count}} 项"
+    "showMore_other": "再显示 {{count}} 项",
+    "segmentsLabel": "{{total}} 条义务中已核验 {{done}} 条"
+  },
+  "workPanel": {
+    "kinds": {
+      "review": "批准结果",
+      "question": "回答问题",
+      "failed": "检查失败",
+      "delivery": "Agent 交付"
+    },
+    "handle": "处理",
+    "openPage": "打开页面",
+    "waiting_one": "等你判断 · {{count}}",
+    "waiting_other": "等你判断 · {{count}}",
+    "waitingLabel": "等你判断",
+    "handleAll": "逐项处理",
+    "nothingWaiting": "没有等你处理的事。",
+    "more_one": "收件箱里还有 {{count}} 项",
+    "more_other": "收件箱里还有 {{count}} 项",
+    "views": "视图",
+    "pinned": "置顶",
+    "records": "记录"
+  },
+  "workPeek": {
+    "title": "条目",
+    "gone": "这个课题已不在看板上。",
+    "allDone": "没有其他等你处理的事了。",
+    "allDoneReason": "你记录的决定保存在审阅记录里。",
+    "claims": "课题",
+    "position": "第 {{index}} 项，共 {{count}} 项",
+    "previous": "上一项（K）",
+    "next": "下一项（J）",
+    "close": "关闭（Esc）",
+    "pin": "置顶",
+    "unpin": "取消置顶"
   }
 }
