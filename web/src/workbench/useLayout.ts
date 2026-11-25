@@ -10,26 +10,34 @@ export type Sizes = {
   side: number;
   right: number;
   chat: number;
+  /** #326: the Work side panel's width. */
+  peek: number;
   chatOpen: boolean;
   atlasOpen: boolean;
   reviewOpen: boolean | null;
   atlas: AtlasBox | null;
   cards: CardLayouts;
 };
-export type SizeKey = "side" | "right" | "chat";
+export type SizeKey = "side" | "right" | "chat" | "peek";
 
 const KEY = "research-multiplier-workbench-layout";
 export const DEFAULT_SIZES: Sizes = {
   side: 240,
   right: 340,
   chat: 320,
+  peek: 560,
   chatOpen: true,
   atlasOpen: true,
   reviewOpen: null,
   atlas: null,
   cards: {},
 };
-export const LIMITS: Record<SizeKey, [number, number]> = { side: [180, 420], right: [280, 640], chat: [140, 640] };
+export const LIMITS: Record<SizeKey, [number, number]> = {
+  side: [180, 420],
+  right: [280, 640],
+  chat: [140, 640],
+  peek: [360, 960],
+};
 
 function entries(value: unknown): [string, unknown][] {
   return value && typeof value === "object" && !Array.isArray(value) ? Object.entries(value) : [];
@@ -59,7 +67,7 @@ function load(): Sizes {
   const sizes = { ...DEFAULT_SIZES };
   try {
     const saved = JSON.parse(window.localStorage.getItem(KEY) || "{}") as Partial<Record<keyof Sizes, unknown>>;
-    for (const key of ["side", "right", "chat"] as const)
+    for (const key of ["side", "right", "chat", "peek"] as const)
       if (typeof saved[key] === "number") sizes[key] = saved[key] as number;
     for (const key of ["chatOpen", "atlasOpen", "reviewOpen"] as const) {
       if (typeof saved[key] === "boolean") (sizes[key] as boolean) = saved[key] as boolean;
@@ -138,6 +146,7 @@ export function useLayout() {
     side: clampSize("side", sizes.side, windowSize.height),
     right: clampSize("right", sizes.right, windowSize.height),
     chat: clampSize("chat", sizes.chat, windowSize.height),
+    peek: clampSize("peek", sizes.peek, windowSize.height),
   };
   return { sizes, clamped, reviewOpen, windowHeight: windowSize.height, update, resizeCard, reset };
 }

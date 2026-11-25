@@ -747,7 +747,8 @@
   "splitter": {
     "side": "Resize navigation panel",
     "right": "Drag to resize the review column",
-    "chat": "Drag to resize the conversation"
+    "chat": "Drag to resize the conversation",
+    "peek": "Drag to resize the side panel"
   },
   "common": {
     "cancel": "Cancel",
@@ -1873,7 +1874,9 @@
     "more_other": "{{count}} more in Inbox",
     "views": "Views",
     "pinned": "Pinned",
-    "records": "Records"
+    "records": "Records",
+    "foldGroups": "Fold {{name}} groups",
+    "unfoldGroups": "Show {{name}} groups"
   },
   "workPeek": {
     "title": "Item",
