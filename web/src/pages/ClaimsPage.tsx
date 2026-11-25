@@ -8,7 +8,7 @@ import { ClaimReviewLinks } from "../components/ClaimReviewLinks";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { Spin } from "../components/Icons";
 import { BoardControls, BoardFilterChips, useBoardDisplay, useCollapsedLanes } from "../components/BoardControls";
-import { ResearchLanes } from "../components/ResearchLanes";
+import { ResearchLanes, TrustBadge } from "../components/ResearchLanes";
 import { WorkStatusColumn, WorkTable } from "../components/WorkDisplay";
 import { WorkSelectionArea, WorkSelectionCheckbox, useWorkItemSelection } from "../components/WorkItemSelection";
 import { href } from "../shell/route";
@@ -21,6 +21,7 @@ import {
   laneColumns,
   laneGroups,
   matchesSearch,
+  trustMark,
   type ClaimView,
 } from "../workbench/claimBoard";
 import { claimCode, statusText } from "../workbench/text";
@@ -108,11 +109,12 @@ export function ClaimsPage({
   const domain = sub.startsWith("domain:") ? sub.slice(7) : "";
   const filter: ClaimView = domain ? "all" : (CLAIM_VIEWS.find((view) => view === sub) ?? "all");
   const blocked = new Map([...counts].map(([id, record]) => [id, record.blocked ?? 0]));
+  const codes = new Map(list.map((claim) => [claim.id, claimCode(claim)]));
   const shown = list.filter((claim) => {
     if (domain && (claim.domain || t("sidebar.uncategorized")) !== domain) return false;
     if (statuses.size && !statuses.has(claim.status)) return false;
     if (!matchesSearch(claim, claimCode(claim), search)) return false;
-    return inClaimView(filter, claim.id, claimReviews, blocked, running);
+    return inClaimView(filter, claim.id, { reviews: claimReviews, blocked, running, progress: claimProgress });
   });
   const columns = boardColumns(list.map((claim) => claim.status));
   const work = useWork();
@@ -183,8 +185,10 @@ export function ClaimsPage({
       </span>
     );
     const progressSummary = <ClaimProgressSummary {...summary} showState={!repeatColumn && !repeatCount} />;
-    const tags = (showReview || showBlocked || live > 0) && (
+    const trusted = trustMark(claim.status, progress?.assurance) !== null;
+    const tags = (trusted || showReview || showBlocked || live > 0) && (
       <div className="tags board-card-tags">
+        <TrustBadge status={claim.status} progress={progress} />
         {live > 0 && (
           <span className="tag" data-tone="live">
             <Spin />
@@ -299,6 +303,7 @@ export function ClaimsPage({
           progress={claimProgress}
           reviews={claimReviews}
           running={running}
+          codes={codes}
           expandedClaim={work ? (work.peek?.kind === "claim" ? work.peek.id : null) : expandedClaim}
           opensPanel={Boolean(work)}
           onToggleClaim={(id) => {

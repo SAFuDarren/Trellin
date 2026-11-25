@@ -1,5 +1,5 @@
 // #326: the research board groups claims by domain and shows each claim's proof obligations as a row of segments.
-import type { ObligationCount } from "../api/projectCanvas";
+import type { ClaimAssurance, ObligationCount } from "../api/projectCanvas";
 import type { AtlasClaim } from "./types";
 
 export type Segment = "done" | "live" | "open" | "failed";
@@ -81,19 +81,46 @@ export function visibleCards<T>(cards: readonly T[], limit: number, expanded: bo
   return { shown: cards.slice(0, limit), hidden: cards.length - limit };
 }
 
-export const CLAIM_VIEWS = ["all", "review", "running", "blocked"] as const;
+export const CLAIM_VIEWS = ["all", "review", "running", "blocked", "advance"] as const;
 export type ClaimView = (typeof CLAIM_VIEWS)[number];
 
+export type ClaimViewContext = {
+  reviews: ReadonlyMap<string, readonly unknown[]>;
+  blocked: ReadonlyMap<string, number>;
+  running: ReadonlyMap<string, number>;
+  progress: ReadonlyMap<string, { canAdvance?: boolean }>;
+};
+
 /** Whether a claim belongs to a Work view; the panel counts and the Claims page filter use the same rule. */
-export function inClaimView(
-  view: ClaimView,
-  claimId: string,
-  reviews: ReadonlyMap<string, readonly unknown[]>,
-  blocked: ReadonlyMap<string, number>,
-  running: ReadonlyMap<string, number>,
-): boolean {
-  if (view === "review") return Boolean(reviews.get(claimId)?.length);
-  if (view === "blocked") return (blocked.get(claimId) ?? 0) > 0;
-  if (view === "running") return (running.get(claimId) ?? 0) > 0;
+export function inClaimView(view: ClaimView, claimId: string, context: ClaimViewContext): boolean {
+  if (view === "review") return Boolean(context.reviews.get(claimId)?.length);
+  if (view === "blocked") return (context.blocked.get(claimId) ?? 0) > 0;
+  if (view === "running") return (context.running.get(claimId) ?? 0) > 0;
+  // #342: open claims with nothing they rely on still unproved.
+  if (view === "advance") return context.progress.get(claimId)?.canAdvance === true;
   return true;
+}
+
+export type TrustMark = "lean" | "certificate" | "audited" | "counterexample" | "numeric";
+
+/** #342: recorded evidence kinds map to marks here, in the client, so no kind list enters kernel SQL. */
+const DECISIVE_MARKS: Readonly<Record<string, TrustMark>> = {
+  lean: "lean",
+  exact_certificate: "certificate",
+  audited_proof: "audited",
+  counterexample: "counterexample",
+};
+
+/**
+ * How a claim was established: the decisive evidence's kind and whether it was approved in Review. An open claim
+ * whose only verified evidence includes a numeric check shows that support instead.
+ */
+export function trustMark(
+  status: string,
+  assurance: ClaimAssurance | undefined,
+): { mark: TrustMark; reviewed: boolean } | null {
+  const decisive = assurance?.kind ? DECISIVE_MARKS[assurance.kind] : undefined;
+  if (decisive && status !== "open") return { mark: decisive, reviewed: assurance?.review === "approved" };
+  if (status === "open" && assurance?.supporting.includes("numeric")) return { mark: "numeric", reviewed: false };
+  return null;
 }

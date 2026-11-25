@@ -172,7 +172,7 @@ def test_workbench_canvas_links_leave_recorded_proof_dependencies_intact(workben
     assert len(recent_claims) == 100
     assert claim not in {item["id"] for item in recent_claims}
     assert {item["id"] for item in project_claims} >= {claim, other}
-    assert [{key: value for key, value in item.items() if key != "obligations"}
+    assert [{key: value for key, value in item.items() if key not in {"obligations", "assurance", "uses"}}
             for item in project_claims[:100]] == recent_claims
     assert all(item["obligations"] == {"verified": 0, "total": 0} for item in project_claims)
     before = _request(server, "GET", f"/api/graph?claim={claim}")
@@ -537,7 +537,19 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
     with paths.use_workspace(server.workspace, strict=True), Store() as store:
         persisted = store.query("human", "SELECT review_status FROM rm.evidence_foundation_status WHERE id = %s",
                                 evidence_id)
+        recorded, = store.query("human", """
+            SELECT e.claim_id::text AS claim_id, e.kind::text AS kind, e.verdict::text AS verdict,
+                   c.decisive_evidence_id::text AS decisive
+            FROM rm.evidence e JOIN rm.claim_foundation_status c ON c.id = e.claim_id WHERE e.id = %s
+        """, evidence_id)
     assert persisted == [{"review_status": "approved"}]
+    # The project map reports the reviewed evidence by its recorded kind, as decisive or as support (#342).
+    mapped = {item["id"]: item for item in _request(server, "GET", "/api/project-canvas/claims")["claims"]}
+    assurance = mapped[recorded["claim_id"]]["assurance"]
+    if recorded["decisive"] == evidence_id:
+        assert assurance == {"kind": recorded["kind"], "review": "approved", "supporting": []}
+    else:
+        assert assurance["supporting"] == ([recorded["kind"]] if recorded["verdict"] == "verified" else [])
 
 
 def test_guidance_and_clarification_emit_once_for_each_committed_change(workbench):

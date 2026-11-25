@@ -371,3 +371,56 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-wash);
 }
+
+/* #342: dependencies and dependents of the claim in the side panel. */
+.work-peek-relations {
+  display: grid;
+  gap: 12px;
+}
+.work-peek-relations h3 {
+  margin: 0 0 6px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-semibold);
+}
+.work-peek-relations ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.work-peek-relations button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: var(--node);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.work-peek-relations button:hover {
+  border-color: var(--edge-soft);
+  background: var(--state-hover);
+}
+.work-peek-relation-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-peek-relation-status {
+  flex: none;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+.work-peek-relation-status[data-status="proved"] {
+  color: color-mix(in srgb, var(--good) 80%, var(--ink));
+}

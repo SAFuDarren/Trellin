@@ -35,6 +35,8 @@ const ICONS: Record<string, string> = {
   running: "M12 3.5a8.5 8.5 0 1 1-8.5 8.5M10.2 9v6l4.8-3z",
   blocked: "M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17ZM6 6l12 12",
   display: "M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4",
+  // #342: a claim whose prerequisites are done can move ahead.
+  advance: "M4 12h13M12 6.5l5.5 5.5-5.5 5.5M20 5v14",
 };
 
 /** Parts of an icon drawn solid rather than as a stroke. */

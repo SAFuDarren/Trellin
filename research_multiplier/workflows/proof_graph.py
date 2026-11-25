@@ -363,8 +363,25 @@ _VISIBLE_CLAIMS = "SELECT " + _CLAIM_COLUMNS + _CLAIMS_FROM + _CLAIMS_VISIBLE
 _CLAIM_ORDER = " ORDER BY claim.created_at DESC, claim.id"
 
 # Count recorded route positions before the graph can fold discharged obligations into lemma links.
+# Count recorded route positions before the graph can fold discharged obligations into lemma links.
+# #342: library items derived from a claim's result, traced back to that claim.
+_DERIVED_FROM = """
+    SELECT d.version_id, source.claim_id
+    FROM rm.formal_lean_derivations d JOIN rm.formalization_packets source ON source.id = d.packet_id
+    UNION ALL
+    SELECT d.version_id, source.claim_id
+    FROM rm.formal_certificate_derivations d JOIN rm.formalization_packets source ON source.id = d.packet_id
+"""
+
+# Count recorded route positions before the graph can fold discharged obligations into lemma links.
+# #342: also record how a proved claim was established and which claims its current formalization relies on.
+# Evidence kinds are returned as recorded; clients name them, so no kind list enters this query.
 _CANVAS_CLAIMS = "SELECT " + _CLAIM_COLUMNS + """,
-    jsonb_build_object('verified', count.verified, 'total', count.total) AS obligations
+    jsonb_build_object('verified', count.verified, 'total', count.total) AS obligations,
+    jsonb_build_object(
+        'kind', decisive.kind::text, 'review', decisive.review_status, 'supporting', support.kinds
+    ) AS assurance,
+    relies.uses
 """ + _CLAIMS_FROM + """
     LEFT JOIN LATERAL (""" + _CURRENT_PACKET + """) packet ON true
     LEFT JOIN LATERAL (""" + _CURRENT_STATEMENT + """) statement ON true
@@ -373,6 +390,32 @@ _CANVAS_CLAIMS = "SELECT " + _CLAIM_COLUMNS + """,
         FROM rm.lean_reduction_status(statement.id) route
         CROSS JOIN LATERAL jsonb_array_elements(route.obligations) obligation(item)
     ) count
+    LEFT JOIN rm.evidence_foundation_status decisive ON decisive.id = claim.decisive_evidence_id
+    CROSS JOIN LATERAL (
+        SELECT coalesce(jsonb_agg(DISTINCT e.kind::text ORDER BY e.kind::text), '[]'::jsonb) AS kinds
+        FROM rm.evidence e
+        WHERE e.claim_id = claim.id AND e.verdict = 'verified' AND e.id IS DISTINCT FROM claim.decisive_evidence_id
+    ) support
+    -- Items the current formalization relies on, traced to the claim whose result they record: an item
+    -- derived from a claim's packet, or a shared theorem published from a claim's decisive evidence.
+    CROSS JOIN LATERAL (
+        SELECT coalesce(jsonb_agg(DISTINCT source.claim_id::text ORDER BY source.claim_id::text), '[]'::jsonb)
+            AS uses
+        FROM (
+            SELECT b.item_version_id AS version_id FROM rm.get_packet_basis(packet.id) b
+            UNION SELECT u.version_id FROM rm.verification_basis_use u
+                JOIN rm.lean_check_status c ON c.id = u.check_id
+                WHERE c.packet_id = packet.id AND u.dependency_kind = 'actual'
+            UNION SELECT u.version_id FROM rm.evidence_basis_use u WHERE u.evidence_id = claim.decisive_evidence_id
+        ) used
+        JOIN rm.formal_item_status item ON item.id = used.version_id
+        LEFT JOIN rm.formalization_status derived ON derived.id = item.derivation_packet_id
+        LEFT JOIN rm.current_lean_core_theorems shared ON shared.id = item.id
+        LEFT JOIN rm.evidence published ON published.id = shared.evidence_id
+        CROSS JOIN LATERAL (SELECT coalesce(derived.claim_id, published.claim_id) AS claim_id) source
+        JOIN rm.claim_foundation_status dependency ON dependency.id = source.claim_id
+        WHERE source.claim_id <> claim.id AND dependency.status NOT IN ('superseded', 'archived')
+    ) relies
 """ + _CLAIMS_VISIBLE + _CLAIM_ORDER
 
 

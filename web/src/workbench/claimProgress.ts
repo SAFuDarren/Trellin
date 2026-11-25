@@ -1,4 +1,4 @@
-import type { ObligationCount, ProjectClaim } from "../api/projectCanvas";
+import type { ClaimAssurance, ObligationCount, ProjectClaim } from "../api/projectCanvas";
 import type { InboxItem, Job } from "../api/sections";
 
 type State = "review" | "decision" | "verifying" | "running" | "recheck" | "ready" | "queued";
@@ -6,6 +6,14 @@ type State = "review" | "decision" | "verifying" | "running" | "recheck" | "read
 export type ClaimProgress = {
   state?: State;
   obligations?: ObligationCount;
+  /** #342: how the claim was established, as recorded. */
+  assurance?: ClaimAssurance;
+  /** #342: claims whose results the claim's current formalization relies on. */
+  uses?: string[];
+  /** #342: claims whose current formalization relies on this claim. */
+  usedBy?: string[];
+  /** #342: an open claim with every claim it relies on proved. */
+  canAdvance?: boolean;
 };
 
 const REVIEW_ITEMS = new Set([
@@ -40,8 +48,23 @@ export function buildClaimProgress({
     }
   }
 
+  function add(claimId: string, value: ClaimProgress) {
+    result.set(claimId, { ...result.get(claimId), ...value });
+  }
+
+  const statuses = new Map(claims.map((claim) => [claim.id, claim.status]));
   for (const claim of claims) {
-    if (claim.obligations) result.set(claim.id, { obligations: claim.obligations });
+    if (claim.obligations) add(claim.id, { obligations: claim.obligations });
+    if (claim.assurance) add(claim.id, { assurance: claim.assurance });
+    // Only claims on the map count; the index already leaves out withdrawn ones.
+    const uses = claim.uses?.filter((id) => id !== claim.id && statuses.has(id));
+    if (uses?.length) add(claim.id, { uses });
+    for (const id of uses ?? []) {
+      add(id, { usedBy: [...(result.get(id)?.usedBy ?? []), claim.id] });
+    }
+    if (uses && claim.status === "open") {
+      add(claim.id, { canAdvance: uses.every((id) => statuses.get(id) === "proved") });
+    }
     if (claim.status === "needs_recheck") addState(claim.id, "recheck");
     if (claim.status === "awaiting_interpretation_review") addState(claim.id, "decision");
   }

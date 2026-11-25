@@ -13,7 +13,7 @@ import type { AtlasClaim } from "../workbench/types";
 import { ClarificationReview } from "./ClarificationReview";
 import { ClaimReviewLinks } from "./ClaimReviewLinks";
 import { WorkbenchIcon } from "./Icons";
-import { Segments } from "./ResearchLanes";
+import { Segments, TrustBadge } from "./ResearchLanes";
 import { workspaceActivityDisplay } from "./WorkspaceActivity";
 import "../styles/work-panel.css";
 
@@ -49,7 +49,9 @@ export function WorkPeek(data: WorkPeekData) {
   const position =
     target.kind === "waiting"
       ? waiting && { index: waiting.index, total: work.waiting.length }
-      : { index: target.order.indexOf(target.id), total: target.order.length };
+      : target.order.includes(target.id)
+        ? { index: target.order.indexOf(target.id), total: target.order.length }
+        : null;
   const previous = stepTarget(target, work.waiting, -1);
   const next = stepTarget(target, work.waiting, 1);
   const move = (to: PeekTarget | null) => {
@@ -222,6 +224,7 @@ function ClaimBody({ claim, ...data }: { claim: PeekClaim } & WorkPeekData) {
         <span className="lane-code">{claimCode(claim)}</span>
         <span>{statusText(t, claim.status)}</span>
         {claim.domain && <span>{claim.domain}</span>}
+        <TrustBadge status={claim.status} progress={data.progress.get(claim.id)} />
       </p>
       <h2 className="work-peek-title">{claim.title || t("sidebar.untitled")}</h2>
       {total > 0 && (
@@ -235,6 +238,7 @@ function ClaimBody({ claim, ...data }: { claim: PeekClaim } & WorkPeekData) {
         </p>
       )}
       {reviews && reviews.length > 0 && <ClaimReviewLinks items={reviews} />}
+      <ClaimRelations claim={claim} {...data} />
       <div className="work-peek-actions">
         <button type="button" className="button" aria-pressed={pinned} onClick={() => work.togglePin(claim.id)}>
           {t(pinned ? "workPeek.unpin" : "workPeek.pin")}
@@ -246,6 +250,45 @@ function ClaimBody({ claim, ...data }: { claim: PeekClaim } & WorkPeekData) {
         id={`peek-preview-${claim.id}`}
         onOpen={() => data.onOpen(claim.id)}
       />
+    </div>
+  );
+}
+
+/** #342: the claims this claim relies on and the claims that rely on it, each opening here. */
+function ClaimRelations({ claim, ...data }: { claim: PeekClaim } & WorkPeekData) {
+  const { t } = useTranslation();
+  const work = useWork()!;
+  const progress = data.progress.get(claim.id);
+  const groups = [
+    { key: "uses", ids: progress?.uses ?? [] },
+    { key: "usedBy", ids: progress?.usedBy ?? [] },
+  ].filter(({ ids }) => ids.length > 0);
+  if (!groups.length) return null;
+  const order = work.peek?.kind === "claim" ? work.peek.order : [];
+  return (
+    <div className="work-peek-relations">
+      {groups.map(({ key, ids }) => (
+        <section key={key} aria-label={t(`workPeek.${key}`)}>
+          <h3>{t(`workPeek.${key}`)}</h3>
+          <ul role="list">
+            {ids.map((id) => {
+              const related = data.claims.find((entry) => entry.id === id);
+              if (!related) return null;
+              return (
+                <li key={id}>
+                  <button type="button" onClick={() => work.setPeek({ kind: "claim", id, order })}>
+                    <span className="lane-code">{claimCode(related)}</span>
+                    <span className="work-peek-relation-title">{related.title || t("sidebar.untitled")}</span>
+                    <span className="work-peek-relation-status" data-status={related.status}>
+                      {statusText(t, related.status)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

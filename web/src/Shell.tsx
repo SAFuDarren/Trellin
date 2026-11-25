@@ -246,7 +246,12 @@ export function Shell({ session }: { session: string }) {
       key,
       href: href("claims", key === "all" ? "" : key),
       count: workClaimList.filter((claim) =>
-        inClaimView(key, claim.id, activity.reviewItemsByClaim, blockedByClaim, activity.runningByClaim),
+        inClaimView(key, claim.id, {
+          reviews: activity.reviewItemsByClaim,
+          blocked: blockedByClaim,
+          running: activity.runningByClaim,
+          progress: claimProgress,
+        }),
       ).length,
     })),
     pinned: pinnedIds.flatMap((id) => {

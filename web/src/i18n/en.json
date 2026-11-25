@@ -826,7 +826,8 @@
       "all": "All claims",
       "review": "Waiting for review",
       "blocked": "Blocked",
-      "running": "Running work"
+      "running": "Running work",
+      "advance": "Ready to advance"
     },
     "domains": "Domains",
     "byStatus": "Grouped by status",
@@ -1854,7 +1855,30 @@
     "cell": "{{lane}}, {{status}}",
     "showMore_one": "Show {{count}} more",
     "showMore_other": "Show {{count}} more",
-    "segmentsLabel": "{{done}} of {{total}} obligations verified"
+    "segmentsLabel": "{{done}} of {{total}} obligations verified",
+    "trust": {
+      "lean": "Lean-checked",
+      "certificate": "Certificate-checked",
+      "audited": "Audited proof",
+      "counterexample": "Counterexample",
+      "numeric": "Numeric support"
+    },
+    "trustReviewed": ", reviewed",
+    "trustTitle": {
+      "lean": "Proved by a Lean check",
+      "certificate": "Proved by an exact certificate",
+      "audited": "Proved by an audited proof",
+      "counterexample": "Refuted by a verified counterexample",
+      "numeric": "Not proved; a numeric check supports it"
+    },
+    "trustTitleReviewed": "{{title}}, approved in Review",
+    "uses": "Uses {{codes}}",
+    "usedBy_one": "Used by {{count}}",
+    "usedBy_other": "Used by {{count}}",
+    "relation": {
+      "uses": "Used by the selected claim",
+      "usedBy": "Relies on the selected claim"
+    }
   },
   "workPanel": {
     "kinds": {
@@ -1889,6 +1913,8 @@
     "next": "Next (J)",
     "close": "Close (Esc)",
     "pin": "Pin",
-    "unpin": "Unpin"
+    "unpin": "Unpin",
+    "uses": "Relies on",
+    "usedBy": "Used by"
   }
 }
