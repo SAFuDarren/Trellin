@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.131
+
+- The light theme is paper: the rail, panels, page and board use warm off-white tones, cards are paper white, and text uses the brand's ink. The dark theme is unchanged. Contrast, selection and focus colors still follow the same tokens and pass the existing checks.
+
 ## 1.0.130
 
 - The **Work** panel starts with **Needs you**: results to approve, questions to answer, failed checks and Agent deliveries, newest first, each in one row whose **Handle** and **Open page** actions appear when you point at it or focus it. **Views** count all claims, claims waiting for review, running work and blocked claims; **Pinned** keeps the claims you pin on this device; **Records** opens Inbox, Review, Agent tasks and Library. Domains moved from the panel to **Filter**.
