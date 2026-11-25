@@ -61,8 +61,11 @@ export function ResearchLanes({
 }) {
   const { t, i18n } = useTranslation();
   const [openCells, setOpenCells] = useState<ReadonlySet<string>>(new Set());
+  // The edge under the pinned domain names shows only once cards have slid beneath it.
+  const [scrolled, setScrolled] = useState(false);
   const lanes = laneGroups(claims, i18n.language);
-  const grid = { gridTemplateColumns: `minmax(150px, 180px) repeat(${columns.length}, minmax(200px, 1fr))` };
+  // Columns share the width up to a comfortable card width, so a wide window leaves space rather than stretching cards.
+  const grid = { gridTemplateColumns: `var(--lane-label-w) repeat(${columns.length}, minmax(200px, 340px))` };
   const segmentsOf = (claim: BoardClaim) =>
     obligationSegments(
       atlas.get(claim.id)?.nodes,
@@ -142,15 +145,22 @@ export function ResearchLanes({
   }
 
   return (
-    <div className="research-lanes" data-density={display.density}>
+    <div
+      className="research-lanes"
+      data-density={display.density}
+      data-scrolled={scrolled}
+      onScroll={(event) => setScrolled(event.currentTarget.scrollLeft > 0)}
+    >
       <div className="lanes-scroll">
         <div className="lanes-head" style={grid}>
-          <span />
+          <span className="lanes-corner" />
           {columns.map((status) => (
             <span key={status} className="lanes-column" data-status={status}>
               <span className="lanes-dot" aria-hidden="true" />
-              {statusText(t, status)}
-              <span className="lanes-count">{claims.filter((claim) => claim.status === status).length}</span>
+              <span>
+                {statusText(t, status)}{" "}
+                <span className="lanes-count">{claims.filter((claim) => claim.status === status).length}</span>
+              </span>
             </span>
           ))}
         </div>

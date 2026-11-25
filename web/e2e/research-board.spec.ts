@@ -169,3 +169,42 @@ test("the board reads in Chinese", async ({ page }) => {
       .getByRole("button", { name: "再显示 2 项" }),
   ).toBeVisible();
 });
+
+test("the board fits a wide window and drops empty status columns", async ({ page }) => {
+  const settled = CLAIMS.filter((claim) => claim.status === "open" || claim.status === "proved");
+  const lanes = await board(page, settled);
+  await expect(page.locator(".lanes-column")).toHaveText([/^In progress/, /^Proved/]);
+  expect(await lanes.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+  // Cards keep a reading width instead of stretching across a wide window.
+  const width = (await page.locator(".lane-card").first().boundingBox())!.width;
+  expect(width).toBeLessThanOrEqual(340);
+});
+
+test("in a narrow window the domain names stay put while cards slide under them", async ({ page }) => {
+  await page.setViewportSize({ width: 860, height: 720 });
+  const lanes = await board(page);
+  const code = page.getByText("GR01", { exact: true });
+  // Nothing covers a card before the board scrolls.
+  expect(
+    await code.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return document.elementFromPoint(box.left + 2, box.top + box.height / 2) === element;
+    }),
+  ).toBe(true);
+  const name = lane(page, "Groups").getByRole("button", { name: /Groups/ });
+  const corner = page.locator(".lanes-corner");
+  const before = (await name.boundingBox())!.x;
+  expect(await lanes.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  await expect(lanes).toHaveAttribute("data-scrolled", "false");
+  await lanes.evaluate((element) => element.scrollBy({ left: 240 }));
+  await expect(lanes).toHaveAttribute("data-scrolled", "true");
+  await expect.poll(async () => (await name.boundingBox())!.x).toBeCloseTo(before, 0);
+  expect((await corner.boundingBox())!.x).toBeCloseTo(before, 0);
+});
+
+test("a wide window shows every column without scrolling sideways", async ({ page }) => {
+  await page.setViewportSize({ width: 1790, height: 900 });
+  const lanes = await board(page);
+  await expect(page.locator(".lanes-column")).toHaveCount(4);
+  expect(await lanes.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+});

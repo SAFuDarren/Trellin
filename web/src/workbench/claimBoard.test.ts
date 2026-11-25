@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   boardColumns,
+  laneColumns,
   laneGroups,
   matchesSearch,
   obligationSegments,
@@ -47,6 +48,12 @@ describe("board layout", () => {
       "refuted",
       "custom",
     ]);
+  });
+
+  it("keeps In progress and Proved and drops other empty columns from the domain rows", () => {
+    const columns = ["open", "awaiting_interpretation_review", "needs_recheck", "proved", "custom"];
+    expect(laneColumns(columns, ["open", "open"])).toEqual(["open", "proved"]);
+    expect(laneColumns(columns, ["needs_recheck", "custom"])).toEqual(["open", "needs_recheck", "proved", "custom"]);
   });
 
   it("groups claims by domain in name order with the unnamed group last", () => {
