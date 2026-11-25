@@ -90,13 +90,12 @@ def test_project_claims_report_assurance_and_the_claims_a_formalization_uses(ser
     checked = general_lean.check(prepared["id"], submission, server.workspace / "runs")
     assert checked["accepted"]
     evidence_id = checked["evidence_id"]
-    with Store() as store:
-        store.promote(evidence_id, REASON)
-    # A promoted proof that nobody has reviewed yet reads as pending.
-    assert project_claims(server)[origin_claim]["assurance"] == {"kind": "lean", "review": "pending", "supporting": []}
+    # A verified proof that has not been promoted is supporting evidence, not how the claim was established.
+    assert project_claims(server)[origin_claim]["assurance"] == {"kind": None, "review": None, "supporting": ["lean"]}
 
     with Store() as store:
         store.review(evidence_id, "approve", "Fixture", REASON)
+        store.promote(evidence_id, REASON)
         theorem = store.query("verifier", "SELECT * FROM rm.publish_lean_core_theorem(%s)", evidence_id)[0]
     approved_statement(destination["packet_id"])
     with Store() as store:
