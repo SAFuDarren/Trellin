@@ -1490,7 +1490,7 @@
     },
     "spaces": {
       "home": "项目图谱。排列课题、建立关联并打开证明。",
-      "work": "打开收件箱、审阅、课题、Agent 任务或定理库。",
+      "work": "课题看板，以及收件箱、审阅、Agent 任务和定理库。",
       "chat": "与 Agent 对话、切换对话或查看证明动态。",
       "team": "设置 Agent 和模型连接，查看任务、用量和运行环境。",
       "automation": "查看推进证明的规则，并跟进它们的运行。"
@@ -1790,5 +1790,63 @@
       "invalid": "无法保存规则，请重试。",
       "unavailable": "无法保存规则，请重试。"
     }
+  },
+  "researchBoard": {
+    "countAll_one": "{{count}} 项课题",
+    "countAll_other": "{{count}} 项课题",
+    "countFiltered": "{{count}} / {{total}} 项",
+    "search": "搜索课题",
+    "searchPlaceholder": "编号、标题或领域",
+    "filter": {
+      "label": "筛选",
+      "active": "筛选 · {{count}}",
+      "domain": "领域",
+      "anyDomain": "全部领域",
+      "status": "状态"
+    },
+    "display": {
+      "label": "显示",
+      "layout": "排列",
+      "layouts": {
+        "lanes": "按领域分行",
+        "board": "状态看板",
+        "list": "列表",
+        "table": "表格"
+      },
+      "density": "密度",
+      "densities": {
+        "comfortable": "舒展",
+        "compact": "紧凑"
+      },
+      "proved": "已证明的课题",
+      "provedAs": {
+        "cards": "卡片",
+        "rows": "一行"
+      },
+      "perCell": "每格最多",
+      "cards_one": "{{count}} 张",
+      "cards_other": "{{count}} 张",
+      "allCards": "全部",
+      "reset": "恢复默认"
+    },
+    "newClaim": "新建课题",
+    "chips": {
+      "label": "当前筛选",
+      "search": "搜索：{{text}}",
+      "domain": "领域：{{domain}}",
+      "status": "状态：{{status}}",
+      "remove": "移除{{label}}",
+      "clear": "清除"
+    },
+    "progress": "{{done}}/{{total}}",
+    "progressFailed_one": "{{done}}/{{total}} · {{count}} 条失败",
+    "progressFailed_other": "{{done}}/{{total}} · {{count}} 条失败",
+    "laneSummary_one": "{{count}} 项 · 已证明 {{proved}}",
+    "laneSummary_other": "{{count}} 项 · 已证明 {{proved}}",
+    "laneRunning_one": " · {{count}} 项运行中",
+    "laneRunning_other": " · {{count}} 项运行中",
+    "cell": "{{lane}}，{{status}}",
+    "showMore_one": "再显示 {{count}} 项",
+    "showMore_other": "再显示 {{count}} 项"
   }
 }

@@ -24,13 +24,15 @@ describe("navigation spaces (#289)", () => {
   it("keeps Home focused on the map and gives Claims a place in Work", () => {
     expect(spaceOf("workbench")?.entries.map((entry) => entry.key)).toEqual(["map"]);
     expect(spaceOf("claims")?.id).toBe("work");
+    // #326: Work opens on the claims board, so Claims comes first.
     expect(spaceOf("claims")?.entries.map((entry) => entry.key)).toEqual([
+      "claims",
       "inbox",
       "review",
-      "claims",
       "agent-tasks",
       "library",
     ]);
+    expect(entryHref(spaceOf("claims")!.entries[0]!)).toBe("#claims");
   });
 
   it("finds the entry for every address, including sub-routes and old addresses", () => {

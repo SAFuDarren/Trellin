@@ -1490,7 +1490,7 @@
     },
     "spaces": {
       "home": "The project map. Arrange and link claims and open their proofs.",
-      "work": "Open the Inbox, Review, Claims, Agent tasks or Library.",
+      "work": "The claims board, plus the Inbox, Review, Agent tasks and Library.",
       "chat": "Talk with an Agent, switch conversations or read proof activity.",
       "team": "Set up Agents and model connections. Check jobs, usage and runtimes.",
       "automation": "Review the rules that advance proofs and follow their runs."
@@ -1790,5 +1790,63 @@
       "invalid": "Could not save the rule. Try again.",
       "unavailable": "Could not save the rule. Try again."
     }
+  },
+  "researchBoard": {
+    "countAll_one": "{{count}} claim",
+    "countAll_other": "{{count}} claims",
+    "countFiltered": "{{count}} of {{total}}",
+    "search": "Search claims",
+    "searchPlaceholder": "Code, title or domain",
+    "filter": {
+      "label": "Filter",
+      "active": "Filter · {{count}}",
+      "domain": "Domain",
+      "anyDomain": "Any domain",
+      "status": "Status"
+    },
+    "display": {
+      "label": "Display",
+      "layout": "Layout",
+      "layouts": {
+        "lanes": "By domain",
+        "board": "Status board",
+        "list": "List",
+        "table": "Table"
+      },
+      "density": "Density",
+      "densities": {
+        "comfortable": "Comfortable",
+        "compact": "Compact"
+      },
+      "proved": "Proved claims",
+      "provedAs": {
+        "cards": "Cards",
+        "rows": "One line"
+      },
+      "perCell": "Cards per cell",
+      "cards_one": "{{count}} card",
+      "cards_other": "{{count}} cards",
+      "allCards": "All",
+      "reset": "Reset display"
+    },
+    "newClaim": "New claim",
+    "chips": {
+      "label": "Active filters",
+      "search": "Search: {{text}}",
+      "domain": "Domain: {{domain}}",
+      "status": "Status: {{status}}",
+      "remove": "Remove {{label}}",
+      "clear": "Clear"
+    },
+    "progress": "{{done}}/{{total}}",
+    "progressFailed_one": "{{done}}/{{total}} · {{count}} failed",
+    "progressFailed_other": "{{done}}/{{total}} · {{count}} failed",
+    "laneSummary_one": "{{count}} claim · {{proved}} proved",
+    "laneSummary_other": "{{count}} claims · {{proved}} proved",
+    "laneRunning_one": " · {{count}} running",
+    "laneRunning_other": " · {{count}} running",
+    "cell": "{{lane}}, {{status}}",
+    "showMore_one": "Show {{count}} more",
+    "showMore_other": "Show {{count}} more"
   }
 }

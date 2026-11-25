@@ -9,7 +9,7 @@ import { ProjectTile } from "./SidebarProjects";
 
 const SPACE_ICONS: Record<SpaceId, string> = {
   home: "workbench",
-  work: "claims",
+  work: "work",
   chat: "chat",
   team: "team",
   automation: "progress",

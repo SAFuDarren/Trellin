@@ -53,7 +53,8 @@ for (const [localeName, locale] of [
 
     const places = inside.getByRole("region", { name: ["Where to work", "工作入口"][locale], exact: true });
     // One link per space, in rail order (#289).
-    const primaryDestinations = ["#workbench", "#agent-work/inbox", "#chat", "#team", "#progress"] as const;
+    // #326: Work opens on the claims board.
+    const primaryDestinations = ["#workbench", "#claims", "#chat", "#team", "#progress"] as const;
     await expect(places.getByRole("link")).toHaveCount(primaryDestinations.length);
     for (const path of primaryDestinations) {
       await places.locator(`a[href="${path}"]`).click();

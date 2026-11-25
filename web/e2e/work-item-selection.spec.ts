@@ -19,7 +19,7 @@ async function openSection(page: Page, section: string) {
   await openDestination(page, section === "Agent work" ? "Agent tasks" : (section as "Claims"));
 }
 
-async function setLayout(page: Page, layout: "List" | "Table" | "Board") {
+async function setLayout(page: Page, layout: "List" | "Table" | "Board" | "Status board") {
   await page.getByRole("button", { name: "Display", exact: true }).click();
   await page.getByRole("menuitemradio", { name: layout, exact: true }).click();
 }
@@ -84,7 +84,7 @@ test("Claims selects a range in visible order, copies IDs and resets when the la
   await expect(filtered.getByText("1 selected", { exact: true })).toBeVisible();
   await filtered.getByRole("button", { name: "Copy record IDs" }).click();
   await expect.poll(clipboard).toBe("aaaaaaaa-0000-4000-8000-000000000003");
-  await setLayout(page, "Board");
+  await setLayout(page, "Status board");
   await expect(page.locator(".board article")).toHaveCount(1);
   await expect(page.getByRole("checkbox")).toHaveCount(0);
 });

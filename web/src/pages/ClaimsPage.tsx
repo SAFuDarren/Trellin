@@ -7,14 +7,16 @@ import { ClaimProgressSummary, claimProgressText } from "../components/ClaimProg
 import { ClaimReviewLinks } from "../components/ClaimReviewLinks";
 import { Empty, PageHead, SectionLayout } from "../components/SectionLayout";
 import { Spin } from "../components/Icons";
-import { WorkDisplayMenu, WorkStatusColumn, WorkTable, useWorkLayout } from "../components/WorkDisplay";
+import { BoardControls, BoardFilterChips, useBoardDisplay, useCollapsedLanes } from "../components/BoardControls";
+import { ResearchLanes } from "../components/ResearchLanes";
+import { WorkStatusColumn, WorkTable } from "../components/WorkDisplay";
 import { WorkSelectionArea, WorkSelectionCheckbox, useWorkItemSelection } from "../components/WorkItemSelection";
 import { href } from "../shell/route";
 import type { ClaimProgress } from "../workbench/claimProgress";
-import { statusText } from "../workbench/text";
+import { boardColumns, matchesSearch } from "../workbench/claimBoard";
+import { claimCode, statusText } from "../workbench/text";
 import type { AtlasClaim, GraphSnapshot } from "../workbench/types";
 
-const COLUMNS = ["open", "awaiting_interpretation_review", "needs_recheck", "proved", "refuted"] as const;
 const FILTERS = ["all", "review", "blocked", "running"] as const;
 
 function ClaimPreview({
@@ -73,6 +75,7 @@ export function ClaimsPage({
   claimReviews,
   atlasClaims,
   running,
+  onNewClaim,
 }: {
   session: string;
   sub: string;
@@ -81,10 +84,16 @@ export function ClaimsPage({
   claimReviews: ReadonlyMap<string, readonly InboxItem[]>;
   atlasClaims?: AtlasClaim[];
   running: ReadonlyMap<string, number>;
+  /** #326: New claim opens the project's Add theorem entry. */
+  onNewClaim?: () => void;
 }) {
   const { t } = useTranslation();
   const [expandedClaim, setExpandedClaim] = useState<string | null>(null);
-  const [layout, setLayout] = useWorkLayout("claims", "board");
+  const [display, setDisplay] = useBoardDisplay();
+  const [collapsed, toggleLane] = useCollapsedLanes();
+  const [search, setSearch] = useState("");
+  const [statuses, setStatuses] = useState<ReadonlySet<string>>(new Set());
+  const layout = display.layout;
   const claims = useClaims(session);
   const counts = new Map((atlasClaims ?? []).map((claim) => [claim.id, claim]));
   const list = claims.data?.claims ?? [];
@@ -95,6 +104,8 @@ export function ClaimsPage({
   const shown = list.filter((claim) => {
     const record = counts.get(claim.id);
     if (domain && (claim.domain || t("sidebar.uncategorized")) !== domain) return false;
+    if (statuses.size && !statuses.has(claim.status)) return false;
+    if (!matchesSearch(claim, claimCode(claim), search)) return false;
     if (filter === "review") return Boolean(claimReviews.get(claim.id)?.length);
     if (filter === "blocked") return (record?.blocked ?? 0) > 0;
     if (filter === "running") return (running.get(claim.id) ?? 0) > 0;
@@ -110,10 +121,33 @@ export function ClaimsPage({
             ? (counts.get(claim.id)?.blocked ?? 0) > 0
             : (running.get(claim.id) ?? 0) > 0,
     ).length;
-  const columns = [
-    ...COLUMNS,
-    ...new Set(list.map((claim) => claim.status).filter((status) => !(COLUMNS as readonly string[]).includes(status))),
-  ];
+  const columns = boardColumns(list.map((claim) => claim.status));
+  const routeFor = (nextDomain: string) =>
+    href("claims", nextDomain ? "domain:" + nextDomain : filter === "all" ? "" : filter);
+  const filters = {
+    domain,
+    domains,
+    statuses,
+    allStatuses: columns,
+    search,
+  };
+  const filterActions = {
+    onDomain: (next: string) => {
+      window.location.hash = routeFor(next);
+    },
+    onToggleStatus: (status: string) => {
+      const next = new Set(statuses);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      setStatuses(next);
+    },
+    onSearch: setSearch,
+    onClear: () => {
+      setSearch("");
+      setStatuses(new Set());
+      if (domain) window.location.hash = routeFor("");
+    },
+  };
   const title = domain || t(`claimsPage.filter.${filter}`);
   const selectionScope = JSON.stringify([session, sub, layout]);
   const selection = useWorkItemSelection(selectionScope, layout === "board" ? [] : shown.map(({ id }) => id));
@@ -249,13 +283,45 @@ export function ClaimsPage({
     >
       <PageHead
         title={title}
-        note={layout === "board" ? t("claimsPage.byStatus") : undefined}
-        actions={<WorkDisplayMenu layout={layout} onChange={setLayout} />}
+        note={
+          !claims.isSuccess
+            ? undefined
+            : shown.length === list.length
+              ? t("researchBoard.countAll", { count: list.length })
+              : t("researchBoard.countFiltered", { count: shown.length, total: list.length })
+        }
+        actions={
+          <BoardControls
+            filters={filters}
+            display={display}
+            onDisplay={setDisplay}
+            onNew={onNewClaim}
+            {...filterActions}
+          />
+        }
       />
+      <BoardFilterChips filters={filters} {...filterActions} />
       {claims.isError ? (
         <Empty>{claims.error.message}</Empty>
       ) : shown.length === 0 ? (
         <Empty>{claims.isPending ? t("common.loading") : t("claimsPage.none")}</Empty>
+      ) : layout === "lanes" ? (
+        <ResearchLanes
+          claims={shown}
+          columns={columns}
+          display={display}
+          collapsed={collapsed}
+          onToggleLane={toggleLane}
+          atlas={counts}
+          progress={claimProgress}
+          reviews={claimReviews}
+          running={running}
+          expandedClaim={expandedClaim}
+          onToggleClaim={(id) => setExpandedClaim(expandedClaim === id ? null : id)}
+          renderPreview={(id, previewId) => (
+            <ClaimPreview session={session} claimId={id} id={previewId} onOpen={() => onOpen(id)} />
+          )}
+        />
       ) : layout !== "board" ? (
         <WorkSelectionArea key={selectionScope} label={title} selection={selection}>
           {layout === "table" ? (

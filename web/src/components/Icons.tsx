@@ -28,12 +28,22 @@ const ICONS: Record<string, string> = {
   link: "M10 7l2-2a4 4 0 0 1 6 6l-2 2m-2 4-2 2a4 4 0 0 1-6-6l2-2m1 4 6-6",
   move: "M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3m12-6 3 3-3 3",
   cancel: "M6 6l12 12M18 6 6 18",
+  // #326: Work is a list of proof obligations; the first two bullets are filled (see FILLED).
+  work: "M4.5 16h4l-1.2 2.5h-4zM11.5 6.75h9M11.5 12h9M11.5 17.25h6",
+  filter: "M4 6h16M7 12h10M10 18h4",
+  display: "M4 7h10M18 7h2M4 17h2M10 17h10M16 5v4M8 15v4",
+};
+
+/** Parts of an icon drawn solid rather than as a stroke. */
+const FILLED: Record<string, string> = {
+  work: "M4.5 5.5h4l-1.2 2.5h-4zM4.5 10.75h4l-1.2 2.5h-4z",
 };
 
 export function WorkbenchIcon({ name }: { name: string }) {
   return (
     <svg className="workbench-icon" viewBox="0 0 24 24" aria-hidden="true">
       <path d={ICONS[name] ?? ""} />
+      {FILLED[name] && <path d={FILLED[name]} fill="currentColor" />}
     </svg>
   );
 }

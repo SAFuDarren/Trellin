@@ -57,6 +57,8 @@ export type FloatingOption = {
 export type FloatingGroup = {
   label?: string;
   options: FloatingOption[];
+  /** Options in this group toggle independently, so `current` marks each as checked rather than chosen. */
+  multiple?: boolean;
 };
 
 function positionPanel(
@@ -452,7 +454,7 @@ function MenuContent({
       tabIndex={-1}
       onKeyDown={handleKey}
     >
-      {nonemptyGroups.map(({ label: groupLabel, options }, groupIndex) => (
+      {nonemptyGroups.map(({ label: groupLabel, options, multiple }, groupIndex) => (
         <div key={groupIndex} role="presentation">
           {groupIndex > 0 && <div className="floating-separator" role="separator" />}
           <div role="group" aria-label={groupLabel}>
@@ -496,7 +498,7 @@ function MenuContent({
                   key={option.id}
                   {...attributes}
                   type="button"
-                  role={option.current === undefined ? "menuitem" : "menuitemradio"}
+                  role={option.current === undefined ? "menuitem" : multiple ? "menuitemcheckbox" : "menuitemradio"}
                   aria-checked={option.current}
                   onClick={() => choose(option)}
                 >

@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.128
+
+- **Work** opens on the claims board, now one row per domain and one column per status. A domain row folds to one line of counts and stays folded. Each card shows the claim's code, its title in the math typeface, whether work is running on it, and one segment per proof obligation (verified, running, open or failed). Proved claims can show as one line, and each cell shows a few cards before **Show N more**. The header has **Search**, **Filter**, **Display** and **New claim**; active filters appear as removable chips. **Display** chooses the layout (by domain, status board, list or table), density, how proved claims show and cards per cell. The rail's Work icon is now a list of proof obligations.
+
 ## 1.0.127
 
 - **Review**, **Add theorem** and the paper import confirmation record decisions as the project's local researcher and show **Recorded by** with that name, instead of asking for **Your name**. A project database without a local identity still asks. The inbox response's `review_identity` adds the researcher's `display_name`.
