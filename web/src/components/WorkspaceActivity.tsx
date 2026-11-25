@@ -78,10 +78,13 @@ export function workspaceActivityDisplay(t: TFunction, agents: ReadonlyMap<strin
     case "review": {
       const kind = reviewItemKindLabel(t, row.item);
       const evidence = row.item.kind === "review_evidence";
+      // #340: an item without a claim, such as an intake, is named by its own recorded title.
+      const own = typeof row.item.detail?.title === "string" ? row.item.detail.title.trim() : "";
+      const name = row.item.claim_title || own;
       return {
-        title: evidence ? reviewResultName(row.item) || kind : row.item.claim_title || kind,
+        title: evidence ? reviewResultName(row.item) || kind : name || kind,
         status: evidence ? t("review.title") : t(`workspaceActivity.filter.${row.state}`),
-        details: [evidence ? row.item.claim_title : row.item.claim_title && kind],
+        details: [evidence ? row.item.claim_title : name && kind],
         url: reviewItemHref(row.item),
       };
     }

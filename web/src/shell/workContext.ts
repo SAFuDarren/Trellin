@@ -3,7 +3,7 @@ import { createContext, useContext, useState } from "react";
 import type { TeamAgent } from "../api/teamAgents";
 import type { ActivityRow } from "./workspaceActivity";
 
-export type WaitingKind = "review" | "question" | "failed" | "delivery";
+export type WaitingKind = "review" | "confirm" | "question" | "failed" | "delivery";
 export type WaitingItem = { id: string; kind: WaitingKind; row: ActivityRow; claimId?: string | null };
 
 const FAILED_JOBS = new Set(["failed", "lease_expired"]);
@@ -11,7 +11,11 @@ const WORK_NEEDS_YOU = new Set(["delivered", "blocked", "failed", "interrupted"]
 
 /** A record that needs the researcher: a review or question, a failed run, or an Agent delivery to decide. */
 export function waitingKind(row: ActivityRow): WaitingKind | null {
-  if (row.source === "review") return row.state === "review" ? "review" : "question";
+  if (row.source === "review") {
+    if (row.state === "review") return "review";
+    // #340: a scope, statement or source to confirm is not a question to answer.
+    return row.item.kind.startsWith("confirm_") ? "confirm" : "question";
+  }
   if (row.source === "job") return FAILED_JOBS.has(row.job.state) ? "failed" : null;
   if (row.source === "work") {
     if (!WORK_NEEDS_YOU.has(row.task.status)) return null;

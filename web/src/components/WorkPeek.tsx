@@ -11,6 +11,7 @@ import type { ClaimProgress } from "../workbench/claimProgress";
 import { claimCode, statusText } from "../workbench/text";
 import type { AtlasClaim } from "../workbench/types";
 import { ClarificationReview } from "./ClarificationReview";
+import { IntakeReview } from "./IntakeReview";
 import { ClaimReviewLinks } from "./ClaimReviewLinks";
 import { WorkbenchIcon } from "./Icons";
 import { Segments, TrustBadge } from "./ResearchLanes";
@@ -122,6 +123,17 @@ export function WorkPeek(data: WorkPeekData) {
           workspace={data.clarificationWorkspace}
           id={row.item.item_id}
           onConfirmed={(kind) => setNotice(t(`clarifications.confirmed.${kind}`))}
+        />
+      );
+    } else if (row.source === "review" && row.item.kind === "confirm_intake") {
+      body = (
+        <IntakeReview
+          key={row.item.item_id}
+          session={data.session}
+          item={row.item}
+          signer={data.signer}
+          onOpen={data.onOpen}
+          onDecided={setNotice}
         />
       );
     } else if (row.source === "review") {

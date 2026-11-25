@@ -12,7 +12,7 @@ import {
 import { Picker } from "../FloatingControls";
 import { href } from "../../shell/route";
 import { ReviewFields } from "./ReviewFields";
-import { reviewIdentity, useReviewSigner } from "./review";
+import { formalText, reviewIdentity, useReviewSigner } from "./review";
 
 const MAX_NOTES_BYTES = 18000;
 
@@ -46,15 +46,6 @@ type ReleasePreview = {
   };
 };
 type Decision = { action: "accept" | "omit"; reason: string; formal?: { lean: { proposition: string } } };
-
-function formalText(value: Candidate["formal"]): string {
-  if (!value) return "";
-  if (Object.keys(value).length === 1) {
-    const lean = value.lean as { proposition?: unknown } | undefined;
-    if (typeof lean?.proposition === "string" && Object.keys(lean).length === 1) return lean.proposition;
-  }
-  return JSON.stringify(value, null, 2);
-}
 
 export function IntakePane({ session, onRecorded }: { session: string; onRecorded: () => void }) {
   const { t } = useTranslation();

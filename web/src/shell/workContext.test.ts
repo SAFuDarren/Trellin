@@ -43,6 +43,17 @@ describe("waiting items", () => {
     expect(waitingKind(work("g", "accepted", 1))).toBeNull();
   });
 
+  it("calls a scope, statement or source to confirm a confirmation, not a question (#340)", () => {
+    const pending = (kind: string) => {
+      const row = review(kind, "attention", 1) as Extract<ActivityRow, { source: "review" }>;
+      return { ...row, item: { ...row.item, kind } } as ActivityRow;
+    };
+    expect(waitingKind(pending("confirm_intake"))).toBe("confirm");
+    expect(waitingKind(pending("confirm_lean_statement"))).toBe("confirm");
+    expect(waitingKind(pending("resolve_clarification"))).toBe("question");
+    expect(waitingKind(pending("decide_condition"))).toBe("question");
+  });
+
   it("lists the newest first and leaves out archived records", () => {
     const rows = [review("old", "review", 1), job("new", "failed", 9), work("mid", "delivered", 5)];
     expect(waitingItems(rows).map(({ id }) => id)).toEqual(["new", "mid", "old"]);

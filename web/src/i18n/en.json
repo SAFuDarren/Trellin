@@ -367,7 +367,12 @@
       "decide_condition": "Condition to decide",
       "checker_hold": "Checker change to review",
       "review_formalpedia_basis": "Library premise to review",
-      "review_lean_scope_change": "Lean scope change to review"
+      "review_lean_scope_change": "Lean scope change to review",
+      "confirm_intake": "Starting scope to confirm",
+      "confirm_formalization": "Formalization to confirm",
+      "confirm_goal": "Research goal to confirm",
+      "confirm_lean_statement": "Lean statement to confirm",
+      "confirm_literature_source": "Literature source to confirm"
     },
     "evidenceExplain": "Approval records this verified result as accepted evidence for the claim. Return it with a reason if it needs changes.",
     "goalEvidenceExplain": "Approval records acceptance of this verified proof of the claim’s Lean statement. The claim’s proof status is finalized separately.",
@@ -387,7 +392,7 @@
     "needReason": "Add a reason first.",
     "context": "Context",
     "status": "Status",
-    "cliNote": "Items of this kind are handled from the command line for now:"
+    "notInApp": "Trellin cannot record this decision in the workbench yet. It is listed so you can see that it is waiting."
   },
   "goalReview": {
     "objective": "Research objective",
@@ -735,7 +740,14 @@
     "claim_code.missing": "This workspace has no claim or node with that code.",
     "claim_code.upgrade_required": "Upgrade the project database to use stable research codes.",
     "claim_code.save_failed": "The code could not be saved. Check the local connection and try again.",
-    "claim_code.conflict": "This goal already has a different short code. Change it from Research references."
+    "claim_code.conflict": "This goal already has a different short code. Change it from Research references.",
+    "intakeReview": {
+      "invalid": "Check every decision and the reason, then try again.",
+      "identity": "Open this project with your local researcher identity to confirm it.",
+      "missing": "This intake is no longer available.",
+      "stale": "This intake changed since you opened it. Review the current version and confirm again.",
+      "unavailable": "Could not read or save this intake. Reload to try again."
+    }
   },
   "graph": {
     "projectClaims": "Other claims in this project",
@@ -1885,7 +1897,8 @@
       "review": "Result to approve",
       "question": "Question to answer",
       "failed": "Check failed",
-      "delivery": "Agent delivery"
+      "delivery": "Agent delivery",
+      "confirm": "To confirm"
     },
     "handle": "Handle",
     "openPage": "Open page",
@@ -1916,5 +1929,40 @@
     "unpin": "Unpin",
     "uses": "Relies on",
     "usedBy": "Used by"
+  },
+  "intakeReview": {
+    "explain": "Choose which items enter the starting scope of this research. Confirmed items become the basis the claim is proved from; omitted items are left out. Items that match the Library exactly are reused as they are.",
+    "domain": "Domain",
+    "objective": "Objective",
+    "sensitivity": "Sensitivity",
+    "target": "Starting statement",
+    "toDecide_one": "{{count}} item to decide",
+    "toDecide_other": "{{count}} items to decide",
+    "itemLabel": "{{index}}. {{kind}}",
+    "decisionFor": "Decision for {{item}}",
+    "accept": "Confirm",
+    "omit": "Omit",
+    "leanFor": "Lean proposition for {{item}}",
+    "status": {
+      "clarify": "Has a question",
+      "confirm_scope": "Suggested by a model",
+      "confirm_meaning": "Check the wording",
+      "formalization_required": "Needs a Lean proposition",
+      "reuse": "Matches the Library"
+    },
+    "reused_one": "{{count}} item reused from the Library",
+    "reused_other": "{{count}} items reused from the Library",
+    "version": "version {{version}}",
+    "changed": "Changed since this draft",
+    "reasonHint": "For example: the premises match the paper's setting",
+    "submit": "Confirm starting scope",
+    "needDecisions": "Choose Confirm or Omit for every item first.",
+    "needLean": "Add a Lean proposition for each item you confirm that has none.",
+    "confirmed": "The starting scope is confirmed.",
+    "closed": {
+      "confirmed": "This starting scope was already confirmed.",
+      "superseded": "A newer intake replaced this one, so there is nothing to confirm here.",
+      "stale": "A Library item this intake reuses changed after it was drafted. Organize the notes again from the Project map to review the current version."
+    }
   }
 }
