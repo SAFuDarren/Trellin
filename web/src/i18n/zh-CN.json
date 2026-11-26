@@ -760,7 +760,7 @@
     "side": "调整导航栏宽度",
     "right": "拖动调整审阅栏宽度",
     "chat": "拖动调整对话区高度",
-    "peek": "拖动调整侧边面板宽度"
+    "peek": "拖动调整窗口宽度，双击恢复"
   },
   "common": {
     "cancel": "取消",
@@ -1913,7 +1913,16 @@
     "pinned": "置顶",
     "records": "记录",
     "foldGroups": "收起{{name}}的分组",
-    "unfoldGroups": "展开{{name}}的分组"
+    "unfoldGroups": "展开{{name}}的分组",
+    "filterLabel": "按类型查看等你判断的项",
+    "filterAll": "全部 {{count}}",
+    "filterKinds": {
+      "review": "待批准 {{count}}",
+      "confirm": "待确认 {{count}}",
+      "question": "待回答 {{count}}",
+      "failed": "失败 {{count}}",
+      "delivery": "交付 {{count}}"
+    }
   },
   "workPeek": {
     "title": "条目",

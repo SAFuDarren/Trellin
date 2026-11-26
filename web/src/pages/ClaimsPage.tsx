@@ -12,7 +12,7 @@ import { ResearchLanes, TrustBadge } from "../components/ResearchLanes";
 import { WorkStatusColumn, WorkTable } from "../components/WorkDisplay";
 import { WorkSelectionArea, WorkSelectionCheckbox, useWorkItemSelection } from "../components/WorkItemSelection";
 import { href } from "../shell/route";
-import { useWork } from "../shell/workContext";
+import { resolveWaiting, useWork } from "../shell/workContext";
 import type { ClaimProgress } from "../workbench/claimProgress";
 import {
   boardColumns,
@@ -114,10 +114,17 @@ export function ClaimsPage({
     if (domain && (claim.domain || t("sidebar.uncategorized")) !== domain) return false;
     if (statuses.size && !statuses.has(claim.status)) return false;
     if (!matchesSearch(claim, claimCode(claim), search)) return false;
-    return inClaimView(filter, claim.id, { reviews: claimReviews, blocked, running, progress: claimProgress });
+    return inClaimView(filter, claim.id, { blocked, running, progress: claimProgress });
   });
   const columns = boardColumns(list.map((claim) => claim.status));
   const work = useWork();
+  // #345: the floating window shows a claim, or an item that belongs to one; the board marks that claim.
+  const peekClaim =
+    work?.peek?.kind === "claim"
+      ? work.peek.id
+      : work?.peek?.kind === "waiting"
+        ? (resolveWaiting(work.shown, work.peek)?.item.claimId ?? null)
+        : null;
   const shownColumns = laneColumns(
     columns,
     shown.map((claim) => claim.status),
@@ -304,7 +311,7 @@ export function ClaimsPage({
           reviews={claimReviews}
           running={running}
           codes={codes}
-          expandedClaim={work ? (work.peek?.kind === "claim" ? work.peek.id : null) : expandedClaim}
+          expandedClaim={work ? peekClaim : expandedClaim}
           opensPanel={Boolean(work)}
           onToggleClaim={(id) => {
             if (!work) setExpandedClaim(expandedClaim === id ? null : id);

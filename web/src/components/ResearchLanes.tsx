@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { InboxItem } from "../api/sections";
 import { claimCode, statusText } from "../workbench/text";
@@ -128,6 +128,14 @@ export function ResearchLanes({
   const [openCells, setOpenCells] = useState<ReadonlySet<string>>(new Set());
   // The edge under the pinned domain names shows only once cards have slid beneath it.
   const [scrolled, setScrolled] = useState(false);
+  const board = useRef<HTMLDivElement>(null);
+  // #345: the floating window covers the board's right side, so the claim it shows is scrolled beside it.
+  useEffect(() => {
+    if (!opensPanel || !expandedClaim) return;
+    board.current
+      ?.querySelector(`[data-claim="${CSS.escape(expandedClaim)}"]`)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [opensPanel, expandedClaim]);
   // #342: pointing at or selecting a card traces what it relies on and what relies on it; the rest dims.
   const [pointed, setPointed] = useState<string | null>(null);
   const anchor = pointed ?? expandedClaim;
@@ -173,7 +181,7 @@ export function ResearchLanes({
     const asRow = display.proved === "rows" && claim.status === "proved";
     if (asRow) {
       return (
-        <li key={claim.id} className="lane-row" data-open={expanded} {...tracedProps(claim.id)}>
+        <li key={claim.id} className="lane-row" data-claim={claim.id} data-open={expanded} {...tracedProps(claim.id)}>
           <button
             type="button"
             className="lane-row-toggle"
@@ -197,7 +205,14 @@ export function ResearchLanes({
       );
     }
     return (
-      <li key={claim.id} className="lane-card" data-live={live > 0} data-open={expanded} {...tracedProps(claim.id)}>
+      <li
+        key={claim.id}
+        className="lane-card"
+        data-claim={claim.id}
+        data-live={live > 0}
+        data-open={expanded}
+        {...tracedProps(claim.id)}
+      >
         <button
           type="button"
           className="lane-card-toggle"
@@ -242,6 +257,7 @@ export function ResearchLanes({
 
   return (
     <div
+      ref={board}
       className="research-lanes"
       data-density={display.density}
       data-scrolled={scrolled}

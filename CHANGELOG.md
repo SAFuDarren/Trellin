@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.136
+
+- **Needs you** is the one count of what waits for you. The rail badge counts the same items, and chips under the heading narrow the list, and **Go through**, to one kind. Review and Inbox under Records no longer show counts of their own, the status bar shows Agent activity only, and the **Waiting for review** view is gone, because Needs you covers it.
+- **Handle**, **Go through** and a claim card open a window floating over the Work board, below the page header, instead of a panel beside it. The board keeps its layout, and the claim the open item belongs to is marked and scrolled beside the window. Drag the window's left edge, or use the arrow keys on it, to resize it between 420 and 900 pixels; a double-click restores the default, and the width is remembered. A double-click restores the default width of the other dividers too.
+
 ## 1.0.135
 
 - A starting scope waiting in **Needs you** or **Review** is confirmed in the workbench. It shows the title, objective, sensitivity, starting statement and each outstanding item with its wording, Lean and status; choose **Confirm** or **Omit** for each, add a Lean proposition where a confirmed item has none, and record one reason. Items matching the Library are listed as reused, with their version. Drafts from the workbench, the command line, an Agent or a frozen target all open here.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ActivityRow } from "./workspaceActivity";
-import { resolveWaiting, stepTarget, waitingItems, waitingKind } from "./workContext";
+import { resolveWaiting, shownWaiting, stepTarget, waitingItems, waitingKind, waitingKindCounts } from "./workContext";
 
 const at = (minute: number) => ({
   at: `2026-11-25T10:${String(minute).padStart(2, "0")}:00Z`,
@@ -84,5 +84,27 @@ describe("the side panel's place in the list", () => {
     expect(stepTarget(claim, items, 1)).toEqual({ ...claim, id: "z" });
     expect(stepTarget(claim, items, -1)).toEqual({ ...claim, id: "x" });
     expect(stepTarget({ ...claim, id: "z" }, items, 1)).toBeNull();
+  });
+});
+
+describe("the Needs you filter (#345)", () => {
+  const items = waitingItems([
+    review("a", "review", 1),
+    review("b", "attention", 2),
+    job("c", "failed", 3),
+    review("d", "review", 4),
+  ]);
+
+  it("counts each kind present, in a fixed order, and leaves out kinds that are absent", () => {
+    expect(waitingKindCounts(items)).toEqual([
+      { kind: "review", count: 2 },
+      { kind: "question", count: 1 },
+      { kind: "failed", count: 1 },
+    ]);
+  });
+
+  it("narrows the list to one kind and keeps every item when no kind is chosen", () => {
+    expect(shownWaiting(items, "review").map((item) => item.id)).toEqual(["d", "a"]);
+    expect(shownWaiting(items, null)).toBe(items);
   });
 });

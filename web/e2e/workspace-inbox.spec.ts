@@ -65,10 +65,10 @@ for (const viewport of [
     );
     await page.goto("/#session=fixture");
     await expect(railSpace(page, "Work")).toHaveAccessibleName(/waiting for you/);
-    // #289: the Work panel's Inbox entry counts unread items.
+    // #345: the Inbox entry keeps no count of its own; Needs you counts what waits.
     const inboxBadge = page.locator("nav.section-nav").getByRole("link", { name: /^Inbox/ });
     let inbox = await openInbox(page);
-    await expect(inboxBadge).toHaveAccessibleName("Inbox 4");
+    await expect(inboxBadge).toHaveAccessibleName("Inbox");
     await expect(inbox.locator("[data-inbox-row]")).toHaveCount(4);
     await expect(inbox.getByText("Queued task stays in Activity")).toHaveCount(0);
     await inbox.getByRole("button", { name: /Delivered proof-writing task/ }).click();
@@ -91,12 +91,12 @@ for (const viewport of [
     const evidenceDetail = inbox.getByRole("complementary", { name: "reverseZeroAdd" });
     await expect(evidenceDetail.getByRole("link", { name: "Open record" })).toHaveAttribute("href", /#review\//);
     await evidence.press("r");
-    await expect(inboxBadge).toHaveAccessibleName("Inbox 3");
+    await expect(inboxBadge).toHaveAccessibleName("Inbox");
     await evidence.press("e");
     await expect(evidence).toHaveCount(0);
     await inbox.getByRole("button", { name: "Undo", exact: true }).press("z");
     await expect(evidence).toBeVisible();
-    await expect(inboxBadge).toHaveAccessibleName("Inbox 3");
+    await expect(inboxBadge).toHaveAccessibleName("Inbox");
     await evidence.press("e");
 
     await railSpace(page, "Home").click();

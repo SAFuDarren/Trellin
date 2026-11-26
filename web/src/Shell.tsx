@@ -35,7 +35,9 @@ import { href, useRoute, workbenchSub } from "./shell/route";
 import { spaceOf } from "./shell/spaces";
 import {
   usePinnedClaims,
+  shownWaiting,
   waitingItems,
+  type WaitingKind,
   WorkContext,
   type PeekTarget,
   type WorkContextValue,
@@ -97,6 +99,7 @@ export function Shell({ session }: { session: string }) {
   const workClaims = useClaims(session, inWork);
   const [pinnedIds, togglePin] = usePinnedClaims();
   const [peekState, setPeekState] = useState<{ session: string; target: PeekTarget } | null>(null);
+  const [waitingFilter, setWaitingFilter] = useState<{ session: string; kind: WaitingKind } | null>(null);
   const projectClaims = useProjectCanvasClaims(session, showsClaimProgress);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [chatRequest, setChatRequest] = useState<{ session: string; value: AgentChatRequest } | null>(null);
@@ -229,7 +232,6 @@ export function Shell({ session }: { session: string }) {
       }),
     ],
   };
-  const pendingReviews = inbox.data ? activity.inboxCount : undefined;
   // #326: the Work panel and its side panel read one snapshot built here.
   const workAgents = new Map(activityAgents.data?.agents?.map((agent) => [agent.id, agent]));
   const archived = new Set(
@@ -239,15 +241,21 @@ export function Shell({ session }: { session: string }) {
   const atlasById = new Map((atlas.data?.claims ?? []).map((claim) => [claim.id, claim]));
   const blockedByClaim = new Map([...atlasById].map(([id, claim]) => [id, claim.blocked ?? 0]));
   const peek = inWork && peekState?.session === session ? peekState.target : null;
+  // #345: one list of waiting items; the rail badge, Needs you and its filters all count it.
+  const waiting = waitingItems(activity.rows, archived);
+  const filterKind = waitingFilter?.session === session ? waitingFilter.kind : null;
+  const shownKind = filterKind && waiting.some((item) => item.kind === filterKind) ? filterKind : null;
   const work: WorkContextValue = {
     agents: workAgents,
-    waiting: waitingItems(activity.rows, archived),
+    waiting,
+    waitingFilter: shownKind,
+    setWaitingFilter: (kind) => setWaitingFilter(kind ? { session, kind } : null),
+    shown: shownWaiting(waiting, shownKind),
     views: CLAIM_VIEWS.map((key) => ({
       key,
       href: href("claims", key === "all" ? "" : key),
       count: workClaimList.filter((claim) =>
         inClaimView(key, claim.id, {
-          reviews: activity.reviewItemsByClaim,
           blocked: blockedByClaim,
           running: activity.runningByClaim,
           progress: claimProgress,
@@ -299,13 +307,13 @@ export function Shell({ session }: { session: string }) {
               current={section}
               badges={{
                 team: { count: activity.counts.running, live: true },
-                // The inbox already holds the review items (#270), so the larger count is the number waiting.
-                work: { count: Math.max(pendingReviews ?? 0, workspaceInbox.unread) },
+                work: { count: waiting.length },
               }}
               onSearch={openPalette}
             />
             <WorkContext.Provider value={work}>
-              <SpaceCounts.Provider value={{ inbox: workspaceInbox.unread, review: pendingReviews }}>
+              {/* #345: records carry no counts of their own; what waits is counted once, in Needs you. */}
+              <SpaceCounts.Provider value={{}}>
                 {section === "review" ? (
                   <ReviewPage session={session} sub={sub} onOpen={open} />
                 ) : section === "agent-work" ? (

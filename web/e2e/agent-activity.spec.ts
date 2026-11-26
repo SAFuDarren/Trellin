@@ -45,7 +45,9 @@ test("running proof jobs agree across Agent activity, Claims, Chats and the Team
   const card = page.locator(".board-card").filter({ hasText: CLAIM_TITLE });
   await expect(card.getByText("2 running", { exact: true })).toBeVisible();
   await expect(card.getByRole("link", { name: "1 result to review", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "1 to review", exact: true })).toBeVisible();
+  // #345: waiting items are counted once, in Needs you, not again in the status bar.
+  await expect(page.locator("nav.section-nav .work-waiting")).toContainText(/Needs you · \d/);
+  await expect(page.locator(".agent-dock-status")).not.toContainText("to review");
 
   await rail.getByRole("link", { name: "Chats", exact: true }).click();
   const proof = page.getByRole("region", { name: "Proof activity", exact: true });

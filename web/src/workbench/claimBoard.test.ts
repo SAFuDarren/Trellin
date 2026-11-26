@@ -116,7 +116,6 @@ describe("assurance and views (#342)", () => {
 
   it("Ready to advance follows the claim progress", () => {
     const context = {
-      reviews: new Map(),
       blocked: new Map(),
       running: new Map(),
       progress: new Map([
