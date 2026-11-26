@@ -224,6 +224,8 @@ type Props = {
   onLayout: (edit: ProjectCanvasOperation) => void;
   layoutUnavailable?: boolean;
   saving?: boolean;
+  /** Shown in place of the canvas while the project has no claims. */
+  empty?: React.ReactNode;
 };
 
 export function ProjectCanvas({
@@ -248,6 +250,7 @@ export function ProjectCanvas({
   onLayout,
   layoutUnavailable,
   saving,
+  empty,
 }: Props) {
   const { t } = useTranslation();
   const stage = useRef<HTMLDivElement>(null);
@@ -1248,7 +1251,7 @@ export function ProjectCanvas({
             ))}
         </div>
         {detailPosition && linkDetails}
-        {!cards.length && <p className="project-canvas-empty">{t("notice.noClaims")}</p>}
+        {!cards.length && (empty ?? <p className="project-canvas-empty">{t("notice.noClaims")}</p>)}
         {atlasOpen &&
           (atlasClaims?.length ? (
             (atlasBox || atlasOpeningBox) && (

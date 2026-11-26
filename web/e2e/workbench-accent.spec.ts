@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { GraphSnapshot } from "../src/workbench/types";
-import { FIXTURE_CLAIM_TITLE, mapClaim, openProof } from "./project-map";
+import { FIXTURE_CLAIM_TITLE, mapClaim, openProof, openAddEntry, THEOREM_ENTRY } from "./project-map";
 import { openDestination } from "./navigation";
 import { startOnStatusBoard } from "./claims-display";
 
@@ -76,8 +76,8 @@ for (const colorScheme of ["light", "dark"] as const) {
     await expect(live).toHaveText("2");
     expect(await contrast(live, { foreground: "color", background: "background-color" })).toBeGreaterThanOrEqual(4.5);
 
-    await page.getByRole("button", { name: "Add theorem", exact: true }).click();
-    const primary = page.getByRole("dialog", { name: "Add theorem", exact: true }).locator("button.primary");
+    await openAddEntry(page, THEOREM_ENTRY);
+    const primary = page.getByRole("dialog", { name: "New theorem", exact: true }).locator("button.primary");
     // #349: on dark the action fill is a light neutral, so the accent keeps meaning selection and focus.
     await expect(primary).toHaveCSS("background-color", colorScheme === "light" ? accent : "rgb(230, 230, 230)");
     expect(await contrast(primary, { foreground: "color", background: "background-color" })).toBeGreaterThanOrEqual(

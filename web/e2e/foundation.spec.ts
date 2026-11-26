@@ -132,15 +132,16 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     await expect(searchResults.getByRole("option").first()).toHaveCSS("border-radius", "6px");
     await page.keyboard.press("Escape");
 
-    const researchActions = page.getByRole("button", { name: "Research actions", exact: true });
-    await researchActions.click();
+    const addMenu = page.getByRole("button", { name: "Add to project", exact: true });
+    await addMenu.click();
     const actions = page.locator(".workbench-actions-items");
     await expectEnter(actions, "rm-float-in", floatDuration);
     await expectToken(actions, "box-shadow", "--elevation-float");
     await page.keyboard.press("Escape");
-    await expect(researchActions).toBeFocused();
+    await expect(addMenu).toBeFocused();
 
-    await page.getByRole("button", { name: "Add theorem", exact: true }).click();
+    await addMenu.click();
+    await page.getByRole("menuitem", { name: /^New theorem…/ }).click();
     const dialog = page.getByRole("dialog");
     await expectEnter(dialog, "rm-dialog-in", panelDuration);
     await expectToken(dialog, "box-shadow", "--elevation-dialog");

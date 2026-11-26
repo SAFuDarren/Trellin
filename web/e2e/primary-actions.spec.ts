@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { clickInspectorAction, FIXTURE_CLAIM_TITLE, mapClaim } from "./project-map";
+import { clickInspectorAction, FIXTURE_CLAIM_TITLE, IMPORT_ENTRY, mapClaim, openAddEntry } from "./project-map";
 
 const PRIMARY = ".button.primary:visible";
 
@@ -25,9 +25,9 @@ test("the header, inspector and current dialog each have one filled main action"
   });
   await page.goto("/#session=fixture");
   const header = page.locator("#workbench .page-head .page-actions");
-  const add = header.getByRole("button", { name: "Add theorem", exact: true });
+  const add = header.getByRole("button", { name: "Add to project", exact: true });
   await expect(header.locator(PRIMARY)).toHaveCount(1);
-  await expect(header.locator(PRIMARY)).toHaveAccessibleName("Add theorem");
+  await expect(header.locator(PRIMARY)).toHaveAccessibleName("Add to project");
   for (const colorScheme of ["dark", "light"] as const) {
     await page.emulateMedia({ colorScheme });
     await expect(add).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -43,7 +43,8 @@ test("the header, inspector and current dialog each have one filled main action"
   await expect(find).toHaveCSS("height", await link.evaluate((button) => getComputedStyle(button).height));
 
   await add.click();
-  const theorem = page.getByRole("dialog", { name: "Add theorem", exact: true });
+  await page.getByRole("menuitem", { name: /^New theorem…/ }).click();
+  const theorem = page.getByRole("dialog", { name: "New theorem", exact: true });
   await expect(theorem.locator(PRIMARY)).toHaveCount(1);
   await expect(theorem.locator(PRIMARY)).toHaveAttribute("type", "submit");
   await page.keyboard.press("Escape");
@@ -127,9 +128,8 @@ test("reviewing a public excerpt transfers the intake dialog's one primary actio
     }),
   );
   await page.goto("/#session=fixture");
-  await page.getByRole("button", { name: "Research actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Organize with AI", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Organize with AI", exact: true });
+  await openAddEntry(page, IMPORT_ENTRY);
+  const dialog = page.getByRole("dialog", { name: "Import paper, notes or code", exact: true });
   await dialog.getByRole("button", { name: "Model", exact: true }).click();
   await dialog.getByRole("option", { name: /Fixture remote/ }).click();
   await dialog.getByLabel("Research notes or Lean text").fill("Fixture notes");

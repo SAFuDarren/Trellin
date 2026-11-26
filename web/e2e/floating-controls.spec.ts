@@ -3,9 +3,9 @@ import { expect, test } from "@playwright/test";
 test("the shared menu supports keyboard navigation, typeahead and focus return", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 460 });
   await page.goto("/#session=fixture");
-  // #293 removed the Settings and help menu; Research actions uses the same shared menu.
-  const trigger = page.getByRole("button", { name: "Research actions", exact: true });
-  const menu = page.getByRole("menu", { name: "Research actions" });
+  // #293 removed the Settings and help menu; #353's Add menu uses the same shared menu.
+  const trigger = page.getByRole("button", { name: "Add to project", exact: true });
+  const menu = page.getByRole("menu", { name: "Add to project" });
   const items = menu.getByRole("menuitem");
 
   await trigger.press("ArrowDown");
@@ -51,9 +51,9 @@ test("a picker inside a native dialog keeps focus and Escape scoped to the picke
   await page.setViewportSize({ width: 760, height: 540 });
   await page.route("**/api/project-intake/models", (route) => route.fulfill({ json: { models: ["fixture-model"] } }));
   await page.goto("/#session=fixture");
-  await page.getByRole("button", { name: "Research actions" }).click();
-  await page.getByRole("menuitem", { name: "Organize with AI" }).click();
-  const information = page.getByRole("dialog", { name: "Organize with AI" });
+  await page.getByRole("button", { name: "Add to project" }).click();
+  await page.getByRole("menuitem", { name: /^Paper, notes or code…/ }).click();
+  const information = page.getByRole("dialog", { name: "Import paper, notes or code" });
   const trigger = information.getByRole("button", { name: "Model", exact: true });
   await expect(trigger).toHaveAccessibleDescription("fixture-model");
   await trigger.press("Enter");

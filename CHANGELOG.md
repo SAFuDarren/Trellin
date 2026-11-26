@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.140
+
+- The project map header has one **Add** menu in place of **Add theorem** and **Research actions**. **Paper, notes or code…** opens the import (formerly **Organize with AI**), and **New theorem…** the theorem form. The command palette uses the same names.
+- Drop a text, Markdown, TeX or Lean file on the project map to import it: its text and name fill the import form. A project without claims shows a drop area in the middle of the map with **Choose file…** and **New theorem…**. A PDF or a file over 18 KB says so in the form.
+- **Local lemmas**, **Premises** and **Research references** move to the claim's context menu on the map, and say why when they are unavailable.
+
 ## 1.0.139
 
 - Opening, stepping through or closing the floating window no longer moves the Work board. It used to scroll the open claim's card beside the window, which slid cards under the pinned domain column and cut off their titles. The claim stays marked, and the board scrolls by hand to bring a card out from under the window.

@@ -100,7 +100,7 @@ for (const [platform, shortcut, actionHint, openHint] of [
     await expect(launcher).toHaveAttribute("title", `Command palette (${glyph})`);
 
     const query = await openPalette(page, shortcut);
-    const add = palette(page).getByRole("option", { name: "Add theorem", exact: true });
+    const add = palette(page).getByRole("option", { name: "New theorem…", exact: true });
     await expect(add.locator("kbd")).toHaveText(actionHint);
     await expect(add).toHaveAttribute("aria-keyshortcuts", "Alt+N");
     await expect(palette(page).locator(".command-palette-keys")).toContainText(platform === "MacIntel" ? "↵" : "Enter");
@@ -189,7 +189,7 @@ test("the # prefix searches claims and exact proof references with the keyboard"
   const claimResult = results.getByRole("option", { name: FIXTURE_CLAIM_TITLE, exact: true });
   await expect(claimResult.locator("svg.workbench-icon")).toBeVisible();
   await expect(results.getByRole("option", { name: "Nat.add_zero", exact: true })).toHaveCount(0);
-  await expect(results.getByRole("option", { name: "Add theorem", exact: true })).toHaveCount(0);
+  await expect(results.getByRole("option", { name: "New theorem…", exact: true })).toHaveCount(0);
   await query.press("Escape");
   await choose(page, "# 加零", FIXTURE_CLAIM_TITLE);
   const map = page.getByRole("application", { name: "Project map", exact: true });
@@ -386,11 +386,15 @@ test("palette actions open the existing forms and wait for explicit authorizatio
   await expect(proofTask).toBeHidden();
 
   await page.goto("/#team");
-  for (const name of ["Add theorem", "Organize with AI", "Research references"]) {
+  for (const [name, title] of [
+    ["New theorem…", "New theorem"],
+    ["Paper, notes or code…", "Import paper, notes or code"],
+    ["Research references", "Research references"],
+  ] as const) {
     await choose(page, name, name);
-    const dialog = page.getByRole("dialog", { name, exact: true });
+    const dialog = page.getByRole("dialog", { name: title, exact: true });
     await expect(dialog).toBeVisible();
-    if (name === "Add theorem") {
+    if (name === "New theorem…") {
       const confirmation = dialog.getByRole("checkbox", { name: /The Lean proposition expresses/ });
       await expect(confirmation).toBeVisible();
       await expect(confirmation).not.toBeChecked();

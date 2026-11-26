@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mapClaim, openProof } from "./project-map";
+import { mapClaim, openProof, openAddEntry, THEOREM_ENTRY } from "./project-map";
 
 const ORIGINAL_CLAIM = "11111111-1111-4111-8111-111111111111";
 const NEW_GOAL = {
@@ -67,7 +67,7 @@ test("adding a project goal keeps the current proof open and draws no dependency
   await originalNode.click();
   await page.locator(".main-proof-graph").getByRole("button", { name: "Zoom in", exact: true }).click();
 
-  await page.getByRole("button", { name: "Add theorem" }).click();
+  await openAddEntry(page, THEOREM_ENTRY);
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Destination · Current project graph")).toBeVisible();
   await dialog.getByLabel("Title", { exact: true }).fill(NEW_GOAL.title);

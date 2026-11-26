@@ -240,7 +240,6 @@
     "map": "项目图谱",
     "mapNote": "排列课题并建立关联",
     "details": "详情",
-    "researchActions": "研究操作",
     "proofOverview": "显示证明概览",
     "reload": "重新加载图谱",
     "claimsUnavailable": "无法加载全部课题，图谱暂时显示近期课题。",
@@ -1515,7 +1514,7 @@
       "revision_pending": "修订范围待确认"
     },
     "invalid": "请完整填写具体的前提和审阅信息。",
-    "unavailable": "此命题当前无法审阅前提。",
+    "unavailable": "这个课题没有可审阅的前提。",
     "identity": "请使用此项目绑定的本机研究者身份审阅前提。",
     "stale": "前提或证明范围已变化。请重新打开「前提」查看当前状态。",
     "duplicate": "这个前提与当前目标或一个已有假设相同。",
@@ -1535,7 +1534,7 @@
     "stale": "已确认的 Lean 范围当前无法核验。请检查最新陈述和依据。",
     "busy": "已有本地引理计划正在运行，完成后可再试。",
     "checkFailed": "Lean 未能核验整份计划。请检查计划和本机 Lean 配置。已通过的引理可以在图谱中查看。",
-    "unavailable": "此项目当前无法核验引理计划。"
+    "unavailable": "本地引理需要这个课题有已确认的 Lean 陈述。"
   },
   "proofTask": {
     "modelConnection": "证明模型",
@@ -1607,8 +1606,8 @@
     "nodeAbsent": "此编号对应当前命题，但它的节点已不在当前图谱中。"
   },
   "projectEntry": {
-    "organize": "和 AI 梳理资料",
-    "addTheorem": "手动添加定理",
+    "organize": "论文、笔记或代码…",
+    "addTheorem": "新定理…",
     "close": "关闭",
     "title": "标题",
     "lean": "Lean 命题",
@@ -1637,7 +1636,7 @@
       "objective": "研究目的（可选）",
       "objectiveDefault": "整理已有陈述，再考虑要证明的定理。",
       "notes": "研究笔记或 Lean 文本",
-      "readFile": "读取文本、Markdown 或 Lean 文件",
+      "readFile": "读取文本、Markdown、TeX 或 Lean 文件",
       "model": "模型",
       "noModels": "未找到可用模型",
       "connectModel": "启动带有本地文本模型的 Ollama，再刷新列表。",
@@ -1664,8 +1663,14 @@
       "confirm": "记录审核决定",
       "reviewed": "审核决定已记录。",
       "pending": "待审的整理结果",
-      "back": "返回笔记"
-    }
+      "back": "返回笔记",
+      "unsupported": "暂时读不了这种文件。请用文本、Markdown、TeX 或 Lean 文件。"
+    },
+    "add": "添加",
+    "addTo": "添加到项目",
+    "organizeTitle": "导入论文、笔记或代码",
+    "addTheoremTitle": "新定理",
+    "dropHint": "也可以直接拖到图谱上"
   },
   "picker": {
     "noMatches": "没有匹配项"
@@ -1969,5 +1974,12 @@
     },
     "none": "还没有记录过判断。在「等你判断」里做的决定会出现在这里。",
     "unavailable": "无法读取判断记录。请刷新后重试。"
+  },
+  "mapDrop": {
+    "title": "这个项目还是空的。把笔记或 Lean 代码拖到这里",
+    "hint": "可以是 18 KB 以内的文本、Markdown、TeX 或 Lean 文件。你选的模型读完后会列出课题，由你确认。",
+    "choose": "选择文件…",
+    "newTheorem": "新定理…",
+    "release": "松开即可导入"
   }
 }
