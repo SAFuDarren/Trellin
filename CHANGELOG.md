@@ -1,5 +1,11 @@
 # Changes
 
+## 1.0.141
+
+- Importing is one step: choose or drop a file (or paste text), and **Organize**. The dialog names the file, its size and the model that will read it; the title comes from the file name and the model is the one last used for the project. Title, model, research objective and the text are under **Advanced options**, remembered per project. Without a usable model, one line links to model connections. The native file chooser is gone.
+- A connected cloud model is allowed once per project for imports instead of a preview before every request. Trellin records who allowed which connection and when, and each import's authorization points at that grant (D4). **Team → Runtimes** shows the permission beside the connection and can withdraw it; removing or changing the connection ends it.
+- New routes `GET /api/project-intake/grants`, `POST /api/project-intake/grant` and `POST /api/project-intake/revoke`; `POST /api/project-intake/public-preview` is removed and `public-draft` no longer takes a token. No migration.
+
 ## 1.0.140
 
 - The project map header has one **+** button (**Add to project**) in place of **Add theorem** and **Research actions**, and the map's **Link selected claim** and **Find claim** become icons too; each tool shows its name on hover and focus. In the **+** menu, **Paper, notes or code…** opens the import (formerly **Organize with AI**), and **New theorem…** the theorem form. The command palette uses the same names.

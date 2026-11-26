@@ -54,6 +54,7 @@ test("a picker inside a native dialog keeps focus and Escape scoped to the picke
   await page.getByRole("button", { name: "Add to project" }).click();
   await page.getByRole("menuitem", { name: /^Paper, notes or code…/ }).click();
   const information = page.getByRole("dialog", { name: "Import paper, notes or code" });
+  await information.getByRole("button", { name: "Advanced options" }).click();
   const trigger = information.getByRole("button", { name: "Model", exact: true });
   await expect(trigger).toHaveAccessibleDescription("fixture-model");
   await trigger.press("Enter");

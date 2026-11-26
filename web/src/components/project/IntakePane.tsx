@@ -1,14 +1,12 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { useLocalTextModels } from "../../api/localModels";
-import {
-  connectionChoiceLabel,
-  connectionModelLabel,
-  dispatchableConnection,
-  useModelConnections,
-} from "../../api/modelConnections";
+import { useIntakeGrantChange, useIntakeGrants } from "../../api/intakeGrants";
+import { connectionChoiceLabel, dispatchableConnection, useModelConnections } from "../../api/modelConnections";
+import { useInbox } from "../../api/sections";
+import { draggingFiles } from "./MapDrop";
 import { Picker } from "../FloatingControls";
 import { href } from "../../shell/route";
 import { ReviewFields } from "./ReviewFields";
@@ -41,18 +39,6 @@ type IntakeDraft = {
 };
 type IntakeInput = { title: string; domain: "lean-core"; objective: string; notes: string };
 type PublicIntakeInput = IntakeInput & { connection_id: string };
-type ReleasePreview = {
-  token: string;
-  provider: string;
-  model: string;
-  outgoing: { domain: string; objective: string; notes: string };
-  limits: {
-    max_calls: number;
-    timeout_seconds: number;
-    max_output_tokens: number;
-    output_token_limit_enforced: boolean;
-  };
-};
 type Decision = { action: "accept" | "omit"; reason: string; formal?: { lean: { proposition: string } } };
 
 export function IntakePane({
@@ -67,13 +53,22 @@ export function IntakePane({
 }) {
   const { t } = useTranslation();
   const signer = useReviewSigner(session);
+  // Databases without a local identity expose no workspace ID; their choices share one key.
+  const project = useInbox(session).data?.review_identity?.workspace_id ?? "default";
   const [notes, setNotes] = useState("");
+  const [source, setSource] = useState<{ name: string; size: number } | null>(null);
+  const [pasting, setPasting] = useState(false);
+  const [objective, setObjective] = useState("");
   const [modelChoice, setModelChoice] = useState<string | null>(null);
+  const [advanced, setAdvanced] = useStoredFlag(`trellin-import-advanced:${project}`);
+  const [askGrant, setAskGrant] = useState(false);
   const [active, setActive] = useState<IntakeDraft | null>(null);
   const [fileError, setFileError] = useState("");
   const [message, setMessage] = useState("");
-  const [release, setRelease] = useState<{ input: PublicIntakeInput; preview: ReleasePreview } | null>(null);
+  const chooser = useRef<HTMLInputElement>(null);
   const connections = useModelConnections(session);
+  const grants = useIntakeGrants(session);
+  const grantChange = useIntakeGrantChange(session);
   const queries = useQueryClient();
   const models = useLocalTextModels(session);
   const recent = useQuery({
@@ -83,22 +78,16 @@ export function IntakePane({
   });
   const save = () => void queries.invalidateQueries({ queryKey: ["project-intake-drafts", session] });
   const draft = useMutation({
-    mutationFn: (input: (IntakeInput & { model: string }) | (PublicIntakeInput & { token: string })) =>
-      api<IntakeDraft>(session, "token" in input ? "/api/project-intake/public-draft" : "/api/project-intake", {
+    mutationFn: (input: (IntakeInput & { model: string }) | PublicIntakeInput) =>
+      api<IntakeDraft>(session, "connection_id" in input ? "/api/project-intake/public-draft" : "/api/project-intake", {
         data: input,
       }),
-    onSuccess: (result) => {
-      setRelease(null);
+    onSuccess: (result, input) => {
+      rememberModel(project, "connection_id" in input ? `connection:${input.connection_id}` : input.model);
+      setAskGrant(false);
       setActive(result);
       save();
     },
-    // A dispatched preview cannot be replayed, including after a provider error.
-    onError: () => setRelease(null),
-  });
-  const preview = useMutation({
-    mutationFn: (input: PublicIntakeInput) =>
-      api<ReleasePreview>(session, "/api/project-intake/public-preview", { data: input }),
-    onSuccess: (result, input) => setRelease({ input, preview: result }),
   });
   const confirm = useMutation({
     mutationFn: (form: FormData) => {
@@ -131,6 +120,7 @@ export function IntakePane({
 
   const [title, setTitle] = useState(() => (file ? fileTitle(file) : t("projectEntry.intake.defaultTitle")));
   async function load(source: File) {
+    setMessage("");
     setFileError("");
     if (!readableNotesFile(source)) {
       setFileError(t("projectEntry.intake.unsupported"));
@@ -144,6 +134,8 @@ export function IntakePane({
       const text = await source.text();
       if (text.includes("\u0000")) throw new Error("binary");
       setNotes(text);
+      setSource({ name: source.name, size: source.size });
+      setPasting(false);
       setTitle(fileTitle(source));
     } catch {
       setFileError(t("projectEntry.intake.fileError"));
@@ -159,27 +151,44 @@ export function IntakePane({
     event.currentTarget.value = "";
     if (source) await load(source);
   }
-  function requestDraft(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function organize(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     setMessage("");
     setFileError("");
-    setRelease(null);
     draft.reset();
-    preview.reset();
-    const form = new FormData(event.currentTarget);
-    const selection = String(form.get("model") ?? "");
-    if (!selection) return;
+    grantChange.reset();
+    if (!selectionValid || !notes.trim()) return;
     const input: IntakeInput = {
-      title: String(form.get("title")).trim(),
+      title: title.trim() || t("projectEntry.intake.defaultTitle"),
       domain: "lean-core",
-      objective: String(form.get("objective") ?? "").trim() || t("projectEntry.intake.objectiveDefault"),
+      objective: objective.trim() || t("projectEntry.intake.objectiveDefault"),
       notes: notes.trim(),
     };
-    if (selection.startsWith("connection:")) {
-      preview.mutate({ ...input, connection_id: selection.slice("connection:".length) });
+    if (selectedConnection) {
+      if (!granted) {
+        setAskGrant(true);
+        return;
+      }
+      draft.mutate({ ...input, connection_id: selectedConnection.id });
     } else {
-      draft.mutate({ ...input, model: selection });
+      draft.mutate({ ...input, model: selectedModel });
     }
+  }
+  async function allowAndOrganize() {
+    if (!selectedConnection) return;
+    try {
+      await grantChange.mutateAsync({ action: "grant", connectionId: selectedConnection.id });
+    } catch {
+      return;
+    }
+    setAskGrant(false);
+    draft.mutate({
+      title: title.trim() || t("projectEntry.intake.defaultTitle"),
+      domain: "lean-core",
+      objective: objective.trim() || t("projectEntry.intake.objectiveDefault"),
+      notes: notes.trim(),
+      connection_id: selectedConnection.id,
+    });
   }
   function confirmReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -189,12 +198,23 @@ export function IntakePane({
   const modelNames = models.data?.models ?? [];
   const available = (connections.data?.connections ?? []).filter(dispatchableConnection);
   const canChoose = modelNames.length > 0 || available.length > 0;
-  const selectedModel = modelChoice ?? modelNames[0] ?? "";
+  const choices = [...modelNames, ...available.map((connection) => `connection:${connection.id}`)];
+  const remembered = rememberedModel(project);
+  const selectedModel =
+    [modelChoice, remembered].find((choice): choice is string => !!choice && choices.includes(choice)) ??
+    choices[0] ??
+    "";
   const selectedConnection = available.find((connection) => selectedModel === `connection:${connection.id}`);
   const selectionValid = Boolean(selectedConnection || modelNames.includes(selectedModel));
-  const working = draft.isPending || preview.isPending;
+  const granted = Boolean(
+    selectedConnection && grants.data?.grants.some((grant) => grant.connection_id === selectedConnection.id),
+  );
+  const modelName = selectedConnection ? connectionChoiceLabel(t, selectedConnection) : selectedModel;
+  const working = draft.isPending || grantChange.isPending;
   const tooLarge = new TextEncoder().encode(notes).length > MAX_NOTES_BYTES;
-  const failure = active ? confirm.error : (draft.error ?? preview.error);
+  const hasMaterial = Boolean(notes.trim()) || pasting;
+  const checking = models.isPending || connections.isPending;
+  const failure = active ? confirm.error : (draft.error ?? grantChange.error);
   const pending = recent.data?.drafts?.filter((item) => !item.confirmed) ?? [];
   return (
     <>
@@ -263,140 +283,217 @@ export function IntakePane({
           </div>
         </form>
       ) : (
-        <form className="project-entry-form" onSubmit={requestDraft}>
-          <p className="project-entry-note">{t("modelConnections.intakeHelp")}</p>
-          <div className="project-entry-columns">
-            <label>
-              {t("projectEntry.title")}
-              <input
-                name="title"
-                value={title}
-                onChange={(event) => setTitle(event.currentTarget.value)}
-                maxLength={300}
-                required
-                disabled={working || Boolean(release)}
-              />
-            </label>
-            <div className="project-entry-field">
-              <label htmlFor="intake-model-picker">{t("projectEntry.intake.model")}</label>
-              <input name="model" type="hidden" value={selectionValid ? selectedModel : ""} />
-              <Picker
-                label={t("projectEntry.intake.model")}
-                triggerId="intake-model-picker"
-                triggerClassName="project-entry-picker"
-                trigger={
-                  selectedConnection
-                    ? connectionChoiceLabel(t, selectedConnection)
-                    : selectionValid
-                      ? selectedModel
-                      : t(canChoose ? "modelConnections.chooseConnection" : "projectEntry.intake.noModels")
-                }
-                value={selectionValid ? selectedModel : ""}
-                disabled={!canChoose || working || Boolean(release)}
-                groups={[
-                  {
-                    label: t("conversations.onDevice"),
-                    options: modelNames.map((model) => ({ id: model, label: model })),
-                  },
-                  {
-                    label: t("conversations.connectedModels"),
-                    options: available.map((connection) => ({
-                      id: `connection:${connection.id}`,
-                      label: connectionChoiceLabel(t, connection),
-                    })),
-                  },
-                ]}
-                searchLabel={t("conversations.searchModels")}
-                emptyLabel={t("picker.noMatches")}
-                onSelect={setModelChoice}
-              />
+        <form
+          className="project-entry-form import-form"
+          onSubmit={organize}
+          onDragOver={(event) => {
+            if (!draggingFiles(event)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }}
+          onDrop={(event) => {
+            if (!draggingFiles(event)) return;
+            event.preventDefault();
+            const dropped = event.dataTransfer.files[0];
+            if (dropped) void load(dropped);
+          }}
+        >
+          <input
+            ref={chooser}
+            className="import-file-input"
+            type="file"
+            tabIndex={-1}
+            aria-hidden="true"
+            accept={TEXT_ACCEPT}
+            onChange={(event) => void readFile(event)}
+          />
+          {!hasMaterial ? (
+            <section className="import-drop" aria-label={t("projectEntry.intake.dropTitle")}>
+              <p className="import-drop-title">{t("projectEntry.intake.dropTitle")}</p>
+              <div className="import-drop-actions">
+                <button type="button" className="button" onClick={() => chooser.current?.click()}>
+                  {t("projectEntry.intake.choose")}
+                </button>
+                <button type="button" className="conversation-text-action" onClick={() => setPasting(true)}>
+                  {t("projectEntry.intake.paste")}
+                </button>
+              </div>
+            </section>
+          ) : source ? (
+            <div className="import-source">
+              <span className="import-source-name">{source.name}</span>
+              <span className="import-source-size">{formatSize(source.size)}</span>
+              <button
+                type="button"
+                className="conversation-text-action"
+                disabled={working}
+                onClick={() => chooser.current?.click()}
+              >
+                {t("projectEntry.intake.replace")}
+              </button>
             </div>
-          </div>
+          ) : (
+            <label>
+              {t("projectEntry.intake.notes")}
+              <textarea rows={8} value={notes} onChange={(event) => setNotes(event.target.value)} disabled={working} />
+            </label>
+          )}
+          {(fileError || tooLarge) && (
+            <p className="project-entry-status" role="alert">
+              {fileError || t("projectEntry.intake.tooLarge")}
+            </p>
+          )}
           {connections.isError && (
             <p className="project-entry-status" role="alert">
               {t("errors.connection.unavailable")}
             </p>
           )}
-          {!models.isPending && !connections.isPending && !canChoose && (
-            <div className="project-entry-buttons">
-              <a className="button" href={href("team", "runtimes")}>
-                {t("modelConnections.openTeam")}
+          {!checking && !canChoose ? (
+            <div className="import-model">
+              <span>{t("projectEntry.intake.noModel")}</span>
+              <a className="conversation-text-action" href={href("team", "runtimes")}>
+                {t("projectEntry.intake.connectModel")}
               </a>
               <button
-                className="button"
+                className="conversation-text-action"
                 type="button"
                 onClick={() => void Promise.all([models.refetch(), connections.refetch()])}
               >
                 {t("projectEntry.intake.refreshModels")}
               </button>
             </div>
+          ) : (
+            selectionValid && <p className="import-model">{t("projectEntry.intake.readBy", { model: modelName })}</p>
           )}
-          <label>
-            {t("projectEntry.intake.objective")}
-            <input name="objective" maxLength={4000} disabled={working || Boolean(release)} />
-          </label>
-          <label>
-            {t("projectEntry.intake.notes")}
-            <textarea
-              rows={8}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              required
-              disabled={working || Boolean(release)}
-            />
-          </label>
-          <label className="project-entry-file">
-            {t("projectEntry.intake.readFile")}
-            <input
-              type="file"
-              disabled={working || Boolean(release)}
-              accept={TEXT_ACCEPT}
-              onChange={(event) => void readFile(event)}
-            />
-          </label>
-          {(fileError || tooLarge) && (
-            <p className="project-entry-status" role="alert">
-              {fileError || t("projectEntry.intake.tooLarge")}
-            </p>
-          )}
-          <div className="project-entry-buttons">
-            <button
-              className={release ? "button" : "button primary"}
-              type="submit"
-              disabled={working || Boolean(release) || tooLarge || !notes.trim() || !canChoose}
-            >
-              {t(draft.isPending ? "projectEntry.intake.analyzing" : "projectEntry.intake.analyze")}
-            </button>
-          </div>
-          {release && (
-            <section className="project-entry-item" aria-labelledby="intake-release">
-              <h3 id="intake-release">{t("modelConnections.publicPreview")}</h3>
+          {askGrant && selectedConnection && !granted && (
+            <div className="import-grant" role="group" aria-label={t("projectEntry.intake.allowLabel")}>
               <p>
-                {t(`team.providers.${release.preview.provider}`, { defaultValue: release.preview.provider })}
-                {" · "}
-                {connectionModelLabel(t, release.preview)}
+                {t("projectEntry.intake.allowAsk", {
+                  model: modelName,
+                  provider: t(`team.providers.${selectedConnection.provider}`, {
+                    defaultValue: selectedConnection.provider,
+                  }),
+                })}
               </p>
-              <p>{t("modelConnections.previewLimits", { seconds: release.preview.limits.timeout_seconds })}</p>
-              <pre className="code-block">{JSON.stringify(release.preview.outgoing, null, 2)}</pre>
               <div className="project-entry-buttons">
-                <button type="button" className="button" disabled={draft.isPending} onClick={() => setRelease(null)}>
-                  {t("modelConnections.editPreview")}
-                </button>
                 <button
                   type="button"
                   className="button primary"
-                  disabled={draft.isPending}
-                  onClick={() => draft.mutate({ ...release.input, token: release.preview.token })}
+                  disabled={working}
+                  onClick={() => void allowAndOrganize()}
                 >
-                  {t("modelConnections.sendPublic")}
+                  {t("projectEntry.intake.allow")}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  disabled={working}
+                  onClick={() => {
+                    setAskGrant(false);
+                    setAdvanced(true);
+                  }}
+                >
+                  {t("projectEntry.intake.otherModel")}
                 </button>
               </div>
-            </section>
+            </div>
+          )}
+          {hasMaterial && !askGrant && (
+            <div className="project-entry-buttons">
+              <button
+                className="button primary"
+                type="submit"
+                disabled={working || tooLarge || !notes.trim() || !selectionValid}
+              >
+                {t(draft.isPending ? "projectEntry.intake.analyzing" : "projectEntry.intake.analyze")}
+              </button>
+            </div>
           )}
           {working && (
             <p className="project-entry-note" role="status">
               {t("projectEntry.intake.running")}
             </p>
+          )}
+          <button
+            type="button"
+            className="conversation-text-action import-advanced-toggle"
+            aria-expanded={advanced}
+            aria-controls="import-advanced"
+            onClick={() => setAdvanced(!advanced)}
+          >
+            {t("projectEntry.intake.advanced")}
+          </button>
+          {advanced && (
+            <section id="import-advanced" className="import-advanced" aria-label={t("projectEntry.intake.advanced")}>
+              <p className="project-entry-note">{t("modelConnections.intakeHelp")}</p>
+              <div className="project-entry-columns">
+                <label>
+                  {t("projectEntry.title")}
+                  <input
+                    name="title"
+                    value={title}
+                    onChange={(event) => setTitle(event.currentTarget.value)}
+                    maxLength={300}
+                    disabled={working}
+                  />
+                </label>
+                <div className="project-entry-field">
+                  <label htmlFor="intake-model-picker">{t("projectEntry.intake.model")}</label>
+                  <Picker
+                    label={t("projectEntry.intake.model")}
+                    triggerId="intake-model-picker"
+                    triggerClassName="project-entry-picker"
+                    trigger={
+                      selectionValid
+                        ? modelName
+                        : t(canChoose ? "modelConnections.chooseConnection" : "projectEntry.intake.noModels")
+                    }
+                    value={selectionValid ? selectedModel : ""}
+                    disabled={!canChoose || working}
+                    groups={[
+                      {
+                        label: t("conversations.onDevice"),
+                        options: modelNames.map((model) => ({ id: model, label: model })),
+                      },
+                      {
+                        label: t("conversations.connectedModels"),
+                        options: available.map((connection) => ({
+                          id: `connection:${connection.id}`,
+                          label: connectionChoiceLabel(t, connection),
+                        })),
+                      },
+                    ]}
+                    searchLabel={t("conversations.searchModels")}
+                    emptyLabel={t("picker.noMatches")}
+                    onSelect={(choice) => {
+                      setModelChoice(choice);
+                      setAskGrant(false);
+                    }}
+                  />
+                </div>
+              </div>
+              <label>
+                {t("projectEntry.intake.objective")}
+                <input
+                  name="objective"
+                  value={objective}
+                  onChange={(event) => setObjective(event.currentTarget.value)}
+                  maxLength={4000}
+                  disabled={working}
+                />
+              </label>
+              {source && (
+                <label>
+                  {t("projectEntry.intake.notes")}
+                  <textarea
+                    rows={8}
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                    disabled={working}
+                  />
+                </label>
+              )}
+            </section>
           )}
         </form>
       )}
@@ -428,4 +525,49 @@ export function IntakePane({
 
 function fileTitle(file: File) {
   return file.name.replace(/\.[^.]+$/, "").slice(0, 300) || file.name.slice(0, 300);
+}
+
+function formatSize(bytes: number) {
+  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`;
+}
+
+const MODEL_KEY = "trellin-import-model:";
+
+function rememberedModel(project: string): string | null {
+  try {
+    return window.localStorage.getItem(MODEL_KEY + project);
+  } catch {
+    return null;
+  }
+}
+
+/** #355: the model last used to import into this project reads the next file by default. */
+function rememberModel(project: string, choice: string) {
+  try {
+    window.localStorage.setItem(MODEL_KEY + project, choice);
+  } catch {
+    // Private browsing or a full store keeps the default choice.
+  }
+}
+
+/** A per-project switch kept across visits. */
+function useStoredFlag(key: string) {
+  const [local, setLocal] = useState(false);
+  const stored = (() => {
+    try {
+      return window.localStorage.getItem(key) === "1";
+    } catch {
+      return null;
+    }
+  })();
+  const value = stored ?? local;
+  const change = (next: boolean) => {
+    setLocal(next);
+    try {
+      window.localStorage.setItem(key, next ? "1" : "0");
+    } catch {
+      // Keep the in-memory value.
+    }
+  };
+  return [value, change] as const;
 }

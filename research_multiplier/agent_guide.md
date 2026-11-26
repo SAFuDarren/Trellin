@@ -32,7 +32,9 @@ This copy matches the Research Multiplier version that wrote it. Run
    sent and to which kind of service. Unpublished work is usually `restricted`.
    Never mark material `public` or run `research release-item` unless the
    researcher says it is public.
-   In Trellin, a public intake preview authorizes one exact request. A public
+   In Trellin, importing with a connected cloud model needs the researcher's
+   standing permission for that project and connection, granted once in the
+   import dialog and withdrawn in Team → Runtimes. A public
    proof task authorizes the displayed frozen scope, selected connection and
    maximum rounds. A changed scope or connection needs renewed consent.
    On database revision `0081`, a public Codex proof note also needs explicit

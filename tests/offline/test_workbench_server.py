@@ -843,3 +843,24 @@ def test_intake_review_routes_enforce_session_origin_params_and_error_mapping(se
         DatabaseOperationError("human", "08006", "connection lost")))
     response, content = request(server, "POST", confirm_route, body=confirm_body)
     assert response.status == 503 and json.loads(content) == {"error": "intakeReview.unavailable"}
+
+
+def test_intake_grants_require_the_project_session(server, monkeypatch):
+    # #355: listing, granting and withdrawing import permission go through the local session only.
+    calls = []
+    monkeypatch.setattr(server.public_intake, "grants", lambda store: {"grants": []})
+    monkeypatch.setattr(server.public_intake, "grant", lambda store, body: calls.append(("grant", body)) or body)
+    monkeypatch.setattr(server.public_intake, "revoke", lambda store, body: calls.append(("revoke", body)) or body)
+    monkeypatch.setattr(server, "read", lambda action, *values: action(None, *values))
+    route = "/api/project-intake/grants"
+    assert request(server, "GET", route, session=False)[0].status == 403
+    assert request(server, "GET", route + "?all=1")[0].status == 400
+    response, content = request(server, "GET", route)
+    assert response.status == 200 and json.loads(content) == {"grants": []}
+    for path, action in (("/api/project-intake/grant", "grant"), ("/api/project-intake/revoke", "revoke")):
+        assert request(server, "POST", path, body={"connection_id": "x"}, origin=False)[0].status == 403
+        assert request(server, "POST", path, body={"connection_id": "x"}, session=False)[0].status == 403
+        response, _ = request(server, "POST", path, body={"connection_id": "x"})
+        assert response.status == 200
+    assert calls == [("grant", {"connection_id": "x"}), ("revoke", {"connection_id": "x"})]
+    assert request(server, "POST", "/api/project-intake/public-preview", body={})[0].status == 404

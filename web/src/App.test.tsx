@@ -106,8 +106,16 @@ async function openClaimAction(name: string, claim = CLAIM) {
 
 /** #353: the project map's Add menu. */
 async function openAddEntry(name: string) {
-  fireEvent.click(await screen.findByRole("button", { name: en.projectEntry.addTo }));
-  fireEvent.click(await screen.findByRole("menuitem", { name }));
+  const trigger = await screen.findByRole("button", { name: en.projectEntry.addTo });
+  // Under a loaded test run the first click can land before the menu is ready; reopen until it shows.
+  const item = await waitFor(
+    () => {
+      if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger);
+      return screen.getByRole("menuitem", { name });
+    },
+    { timeout: 5000 },
+  );
+  fireEvent.click(item);
 }
 
 async function openPaletteAction(name: string) {
@@ -1477,7 +1485,10 @@ describe("App", () => {
     renderApp("token");
     await openAddEntry(en.projectEntry.organize);
     const dialog = within(await screen.findByRole("dialog"));
-    expect(await dialog.findByText("local-text", { selector: "button" })).toBeTruthy();
+    // #355: the import starts from the material; the model is named, not asked for.
+    expect(await dialog.findByText("Read by local-text")).toBeTruthy();
+    expect(dialog.queryByLabelText(en.projectEntry.intake.objective)).toBeNull();
+    fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.paste }));
     fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: wording } });
     fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.analyze }));
     expect(await dialog.findByText(wording)).toBeTruthy();
@@ -1608,55 +1619,62 @@ describe("App", () => {
     expect(fetch.mock.calls.some(([path]) => path === "/api/model-connections/add-native")).toBe(false);
   });
 
-  it.each(NATIVE_CONNECTIONS)("previews the exact public excerpt before calling $label", async (choice) => {
-    const content = "Addition of natural numbers is commutative.";
-    const connection = {
-      id: choice.id,
-      provider: choice.provider,
-      label: choice.label,
-      model: choice.model,
-      status: "connected",
-      fingerprint: "fingerprint",
-    };
-    let proposed: Record<string, unknown> | undefined;
-    const fetch = vi.fn(async (input: string, init?: RequestInit) => {
-      if (input === "/api/claims") return Response.json({ claim_id: null, claims: [] });
-      if (input === "/api/model-connections") return Response.json({ connections: [connection] });
-      if (input === "/api/project-intake/models") return Response.json({ models: [] });
-      if (input.endsWith("/public-preview")) {
-        proposed = JSON.parse(String(init?.body)) as Record<string, unknown>;
-        expect(proposed.connection_id).toBe(choice.id);
-        const { domain, objective, notes } = proposed;
-        return Response.json({
-          token: "reviewed",
-          provider: connection.provider,
-          model: connection.model,
-          outgoing: { domain, objective, notes },
-          limits: { timeout_seconds: 45, max_calls: 1 },
-        });
-      }
-      if (input.endsWith("/public-draft")) {
-        expect(JSON.parse(String(init?.body))).toEqual({ ...proposed, token: "reviewed" });
-        return Response.json({ id: "review", title: "Reviewed public notes", items: [], confirmed: false });
-      }
-      return Response.json(responses[input.split("?")[0]!] ?? {});
-    });
-    vi.stubGlobal("fetch", fetch);
-    renderApp("token");
-    await openAddEntry(en.projectEntry.organize);
-    const dialog = within(await screen.findByRole("dialog"));
-    const recipient = `${choice.label} · ${choice.model}`;
-    fireEvent.click(await dialog.findByRole("button", { name: en.projectEntry.intake.model }));
-    fireEvent.click(await dialog.findByRole("option", { name: recipient }));
-    fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: content } });
-    fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.analyze }));
-    const preview = within(await dialog.findByRole("region", { name: en.modelConnections.publicPreview }));
-    expect(preview.getByText(new RegExp(content))).toBeTruthy();
-    expect(preview.getByText(recipient)).toBeTruthy();
-    expect(fetch.mock.calls.some(([path]) => path.endsWith("/public-draft"))).toBe(false);
-    fireEvent.click(preview.getByRole("button", { name: en.modelConnections.sendPublic }));
-    expect(await dialog.findByText("Reviewed public notes")).toBeTruthy();
-  });
+  it.each(NATIVE_CONNECTIONS)(
+    "asks once to allow $label for imports and then sends without a preview",
+    async (choice) => {
+      const content = "Addition of natural numbers is commutative.";
+      const connection = {
+        id: choice.id,
+        provider: choice.provider,
+        label: choice.label,
+        model: choice.model,
+        status: "connected",
+        fingerprint: "fingerprint",
+      };
+      let granted = false;
+      const sent: Record<string, unknown>[] = [];
+      const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+        if (input === "/api/claims") return Response.json({ claim_id: null, claims: [] });
+        if (input === "/api/model-connections") return Response.json({ connections: [connection] });
+        if (input === "/api/project-intake/models") return Response.json({ models: [] });
+        if (input === "/api/project-intake/grants")
+          return Response.json({ grants: granted ? [{ connection_id: choice.id, provider: choice.provider }] : [] });
+        if (input === "/api/project-intake/grant") {
+          expect(JSON.parse(String(init?.body))).toEqual({ connection_id: choice.id });
+          granted = true;
+          return Response.json({ connection_id: choice.id });
+        }
+        if (input.endsWith("/public-draft")) {
+          expect(granted).toBe(true);
+          sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+          return Response.json({ id: "review", title: "Organized public notes", items: [], confirmed: false });
+        }
+        return Response.json(responses[input.split("?")[0]!] ?? {});
+      });
+      vi.stubGlobal("fetch", fetch);
+      renderApp("token");
+      await openAddEntry(en.projectEntry.organize);
+      const dialog = within(await screen.findByRole("dialog"));
+      const recipient = `${choice.label} · ${choice.model}`;
+      expect(await dialog.findByText(`Read by ${recipient}`)).toBeTruthy();
+      fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.paste }));
+      fireEvent.change(dialog.getByLabelText(en.projectEntry.intake.notes), { target: { value: content } });
+      fireEvent.click(dialog.getByRole("button", { name: en.projectEntry.intake.analyze }));
+      const ask = within(await dialog.findByRole("group", { name: en.projectEntry.intake.allowLabel }));
+      expect(ask.getByText(new RegExp(recipient))).toBeTruthy();
+      expect(fetch.mock.calls.some(([path]) => path.endsWith("/public-draft"))).toBe(false);
+      fireEvent.click(ask.getByRole("button", { name: en.projectEntry.intake.allow }));
+      expect(await dialog.findByText("Organized public notes")).toBeTruthy();
+      expect(sent).toEqual([
+        expect.objectContaining({
+          notes: content,
+          connection_id: choice.id,
+          title: en.projectEntry.intake.defaultTitle,
+        }),
+      ]);
+      expect(sent[0]).not.toHaveProperty("token");
+    },
+  );
 
   it("saves and confirms a manual library theorem without a model", async () => {
     let submission: unknown;

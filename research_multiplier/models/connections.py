@@ -34,6 +34,16 @@ _SCHEMA = """
         test_sequence INTEGER NOT NULL DEFAULT 0
     )
 """
+# #355: a researcher's standing permission for one project to send import material to one connection (D4).
+# The grant record itself is a content-addressed artifact; this row only points at it.
+_GRANT_SCHEMA = """
+    CREATE TABLE IF NOT EXISTS intake_grants (
+        workspace_id TEXT NOT NULL,
+        connection_id TEXT NOT NULL,
+        grant_ref TEXT NOT NULL,
+        PRIMARY KEY (workspace_id, connection_id)
+    )
+"""
 _CONNECTION_FAILURES = frozenset({
     "authentication", "rate_limit", "transport", "timeout", "request_rejected", "model_unavailable",
     "invalid_output", "configuration",
@@ -221,6 +231,7 @@ class Registry:
                 database.row_factory = sqlite3.Row
                 database.execute("BEGIN IMMEDIATE")
                 database.execute(_SCHEMA)
+                database.execute(_GRANT_SCHEMA)
                 yield database
         except (OSError, sqlite3.Error):
             raise ConnectionError("unavailable") from None
@@ -348,6 +359,40 @@ class Registry:
                 if PROVIDERS[row["provider"]][0] != "cli":
                     self._secret("remove", identifier)
                 database.execute("DELETE FROM model_connections WHERE id = ?", (identifier,))
+                database.execute("DELETE FROM intake_grants WHERE connection_id = ?", (identifier,))
+
+    def intake_grants(self, workspace_id):
+        """Grant references for one project's imports, by connection ID."""
+        workspace_id = _identifier(workspace_id)
+        try:
+            _validate_metadata(self._file)
+            with closing(sqlite3.connect(self._file.absolute().as_uri() + "?mode=ro", uri=True, timeout=2)) as database:
+                if database.execute("SELECT 1 FROM sqlite_master WHERE name = 'intake_grants'").fetchone() is None:
+                    return {}
+                rows = database.execute(
+                    "SELECT connection_id, grant_ref FROM intake_grants WHERE workspace_id = ?", (workspace_id,)
+                ).fetchall()
+        except FileNotFoundError:
+            return {}
+        except (OSError, sqlite3.Error):
+            raise ConnectionError("unavailable") from None
+        return {connection: ref for connection, ref in rows}
+
+    def set_intake_grant(self, workspace_id, identifier, grant_ref):
+        """Record or withdraw (grant_ref None) one project's import permission for an existing connection."""
+        workspace_id, identifier = _identifier(workspace_id), _identifier(identifier)
+        with self._write() as database:
+            if grant_ref is None:
+                database.execute("DELETE FROM intake_grants WHERE workspace_id = ? AND connection_id = ?",
+                                 (workspace_id, identifier))
+                return
+            if database.execute("SELECT 1 FROM model_connections WHERE id = ?", (identifier,)).fetchone() is None:
+                raise ConnectionError("missing")
+            database.execute(
+                "INSERT INTO intake_grants (workspace_id, connection_id, grant_ref) VALUES (?, ?, ?) "
+                "ON CONFLICT (workspace_id, connection_id) DO UPDATE SET grant_ref = excluded.grant_ref",
+                (workspace_id, identifier, grant_ref),
+            )
 
     def _secret(self, action, *arguments):
         try:

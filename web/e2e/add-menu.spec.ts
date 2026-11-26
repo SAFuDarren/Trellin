@@ -100,6 +100,9 @@ test("an empty map offers a drop area that reads a dropped file into the import"
 
   await dropFile(page, "group-notes.md", NOTES, "text/markdown");
   const dialog = page.getByRole("dialog", { name: IMPORT_DIALOG, exact: true });
+  // #355: the dropped file is the material; its text and title wait under Advanced options.
+  await expect(dialog.locator(".import-source-name")).toHaveText("group-notes.md");
+  await dialog.getByRole("button", { name: "Advanced options" }).click();
   await expect(dialog.getByLabel("Research notes or Lean text")).toHaveValue(NOTES);
   await expect(dialog.getByLabel("Title", { exact: true })).toHaveValue("group-notes");
   await expect(page.getByText("Drop to import", { exact: true })).toBeHidden();
@@ -111,6 +114,8 @@ test("Choose file reads the chosen file into the import", async ({ page }) => {
     .locator(".map-drop-input")
     .setInputFiles({ name: "basis.tex", mimeType: "text/x-tex", buffer: Buffer.from("\\begin{lemma}A.\\end{lemma}") });
   const dialog = page.getByRole("dialog", { name: IMPORT_DIALOG, exact: true });
+  await expect(dialog.locator(".import-source-name")).toHaveText("basis.tex");
+  await dialog.getByRole("button", { name: "Advanced options" }).click();
   await expect(dialog.getByLabel("Research notes or Lean text")).toHaveValue("\\begin{lemma}A.\\end{lemma}");
   await expect(dialog.getByLabel("Title", { exact: true })).toHaveValue("basis");
 });
@@ -123,14 +128,15 @@ test("a file dropped on a map with claims opens the import, and unreadable files
   await expect(page.getByRole("region", { name: /This project is empty/ })).toHaveCount(0);
   await dropFile(page, "Basis.lean", "theorem t : True := trivial\n", "");
   const dialog = page.getByRole("dialog", { name: IMPORT_DIALOG, exact: true });
-  await expect(dialog.getByLabel("Research notes or Lean text")).toHaveValue("theorem t : True := trivial\n");
+  await expect(dialog.locator(".import-source-name")).toHaveText("Basis.lean");
   await page.keyboard.press("Escape");
 
   await dropFile(page, "paper.pdf", [37, 80, 68, 70, 0, 1, 2], "application/pdf");
   await expect(dialog.getByRole("alert")).toHaveText(
     "This file type cannot be read yet. Use a text, Markdown, TeX or Lean file.",
   );
-  await expect(dialog.getByLabel("Research notes or Lean text")).toHaveValue("");
+  await expect(dialog.locator(".import-source")).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Choose file…" })).toBeVisible();
   await page.keyboard.press("Escape");
 
   await dropFile(page, "long.md", "x".repeat(19_000), "text/markdown");

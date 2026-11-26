@@ -471,3 +471,25 @@ def test_api_model_failures_have_safe_codes(status, body, expected, monkeypatch)
         model_http.post_json("https://api.example.test/v1/messages", {}, {}, 1)
     assert failure.value.code == expected
     assert "provider-only details" not in str(failure.value)
+
+
+def test_intake_grants_are_per_project_and_end_with_their_connection(tmp_path):
+    # #355: a project's standing import permission points at its grant record.
+    location = tmp_path / "settings" / "connections.sqlite3"
+    registry = connections.Registry(location, secrets=Secrets())
+    project, other = "01234567-89ab-cdef-0123-456789abcdef", "01234567-89ab-cdef-0123-456789abcdee"
+    assert registry.intake_grants(project) == {}
+    added = registry.add({"provider": "anthropic", "model": "test-claude", "label": "Work",
+                          "api_key": "test-secret-api-key"})
+    with pytest.raises(connections.ConnectionError, match=r"connection\.missing"):
+        registry.set_intake_grant(project, other, "{}")
+    registry.set_intake_grant(project, added["id"], '{"sha256": "a"}')
+    registry.set_intake_grant(project, added["id"], '{"sha256": "b"}')
+    saved = connections.Registry(location, secrets=Secrets())
+    assert saved.intake_grants(project) == {added["id"]: '{"sha256": "b"}'}
+    assert saved.intake_grants(other) == {}
+    saved.set_intake_grant(project, added["id"], None)
+    assert saved.intake_grants(project) == {}
+    saved.set_intake_grant(project, added["id"], '{"sha256": "c"}')
+    saved.remove(added["id"])
+    assert saved.intake_grants(project) == {}

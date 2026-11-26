@@ -96,7 +96,7 @@ test("the view icons show pressed state and only handle letter shortcuts in the 
   await expect(atlas).toHaveAttribute("aria-pressed", "false");
 });
 
-test("reviewing a public excerpt transfers the intake dialog's one primary action", async ({ page }) => {
+test("allowing a cloud model for imports transfers the intake dialog's one primary action", async ({ page }) => {
   await page.route("**/api/model-connections", (route) =>
     route.fulfill({
       json: {
@@ -113,27 +113,20 @@ test("reviewing a public excerpt transfers the intake dialog's one primary actio
       },
     }),
   );
-  await page.route("**/api/project-intake/public-preview", (route) =>
-    route.fulfill({
-      json: {
-        token: "fixture-preview",
-        provider: "openai",
-        model: "fixture",
-        outgoing: { domain: "lean-core", objective: "Fixture objective", notes: "Fixture notes" },
-        limits: { max_calls: 1, timeout_seconds: 30, max_output_tokens: 400, output_token_limit_enforced: true },
-      },
-    }),
-  );
+  await page.route("**/api/project-intake/grants", (route) => route.fulfill({ json: { grants: [] } }));
   await page.goto("/#session=fixture");
   await openAddEntry(page, IMPORT_ENTRY);
   const dialog = page.getByRole("dialog", { name: "Import paper, notes or code", exact: true });
+  await dialog.getByRole("button", { name: "Paste text instead" }).click();
+  await dialog.getByLabel("Research notes or Lean text").fill("Fixture notes");
+  await dialog.getByRole("button", { name: "Advanced options" }).click();
   await dialog.getByRole("button", { name: "Model", exact: true }).click();
   await dialog.getByRole("option", { name: /Fixture remote/ }).click();
-  await dialog.getByLabel("Research notes or Lean text").fill("Fixture notes");
   await expect(dialog.locator(PRIMARY)).toHaveCount(1);
-  await expect(dialog.locator(PRIMARY)).toHaveAccessibleName("Analyze selected notes");
+  await expect(dialog.locator(PRIMARY)).toHaveAccessibleName("Organize");
   await dialog.locator(PRIMARY).click();
-  await expect(dialog.getByRole("heading", { name: "Review the public material to share" })).toBeVisible();
+  // #355: a cloud model asks once per project; the ask carries the one primary action.
+  await expect(dialog.getByRole("group", { name: "Allow this model for imports" })).toBeVisible();
   await expect(dialog.locator(PRIMARY)).toHaveCount(1);
-  await expect(dialog.locator(PRIMARY)).toHaveAccessibleName("Send this public excerpt");
+  await expect(dialog.locator(PRIMARY)).toHaveAccessibleName("Allow and organize");
 });
