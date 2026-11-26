@@ -78,7 +78,8 @@ for (const colorScheme of ["light", "dark"] as const) {
 
     await page.getByRole("button", { name: "Add theorem", exact: true }).click();
     const primary = page.getByRole("dialog", { name: "Add theorem", exact: true }).locator("button.primary");
-    await expect(primary).toHaveCSS("background-color", accent);
+    // #349: on dark the action fill is a light neutral, so the accent keeps meaning selection and focus.
+    await expect(primary).toHaveCSS("background-color", colorScheme === "light" ? accent : "rgb(230, 230, 230)");
     expect(await contrast(primary, { foreground: "color", background: "background-color" })).toBeGreaterThanOrEqual(
       4.5,
     );

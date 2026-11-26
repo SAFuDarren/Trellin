@@ -44,6 +44,21 @@ test("the rail tile opens the project switcher without folder actions", async ({
   await expect(page.getByRole("button", { name: `Switch project, ${project.name}` })).toHaveCount(1);
 });
 
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`the project tile is the brand navy with a white letter in ${colorScheme}`, async ({ page }) => {
+    // #349: the tile marks the project, not a selection, so it never takes the selection accent.
+    await page.emulateMedia({ colorScheme });
+    const project = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Only Research Project", available: true };
+    await stubLibrary(page, (request) =>
+      request.action === "list" ? { projects: [project], activeId: project.id } : true,
+    );
+    await page.goto("/#session=fixture");
+    const switcher = tile(page, project.name);
+    await expect(switcher).toHaveCSS("background-color", "rgb(22, 35, 63)");
+    await expect(switcher).toHaveCSS("color", "rgb(255, 255, 255)");
+  });
+}
+
 test("the rail tile lists and opens registered desktop projects", async ({ page }) => {
   const first = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "First Research", available: true };
   const second = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Second Research", available: true };
