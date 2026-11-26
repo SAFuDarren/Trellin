@@ -42,6 +42,36 @@ def inbox(store):
     return result
 
 
+# #345: decisions people recorded, newest first. Claim and evidence decisions come from the append-only
+# decision log; a confirmed starting scope from its intake. Program decisions such as promotion are left out.
+_DECISION_RECORDS = """
+SELECT * FROM (
+    SELECT 'claim' AS source, d.id::text AS id, d.action, d.claim_id::text AS claim_id, c.title AS claim_title,
+           d.evidence_id::text AS evidence_id, e.kind::text AS evidence_kind,
+           coalesce(nullif(checked.body ->> 'source_declaration', ''),
+                    nullif(checked.body ->> 'candidate_theorem', '')) AS title,
+           d.actor_ref AS actor, d.reason, d.decided_at
+    FROM rm.decisions d
+    JOIN rm.claims c ON c.id = d.claim_id
+    LEFT JOIN rm.evidence_foundation_status e ON e.id = d.evidence_id
+    LEFT JOIN rm.lean_check_status checked ON checked.id = e.lean_check_id
+    WHERE d.decided_by = 'human'
+    UNION ALL
+    SELECT 'intake', i.id::text, 'confirm', NULL, NULL, NULL, NULL, i.body ->> 'title',
+           i.actor_ref, i.reason, i.confirmed_at
+    FROM rm.research_intake_status i
+    WHERE i.goal_id IS NOT NULL
+) recorded
+ORDER BY decided_at DESC, id
+LIMIT 200
+"""
+
+
+def decision_records(store):
+    """The latest decisions people recorded, for the Decision records page."""
+    return {"records": store.query("human", _DECISION_RECORDS)}
+
+
 _LIBRARY = """
 SELECT i.id, i.logical_key, i.version, i.origin, i.admitted, i.needs_recheck, i.created_at,
        i.body ->> 'kind' AS kind, left(i.body ->> 'natural', 2000) AS natural,

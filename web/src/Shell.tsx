@@ -19,7 +19,6 @@ import { WorkPeek } from "./components/WorkPeek";
 import { ReleaseUpdateNotice } from "./components/ReleaseUpdateNotice";
 import { ShortcutSheet } from "./components/ShortcutSheet";
 import { WorkspaceActivityList } from "./components/WorkspaceActivity";
-import { WorkspaceInbox } from "./components/WorkspaceInbox";
 import { AgentWorkPage } from "./pages/AgentWorkPage";
 import { ClaimsPage } from "./pages/ClaimsPage";
 import { ConversationsPage } from "./pages/ConversationsPage";
@@ -46,7 +45,6 @@ import { CLAIM_VIEWS, inClaimView } from "./workbench/claimBoard";
 import { claimCode } from "./workbench/text";
 import { WorkspaceEventFeed, type WorkspaceConnection } from "./shell/WorkspaceEventFeed";
 import { buildWorkspaceActivity, type ActivityState } from "./shell/workspaceActivity";
-import { useWorkspaceInbox, workspaceInboxScope } from "./shell/workspaceInbox";
 import { refreshWorkspaceQuery, workspaceEventQueries } from "./shell/workspaceEventQueries";
 import { SHORTCUTS } from "./shortcuts";
 import { Workbench, type Focus, type WorkbenchPosition } from "./Workbench";
@@ -61,7 +59,11 @@ export function Shell({ session }: { session: string }) {
   const { section, sub } = route;
   const showsClaims = section === "claims";
   const showsActivity = section === "agent-work" && sub === "activity";
+  // #345: the Inbox's list is retired; its old address opens Work, where Needs you lists what waits.
   const showsInbox = section === "agent-work" && sub === "inbox";
+  useEffect(() => {
+    if (showsInbox) go("claims");
+  }, [showsInbox, go]);
   // #326: every Work page shows the Work panel, which counts claims and lists what waits for you.
   const inWork = spaceOf(section)?.id === "work";
   const showsClaimProgress = section === "workbench" || showsClaims || inWork;
@@ -78,7 +80,7 @@ export function Shell({ session }: { session: string }) {
   const team = useTeam(session, live);
   const agentWorkList = useAgentWork(session, live);
   const conversations = useConversations(session, undefined, live);
-  const activityAgents = useTeamAgents(session, showsActivity || showsInbox || inWork);
+  const activityAgents = useTeamAgents(session, showsActivity || inWork);
   const [activityFilter, setActivityFilter] = useState<ActivityState | "all">("all");
   const activityLoading = team.isPending || agentWorkList.isPending || conversations.isPending || inbox.isPending;
   const activityUnavailable = team.isError || agentWorkList.isError || conversations.isError || inbox.isError;
@@ -93,8 +95,6 @@ export function Shell({ session }: { session: string }) {
       }),
     [team.data, agentWorkList.data, conversations.data, inbox.data],
   );
-  const inboxScope = workspaceInboxScope(session, workspace, inbox.data?.review_identity?.workspace_id);
-  const workspaceInbox = useWorkspaceInbox(inboxScope, activity.rows);
   const atlas = useAtlas(session, showsClaims || inWork);
   const workClaims = useClaims(session, inWork);
   const [pinnedIds, togglePin] = usePinnedClaims();
@@ -234,15 +234,12 @@ export function Shell({ session }: { session: string }) {
   };
   // #326: the Work panel and its side panel read one snapshot built here.
   const workAgents = new Map(activityAgents.data?.agents?.map((agent) => [agent.id, agent]));
-  const archived = new Set(
-    workspaceInbox.rows.filter(({ mark }) => mark === "archived").map(({ record }) => record.id),
-  );
   const workClaimList = workClaims.data?.claims ?? [];
   const atlasById = new Map((atlas.data?.claims ?? []).map((claim) => [claim.id, claim]));
   const blockedByClaim = new Map([...atlasById].map(([id, claim]) => [id, claim.blocked ?? 0]));
   const peek = inWork && peekState?.session === session ? peekState.target : null;
   // #345: one list of waiting items; the rail badge, Needs you and its filters all count it.
-  const waiting = waitingItems(activity.rows, archived);
+  const waiting = waitingItems(activity.rows);
   const filterKind = waitingFilter?.session === session ? waitingFilter.kind : null;
   const shownKind = filterKind && waiting.some((item) => item.kind === filterKind) ? filterKind : null;
   const work: WorkContextValue = {
@@ -320,18 +317,6 @@ export function Shell({ session }: { session: string }) {
                   <AgentWorkPage
                     session={session}
                     sub={sub}
-                    inbox={
-                      showsInbox && (
-                        <WorkspaceInbox
-                          key={inboxScope ?? session}
-                          inbox={workspaceInbox}
-                          agents={new Map(activityAgents.data?.agents.map((agent) => [agent.id, agent]))}
-                          loading={inbox.isPending || team.isPending || agentWorkList.isPending}
-                          unavailable={inbox.isError || team.isError || agentWorkList.isError}
-                          onOpenProof={(id, nodeId) => open(id, nodeId, true)}
-                        />
-                      )
-                    }
                     activity={
                       showsActivity && (
                         <WorkspaceActivityList

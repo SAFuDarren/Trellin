@@ -1,0 +1,102 @@
+/* #345: decisions people recorded, newest first. */
+.decision-records {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  max-width: 920px;
+}
+.decision-records-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.decision-records-filter button {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--sub);
+  font: inherit;
+  font-size: var(--type-meta-size);
+  cursor: pointer;
+}
+.decision-records-filter button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--pick);
+  color: var(--ink);
+}
+.decision-records-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.decision-record {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: start;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--hair);
+}
+.decision-record-action {
+  justify-self: start;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--ink);
+  font-size: var(--type-meta-size);
+  white-space: nowrap;
+}
+.decision-record[data-action="approve"] .decision-record-action,
+.decision-record[data-action="confirm"] .decision-record-action {
+  background: color-mix(in srgb, var(--good) 16%, transparent);
+}
+.decision-record[data-action="return"] .decision-record-action,
+.decision-record[data-action="archive"] .decision-record-action,
+.decision-record[data-action="supersede"] .decision-record-action {
+  background: var(--warn-soft);
+}
+.decision-record-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.decision-record-main strong {
+  font-weight: var(--type-semibold);
+  overflow-wrap: anywhere;
+}
+.decision-record-claim {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sub);
+  font: inherit;
+  font-size: var(--type-meta-size);
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--edge-soft);
+  cursor: pointer;
+}
+.decision-record-main q {
+  color: var(--sub);
+  overflow-wrap: anywhere;
+}
+.decision-record-meta {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .decision-record {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .decision-record-meta {
+    justify-items: start;
+  }
+}

@@ -215,12 +215,8 @@ describe("App", () => {
         return Response.json(responses[path.split("?")[0]!] ?? {});
       }),
     );
-    window.history.replaceState(null, "", "#review");
+    window.history.replaceState(null, "", `#review/goal:${goal}`);
     renderApp("token");
-    expect(await screen.findByRole("link", { name: new RegExp(proposal.title) })).toHaveProperty(
-      "hash",
-      `#review/goal%3A${goal}`,
-    );
     expect(await screen.findByText("Version 2", { exact: false })).toBeTruthy();
     expect(screen.getByText("Recorded equality source", { exact: false })).toBeTruthy();
     expect(screen.getByText("A broader archived idea.")).toBeTruthy();
@@ -308,7 +304,6 @@ describe("App", () => {
     const goalLink = await screen.findByRole("link", { name: first.title });
     expect(goalLink).toHaveProperty("hash", `#review/goal%3A${first.id}`);
     expect(screen.getByText(en.review.openGoals)).toBeTruthy();
-    expect(screen.getByText(en.review.waiting.replace("{{count}}", "0"))).toBeTruthy();
     expect(searches).toHaveLength(0);
     fireEvent.click(goalLink);
     expect(await screen.findByRole("heading", { name: first.title })).toBeTruthy();
@@ -666,7 +661,7 @@ describe("App", () => {
   });
 
   it("records an authenticated review with only the decision and reason", async () => {
-    window.history.replaceState(null, "", "#review");
+    window.history.replaceState(null, "", `#review/${REVIEW_ITEM.item_id}`);
     let reviewed = false;
     const fetch = vi.fn(async (input: string, init?: RequestInit) => {
       if (input === "/api/inbox") {
@@ -683,8 +678,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderApp("token");
-    const submit = await screen.findByRole("button", { name: en.review.submitDecision });
-    fireEvent.click(screen.getByRole("radio", { name: en.review.approve }));
+    const submit = await screen.findByRole("button", { name: en.review.approveNext });
     expect(screen.queryByLabelText(en.review.reviewer)).toBeNull();
     fireEvent.click(submit);
     expect(await screen.findByText(en.review.needReason)).toBeTruthy();
@@ -692,7 +686,8 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "  Exact scope verified.  " } });
     fireEvent.click(submit);
     expect(await screen.findByText(en.review.approved)).toBeTruthy();
-    expect(await screen.findByText(en.review.allDone)).toBeTruthy();
+    // #345: with nothing left waiting, the page returns to the decision records.
+    expect(await screen.findByText(en.decisionRecords.none)).toBeTruthy();
     const writes = fetch.mock.calls.filter(([, init]) => init?.method === "POST");
     expect(writes).toHaveLength(1);
     const [path, request] = writes[0]!;
@@ -704,7 +699,7 @@ describe("App", () => {
   });
 
   it("retries the same authenticated review with its original key and preserves the chosen route", async () => {
-    window.history.replaceState(null, "", "#review");
+    window.history.replaceState(null, "", `#review/${REVIEW_ITEM.item_id}`);
     const fetch = vi.fn(async (input: string, init?: RequestInit) => {
       if (input === "/api/inbox") {
         return Response.json({ items: [REVIEW_ITEM], review_identity: { workspace_id: WORKSPACE } });
@@ -719,8 +714,7 @@ describe("App", () => {
     });
     vi.stubGlobal("fetch", fetch);
     renderApp("token");
-    const submit = await screen.findByRole("button", { name: en.review.submitDecision });
-    fireEvent.click(screen.getByRole("radio", { name: en.review.approve }));
+    const submit = await screen.findByRole("button", { name: en.review.approveNext });
     const sendAndWait = async (button: HTMLElement) => {
       fireEvent.click(button);
       expect(await screen.findByText(en.errors["review.identity_required"])).toBeTruthy();
@@ -728,8 +722,7 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "Reviewed frozen scope." } });
     await sendAndWait(submit);
     await sendAndWait(submit);
-    fireEvent.click(screen.getByRole("radio", { name: en.review.return }));
-    await sendAndWait(submit);
+    await sendAndWait(screen.getByRole("button", { name: en.review.return }));
     const writes = fetch.mock.calls.filter(([, init]) => init?.method === "POST");
     expect(writes.map(([path]) => path)).toEqual([REVIEW_PATH, REVIEW_PATH, REVIEW_PATH]);
     const keys = writes.map(([, init]) => new Headers(init?.headers).get("Idempotency-Key"));
@@ -739,8 +732,8 @@ describe("App", () => {
   });
 
   it("saves answers, resumes the archived proposal after reopening, and separately confirms its exact token", async () => {
-    window.history.replaceState(null, "", "#review");
     const id = "55555555-5555-4555-8555-555555555555";
+    window.history.replaceState(null, "", `#review/${id}`);
     const route = `/api/v1/workspaces/${WORKSPACE}/clarifications/${id}`;
     const question = "Which carrier is intended?";
     const original = "Every element equals itself.";
@@ -827,7 +820,7 @@ describe("App", () => {
   });
 
   it("retains the display name and original request on a legacy review inbox", async () => {
-    window.history.replaceState(null, "", "#review");
+    window.history.replaceState(null, "", `#review/${REVIEW_ITEM.item_id}`);
     const fetch = vi.fn(async (input: string, init?: RequestInit) => {
       if (input === "/api/inbox") return Response.json({ items: [REVIEW_ITEM] });
       if (input === "/api/review" && init?.method === "POST") return Response.json({ id: "legacy-review" });
@@ -837,8 +830,7 @@ describe("App", () => {
     renderApp("token");
     fireEvent.change(await screen.findByLabelText(en.review.reviewer), { target: { value: "Reviewer" } });
     fireEvent.change(screen.getByLabelText(en.review.reason), { target: { value: "Reviewed exact scope." } });
-    fireEvent.click(screen.getByRole("radio", { name: en.review.approve }));
-    fireEvent.click(screen.getByRole("button", { name: en.review.submitDecision }));
+    fireEvent.click(screen.getByRole("button", { name: en.review.approveNext }));
     expect(await screen.findByText(en.review.approved)).toBeTruthy();
     const writes = fetch.mock.calls.filter(([, init]) => init?.method === "POST");
     expect(writes).toHaveLength(1);
@@ -855,7 +847,7 @@ describe("App", () => {
   });
 
   it("refreshes a review once for the owned event and resumes from that event instead of a later inbox cursor", async () => {
-    window.history.replaceState(null, "", "#review");
+    window.history.replaceState(null, "", `#review/${REVIEW_ITEM.item_id}`);
     let pending = true;
     let head = "9007199254740992";
     const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
@@ -877,7 +869,7 @@ describe("App", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const app = renderApp("active", client);
-    expect(await screen.findByRole("radio", { name: en.review.approve })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: en.review.approveNext })).toBeTruthy();
     await waitFor(() => expect(streams).toHaveLength(1));
     const opened = fetch.mock.calls.find(([path]) => path === EVENT_PATH)?.[1];
     expect(new Headers(opened?.headers).get("Last-Event-ID")).toBe(head);
@@ -901,7 +893,8 @@ describe("App", () => {
     streams[0]!.enqueue(
       new TextEncoder().encode(frame(body) + frame(body) + frame({ ...body, id: head, workspace_id: CLAIM })),
     );
-    expect(await screen.findByText(en.review.allDone)).toBeTruthy();
+    // #345: an item decided elsewhere leaves its page, which says so.
+    expect(await screen.findByText(en.review.itemNoLongerWaiting)).toBeTruthy();
     expect(invalidate.mock.calls.map(([filter]) => filter?.queryKey)).toEqual([
       ["inbox", "active"],
       ["atlas"],

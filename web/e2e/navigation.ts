@@ -19,7 +19,6 @@ export async function openMenu(trigger: Locator) {
 const SPACE_OF = {
   "Project map": "Home",
   Claims: "Work",
-  Inbox: "Work",
   Review: "Work",
   "Agent tasks": "Work",
   Library: "Work",
@@ -38,8 +37,8 @@ export async function openDestination(page: Page, destination: Destination) {
   await expect(space).toHaveAttribute("aria-current", "page");
   if (destination === "Project map") return;
   const panel = page.locator("nav.section-nav");
-  // #326: Work's panel reaches Claims through its "All claims" view.
-  const label = destination === "Claims" ? "All claims" : destination;
+  // #326: Work's panel reaches Claims through its "All claims" view; #345: Review is listed as Decision records.
+  const label = destination === "Claims" ? "All claims" : destination === "Review" ? "Decision records" : destination;
   // An entry with a count is named with it ("Review 2").
   const entry = panel.getByRole("link", { name: new RegExp(`^${label}( \\d+)?$`) });
   await entry.click();

@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import type { TeamAgent } from "../api/teamAgents";
 import { currentEntry, currentRoute, entryHref, SPACES } from "../shell/spaces";
 import { useWork, waitingKindCounts, type WaitingItem, type WaitingKind } from "../shell/workContext";
-import { href } from "../shell/route";
 import { timeText } from "../workbench/text";
 import { Chevron, WorkbenchIcon } from "./Icons";
 import { SpaceCounts } from "./SectionLayout";
@@ -159,7 +158,6 @@ const VIEW_ICONS: Record<string, string> = {
   advance: "advance",
 };
 const RECORD_ICONS: Record<string, string> = {
-  inbox: "inbox",
   review: "review",
   "agent-tasks": "agent-work",
   library: "library",
@@ -268,9 +266,14 @@ export function WorkPanelSections({ pageGroups }: { pageGroups?: ReactNode }) {
               <p className="nav-empty">{t("workPanel.nothingWaiting")}</p>
             )}
             {work.shown.length > WAITING_ROWS && (
-              <a className="work-more" href={href("agent-work", "inbox")}>
+              // #345: the rest open in the floating window, from the first one not listed.
+              <button
+                type="button"
+                className="work-more"
+                onClick={() => work.setPeek({ kind: "waiting", id: work.shown[WAITING_ROWS]!.id, index: WAITING_ROWS })}
+              >
                 {t("workPanel.more", { count: work.shown.length - WAITING_ROWS })}
-              </a>
+              </button>
             )}
           </div>
         )}

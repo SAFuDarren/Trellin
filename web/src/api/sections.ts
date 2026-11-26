@@ -151,6 +151,29 @@ export function useClaimGraph(session: string, claimId: string | null, enabled: 
     enabled: Boolean(claimId) && enabled,
   });
 }
+/** #345: a decision a person recorded, newest first. */
+export type DecisionRecord = {
+  source: "claim" | "intake";
+  id: string;
+  action: string;
+  claim_id: string | null;
+  claim_title: string | null;
+  evidence_id: string | null;
+  evidence_kind: string | null;
+  title: string | null;
+  actor: string;
+  reason: string;
+  decided_at: string;
+};
+
+export function useDecisionRecords(session: string) {
+  return useQuery({
+    queryKey: ["decision-records", session],
+    queryFn: ({ signal }) => api<{ records: DecisionRecord[] }>(session, "/api/decision-records", { signal }),
+    retry: false,
+  });
+}
+
 export function useInbox(session: string, streamHealthy = false) {
   return useQuery({
     queryKey: ["inbox", session],

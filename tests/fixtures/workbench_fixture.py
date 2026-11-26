@@ -129,6 +129,16 @@ INBOX = {"items": [
      "claim_title": "单射映射的复合", "waiting_since": at(120), "question": "Which composition order is intended?",
      "detail": {"question_count": 1}, "priority": 1},
 ]}
+# #345: decisions recorded before the session; decisions recorded in it come first, newest first.
+DECISION_RECORDS = [
+    {"source": "claim", "id": "decision-earlier", "action": "approve", "claim_id": CLAIM,
+     "claim_title": "自然数加零的对称性", "evidence_id": "evidence-earlier", "evidence_kind": "lean",
+     "title": "FirstProof.zeroAddEarlier", "actor": "Fixture reviewer", "reason": "Scope matches; no extra premises.",
+     "decided_at": at(600)},
+    {"source": "intake", "id": "intake-earlier", "action": "confirm", "claim_id": None, "claim_title": None,
+     "evidence_id": None, "evidence_kind": None, "title": "Synthetic starting scope", "actor": "Fixture reviewer",
+     "reason": "The premises match the setting.", "decided_at": at(1440)},
+]
 LIBRARY = {"items": [
     {"id": LIB, "logical_key": "formalpedia:Nat.add_zero", "version": 1, "origin": "formalpedia", "admitted": True,
      "needs_recheck": False, "retired": False, "created_at": at(3000), "kind": "theorem", "natural": "Adding zero on the right leaves a natural number unchanged.",
@@ -196,6 +206,16 @@ AVAILABLE_RELEASE = {"version": "1.10.0", "url": "https://github.com/SAFuDarren/
 REVIEWS = []
 PROJECT_CANVAS = {"positions": {}, "links": []}
 INITIAL_INBOX = [dict(item) for item in INBOX["items"]]
+
+
+def _recorded(body):
+    """A decision recorded through the fixture's review route, as the Decision records page lists it."""
+    item = next((entry for entry in INITIAL_INBOX if entry["item_id"] == body["evidence_id"]), {})
+    return {"source": "claim", "id": f"decision-{body['evidence_id']}", "action": body["action"],
+            "claim_id": item.get("claim_id"), "claim_title": item.get("claim_title"),
+            "evidence_id": body["evidence_id"], "evidence_kind": (item.get("detail") or {}).get("kind"),
+            "title": (item.get("detail") or {}).get("declaration"), "actor": body.get("actor") or "Fixture reviewer",
+            "reason": body["reason"], "decided_at": datetime.now(timezone.utc).isoformat()}
 INITIAL_GUIDANCE = [dict(item) for item in ACTIVITY["guidance"]]
 
 
@@ -249,6 +269,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         data = {"/api/claims": {"claims": CLAIMS, "claim_id": None}, "/api/graph": GRAPH, "/api/activity": ACTIVITY,
                 "/api/atlas": ATLAS, "/api/impact": IMPACT, "/api/inbox": INBOX, "/api/library": LIBRARY,
+                "/api/decision-records": {"records": [_recorded(body) for body in reversed(REVIEWS)] + DECISION_RECORDS},
                 "/api/model-connections": {"connections": []},
                 "/api/model-connections/native": {"providers": [{"provider": "codex-cli", "status": "signed_in"}]},
                 "/api/team-agents": {"agents": []},

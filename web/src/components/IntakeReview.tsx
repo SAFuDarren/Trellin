@@ -153,7 +153,7 @@ export function IntakeReview({
       });
       setState({});
       onDecided(t("intakeReview.confirmed"));
-      for (const key of ["inbox", "claims", "atlas", "project-canvas-claims", "intake-review"])
+      for (const key of ["inbox", "claims", "atlas", "project-canvas-claims", "intake-review", "decision-records"])
         void queries.invalidateQueries({ queryKey: [key] });
     } catch (error) {
       setState({ message: errorText(t, error), error: true });

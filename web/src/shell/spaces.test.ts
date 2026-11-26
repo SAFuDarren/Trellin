@@ -27,7 +27,6 @@ describe("navigation spaces (#289)", () => {
     // #326: Work opens on the claims board, so Claims comes first.
     expect(spaceOf("claims")?.entries.map((entry) => entry.key)).toEqual([
       "claims",
-      "inbox",
       "review",
       "agent-tasks",
       "library",
@@ -40,7 +39,6 @@ describe("navigation spaces (#289)", () => {
     expect(entry("#workbench")).toBe("map");
     expect(entry("#claims")).toBe("claims");
     expect(entry("#claims/board")).toBe("claims");
-    expect(entry("#agent-work/inbox")).toBe("inbox");
     expect(entry("#agent-work")).toBe("agent-tasks");
     expect(entry("#agent-work/activity")).toBe("agent-tasks");
     expect(entry("#claims/agent-work/waiting")).toBe("agent-tasks");

@@ -33,9 +33,8 @@ test("Review records a decision for the bound researcher without asking for a na
   await page.goto(`/#review/${EVIDENCE}`);
   await expect(page.getByText(`Recorded by ${SIGNER}`, { exact: true })).toBeVisible();
   await expect(page.getByLabel("Your name")).toHaveCount(0);
-  await page.getByRole("radio", { name: "Approve", exact: true }).check();
   await page.getByLabel("Reason", { exact: true }).fill("The result proves the selected Lean statement.");
-  await page.getByRole("button", { name: "Record decision", exact: true }).click();
+  await page.getByRole("button", { name: "Approve and next", exact: true }).click();
   await expect(page.getByText("Approved and recorded.", { exact: true })).toBeVisible();
   expect(decision).toEqual({ decision: "approve", reason: "The result proves the selected Lean statement." });
 });
@@ -48,10 +47,9 @@ test("an identity without a bound workspace signs the older review route with th
   await page.goto(`/#review/${EVIDENCE}`);
   await expect(page.getByText(`Recorded by ${SIGNER}`, { exact: true })).toBeVisible();
   await expect(page.getByLabel("Your name")).toHaveCount(0);
-  await page.getByRole("radio", { name: "Return", exact: true }).check();
   await page.getByLabel("Reason", { exact: true }).fill("Recheck the scope.");
   const sent = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith("/api/review"));
-  await page.getByRole("button", { name: "Record decision", exact: true }).click();
+  await page.getByRole("button", { name: "Return", exact: true }).click();
   expect((await sent).postDataJSON()).toEqual({
     evidence_id: EVIDENCE,
     action: "return",

@@ -543,6 +543,12 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
             FROM rm.evidence e JOIN rm.claim_foundation_status c ON c.id = e.claim_id WHERE e.id = %s
         """, evidence_id)
     assert persisted == [{"review_status": "approved"}]
+    # #345: the approval is listed in Decision records with who decided and why.
+    records = _request(server, "GET", "/api/decision-records")["records"]
+    approved = next(row for row in records if row["evidence_id"] == evidence_id)
+    assert (approved["source"], approved["action"], approved["reason"]) == ("claim", "approve", REASON)
+    assert approved["actor"]
+    assert approved["claim_id"] == recorded["claim_id"] and approved["claim_title"]
     # The project map reports the reviewed evidence by its recorded kind, as decisive or as support (#342).
     mapped = {item["id"]: item for item in _request(server, "GET", "/api/project-canvas/claims")["claims"]}
     assurance = mapped[recorded["claim_id"]]["assurance"]

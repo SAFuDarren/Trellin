@@ -352,12 +352,8 @@
     "empty": "Nothing needs your attention right now.",
     "detail": "Node details",
     "moreInspectorActions": "More inspector actions",
-    "waiting": "Waiting for you · {{count}}",
-    "none": "Nothing is waiting.",
-    "allDone": "You're all caught up. New items appear here when a check or question needs you.",
     "itemNoLongerWaiting": "This item is no longer waiting for review.",
     "openGoals": "Open research goals",
-    "chooseOpenGoal": "Choose an open research goal to review its basis and search related work.",
     "kinds": {
       "review_evidence": "Verified result to review",
       "counterexample": "Counterexample to review",
@@ -377,9 +373,6 @@
     "evidenceExplain": "Approval records this verified result as accepted evidence for the claim. Return it with a reason if it needs changes.",
     "goalEvidenceExplain": "Approval records acceptance of this verified proof of the claim’s Lean statement. The claim’s proof status is finalized separately.",
     "counterexampleExplain": "Approval records this verified result as accepted evidence against the claim. The claim’s status is finalized separately.",
-    "decisionLabel": "Decision",
-    "submitDecision": "Record decision",
-    "chooseDecision": "Choose Approve or Return first.",
     "reviewer": "Your name",
     "signedAs": "Recorded by {{name}}",
     "reason": "Reason",
@@ -392,7 +385,13 @@
     "needReason": "Add a reason first.",
     "context": "Context",
     "status": "Status",
-    "notInApp": "Trellin cannot record this decision in the workbench yet. It is listed so you can see that it is waiting."
+    "notInApp": "Trellin cannot record this decision in the workbench yet. It is listed so you can see that it is waiting.",
+    "approveNext": "Approve and next",
+    "suggestionsLabel": "Reason suggestions",
+    "suggestions": {
+      "scope": "The scope matches the claim",
+      "premises": "Uses only confirmed premises"
+    }
   },
   "goalReview": {
     "objective": "Research objective",
@@ -847,37 +846,6 @@
     "verified": "{{done}} of {{total}} verified",
     "running_one": "{{count}} running",
     "running_other": "{{count}} running"
-  },
-  "agentInbox": {
-    "title": "Inbox",
-    "filter": "Inbox filter",
-    "filters": {
-      "all": "All",
-      "unread": "Unread",
-      "archived": "Archived"
-    },
-    "empty": {
-      "all": "There are no inbox items.",
-      "unread": "There are no unread items.",
-      "archived": "There are no archived items."
-    },
-    "windowNote": "Read and archive choices last while this project is open in this window.",
-    "unavailable": "Inbox is unavailable for this project.",
-    "undo": "Undo",
-    "unread": "Unread",
-    "openRecord": "Open record",
-    "restore": "Restore",
-    "markRead": "Mark as read",
-    "markUnread": "Mark as unread",
-    "archive": "Archive",
-    "unavailableReason": "This project's database does not identify you yet, so Inbox cannot keep read and archived marks. Items waiting for you are still in Review.",
-    "openReview": "Open Review",
-    "showAll": "Show all items",
-    "emptyReason": {
-      "all": "Agent results and questions that need you appear here.",
-      "unread": "Everything here has been read.",
-      "archived": "Items you archive move here."
-    }
   },
   "agentWork": {
     "title": "Agent tasks",
@@ -1730,8 +1698,7 @@
     "entries": {
       "map": "Project map",
       "claims": "Claims",
-      "inbox": "Inbox",
-      "review": "Review",
+      "review": "Decision records",
       "agentTasks": "Agent tasks",
       "library": "Library"
     }
@@ -1973,5 +1940,34 @@
       "superseded": "A newer intake replaced this one, so there is nothing to confirm here.",
       "stale": "A Library item this intake reuses changed after it was drafted. Organize the notes again from the Project map to review the current version."
     }
+  },
+  "decisionRecords": {
+    "title": "Decision records",
+    "count_one": "{{count}} decision",
+    "count_other": "{{count}} decisions",
+    "explain": "Decisions you and others recorded, newest first: results approved or returned, starting scopes confirmed and claims frozen, withdrawn or restored. What still waits is in Needs you.",
+    "filterLabel": "Show decisions about",
+    "filters": {
+      "all": "All",
+      "evidence": "Results",
+      "claims": "Claims",
+      "intake": "Starting scopes"
+    },
+    "actions": {
+      "approve": "Approved",
+      "return": "Returned",
+      "confirm": "Confirmed",
+      "freeze": "Frozen",
+      "supersede": "Replaced",
+      "archive": "Withdrawn",
+      "restore": "Restored"
+    },
+    "subjects": {
+      "evidence": "Verified result",
+      "claim": "Claim",
+      "intake": "Starting scope"
+    },
+    "none": "No decisions recorded yet. Decisions you record from Needs you appear here.",
+    "unavailable": "Could not read decision records. Reload to try again."
   }
 }

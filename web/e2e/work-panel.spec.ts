@@ -45,8 +45,8 @@ test("the Work panel lists waiting items, views with counts and records", async 
   await expect(views.getByRole("link", { name: /^Running work/ })).toHaveAttribute("aria-current", "page");
 
   const records = panel(page).locator(".work-records");
-  await expect(records.getByRole("link")).toHaveText([/^Inbox/, /^Review/, /^Agent tasks/, /^Library/]);
-  await records.getByRole("link", { name: /^Review/ }).click();
+  await expect(records.getByRole("link")).toHaveText([/^Decision records/, /^Agent tasks/, /^Library/]);
+  await records.getByRole("link", { name: /^Decision records/ }).click();
   await expect(page).toHaveURL(/#review/);
   await expect(panel(page).getByText("Needs you · 2")).toBeVisible();
 });
@@ -56,7 +56,7 @@ test("Handle opens a waiting item large, J and K move through the list, and Esca
   await panel(page).getByRole("button", { name: "Go through" }).click();
   await expect(peek(page)).toBeVisible();
   await expect(peek(page)).toContainText("1 of 2");
-  await expect(peek(page).getByRole("button", { name: "Record decision" })).toBeVisible();
+  await expect(peek(page).getByRole("button", { name: "Approve and next" })).toBeVisible();
   await expect(page.locator(".research-lanes")).toBeVisible();
 
   await page.keyboard.press("j");
@@ -82,9 +82,8 @@ test("recording a decision in the panel moves on to the next waiting item", asyn
     .click();
   await expect(peek(page)).toContainText("1 of 2");
   await peek(page).getByLabel("Your name").fill("Fixture researcher");
-  await peek(page).getByRole("radio", { name: "Approve" }).check();
   await peek(page).getByLabel("Reason", { exact: true }).fill("Scope matches.");
-  await peek(page).getByRole("button", { name: "Record decision" }).click();
+  await peek(page).getByRole("button", { name: "Approve and next" }).click();
   await expect(peek(page).getByRole("status").filter({ hasText: "Approved and recorded." })).toBeVisible();
   await expect(peek(page)).toContainText("1 of 1");
   await expect(peek(page)).not.toContainText("reverseZeroAdd");
