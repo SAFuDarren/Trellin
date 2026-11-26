@@ -2,7 +2,7 @@
 
 ## 1.0.140
 
-- The project map header has one **Add** menu in place of **Add theorem** and **Research actions**. **Paper, notes or code…** opens the import (formerly **Organize with AI**), and **New theorem…** the theorem form. The command palette uses the same names.
+- The project map header has one **+** button (**Add to project**) in place of **Add theorem** and **Research actions**, and the map's **Link selected claim** and **Find claim** become icons too; each tool shows its name on hover and focus. In the **+** menu, **Paper, notes or code…** opens the import (formerly **Organize with AI**), and **New theorem…** the theorem form. The command palette uses the same names.
 - Drop a text, Markdown, TeX or Lean file on the project map to import it: its text and name fill the import form. A project without claims shows a drop area in the middle of the map with **Choose file…** and **New theorem…**. A PDF or a file over 18 KB says so in the form.
 - **Local lemmas**, **Premises** and **Research references** move to the claim's context menu on the map, and say why when they are unavailable.
 

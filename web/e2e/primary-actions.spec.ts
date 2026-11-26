@@ -3,7 +3,7 @@ import { clickInspectorAction, FIXTURE_CLAIM_TITLE, IMPORT_ENTRY, mapClaim, open
 
 const PRIMARY = ".button.primary:visible";
 
-test("the header, inspector and current dialog each have one filled main action", async ({ page }) => {
+test("the inspector and current dialog each have one filled main action, and the map header none", async ({ page }) => {
   await page.route("**/api/proof-task?*", (route) => {
     const claim_id = new URL(route.request().url()).searchParams.get("claim");
     return route.fulfill({
@@ -25,13 +25,10 @@ test("the header, inspector and current dialog each have one filled main action"
   });
   await page.goto("/#session=fixture");
   const header = page.locator("#workbench .page-head .page-actions");
+  // #353: the map header's only action is the Add menu, an icon button like the map's other tools.
   const add = header.getByRole("button", { name: "Add to project", exact: true });
-  await expect(header.locator(PRIMARY)).toHaveCount(1);
-  await expect(header.locator(PRIMARY)).toHaveAccessibleName("Add to project");
-  for (const colorScheme of ["dark", "light"] as const) {
-    await page.emulateMedia({ colorScheme });
-    await expect(add).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  }
+  await expect(header.locator(PRIMARY)).toHaveCount(0);
+  await expect(add).toHaveText("");
   const toolbar = page.locator(".project-canvas-tools");
   await expect(toolbar.locator(PRIMARY)).toHaveCount(0);
   const find = toolbar.getByRole("button", { name: "Find claim", exact: true });

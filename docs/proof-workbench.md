@@ -13,7 +13,7 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 ## Start a research project
 
-The project map's **Add** menu, with **Paper, notes or code…** and **New theorem…**, is available before the first claim, and an empty map takes a dropped file. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
+The project map's **+** button (**Add to project**), with **Paper, notes or code…** and **New theorem…**, is available before the first claim, and an empty map takes a dropped file. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
 
 ## Switch between the graph and Review
 

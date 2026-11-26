@@ -54,6 +54,28 @@ test("the project map has one Add menu with the import and a new theorem", async
   await expect(page.getByRole("dialog", { name: THEOREM_DIALOG, exact: true })).toBeVisible();
 });
 
+test("the map's tools are icons that name themselves on hover", async ({ page }) => {
+  await page.goto("/#session=fixture");
+  const tools = [
+    page.locator("#workbench .page-actions").getByRole("button", { name: ADD_MENU, exact: true }),
+    page.locator(".project-canvas-tools").getByRole("button", { name: "Link selected claim", exact: true }),
+    page.locator(".project-canvas-tools").getByRole("button", { name: "Find claim", exact: true }),
+  ];
+  for (const tool of tools) {
+    await expect(tool).toHaveText("");
+    const box = await tool.boundingBox();
+    expect(box?.width).toBeLessThanOrEqual(32);
+    const hint = tool.locator("xpath=..").locator(".map-view-hint");
+    await expect(hint).toBeHidden();
+    await tool.hover();
+    await expect(hint).toBeVisible();
+    await expect(hint).toBeInViewport({ ratio: 1 });
+  }
+  await expect(tools[1]!.locator("xpath=..").locator(".map-view-hint")).toHaveText(/^Link selected claim/);
+  await tools[0]!.click();
+  await expect(tools[0]!.locator("xpath=..").locator(".map-view-hint")).toBeHidden();
+});
+
 test("a claim's context menu holds its lemma and premise work, and says when it is unavailable", async ({ page }) => {
   await page.goto("/#session=fixture");
   await mapClaim(page, FIXTURE_CLAIM_TITLE).click({ button: "right" });

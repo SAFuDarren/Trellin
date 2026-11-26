@@ -16,7 +16,7 @@ Press **⌘K** (**Ctrl+K** on other platforms) or use the search button in the l
 
 The project map, Claims board and inspector show recorded proof obligation counts. When none are recorded, the progress label explains what will appear there. In Claims or the claim inspector, open **Results to review** to inspect the recorded results for that claim.
 
-The project map's **Add** menu brings material in: **Paper, notes or code…** opens the import, and **New theorem…** enters one theorem. Drop a text, Markdown, TeX or Lean file anywhere on the map to import it; a project without claims shows a drop area in the middle of the map. Work on one claim, such as **Local lemmas**, **Premises** and **Research references**, is in the claim's context menu.
+The **+** button in the project map header (**Add to project**) brings material in: **Paper, notes or code…** opens the import, and **New theorem…** enters one theorem. Drop a text, Markdown, TeX or Lean file anywhere on the map to import it; a project without claims shows a drop area in the middle of the map. The map's tools are icons that show their names on hover and focus. Work on one claim, such as **Local lemmas**, **Premises** and **Research references**, is in the claim's context menu.
 
 Use **Find claim** on the project map to search and select a card. In **Agent chat**, search for a recipient or conversation from its chooser. In these search controls and the command palette, use arrow keys to move through options, Enter to select, and Escape to return focus.
 

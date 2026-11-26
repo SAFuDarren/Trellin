@@ -39,7 +39,8 @@ import {
   type FloatingGroup,
   type FloatingOption,
 } from "./FloatingControls";
-import { Chevron } from "./Icons";
+import { Chevron, WorkbenchIcon } from "./Icons";
+import { IconHint } from "./IconHint";
 import "../styles/project-canvas.css";
 
 type Camera = Point & { k: number };
@@ -970,34 +971,34 @@ export function ProjectCanvas({
   return (
     <div className="project-canvas" onKeyDown={onCanvasKey}>
       <div className="project-canvas-tools">
-        <button
-          type="button"
-          className="button"
-          disabled={toolbarLink.disabled}
-          onClick={(event) => {
-            event.currentTarget.focus();
-            toolbarLink.onSelect?.();
-          }}
-        >
-          {toolbarLink.label}
-        </button>
-        <Picker
-          label={t("projectCanvas.findClaim")}
-          searchLabel={t("projectCanvas.searchClaims")}
-          emptyLabel={t("projectCanvas.noMatches")}
-          trigger={
-            <>
-              {t("projectCanvas.findClaim")}
-              <Chevron />
-            </>
-          }
-          triggerClassName="button project-canvas-find"
-          className="project-canvas-popover"
-          groups={[{ options: cards.map(({ id, title }) => ({ id, label: title })) }]}
-          value={selected ?? undefined}
-          focusOnSelect={false}
-          onSelect={reveal}
-        />
+        <IconHint label={toolbarLink.label} shortcut={toolbarLink.shortcut}>
+          <button
+            type="button"
+            className="button map-view-toggle"
+            aria-label={toolbarLink.label}
+            disabled={toolbarLink.disabled}
+            onClick={(event) => {
+              event.currentTarget.focus();
+              toolbarLink.onSelect?.();
+            }}
+          >
+            {toolbarLink.icon}
+          </button>
+        </IconHint>
+        <IconHint label={t("projectCanvas.findClaim")}>
+          <Picker
+            label={t("projectCanvas.findClaim")}
+            searchLabel={t("projectCanvas.searchClaims")}
+            emptyLabel={t("projectCanvas.noMatches")}
+            trigger={<WorkbenchIcon name="search" />}
+            triggerClassName="button map-view-toggle project-canvas-find"
+            className="project-canvas-popover"
+            groups={[{ options: cards.map(({ id, title }) => ({ id, label: title })) }]}
+            value={selected ?? undefined}
+            focusOnSelect={false}
+            onSelect={reveal}
+          />
+        </IconHint>
         {visibleLinks.length > 0 && (
           <Menu
             label={t("projectCanvas.researchLinks")}

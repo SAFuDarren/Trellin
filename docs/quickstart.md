@@ -44,7 +44,7 @@ $RmPython = Join-Path $RmEnv "Scripts\python.exe"
 
 ## Start with your own question
 
-In the local proof workbench, use **Add → Paper, notes or code…** on the project map, or drop a file on it, to review selected notes before creating a claim, or **Add → New theorem…** to enter a theorem yourself. See [Project intake](project-intake.md).
+In the local proof workbench, use **+ → Paper, notes or code…** on the project map, or drop a file on it, to review selected notes before creating a claim, or **+ → New theorem…** to enter a theorem yourself. See [Project intake](project-intake.md).
 
 Choose the project folder when prompted. The first command prints its actual path. In the remaining commands, replace `PATH` with that folder and run from there.
 

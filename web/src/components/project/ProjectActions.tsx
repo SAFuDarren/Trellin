@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { graphAction, graphDialogTitle, type ProjectAction, type ProjectDialog } from "../../workbench/actions";
 import type { PremiseReview } from "../../workbench/types";
 import { Menu } from "../FloatingControls";
-import { Chevron, WorkbenchIcon } from "../Icons";
+import { IconHint } from "../IconHint";
+import { WorkbenchIcon } from "../Icons";
 import { ClaimCodesPane } from "./ClaimCodesPane";
 import { IntakePane } from "./IntakePane";
 import { LemmaPlanPane, type LemmaPlanScope } from "./LemmaPlanPane";
@@ -71,20 +72,16 @@ export function ProjectActions({
 
   return (
     <div className="project-actions">
-      <Menu
-        label={t("projectEntry.addTo")}
-        trigger={
-          <>
-            <WorkbenchIcon name="add" />
-            <span>{t("projectEntry.add")}</span>
-            <Chevron />
-          </>
-        }
-        triggerClassName="button primary project-add-trigger"
-        className="workbench-actions-items"
-        placement="bottom-end"
-        groups={[{ options: addOptions }]}
-      />
+      <IconHint label={t("projectEntry.addTo")}>
+        <Menu
+          label={t("projectEntry.addTo")}
+          trigger={<WorkbenchIcon name="add" />}
+          triggerClassName="button map-view-toggle project-add-trigger"
+          className="workbench-actions-items"
+          placement="bottom-end"
+          groups={[{ options: addOptions }]}
+        />
+      </IconHint>
       <dialog ref={dialog} className="project-entry" aria-labelledby={title} onClose={onClose}>
         {mode && (
           <>

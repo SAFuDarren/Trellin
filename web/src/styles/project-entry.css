@@ -6,35 +6,13 @@
   gap: 6px 10px;
 }
 
-.project-add-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.project-actions .workbench-icon {
-  width: 14px;
-  height: 14px;
-}
-@container (max-width: 620px) {
-  .project-actions {
-    flex-wrap: nowrap;
-    gap: 4px;
-  }
-  .project-actions .project-add-trigger {
-    display: grid;
-    place-items: center;
-    min-width: 30px;
-    height: 30px;
-    padding: 0;
-  }
-  .project-actions .project-add-trigger :is(span, .chevron) {
-    display: none;
-  }
-  .project-actions .workbench-icon {
-    width: 16px;
-    height: 16px;
-  }
+/* #353: the Add menu is one icon button, named on hover like the map's other tools. */
+.project-actions .project-add-trigger {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
 }
 
 .workbench-actions-items {
