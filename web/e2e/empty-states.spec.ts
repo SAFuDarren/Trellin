@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
 // #328: Inbox, Agent tasks and Automation say why a page is empty or unavailable and offer one next step.
-const WORKSPACE = "11111111-2222-4333-8444-555555555555";
 
 async function go(page: Page, hash: string, language?: "zh-CN") {
   if (language)
@@ -18,33 +17,6 @@ function emptyState(page: Page) {
 
 test.beforeEach(async ({ request }) => {
   await request.post("/__reset", { data: {} });
-});
-
-test("an Inbox without a workspace identity explains why and opens Review", async ({ page }) => {
-  await go(page, "#agent-work/inbox");
-  const state = emptyState(page);
-  await expect(state.getByRole("status")).toHaveText("Inbox is unavailable for this project.");
-  await expect(state).toContainText("Items waiting for you are still in Review.");
-  await state.getByRole("link", { name: "Open Review", exact: true }).click();
-  await expect(page).toHaveURL(/#review/);
-});
-
-test("an empty Inbox view says what will appear and offers a way on", async ({ page }) => {
-  await page.route("**/api/inbox", async (route) => {
-    const response = await route.fetch();
-    const inbox = await response.json();
-    await route.fulfill({ response, json: { ...inbox, items: [], review_identity: { workspace_id: WORKSPACE } } });
-  });
-  await page.route(/\/api\/agent-work(?:\?|$)/, (route) => route.fulfill({ json: { tasks: [], available: true } }));
-  await page.route("**/api/jobs", (route) => route.fulfill({ json: { jobs: [] } }));
-  await go(page, "#agent-work/inbox");
-  const inbox = page.getByRole("region", { name: "Inbox", exact: true });
-  await inbox.getByRole("button", { name: "Archived", exact: true }).click();
-  const state = emptyState(page);
-  await expect(state.getByRole("status")).toHaveText("There are no archived items.");
-  await expect(state).toContainText("Items you archive move here.");
-  await state.getByRole("button", { name: "Show all items", exact: true }).click();
-  await expect(inbox.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("Agent tasks without tasks offers New task, and an empty waiting view returns to all tasks", async ({ page }) => {

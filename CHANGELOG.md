@@ -1,5 +1,14 @@
 # Changes
 
+## 1.0.137
+
+- **Review** becomes **Decision records**: the decisions you and others recorded, newest first, with who decided, the reason and when. It covers results approved or returned, starting scopes confirmed and claims frozen, withdrawn or restored, filters by kind, and opens a decision's claim. It no longer lists waiting items beside Needs you, and an item still opens on its own page from Needs you.
+- The Inbox is retired: its items were the waiting items Needs you lists, and its read and archive marks did not outlast the window. Its old address opens Work.
+- A verified result is approved with **Approve and next** (**⌘↵**) or returned with **Return**, and two suggested reasons fill the reason field. After a decision on its page, the next waiting item opens.
+- Opening the floating window no longer narrows the board's columns: the room to scroll a card clear of the window is added beside the board instead of taken from it.
+- Review's context no longer shows the result's checksum.
+- New read route `GET /api/decision-records` for the workbench, from the existing decision log and intake confirmations; no migration.
+
 ## 1.0.136
 
 - **Needs you** is the one count of what waits for you. The rail badge counts the same items, and chips under the heading narrow the list, and **Go through**, to one kind. Review and Inbox under Records no longer show counts of their own, the status bar shows Agent activity only, and the **Waiting for review** view is gone, because Needs you covers it.

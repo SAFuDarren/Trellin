@@ -209,9 +209,13 @@
 }
 .work-more {
   padding: 4px 10px 0 34px;
+  border: 0;
+  background: none;
   color: var(--accent);
+  font: inherit;
   font-size: 12px;
   text-decoration: none;
+  cursor: pointer;
 }
 .work-pin {
   font: inherit;
@@ -286,7 +290,11 @@
 .section-stage[data-peek="true"] .research-lanes {
   scroll-padding-inline-end: calc(var(--peek-w) + 24px);
 }
+/* The room is added outside the board's content, which keeps its width, so no column narrows or rewraps
+   when the window opens (#345). The minimum matches the 22px side padding the board has when closed. */
 .section-stage[data-peek="true"] .lanes-scroll {
+  box-sizing: content-box;
+  min-width: calc(100% - 44px);
   padding-right: calc(var(--peek-w) + 24px);
 }
 .work-peek {

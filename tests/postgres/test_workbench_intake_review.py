@@ -121,6 +121,11 @@ def test_notes_intake_review_detail_and_confirm_clear_inbox(review_server):
     assert after_detail["confirmation"]["actor"] == local_user["display_name"]
     assert after_detail["confirmation"]["reason"] == REASON
 
+    # #345: the confirmed scope appears in Decision records under the bound researcher.
+    recorded = _request(review_server, "/api/decision-records")["records"]
+    scope = next(row for row in recorded if row["source"] == "intake" and row["id"] == str(draft["id"]))
+    assert (scope["action"], scope["actor"], scope["reason"]) == ("confirm", local_user["display_name"], REASON)
+
 
 def test_target_first_intake_review_binds_claim_and_supersedes_competing_draft(review_server):
     target_doc = {

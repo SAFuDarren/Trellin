@@ -58,17 +58,7 @@ function workError(t: TFunction, error: unknown, fallback: string) {
   return t(key, { defaultValue: t(`agentWork.errors.${fallback}`) });
 }
 
-export function AgentWorkPage({
-  session,
-  sub,
-  activity,
-  inbox,
-}: {
-  session: string;
-  sub: string;
-  activity: ReactNode;
-  inbox: ReactNode;
-}) {
+export function AgentWorkPage({ session, sub, activity }: { session: string; sub: string; activity: ReactNode }) {
   const { t } = useTranslation();
   const [layout, setLayout] = useWorkLayout("agent-work", "list");
   const work = useAgentWork(session);
@@ -77,7 +67,6 @@ export function AgentWorkPage({
   const waiting = tasks.filter((task) => task.status === "delivered");
   const filtered = path === "waiting";
   const showingActivity = path === "activity";
-  const showingInbox = path === "inbox";
   const creating = path === "new";
   const taskId = TASK_ID.test(path ?? "") ? path : null;
   const originId = creating && TASK_ID.test(id ?? "") ? id : undefined;
@@ -90,9 +79,9 @@ export function AgentWorkPage({
     <SectionLayout
       space="work"
       title={t("agentWork.title")}
-      // #294: the Inbox and the full activity page are their own destinations, so they show only the space group.
+      // #294: the full activity page is its own destination, so it shows only the space group.
       groups={
-        showingInbox || showingActivity
+        showingActivity
           ? []
           : [
               {
@@ -113,20 +102,17 @@ export function AgentWorkPage({
       <div className="agent-work-view">
         <PageHead
           title={t(
-            showingInbox
-              ? "agentInbox.title"
-              : showingActivity
-                ? "agentDock.activity"
-                : creating
-                  ? "agentWork.newTask"
-                  : filtered
-                    ? "agentWork.waiting"
-                    : "agentWork.title",
+            showingActivity
+              ? "agentDock.activity"
+              : creating
+                ? "agentWork.newTask"
+                : filtered
+                  ? "agentWork.waiting"
+                  : "agentWork.title",
           )}
           actions={
             work.data?.available &&
-            !creating &&
-            !showingInbox && (
+            !creating && (
               <>
                 {!taskId && !showingActivity && <WorkDisplayMenu layout={layout} onChange={setLayout} />}
                 <a className="button primary" href={agentWorkHref("new")}>
@@ -137,9 +123,7 @@ export function AgentWorkPage({
           }
         />
         <div className="agent-work-scroll" key={sub}>
-          {showingInbox ? (
-            inbox
-          ) : showingActivity ? (
+          {showingActivity ? (
             activity
           ) : work.isPending ? (
             <Empty>{t("common.loading")}</Empty>

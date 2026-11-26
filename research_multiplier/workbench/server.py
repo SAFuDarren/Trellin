@@ -46,6 +46,7 @@ _SCHEMA_SQLSTATES = {"42883", "42P01", "42703"}
 # Each workspace-wide page takes no parameters.
 _SECTIONS = {
     "/api/inbox": workbench_sections.inbox,
+    "/api/decision-records": workbench_sections.decision_records,
     "/api/library": workbench_sections.library,
     "/api/team": workbench_sections.team,
     "/api/progress": workbench_sections.progress,

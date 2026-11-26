@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "../api/client";
 import { useInbox, type InboxItem } from "../api/sections";
 import { ClarificationReview } from "../components/ClarificationReview";
 import { GoalReview } from "../components/GoalReview";
+import { DecisionRecords } from "../components/DecisionRecords";
 import { IntakeReview } from "../components/IntakeReview";
 import { ReviewSigner } from "../components/project/ReviewFields";
 import { rememberReviewer, savedReviewer } from "../components/project/review";
@@ -16,7 +17,9 @@ import { nodeFormula, nodeTitle, statusText, timeText } from "../workbench/text"
 import type { GraphSnapshot } from "../workbench/types";
 import "../styles/evidence-review.css";
 
-const DECISIONS = ["approve", "return"] as const;
+type Decision = "approve" | "return";
+/** #345: a reason the researcher can pick instead of typing, for an approval. */
+const REASON_SUGGESTIONS = ["scope", "premises"] as const;
 const GOAL_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 export function ReviewPage({
@@ -28,7 +31,7 @@ export function ReviewPage({
   sub: string;
   onOpen: (claimId: string, nodeId?: string) => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const inbox = useInbox(session);
   const clarification = inbox.data?.clarification_review;
   const openGoals = inbox.data?.open_research_goals ?? [];
@@ -46,48 +49,31 @@ export function ReviewPage({
     })),
   ];
   const requestedGoal = sub.startsWith(GOAL_REVIEW_ROUTE) ? sub.slice(GOAL_REVIEW_ROUTE.length).toLowerCase() : null;
+  // #345: without an item, this page lists decision records; what waits is listed in Needs you.
   const selected =
     requestedGoal === null
       ? sub
         ? items.find((item) => item.item_id === sub)
-        : items[0]
+        : undefined
       : items.find((item) => item.kind === "choose_conjecture" && item.item_id === requestedGoal);
   const goalId = requestedGoal ?? (selected?.kind === "choose_conjecture" ? selected.item_id : null);
-  // A decided item leaves the inbox, so its confirmation is kept here rather than on the item.
-  const [notice, setNotice] = useState("");
-  useEffect(() => setNotice(""), [sub]);
+  // A decided item leaves the list, so its confirmation travels with the page that comes next.
+  const [notice, setNotice] = useState<{ text: string; at: string } | null>(null);
+  const shownNotice = notice?.at === sub ? notice.text : "";
+  const subOf = (item: InboxItem) => (item.kind === "choose_conjecture" ? GOAL_REVIEW_ROUTE : "") + item.item_id;
+  const decided = (text: string) => {
+    const others = items.filter((item) => item !== selected);
+    const index = selected ? items.indexOf(selected) : -1;
+    const next = others[Math.max(0, Math.min(index, others.length - 1))];
+    const at = next ? subOf(next) : "";
+    setNotice({ text, at });
+    window.location.hash = next ? reviewItemHref(next) : href("review");
+  };
   return (
     <SectionLayout
       space="work"
-      title={t("rail.review")}
+      title={t("decisionRecords.title")}
       groups={[
-        {
-          name: t("review.waiting", { count: items.length }),
-          empty: inbox.isPending ? t("common.loading") : t("review.none"),
-          entries: items.map((item) => {
-            const evidence = item.kind === "review_evidence";
-            const kind = reviewItemKindLabel(t, item);
-            const summary = [
-              evidence
-                ? item.claim_title
-                : typeof item.detail?.clarification_status === "string"
-                  ? t(`clarifications.status.${item.detail.clarification_status}`)
-                  : kind,
-              timeText(i18n.language, item.waiting_since, true),
-            ];
-            return {
-              key: item.item_id,
-              label: evidence
-                ? reviewResultName(item) || kind
-                : item.claim_title ||
-                  (typeof item.detail?.title === "string" ? item.detail.title : t("sidebar.untitled")),
-              sub: summary.filter(Boolean).join(" · "),
-              href: reviewItemHref(item),
-              current: item === selected,
-              dot: item.priority <= 1 ? "bad" : "warn",
-            };
-          }),
-        },
         {
           name: t("review.openGoals"),
           entries: openGoals.map((goal) => ({
@@ -99,9 +85,9 @@ export function ReviewPage({
         },
       ]}
     >
-      {notice && (
+      {shownNotice && (
         <p className="page-notice" role="status">
-          {notice}
+          {shownNotice}
         </p>
       )}
       {goalId !== null ? (
@@ -115,16 +101,12 @@ export function ReviewPage({
         )
       ) : inbox.isError ? (
         <Empty>{inbox.error.message}</Empty>
+      ) : !selected && !sub ? (
+        <DecisionRecords session={session} onOpen={onOpen} />
       ) : !selected ? (
         <>
           <PageHead title={t("rail.review")} />
-          <Empty>
-            {inbox.isPending
-              ? t("common.loading")
-              : sub && !notice
-                ? t("review.itemNoLongerWaiting")
-                : t(openGoals.length ? "review.chooseOpenGoal" : "review.allDone")}
-          </Empty>
+          <Empty>{inbox.isPending ? t("common.loading") : t("review.itemNoLongerWaiting")}</Empty>
         </>
       ) : selected.kind === "clarify_formalization" && clarification ? (
         <ClarificationReview
@@ -132,7 +114,7 @@ export function ReviewPage({
           session={session}
           workspace={clarification.workspace_id}
           id={selected.item_id}
-          onConfirmed={(kind) => setNotice(t(`clarifications.confirmed.${kind}`))}
+          onConfirmed={(kind) => decided(t(`clarifications.confirmed.${kind}`))}
         />
       ) : selected.kind === "confirm_intake" ? (
         <IntakeReview
@@ -141,7 +123,7 @@ export function ReviewPage({
           item={selected}
           signer={inbox.data?.review_identity?.display_name || undefined}
           onOpen={onOpen}
-          onDecided={setNotice}
+          onDecided={decided}
         />
       ) : selected.kind === "review_evidence" && selected.claim_id ? (
         <EvidenceReview
@@ -151,7 +133,7 @@ export function ReviewPage({
           reviewWorkspace={inbox.data?.review_identity?.workspace_id}
           signer={inbox.data?.review_identity?.display_name || undefined}
           onOpen={onOpen}
-          onDecided={setNotice}
+          onDecided={decided}
         />
       ) : (
         <OtherItem item={selected} onOpen={onOpen} />
@@ -197,20 +179,15 @@ export function EvidenceReview({
   // #328: only a database without a local identity asks who is deciding.
   const asksName = !reviewWorkspace && !signer;
   const [reason, setReason] = useState("");
-  const [choice, setChoice] = useState<(typeof DECISIONS)[number] | null>(null);
   const [state, setState] = useState<{ sending?: boolean; message?: string; error?: boolean }>({});
   const requestKeys = useRef(new Map<string, string>());
-  const decide = async () => {
+  // #345: Approve and next is the primary action; returning asks for the same reason.
+  const decide = async (action: Decision) => {
     if (state.sending) return;
-    const action = choice;
     const actor = signer ?? reviewer.trim();
     const rationale = reason.trim();
     if (!rationale || (asksName && !actor)) {
       setState({ message: t(asksName ? "review.needNameAndReason" : "review.needReason"), error: true });
-      return;
-    }
-    if (!action) {
-      setState({ message: t("review.chooseDecision"), error: true });
       return;
     }
     setState({ sending: true });
@@ -234,6 +211,7 @@ export function EvidenceReview({
       setReason("");
       onDecided(t(action === "approve" ? "review.approved" : "review.returned"));
       void queries.invalidateQueries({ queryKey: ["inbox"] });
+      void queries.invalidateQueries({ queryKey: ["decision-records"] });
       void queries.invalidateQueries({ queryKey: ["graph", item.claim_id] });
       void queries.invalidateQueries({ queryKey: ["atlas"] });
     } catch (error) {
@@ -279,7 +257,7 @@ export function EvidenceReview({
             className="decision"
             onSubmit={(event) => {
               event.preventDefault();
-              void decide();
+              void decide("approve");
             }}
             onKeyDown={(event) => {
               if (
@@ -311,24 +289,24 @@ export function EvidenceReview({
                 />
               </>
             ) : null}
-            <fieldset className="evidence-decision-choice" disabled={state.sending}>
-              <legend className="field-label">{t("review.decisionLabel")}</legend>
-              {DECISIONS.map((action) => (
-                <label key={action}>
-                  <input
-                    type="radio"
-                    name="review-decision"
-                    value={action}
-                    checked={choice === action}
-                    onChange={() => setChoice(action)}
-                  />
-                  {t(`review.${action}`)}
-                </label>
-              ))}
-            </fieldset>
             <label className="field-label" htmlFor="review-reason">
               {t("review.reason")}
             </label>
+            <div className="reason-suggestions" role="group" aria-label={t("review.suggestionsLabel")}>
+              {REASON_SUGGESTIONS.map((key) => {
+                const text = t(`review.suggestions.${key}`);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={state.sending}
+                    onClick={() => setReason(reason.trim() ? `${reason.trim()}; ${text}` : text)}
+                  >
+                    {text}
+                  </button>
+                );
+              })}
+            </div>
             <textarea
               id="review-reason"
               rows={3}
@@ -344,7 +322,10 @@ export function EvidenceReview({
                 aria-keyshortcuts="Meta+Enter Control+Enter"
                 disabled={state.sending}
               >
-                {t("review.submitDecision")}
+                {t("review.approveNext")}
+              </button>
+              <button type="button" className="button" disabled={state.sending} onClick={() => void decide("return")}>
+                {t("review.return")}
               </button>
               <kbd>{formatShortcut("Primary+Enter")}</kbd>
               {state.message && (
@@ -374,12 +355,6 @@ export function EvidenceReview({
               <>
                 <dt>{t("detail.usedBy")}</dt>
                 <dd>{uses.map((use) => (use ? nodeTitle(t, use) : "")).join(", ")}</dd>
-              </>
-            )}
-            {typeof item.detail?.sha256 === "string" && (
-              <>
-                <dt>{"SHA-256"}</dt>
-                <dd className="mono">{String(item.detail.sha256).slice(0, 16)}…</dd>
               </>
             )}
           </dl>

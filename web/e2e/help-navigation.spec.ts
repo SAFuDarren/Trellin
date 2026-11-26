@@ -4,7 +4,6 @@ const destinations = {
   "#workbench": ["Project map", "项目图谱"],
   "#claims": ["Work", "工作"],
   "#library": ["Work", "工作"],
-  "#agent-work/inbox": ["Work", "工作"],
   "#chat": ["Chats", "对话"],
   "#team": ["Team", "团队"],
   "#progress": ["Automation", "自动化"],

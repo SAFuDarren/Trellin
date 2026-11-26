@@ -38,7 +38,7 @@ async function confirmImeCandidate(input: Locator) {
 }
 
 async function goToSection(page: Page, section: string) {
-  if (["Review", "Claims", "Library", "Inbox", "Agent tasks"].includes(section)) {
+  if (["Review", "Claims", "Library", "Agent tasks"].includes(section)) {
     await openDestination(page, section as Destination);
   } else {
     await railLink(page, section).click();
@@ -452,15 +452,16 @@ test("Work shows review counts and the rail keeps Team and utilities reachable",
 
 test("approving a verified result records it and clears it from the inbox", async ({ page }) => {
   await open(page, "Review");
+  // #345: Review lists decision records; a waiting item opens by its address, as from Needs you.
+  await page.evaluate(() => (location.hash = "review/77777777-7777-4777-8777-777777777777"));
   await expect(page.locator(".page-head h2")).toHaveText("reverseZeroAdd");
-  await page.getByRole("button", { name: "Record decision" }).click();
+  await page.getByRole("button", { name: "Approve and next" }).click();
   await expect(page.getByRole("status")).toHaveText("Add your name and a reason first.");
   await page.getByLabel("Your name").fill("Fixture reviewer");
-  await page.getByLabel("Reason").fill("Scope matches; only H1 is used.");
-  await page.getByRole("radio", { name: "Approve" }).check();
-  await page.getByRole("button", { name: "Record decision" }).click();
+  await page.getByLabel("Reason", { exact: true }).fill("Scope matches; only H1 is used.");
+  await page.getByRole("button", { name: "Approve and next" }).click();
   await expect(page.locator(".page-notice")).toHaveText("Approved and recorded.");
-  const review = page.locator("nav.section-nav").getByRole("link", { name: /^Review/ });
+  const review = page.locator("nav.section-nav").getByRole("link", { name: /^Decision records/ });
   await expect(page.locator("nav.section-nav .work-waiting")).toContainText("Needs you · 1");
   await expect(review).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".page-head h2")).not.toHaveText("reverseZeroAdd");
@@ -468,6 +469,7 @@ test("approving a verified result records it and clears it from the inbox", asyn
 
 test("a result can be opened from review in the workbench", async ({ page }) => {
   await open(page, "Review");
+  await page.evaluate(() => (location.hash = "review/77777777-7777-4777-8777-777777777777"));
   await page.getByRole("button", { name: "Open in workbench" }).click();
   await expect(page.locator(".node-detail h2")).toHaveText("reverseZeroAdd");
 });

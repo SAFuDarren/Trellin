@@ -199,7 +199,7 @@ test("utilities and direct review links work in a narrow Chinese window", async 
   await page.reload();
   await expect(page.locator("#section-title")).toHaveText("工作");
   await expect(page.locator(".page-head h2")).toHaveText("reverseZeroAdd");
-  const review = page.locator("nav.section-nav").getByRole("link", { name: /^审阅/ });
+  const review = page.locator("nav.section-nav").getByRole("link", { name: /^判断记录/ });
   await expect(review).toHaveAttribute("aria-current", "page");
   // #345: Review keeps no count of its own; Needs you counts what waits.
   await expect(page.locator("nav.section-nav .work-waiting")).toContainText("等你判断 · 2");

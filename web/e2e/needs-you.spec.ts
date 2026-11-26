@@ -71,12 +71,16 @@ test("an item opens floating over the board, which keeps its width and shows the
   await openWork(page, []);
   const board = page.locator(".research-lanes");
   const before = (await board.boundingBox())!;
+  const cardWidths = () => page.locator(".lane-card").evaluateAll((cards) => cards.map((card) => card.clientWidth));
+  const widths = await cardWidths();
   const row = needsYou(page).locator(".waiting-row").first();
   await row.hover();
   await row.getByRole("button", { name: "Handle" }).click();
   await expect(floating(page)).toBeVisible();
   const after = (await board.boundingBox())!;
   expect(after.width).toBe(before.width);
+  // No column narrows or rewraps its cards when the window opens.
+  expect(await cardWidths()).toEqual(widths);
   // The window sits below the page header, which stays usable.
   const head = (await page.locator(".section-main .page-head").first().boundingBox())!;
   const window = (await floating(page).boundingBox())!;

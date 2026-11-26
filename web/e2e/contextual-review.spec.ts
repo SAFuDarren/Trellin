@@ -17,9 +17,8 @@ async function inspectClaim(page: Page) {
 async function expectReview(page: Page, evidence: string, title: string) {
   await expect(page).toHaveURL(new RegExp(`#review/${evidence}$`));
   await expect(page.locator(".page-head h2")).toHaveText(title);
-  const item = page.locator(".section-nav .nav-group:not(.space-entries) .nav-item[aria-current=page]");
-  await expect(item.locator(".label")).toHaveText(title);
-  await expect(item.locator(".nav-sub")).toContainText(FIXTURE_CLAIM_TITLE);
+  // #345: the page names the item's claim; the panel lists what waits in Needs you, not again beside it.
+  await expect(page.locator(".crumbs")).toContainText(FIXTURE_CLAIM_TITLE);
 }
 
 test.beforeEach(async ({ request }) => {
@@ -49,13 +48,11 @@ test("the claim, inspector queue and selected result open the evidence review di
   await page.getByLabel("Your name").fill("Fixture researcher");
   const reason = page.getByLabel("Reason", { exact: true });
   await reason.fill("Recheck the scope against the selected Lean statement.");
-  await reason.press("Meta+Enter");
-  await expect(page.getByText("Choose Approve or Return first.", { exact: true })).toBeVisible();
   expect(writes).toBe(0);
 
-  await page.getByRole("radio", { name: "Return", exact: true }).check();
+  // #345: Return is its own button; the keyboard shortcut approves.
   const sent = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith("/api/review"));
-  await reason.press("Meta+Enter");
+  await page.getByRole("button", { name: "Return", exact: true }).click();
   expect((await sent).postDataJSON()).toEqual({
     evidence_id: EVIDENCE,
     action: "return",
@@ -91,7 +88,6 @@ test("a single footer result opens directly and records the decision through the
   await waiting.getByRole("link", { name: "Open page" }).click();
   await expectReview(page, EVIDENCE, resultName);
   await expect(page.getByLabel("Your name")).toHaveCount(0);
-  await page.getByRole("radio", { name: "Approve", exact: true }).check();
   const reason = page.getByLabel("Reason", { exact: true });
   await reason.press("Control+Enter");
   await expect(page.getByText("Add a reason first.", { exact: true })).toBeVisible();
@@ -154,9 +150,8 @@ test("the footer filters multiple reviews and names each result before opening i
   await expect(page.getByText(/as accepted evidence against the claim/)).toBeVisible();
 
   await page.getByLabel("Your name").fill("Fixture researcher");
-  await page.getByRole("radio", { name: "Approve", exact: true }).check();
   await page.getByLabel("Reason", { exact: true }).fill("The second result addresses the recorded claim.");
-  await page.getByRole("button", { name: "Record decision", exact: true }).click();
+  await page.getByRole("button", { name: "Approve and next", exact: true }).click();
   await expect(page.getByText("Approved and recorded.", { exact: true })).toBeVisible();
   expect(seen).toEqual([SECOND_EVIDENCE]);
 });
