@@ -271,6 +271,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/atlas": ATLAS, "/api/impact": IMPACT, "/api/inbox": INBOX, "/api/library": LIBRARY,
                 "/api/decision-records": {"records": [_recorded(body) for body in reversed(REVIEWS)] + DECISION_RECORDS},
                 "/api/model-connections": {"connections": []},
+                "/api/project-intake/grants": {"grants": []},
                 "/api/model-connections/native": {"providers": [{"provider": "codex-cli", "status": "signed_in"}]},
                 "/api/team-agents": {"agents": []},
                 "/api/conversations": {"threads": []}, "/api/agent-work": {"available": True, "tasks": []},

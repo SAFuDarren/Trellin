@@ -745,6 +745,9 @@
       "missing": "This intake is no longer available.",
       "stale": "This intake changed since you opened it. Review the current version and confirm again.",
       "unavailable": "Could not read or save this intake. Reload to try again."
+    },
+    "intake": {
+      "authorization_required": "Allow this model for the project's imports first."
     }
   },
   "graph": {
@@ -1383,15 +1386,14 @@
     "openTeam": "Open model connections",
     "chooseConnection": "Choose a connected model",
     "intakeHelp": "Use a local model for private notes. A connected cloud model requires approval of the public excerpt.",
-    "publicPreview": "Review the public material to share",
-    "previewLimits": "One request with a timeout of {{seconds}} seconds.",
-    "editPreview": "Back to editing",
-    "sendPublic": "Send this public excerpt",
     "status": {
       "untested": "Not tested",
       "connected": "Connection tested",
       "missing_cli": "Command unavailable"
-    }
+    },
+    "allowed": "Allowed for this project's imports",
+    "withdraw": "Withdraw",
+    "withdrawLabel": "Withdraw {{model}} from this project's imports"
   },
   "settings": {
     "search": "Search settings",
@@ -1639,12 +1641,12 @@
       "readFile": "Read a text, Markdown, TeX or Lean file",
       "model": "Model",
       "noModels": "No usable models found",
-      "connectModel": "Start Ollama with a local text model, then refresh the list.",
+      "connectModel": "Connect a model",
       "refreshModels": "Refresh models",
       "tooLarge": "Use up to 18 KB of research text per request.",
       "fileError": "This file could not be read as text.",
-      "analyze": "Analyze selected notes",
-      "analyzing": "Analyzing…",
+      "analyze": "Organize",
+      "analyzing": "Organizing…",
       "running": "The model is extracting statements from your notes.",
       "reviewHint": "Check the exact quote and formalization for each item before confirming your decisions.",
       "kinds": {
@@ -1664,7 +1666,18 @@
       "reviewed": "Your decisions were recorded.",
       "pending": "Intake notes to review",
       "back": "Back to notes",
-      "unsupported": "This file type cannot be read yet. Use a text, Markdown, TeX or Lean file."
+      "unsupported": "This file type cannot be read yet. Use a text, Markdown, TeX or Lean file.",
+      "dropTitle": "Drop a text, Markdown, TeX or Lean file here",
+      "choose": "Choose file…",
+      "paste": "Paste text instead",
+      "replace": "Choose another file",
+      "readBy": "Read by {{model}}",
+      "advanced": "Advanced options",
+      "noModel": "No model can read it yet.",
+      "allowLabel": "Allow this model for imports",
+      "allowAsk": "Allow {{model}} to read this project's imports? The material is sent to {{provider}}. You can withdraw this in Team → Runtimes.",
+      "allow": "Allow and organize",
+      "otherModel": "Choose another model"
     },
     "add": "Add",
     "addTo": "Add to project",

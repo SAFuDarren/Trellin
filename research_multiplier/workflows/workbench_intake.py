@@ -1,12 +1,9 @@
 """Project-level intake over the existing human-reviewed notes workflow."""
 
-from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from http.client import HTTPConnection, HTTPException
 import json
 import re
-from secrets import token_hex
-from threading import Lock
 from uuid import UUID
 
 from research_multiplier.model_adapters import ModelConfig, PROVIDERS
@@ -33,7 +30,6 @@ _ITEM_ID = re.compile(r"i[1-9][0-9]?")
 _INTAKE_FIELDS = {"title", "domain", "objective", "notes"}
 _REVIEW_CONFIRM_REQUIRED = {"id", "sha256", "decisions", "reason"}
 _REVIEW_CONFIRM_ALLOWED = _REVIEW_CONFIRM_REQUIRED | {"actor"}
-_MAX_RELEASE_PREVIEWS = 64
 
 
 class IntakeError(ValueError):
@@ -179,20 +175,22 @@ def draft(store, document):
 
 
 class PublicIntake:
-    """Preview and consume authorization for one public excerpt in this workbench session."""
+    """Send import material to a connected model under the project's standing authorization (D4, #355).
+
+    A researcher allows one connection for one project's imports once. The grant is a content-addressed
+    record of who allowed which exact connection, for which workspace, and when; each import records its
+    own call authorization that points at that grant. Withdrawing the grant makes the next import ask again.
+    """
 
     def __init__(self, registry):
         self.registry = registry
-        self.previews = {}
-        self.lock = Lock()
 
-    @contextmanager
-    def _request(self, store, document, *, dispatch=False):
-        data, raw = _draft_data(document, "public")
-        try:
-            identifier = str(UUID(_text(document["connection_id"], 36)))
-        except ValueError:
-            raise IntakeError("intake.invalid_input") from None
+    @staticmethod
+    def _objects():
+        return Artifacts(paths.object_store(), workspace=False)
+
+    @staticmethod
+    def _researcher(store):
         try:
             researcher = store.local_user()
         except DatabaseOperationError:
@@ -201,9 +199,108 @@ class PublicIntake:
             raise IntakeError("intake.identity_required") from None
         if not researcher or store.workspace_id is None:
             raise IntakeError("intake.identity_required")
+        return researcher
+
+    @staticmethod
+    def _connection_id(document):
         try:
-            selected = self.registry.use(identifier) if dispatch else nullcontext(self.registry.resolve(identifier))
-            with selected as (config, connection):
+            return str(UUID(_text(document["connection_id"], 36)))
+        except ValueError:
+            raise IntakeError("intake.invalid_input") from None
+
+    def _identity(self, identifier):
+        try:
+            config, connection = self.registry.resolve(identifier)
+        except ConnectionError as error:
+            raise IntakeError(error.code) from None
+        if (config.private or config.adapter_factory or config.provider != connection["provider"]
+                or config.model != connection["model"]):
+            raise IntakeError("connection.configuration")
+        return connection
+
+    def _grant(self, store, identifier):
+        """The current grant for this connection, or None when it is absent or the connection changed."""
+        try:
+            refs = self.registry.intake_grants(store.workspace_id)
+        except ConnectionError as error:
+            raise IntakeError(error.code) from None
+        raw = refs.get(identifier)
+        if raw is None:
+            return None
+        try:
+            ref = json.loads(raw)
+            grant = self._objects().read_json(ref)
+        except (OSError, ValueError, TypeError, KeyError):
+            return None
+        if (grant.get("kind") != "workbench_intake_grant" or grant.get("workspace_id") != str(store.workspace_id)
+                or grant.get("connection") != self._identity(identifier)):
+            return None
+        return ref, grant
+
+    def grants(self, store):
+        """This project's standing import permissions for connections that still exist unchanged."""
+        if store.workspace_id is None:
+            return {"grants": []}
+        try:
+            refs = self.registry.intake_grants(store.workspace_id)
+        except ConnectionError as error:
+            raise IntakeError(error.code) from None
+        listed = []
+        for identifier in sorted(refs):
+            try:
+                current = self._grant(store, identifier)
+            except IntakeError:
+                continue
+            if current is not None:
+                grant = current[1]
+                listed.append({"connection_id": identifier, "provider": grant["connection"]["provider"],
+                               "model": grant["connection"]["model"], "researcher_id": grant["researcher_id"],
+                               "granted_at": grant["granted_at"]})
+        return {"grants": listed}
+
+    def grant(self, store, document):
+        _shape(document, {"connection_id"})
+        identifier = self._connection_id(document)
+        researcher = self._researcher(store)
+        connection = self._identity(identifier)
+        record = {
+            "kind": "workbench_intake_grant",
+            "workspace_id": str(store.workspace_id),
+            "researcher_id": str(researcher["id"]),
+            "visibility": "public",
+            "connection": connection,
+            "granted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        ref = self._objects().put(record)
+        try:
+            self.registry.set_intake_grant(store.workspace_id, identifier, json.dumps(ref, sort_keys=True))
+        except ConnectionError as error:
+            raise IntakeError(error.code) from None
+        return {"connection_id": identifier, "provider": connection["provider"], "model": connection["model"],
+                "researcher_id": record["researcher_id"], "granted_at": record["granted_at"]}
+
+    def revoke(self, store, document):
+        _shape(document, {"connection_id"})
+        identifier = self._connection_id(document)
+        if store.workspace_id is None:
+            raise IntakeError("intake.identity_required")
+        try:
+            self.registry.set_intake_grant(store.workspace_id, identifier, None)
+        except ConnectionError as error:
+            raise IntakeError(error.code) from None
+        return {"connection_id": identifier, "revoked": True}
+
+    def draft(self, store, document):
+        _shape(document, _INTAKE_FIELDS | {"connection_id"})
+        data, raw = _draft_data(document, "public")
+        identifier = self._connection_id(document)
+        researcher = self._researcher(store)
+        current = self._grant(store, identifier)
+        if current is None:
+            raise IntakeError("intake.authorization_required")
+        grant_ref, _ = current
+        try:
+            with self.registry.use(identifier) as (config, connection):
                 if (config.private or config.adapter_factory or config.provider != connection["provider"]
                         or config.model != connection["model"]):
                     raise IntakeError("connection.configuration")
@@ -224,38 +321,16 @@ class PublicIntake:
                     "researcher_id": str(researcher["id"]),
                     "visibility": "public",
                     "connection": connection,
+                    "grant": grant_ref,
                     "intake_sha256": fingerprint(data),
                     "request_sha256": fingerprint([intake.EXTRACT_PROMPT, outgoing]),
                     "limits": limits,
+                    "authorized_at": datetime.now(timezone.utc).isoformat(),
                 }
-                yield authorization, outgoing, raw, config
+                ref = self._objects().put(authorization)
+                return _save_draft(store, raw, model=True, model_config=config, public_authorization=ref)
         except ConnectionError as error:
             raise IntakeError(error.code) from None
-
-    def preview(self, store, document):
-        _shape(document, _INTAKE_FIELDS | {"connection_id"})
-        with self._request(store, document) as (authorization, outgoing, _, config):
-            model = {"provider": config.provider, "model": config.model}
-        token = token_hex(32)
-        with self.lock:
-            if len(self.previews) >= _MAX_RELEASE_PREVIEWS:
-                del self.previews[next(iter(self.previews))]
-            self.previews[token] = authorization
-        return {"token": token, **model, "outgoing": outgoing, "limits": authorization["limits"]}
-
-    def draft(self, store, document):
-        _shape(document, _INTAKE_FIELDS | {"connection_id", "token"})
-        token = _text(document["token"], 64)
-        if not _SHA256.fullmatch(token):
-            raise IntakeError("intake.release_stale")
-        with self._request(store, document, dispatch=True) as (authorization, _, raw, config):
-            with self.lock:
-                if self.previews.get(token) != authorization:
-                    raise IntakeError("intake.release_stale")
-                del self.previews[token]
-            objects = Artifacts(paths.object_store(), workspace=False)
-            ref = objects.put({**authorization, "token": token, "authorized_at": datetime.now(timezone.utc).isoformat()})
-            return _save_draft(store, raw, model=True, model_config=config, public_authorization=ref)
 
 
 def confirm(store, document):

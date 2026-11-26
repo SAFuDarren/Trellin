@@ -90,7 +90,10 @@ _PROJECT_CANVAS_ERRORS = {
     "project_canvas.missing": HTTPStatus.CONFLICT,
     "project_canvas.unavailable": HTTPStatus.SERVICE_UNAVAILABLE,
 }
-_INTAKE_PUBLIC = ("/api/project-intake/public-preview", "/api/project-intake/public-draft")
+_INTAKE_PUBLIC = ("/api/project-intake/public-draft",)
+# #355: a project's standing permission to send import material to a connected model (D4).
+_INTAKE_GRANTS = "/api/project-intake/grants"
+_INTAKE_GRANT_WRITES = {"/api/project-intake/grant": "grant", "/api/project-intake/revoke": "revoke"}
 _PROOF_WRITES = {"/api/proof-task/start", "/api/proof-task/stop"}
 # #94: create, approve and stop automation rules from the workbench.
 _AUTOMATION_ROUTE = "/api/automation"
@@ -584,6 +587,10 @@ class _Handler(BaseHTTPRequestHandler):
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
             return workbench_intake.models()
+        if route.path == _INTAKE_GRANTS:
+            if route.query:
+                raise _BadRequest("This endpoint does not take parameters.")
+            return self.server.read(self.server.public_intake.grants)
         if route.path == "/api/conversations":
             claim = _uuid_parameters(route.query, "claim_id")[0] if route.query else None
             return self.server.read(workbench_conversations.threads, self.server.team_agents, claim)
@@ -1066,8 +1073,9 @@ class _Handler(BaseHTTPRequestHandler):
                 document = self._body(workbench_project_canvas.MAX_REQUEST_BYTES)
                 self._json(HTTPStatus.OK, self.server.read(workbench_project_canvas.apply,
                                                           self.server.project_canvas, document))
-            elif self.path == "/api/project-intake/public-preview":
-                self._json(HTTPStatus.OK, self.server.read(self.server.public_intake.preview, self._body(_MAX_PROJECT_BYTES)))
+            elif self.path in _INTAKE_GRANT_WRITES:
+                action = getattr(self.server.public_intake, _INTAKE_GRANT_WRITES[self.path])
+                self._json(HTTPStatus.OK, self.server.read(action, self._body(_MAX_PROJECT_BYTES)))
             elif self.path == "/api/project-intake/public-draft":
                 self._json(HTTPStatus.OK, self.server.write_project(self.server.public_intake.draft,
                                                                    self._body(_MAX_PROJECT_BYTES)))

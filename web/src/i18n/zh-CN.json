@@ -745,6 +745,9 @@
       "missing": "这个起始范围已不存在。",
       "stale": "打开后它有了变更。请按当前版本审阅后重新确认。",
       "unavailable": "无法读取或保存这个起始范围。请刷新后重试。"
+    },
+    "intake": {
+      "authorization_required": "请先允许这个模型用于这个项目的导入。"
     }
   },
   "graph": {
@@ -1383,15 +1386,14 @@
     "openTeam": "打开模型连接",
     "chooseConnection": "选择已添加的模型",
     "intakeHelp": "私有笔记使用本机模型。调用已连接的在线模型前，需要核对并授权发送公开摘录。",
-    "publicPreview": "核对即将共享的公开材料",
-    "previewLimits": "调用一次，超时上限为 {{seconds}} 秒。",
-    "editPreview": "返回编辑",
-    "sendPublic": "发送这段公开摘录",
     "status": {
       "untested": "尚未试连",
       "connected": "试连通过",
       "missing_cli": "命令不可用"
-    }
+    },
+    "allowed": "已允许用于这个项目的导入",
+    "withdraw": "撤销",
+    "withdrawLabel": "撤销 {{model}} 对这个项目导入的许可"
   },
   "settings": {
     "search": "搜索设置",
@@ -1639,12 +1641,12 @@
       "readFile": "读取文本、Markdown、TeX 或 Lean 文件",
       "model": "模型",
       "noModels": "未找到可用模型",
-      "connectModel": "启动带有本地文本模型的 Ollama，再刷新列表。",
+      "connectModel": "连接模型",
       "refreshModels": "刷新模型",
       "tooLarge": "每次最多分析 18 KB 的研究文本。",
       "fileError": "无法将所选文件读为文本。",
-      "analyze": "分析所选笔记",
-      "analyzing": "正在分析…",
+      "analyze": "整理",
+      "analyzing": "正在整理…",
       "running": "模型正在从笔记中提取候选陈述。",
       "reviewHint": "请对照每条原文检查形式化，再确认你的决定。",
       "kinds": {
@@ -1664,7 +1666,18 @@
       "reviewed": "审核决定已记录。",
       "pending": "待审的整理结果",
       "back": "返回笔记",
-      "unsupported": "暂时读不了这种文件。请用文本、Markdown、TeX 或 Lean 文件。"
+      "unsupported": "暂时读不了这种文件。请用文本、Markdown、TeX 或 Lean 文件。",
+      "dropTitle": "把文本、Markdown、TeX 或 Lean 文件拖到这里",
+      "choose": "选择文件…",
+      "paste": "改为粘贴文本",
+      "replace": "换一个文件",
+      "readBy": "由 {{model}} 读取",
+      "advanced": "高级选项",
+      "noModel": "还没有可用的模型来读取。",
+      "allowLabel": "允许这个模型用于导入",
+      "allowAsk": "允许 {{model}} 读取这个项目导入的材料吗？材料会发送给 {{provider}}，之后可在「Team → 运行环境」撤销。",
+      "allow": "允许并整理",
+      "otherModel": "换一个模型"
     },
     "add": "添加",
     "addTo": "添加到项目",

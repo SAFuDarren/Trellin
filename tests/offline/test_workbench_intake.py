@@ -193,6 +193,7 @@ _PUBLIC_DRAFT = {key: value for key, value in _DRAFT.items() if key != "model"} 
 def public_intake(monkeypatch, tmp_path):
     families = {"codex-cli": "openai", "claude-code": "claude"}
     settings = {"provider": "codex-cli", "model": "test-model", "fingerprint": "route revision one"}
+    grants = {}
 
     class Registry:
         def resolve(self, identifier):
@@ -205,14 +206,32 @@ def public_intake(monkeypatch, tmp_path):
         def use(self, identifier):
             return nullcontext(self.resolve(identifier))
 
+        def intake_grants(self, workspace_id):
+            return {connection: ref for (workspace, connection), ref in grants.items() if workspace == str(workspace_id)}
+
+        def set_intake_grant(self, workspace_id, identifier, grant_ref):
+            if grant_ref is None:
+                grants.pop((str(workspace_id), identifier), None)
+            else:
+                grants[(str(workspace_id), identifier)] = grant_ref
+
     researcher = UUID(_GOAL_ID)
     store = SimpleNamespace(workspace_id=UUID(_ID), local_user=lambda: {"id": researcher})
     monkeypatch.setattr(workbench_intake.paths, "object_store", lambda: tmp_path)
     return workbench_intake.PublicIntake(Registry()), settings, store
 
 
+_GRANT = {"connection_id": _CONNECTION_ID}
+
+
+def _records(tmp_path, kind):
+    return [record for path in tmp_path.iterdir()
+            if (record := json.loads(path.read_text())).get("kind") == kind] if tmp_path.exists() else []
+
+
 @pytest.mark.parametrize("provider", ["codex-cli", "claude-code"])
-def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(monkeypatch, tmp_path, public_intake, provider):
+def test_public_intake_sends_under_one_standing_grant_and_keeps_existing_review(
+        monkeypatch, tmp_path, public_intake, provider):
     service, settings, store = public_intake
     settings["provider"] = provider
     calls = []
@@ -221,96 +240,94 @@ def test_public_intake_authorizes_one_exact_excerpt_and_keeps_existing_review(mo
     normalized = {**candidate, "formal": {"lean": {"proposition": proposition}}}
     artifacts = workbench_intake.Artifacts(tmp_path, workspace=False)
     store.json = lambda value: value
+    outgoing_expected = {"domain": _DRAFT["domain"], "objective": _DRAFT["objective"], "notes": _NOTES}
 
     def draft_query(role, query, body):
         assert role == "human" and "rm.draft_research_intake" in query
         assert list(body["items"]) == [{**normalized, "id": "i1", "origin": "model"}]
         assert body["sensitivity"] == "public"
-        assert json.loads(artifacts.read(body["notes"]))["notes"] == _NOTES
         ref = body["model"]["call"]["parameters"]["workbench_public_intake"]
-        assert artifacts.read_json(ref)["researcher_id"] == _GOAL_ID
-        assert artifacts.read_json(ref)["token"] == preview["token"]
-        assert artifacts.read_json(body["model"]["transcript"]) == {"items": [candidate]}
+        authorization = artifacts.read_json(ref)
+        assert authorization["researcher_id"] == _GOAL_ID and "token" not in authorization
+        grant = artifacts.read_json(authorization["grant"])
+        assert grant["kind"] == "workbench_intake_grant" and grant["researcher_id"] == _GOAL_ID
+        assert grant["workspace_id"] == _ID and grant["connection"]["provider"] == provider
         return [{**_saved_draft(), "body": body}]
 
     def complete(config, role, system, outgoing, output_limit, deadline):
         calls.append(outgoing)
         assert role == "intake-notes" and config.provider == provider
         assert system == intake.EXTRACT_PROMPT
-        assert 'Use "items" as the only top-level key' in system
-        assert outgoing == preview["outgoing"]
+        assert outgoing == outgoing_expected
         assert config.timeout_seconds == 60 and output_limit == intake.MODEL_OUTPUT_TOKENS
-        audit_file, = tmp_path.iterdir()
-        assert json.loads(audit_file.read_text())["visibility"] == "public"
         result = {"items": [candidate]}
         return SimpleNamespace(output=result, metadata={"parameters": {}}, transcript=result)
 
     store.query = draft_query
     monkeypatch.setattr(intake, "complete_structured", complete)
-    preview = service.preview(store, _PUBLIC_DRAFT)
-    assert preview["provider"] == provider and preview["model"] == "test-model"
-    assert preview["outgoing"] == {"domain": _DRAFT["domain"], "objective": _DRAFT["objective"], "notes": _NOTES}
-    assert preview["limits"]["timeout_seconds"] == 60
-    assert preview["limits"]["output_token_limit_enforced"] is False
-    assert not calls and not list(tmp_path.iterdir())
+    granted = service.grant(store, _GRANT)
+    assert granted["provider"] == provider and granted["researcher_id"] == _GOAL_ID and granted["granted_at"]
+    assert service.grants(store)["grants"] == [granted]
+    assert not calls
 
-    authorized = {**_PUBLIC_DRAFT, "token": preview["token"]}
-    saved = service.draft(store, authorized)
-    assert saved["id"] == _ID and saved["items"][0]["status"] == "confirm_scope"
-    assert saved["items"][0]["formal"] == normalized["formal"]
-    with pytest.raises(workbench_intake.IntakeError, match="intake.release_stale"):
-        service.draft(store, authorized)
-    assert calls == [preview["outgoing"]]
+    # Two imports after one grant: no preview, token or confirmation in between.
+    for _ in range(2):
+        saved = service.draft(store, _PUBLIC_DRAFT)
+        assert saved["id"] == _ID and saved["items"][0]["status"] == "confirm_scope"
+        assert saved["items"][0]["formal"] == normalized["formal"]
+    assert calls == [outgoing_expected, outgoing_expected]
+    assert len(_records(tmp_path, "workbench_intake_grant")) == 1
 
 
-def test_legacy_lean_extraction_keeps_model_form_until_explicit_review(monkeypatch):
-    candidate = {"kind": "theorem", "natural": _NOTES.strip(), "formal": {"lean": "True"}}
-    reply = SimpleNamespace(output={"items": [candidate]})
-    monkeypatch.setattr(intake.ModelConfig, "from_env", lambda *args, **kwargs: object())
-    monkeypatch.setattr(intake, "complete_structured", lambda *args: reply)
-    _, items = intake._extract({**_DRAFT, "sensitivity": "public"})
-    assert items == [{**candidate, "origin": "model"}]
+def test_public_intake_without_a_grant_never_calls_the_model(monkeypatch, tmp_path, public_intake):
+    service, _, store = public_intake
+    monkeypatch.setattr(intake, "draft", lambda *args, **kwargs: pytest.fail("unexpected public call"))
+    with pytest.raises(workbench_intake.IntakeError, match="intake.authorization_required"):
+        service.draft(store, _PUBLIC_DRAFT)
+    service.grant(store, _GRANT)
+    assert service.revoke(store, _GRANT) == {"connection_id": _CONNECTION_ID, "revoked": True}
+    assert service.grants(store) == {"grants": []}
+    with pytest.raises(workbench_intake.IntakeError, match="intake.authorization_required"):
+        service.draft(store, _PUBLIC_DRAFT)
+    assert not _records(tmp_path, "workbench_public_intake")
 
 
-@pytest.mark.parametrize("change", ["notes", "objective", "title", "workspace", "researcher", "model"])
-def test_changed_public_intake_requires_a_new_preview(monkeypatch, tmp_path, public_intake, change):
+@pytest.mark.parametrize("change", ["workspace", "model"])
+def test_a_grant_covers_only_its_project_and_exact_connection(monkeypatch, tmp_path, public_intake, change):
     service, settings, store = public_intake
-    preview = service.preview(store, _PUBLIC_DRAFT)
-    request = {**_PUBLIC_DRAFT, "token": preview["token"]}
+    service.grant(store, _GRANT)
     if change == "workspace":
         store.workspace_id = UUID(_GOAL_ID)
-    elif change == "researcher":
-        store.local_user = lambda: {"id": UUID(_ID)}
-    elif change == "model":
-        settings.update(provider="claude-code", fingerprint="route revision two")
     else:
-        request[change] += " changed"
+        settings.update(provider="claude-code", fingerprint="route revision two")
     monkeypatch.setattr(intake, "draft", lambda *args, **kwargs: pytest.fail("unexpected public call"))
-    with pytest.raises(workbench_intake.IntakeError, match="intake.release_stale"):
-        service.draft(store, request)
-    assert not list(tmp_path.iterdir())
+    with pytest.raises(workbench_intake.IntakeError, match="intake.authorization_required"):
+        service.draft(store, _PUBLIC_DRAFT)
+    assert service.grants(store) == {"grants": []}
 
 
 def test_public_intake_rejects_restricted_input_or_unbound_identity(monkeypatch, public_intake):
     service, _, store = public_intake
+    service.grant(store, _GRANT)
     monkeypatch.setattr(intake, "draft", lambda *args, **kwargs: pytest.fail("unexpected public call"))
     with pytest.raises(workbench_intake.IntakeError, match="intake.invalid_input"):
-        service.preview(store, {**_PUBLIC_DRAFT, "sensitivity": "restricted"})
+        service.draft(store, {**_PUBLIC_DRAFT, "sensitivity": "restricted"})
     store.local_user = lambda: None
     with pytest.raises(workbench_intake.IntakeError, match="intake.identity_required"):
-        service.preview(store, _PUBLIC_DRAFT)
+        service.draft(store, _PUBLIC_DRAFT)
+    with pytest.raises(workbench_intake.IntakeError, match="intake.identity_required"):
+        service.grant(store, _GRANT)
 
 
-def test_public_intake_reports_a_removed_connection_without_calling_the_model(monkeypatch, public_intake):
+def test_a_removed_connection_cannot_be_granted(monkeypatch, public_intake):
     service, _, store = public_intake
-    monkeypatch.setattr(intake, "draft", lambda *args, **kwargs: pytest.fail("unexpected public call"))
     with pytest.raises(workbench_intake.IntakeError, match="connection.missing"):
-        service.preview(store, {**_PUBLIC_DRAFT, "connection_id": _GOAL_ID})
+        service.grant(store, {"connection_id": _GOAL_ID})
 
 
-def test_public_intake_fails_without_retrying_or_releasing_the_same_preview(monkeypatch, tmp_path, public_intake):
+def test_a_failed_public_call_keeps_its_authorization_and_is_not_retried(monkeypatch, tmp_path, public_intake):
     service, _, store = public_intake
-    preview = service.preview(store, _PUBLIC_DRAFT)
+    service.grant(store, _GRANT)
     attempts = []
 
     def timeout(*args, **kwargs):
@@ -318,13 +335,10 @@ def test_public_intake_fails_without_retrying_or_releasing_the_same_preview(monk
         raise ModelFailure("timeout", "Detailed error stays out of the workbench")
 
     monkeypatch.setattr(intake, "draft", timeout)
-    authorized = {**_PUBLIC_DRAFT, "token": preview["token"]}
     with pytest.raises(workbench_intake.IntakeError, match="connection.timeout"):
-        service.draft(store, authorized)
-    with pytest.raises(workbench_intake.IntakeError, match="intake.release_stale"):
-        service.draft(store, authorized)
-    audit_file, = tmp_path.iterdir()
-    assert json.loads(audit_file.read_text())["token"] == preview["token"]
+        service.draft(store, _PUBLIC_DRAFT)
+    authorization, = _records(tmp_path, "workbench_public_intake")
+    assert authorization["visibility"] == "public" and authorization["grant"]
     assert attempts == [1]
 
 
@@ -335,15 +349,24 @@ def test_public_intake_fails_without_retrying_or_releasing_the_same_preview(monk
 ])
 def test_public_intake_sanitizes_provider_failure(monkeypatch, public_intake, code, expected):
     service, _, store = public_intake
-    preview = service.preview(store, _PUBLIC_DRAFT)
+    service.grant(store, _GRANT)
 
     def reject(*args, **kwargs):
         raise ModelFailure(code, "Detailed response stays out of the workbench")
 
     monkeypatch.setattr(intake, "draft", reject)
     with pytest.raises(workbench_intake.IntakeError) as failure:
-        service.draft(store, {**_PUBLIC_DRAFT, "token": preview["token"]})
+        service.draft(store, _PUBLIC_DRAFT)
     assert str(failure.value) == expected
+
+
+def test_legacy_lean_extraction_keeps_model_form_until_explicit_review(monkeypatch):
+    candidate = {"kind": "theorem", "natural": _NOTES.strip(), "formal": {"lean": "True"}}
+    reply = SimpleNamespace(output={"items": [candidate]})
+    monkeypatch.setattr(intake.ModelConfig, "from_env", lambda *args, **kwargs: object())
+    monkeypatch.setattr(intake, "complete_structured", lambda *args: reply)
+    _, items = intake._extract({**_DRAFT, "sensitivity": "public"})
+    assert items == [{**candidate, "origin": "model"}]
 
 
 def test_public_draft_review_requires_the_saved_authorization(monkeypatch, tmp_path):

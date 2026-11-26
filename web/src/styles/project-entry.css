@@ -324,3 +324,91 @@
   pointer-events: none;
   box-shadow: var(--elevation-float);
 }
+
+/* #355: importing starts from the material; everything else is under Advanced options. */
+.import-file-input {
+  display: none;
+}
+.import-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 20px;
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 40%, var(--hair));
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+.import-drop-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--type-body-size);
+  font-weight: var(--type-medium);
+}
+.import-drop-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.import-source {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-card);
+  background: var(--node);
+}
+.import-source-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: var(--type-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-source-size {
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}
+.import-source .conversation-text-action {
+  margin-inline-start: auto;
+}
+.import-model {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+  color: var(--sub);
+  font-size: var(--type-control-size);
+}
+.import-grant {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--hair));
+  border-radius: var(--radius-card);
+  background: var(--accent-wash);
+}
+.import-grant p {
+  margin: 0;
+  color: var(--ink);
+}
+.import-advanced-toggle {
+  align-self: flex-start;
+  justify-self: start;
+}
+.import-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--hair);
+}
+.team-secondary.model-connection-grant {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}

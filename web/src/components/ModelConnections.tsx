@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef, useState, type FormEvent } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client";
+import { useIntakeGrantChange, useIntakeGrants } from "../api/intakeGrants";
 import {
   API_MODEL_PROVIDERS,
   connectionLabel,
@@ -105,6 +106,8 @@ export function ModelConnections({ session, onClose }: { session: string; onClos
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
   const connections = useModelConnections(session);
+  const grants = useIntakeGrants(session);
+  const grantChange = useIntakeGrantChange(session);
   const [adding, setAdding] = useState<"native" | "api" | null>(inDialog ? "native" : null);
   const [pending, setPending] = useState(false);
   const [removing, setRemoving] = useState("");
@@ -181,6 +184,7 @@ export function ModelConnections({ session, onClose }: { session: string; onClos
   }
 
   const list = connections.data?.connections ?? [];
+  const grantedIds = new Set((grants.data?.grants ?? []).map((grant) => grant.connection_id));
   const discovered = native.data?.providers ?? [];
   const Container = inDialog ? "div" : "section";
   const FormHeading = inDialog ? "h3" : "h4";
@@ -229,6 +233,20 @@ export function ModelConnections({ session, onClose }: { session: string; onClos
                       {t(`modelConnections.status.${connection.status}`, {
                         defaultValue: errorMessage(connection.status),
                       })}
+                      {grantedIds.has(connection.id) && (
+                        <span className="team-secondary model-connection-grant">
+                          {t("modelConnections.allowed")}
+                          <button
+                            type="button"
+                            className="conversation-text-action"
+                            aria-label={t("modelConnections.withdrawLabel", { model: label })}
+                            disabled={grantChange.isPending}
+                            onClick={() => grantChange.mutate({ action: "revoke", connectionId: connection.id })}
+                          >
+                            {t("modelConnections.withdraw")}
+                          </button>
+                        </span>
+                      )}
                     </td>
                     <td>
                       <div className="choices team-model-actions">
