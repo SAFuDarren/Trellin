@@ -32,6 +32,9 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
+    /* #349: actions are a light neutral on dark, so the pale accent keeps meaning selection and focus. */
+    --action-fill: #e6e6e6;
+    --action-label: #191919;
     --elevation-float: 0 1px 2px rgb(0 0 0 / 30%), 0 10px 28px rgb(0 0 0 / 42%);
     --elevation-dialog: 0 2px 8px rgb(0 0 0 / 36%), 0 20px 64px rgb(0 0 0 / 56%);
   }

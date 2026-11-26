@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.138
+
+- In the dark theme, primary actions such as **New claim**, **Approve and next** and **Handle** are a light neutral with dark text instead of the pale blue that marks selection and focus. The light theme keeps its navy actions.
+- The project tile at the top of the rail is the brand navy with a white letter in both themes.
+
 ## 1.0.137
 
 - **Review** becomes **Decision records**: the decisions you and others recorded, newest first, with who decided, the reason and when. It covers results approved or returned, starting scopes confirmed and claims frozen, withdrawn or restored, filters by kind, and opens a decision's claim. It no longer lists waiting items beside Needs you, and an item still opens on its own page from Needs you.
