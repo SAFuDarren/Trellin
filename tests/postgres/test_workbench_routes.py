@@ -176,6 +176,8 @@ def test_workbench_canvas_links_leave_recorded_proof_dependencies_intact(workben
             for item in project_claims[:100]] == recent_claims
     assert all(item["obligations"] == {"verified": 0, "total": 0} for item in project_claims)
     before = _request(server, "GET", f"/api/graph?claim={claim}")
+    # #356: the graph carries the claim's ledger; a claim without Lean history has an empty one.
+    assert before["ledger"] == {"lemmas": [], "tried_routes": [], "counts": {"lemmas": 0, "tried_routes": 0}}
     absent = {"action": "link", "source": claim, "target": str(uuid4())}
     assert _request(server, "POST", endpoint, body=absent, status=409) == {"error": "project_canvas.missing"}
     source, target = sorted((claim, other))

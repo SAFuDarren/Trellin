@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from research_multiplier import general_lean, lean_parameters
-from research_multiplier.workflows import claim_references
+from research_multiplier.workflows import claim_references, proof_ledger
 
 
 _CURRENT_PACKET = """
@@ -345,8 +345,10 @@ def _snapshot(row):
         focus = blockers[0]["node_id"] if blockers else root_id
     claim = {key: row[key] for key in ("title", "statement", "status", "domain")}
     claim.update(id=str(row["id"]), statement_id=row["lean"]["id"] if row["lean"] else None)
+    # #356: what earlier rounds left behind, from the same rows the graph is drawn from.
+    ledger = proof_ledger.summarize(row["lemmas"], row["reductions"], advance.get("attempts") or ())
     return {
-        "claim": claim, "nodes": list(nodes.values()), "focus_id": focus, "blockers": blockers,
+        "claim": claim, "nodes": list(nodes.values()), "focus_id": focus, "blockers": blockers, "ledger": ledger,
         "edges": [edge for (source, target, _), edge in edges.items() if source in nodes and target in nodes],
     }
 

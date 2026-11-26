@@ -12,6 +12,7 @@ import type { ImpactEntry, ImpactPreview } from "../workbench/types";
 import { ClaimProgressSummary, claimProgressText } from "./ClaimProgress";
 import { ClaimReviewLinks } from "./ClaimReviewLinks";
 import { Mark } from "./Icons";
+import { ProofLedger } from "./ProofLedger";
 import { reviewItemHref, reviewLinkLabel, reviewOptions } from "../shell/reviewItems";
 
 const REFERENCE_KEYS = [
@@ -160,6 +161,7 @@ export function ReviewPanel(props: Props) {
         )}
         <NodeDetail {...props} />
       </section>
+      {graph && !isImpact && <ProofLedger graph={graph} onSelect={props.onSelect} />}
       {props.children}
     </aside>
   );

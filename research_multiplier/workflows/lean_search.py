@@ -15,6 +15,7 @@ from ..policy.lean_search_scope import (
     authorize_model_dispatch, load_local_search_scope, load_model_search_scope,
 )
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
+from . import proof_ledger
 from ..proof import lean_decomposition, lean_proof_search, lean_reductions, lean_search_session, lean_working_reuse
 from ..proof.lean_blueprint import _proof, _under_scope
 from ..proof.lean_search_proposals import validate_proposal as _candidate
@@ -220,10 +221,8 @@ def _request(store, artifacts, subject, key, context, index, history, known, dis
     if ranked and route_attempts:
         failures = []
         for row in reversed(route_attempts):
-            failure = dict(row)
-            if "proposition" in failure:
-                failure["proposition"] = failure["proposition"][:400]
-            failures.append(failure)
+            # #356: the claim's ledger reads route attempts through the same function.
+            failures.append(proof_ledger.route_failure(row))
             if len(json_text({**base, "route_failures": failures}).encode("utf-8")) > MAX_REQUEST_BYTES:
                 failures.pop()
             if len(failures) == 6:

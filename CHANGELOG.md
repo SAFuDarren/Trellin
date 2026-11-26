@@ -1,5 +1,10 @@
 # Changes
 
+## 1.0.142
+
+- A claim's inspector shows its **Verified ledger**: checked lemmas that earlier proof rounds left behind, with the route that used each one or **Not used yet**, and **Tried routes**, the directions whose closing proof Lean rejected, whose obligation was refuted or that need recheck, with where each stopped and why. Entries on the graph select their node.
+- The ledger is built from the records the proof graph already reads, and `GET /api/graph` returns it as `ledger`. The next proof round reads route failures through the same function, so the researcher and the model see one account. No migration.
+
 ## 1.0.141
 
 - Importing is one step: choose or drop a file (or paste text), and **Organize**. The dialog names the file, its size and the model that will read it; the title comes from the file name and the model is the one last used for the project. Title, model, research objective and the text are under **Advanced options**, remembered per project. Without a usable model, one line links to model connections. The native file chooser is gone.

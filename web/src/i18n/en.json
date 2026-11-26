@@ -1994,5 +1994,24 @@
     "choose": "Choose file…",
     "newTheorem": "New theorem…",
     "release": "Drop to import"
+  },
+  "ledger": {
+    "title": "Verified ledger",
+    "lemmas_one": "Checked lemma · {{count}}",
+    "lemmas_other": "Checked lemmas · {{count}}",
+    "routes_one": "Tried route · {{count}}",
+    "routes_other": "Tried routes · {{count}}",
+    "usedBy_one": "Used by route {{routes}}",
+    "usedBy_other": "Used by routes {{routes}}",
+    "unused": "Not used yet; later rounds can use it",
+    "stuckAt": "Stopped at",
+    "more_one": "{{count}} more not shown",
+    "more_other": "{{count}} more not shown",
+    "status": {
+      "closure_rejected": "Lean rejected the closing proof",
+      "refuted_obligation": "An obligation was refuted",
+      "route_refuted": "Route refuted",
+      "needs_recheck": "Needs recheck"
+    }
   }
 }
