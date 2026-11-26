@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { boardLayout } from "./claims-display";
 
 // #345: Needs you is the one list of waiting items, and an item opens in a window floating over the board.
 
@@ -71,24 +72,25 @@ test("an item opens floating over the board, which keeps its width and shows the
   await openWork(page, []);
   const board = page.locator(".research-lanes");
   const before = (await board.boundingBox())!;
-  const cardWidths = () => page.locator(".lane-card").evaluateAll((cards) => cards.map((card) => card.clientWidth));
-  const widths = await cardWidths();
+  const layout = () => boardLayout(page);
+  const resting = await layout();
   const row = needsYou(page).locator(".waiting-row").first();
   await row.hover();
   await row.getByRole("button", { name: "Handle" }).click();
   await expect(floating(page)).toBeVisible();
   const after = (await board.boundingBox())!;
   expect(after.width).toBe(before.width);
-  // No column narrows or rewraps its cards when the window opens.
-  expect(await cardWidths()).toEqual(widths);
+  // #351: nothing on the board moves, narrows or scrolls when the window opens.
+  expect(await layout()).toEqual(resting);
   // The window sits below the page header, which stays usable.
   const head = (await page.locator(".section-main .page-head").first().boundingBox())!;
   const window = (await floating(page).boundingBox())!;
   expect(window.y).toBeGreaterThanOrEqual(head.y + head.height);
   await expect(page.getByRole("button", { name: "New claim" })).toBeEnabled();
-  // The claim the item belongs to is marked and scrolled clear of the window.
+  // The claim the item belongs to is marked, and the board scrolls by hand until it is clear of the window.
   const card = page.locator('.lane-card[data-open="true"]');
   await expect(card).toHaveCount(1);
+  await board.evaluate((element) => (element.scrollLeft = element.scrollWidth));
   const box = (await card.boundingBox())!;
   expect(box.x + box.width).toBeLessThanOrEqual(window.x);
   await page.keyboard.press("Escape");

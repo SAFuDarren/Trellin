@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { boardLayout } from "./claims-display";
 import { railSpace } from "./navigation";
 
 // #326: the Work panel lists what waits for you in one row style, and a side panel opens items large
@@ -139,19 +140,19 @@ async function withLongLean(page: Page) {
   });
 }
 
-test("a claim opens in a window floating over the board, which keeps its width and shows the claim beside it", async ({
-  page,
-}) => {
+test("a claim opens in a window floating over the board, which stays where it was", async ({ page }) => {
   await openWork(page);
   const board = page.locator(".research-lanes");
-  const before = (await board.boundingBox())!.width;
+  const resting = await boardLayout(page);
   const card = page.locator(".lane-card").first();
   await card.locator(".lane-card-toggle").click();
   await expect(peek(page)).toBeVisible();
-  // #345: the board keeps its layout under the window; the opened claim is scrolled clear of it.
-  expect((await board.boundingBox())!.width).toBe(before);
+  // #351: the board does not move under the window; the opened claim is marked, and scrolls clear by hand.
+  expect(await boardLayout(page)).toEqual(resting);
   const window = (await page.locator(".work-peek-float").boundingBox())!;
   expect(window.width).toBeCloseTo(560, -1);
+  await expect(page.locator('.lane-card[data-open="true"]')).toHaveCount(1);
+  await board.evaluate((element) => (element.scrollLeft = element.scrollWidth));
   const opened = (await page.locator('.lane-card[data-open="true"]').boundingBox())!;
   expect(opened.x + opened.width).toBeLessThanOrEqual(window.x);
   await page.keyboard.press("Escape");
