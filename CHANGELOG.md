@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.139
+
+- Opening, stepping through or closing the floating window no longer moves the Work board. It used to scroll the open claim's card beside the window, which slid cards under the pinned domain column and cut off their titles. The claim stays marked, and the board scrolls by hand to bring a card out from under the window.
+
 ## 1.0.138
 
 - In the dark theme, primary actions such as **New claim**, **Approve and next** and **Handle** are a light neutral with dark text instead of the pale blue that marks selection and focus. The light theme keeps its navy actions.

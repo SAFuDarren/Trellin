@@ -10,3 +10,14 @@ export async function startOnStatusBoard(page: Page) {
     localStorage.setItem("trellin.claims.display", JSON.stringify({ layout: "board" }));
   });
 }
+
+/** Where the board is scrolled to and where each card sits, to show that opening the window moves nothing. */
+export async function boardLayout(page: Page) {
+  return page.locator(".research-lanes").evaluate((board) => ({
+    scroll: [board.scrollLeft, board.scrollTop],
+    cards: [...board.querySelectorAll(".lane-card, .lane-row")].map((card) => {
+      const box = card.getBoundingClientRect();
+      return [Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)];
+    }),
+  }));
+}
