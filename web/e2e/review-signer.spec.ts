@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openAddEntry, THEOREM_ENTRY } from "./project-map";
 
 // #328: a project database with a local identity signs decisions as its researcher, so Review and
 // the confirmation forms never ask for a name. Databases without an identity still ask (see
@@ -58,7 +59,7 @@ test("an identity without a bound workspace signs the older review route with th
   });
 });
 
-test("Add theorem confirms a goal as the bound researcher", async ({ page }) => {
+test("New theorem confirms a goal as the bound researcher", async ({ page }) => {
   let sent: Record<string, unknown> | null = null;
   await withIdentity(page, WORKSPACE);
   await page.route("**/api/theorems", async (route) => {
@@ -70,7 +71,7 @@ test("Add theorem confirms a goal as the bound researcher", async ({ page }) => 
     await route.fulfill({ status: 400, json: { error: { code: "theorem.invalid_input", message: "stop" } } });
   });
   await page.goto("/#session=fixture");
-  await page.getByRole("button", { name: "Add theorem" }).click();
+  await openAddEntry(page, THEOREM_ENTRY);
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText(`Recorded by ${SIGNER}`, { exact: true })).toBeVisible();
   await expect(dialog.getByLabel("Your name")).toHaveCount(0);

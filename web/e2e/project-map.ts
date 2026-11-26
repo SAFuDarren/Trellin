@@ -25,3 +25,22 @@ export async function openProof(page: Page, title = FIXTURE_CLAIM_TITLE, label =
   await mapClaim(page, title).click();
   await clickInspectorAction(page, label);
 }
+
+export const ADD_MENU = "Add to project";
+export const IMPORT_ENTRY = "Paper, notes or code…";
+export const THEOREM_ENTRY = "New theorem…";
+export const IMPORT_DIALOG = "Import paper, notes or code";
+export const THEOREM_DIALOG = "New theorem";
+
+/** #353: open one of the project map's Add menu entries. */
+export async function openAddEntry(page: Page, entry: string) {
+  await page.locator("#workbench .page-actions").getByRole("button", { name: ADD_MENU, exact: true }).click();
+  await page
+    .getByRole("menu", { name: ADD_MENU })
+    .getByRole("menuitem", { name: new RegExp(`^${escape(entry)}`) })
+    .click();
+}
+
+function escape(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

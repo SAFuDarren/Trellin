@@ -24,7 +24,14 @@ import { ReviewPanel } from "./components/ReviewPanel";
 import { PageHead } from "./components/SectionLayout";
 import { Splitter } from "./components/Splitter";
 import { href, parseWorkbenchAddress, workbenchSub, type AddressMode, type WorkbenchAddress } from "./shell/route";
-import { graphAction, graphCopyActions, type ProjectAction, type ProjectActionRequest } from "./workbench/actions";
+import {
+  graphAction,
+  graphCopyActions,
+  type ProjectAction,
+  type ProjectActionRequest,
+  type ProjectDialog,
+} from "./workbench/actions";
+import { MapDrop, draggingFiles } from "./components/project/MapDrop";
 import type { InboxItem } from "./api/sections";
 import type { ClaimProgress } from "./workbench/claimProgress";
 import { desktopPosition, saveDesktopPosition, type DesktopPosition } from "./workbench/desktop";
@@ -126,7 +133,9 @@ export function Workbench({
   const [recordedGoal, setRecordedGoal] = useState<string | null>(null);
   const [allNodes, setAllNodes] = useState(false);
   const [premiseDialog, setPremiseDialog] = useState<{ id?: string } | null>(null);
-  const [projectAction, setProjectAction] = useState<ProjectAction | null>(null);
+  const [projectAction, setProjectAction] = useState<ProjectDialog | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [droppingFile, setDroppingFile] = useState(false);
   const [contextClaim, setContextClaim] = useState<string | null>(null);
   const [copyNotice, setCopyNotice] = useState<{ id: number; copied: boolean }>();
   const [linkFeedback, setLinkFeedback] = useState<{ session: string; removed: ResearchLink | null }>();
@@ -199,7 +208,13 @@ export function Workbench({
 
   const openProjectAction = useCallback((id: ProjectAction) => {
     if (id === "proof-task") setDetailsOpen(true);
+    if (id === "organize-research") setImportFile(null);
     setProjectAction(id);
+  }, []);
+  /** #353: a file dropped on the map or chosen from its empty state opens the import with it. */
+  const importDropped = useCallback((file: File) => {
+    setImportFile(file);
+    setProjectAction("organize-research");
   }, []);
 
   useEffect(() => {
@@ -496,6 +511,31 @@ export function Workbench({
       void copy(text);
     });
 
+  /** #353: claim-scoped research work, moved here from the map header's former Research actions menu. */
+  function researchActions(id: string, scope: Graph | null, unavailable?: string): FloatingOption[] {
+    const review = scope?.claim.premise_review;
+    const premises = Boolean(review && (review.available || review.proposals.length > 0));
+    const lemmas = Boolean(scope && lemmaPlanScope?.claimId === id);
+    return [
+      graphAction(
+        t,
+        "lemma-plan",
+        lemmas ? () => setProjectAction("lemma-plan") : undefined,
+        lemmas ? undefined : scope ? t("lemmaPlan.unavailable") : unavailable,
+      ),
+      graphAction(
+        t,
+        "premises",
+        premises ? () => setPremiseDialog({}) : undefined,
+        premises ? undefined : scope ? t("premise.unavailable") : unavailable,
+      ),
+      // Short codes need a database that records them, as in the palette.
+      ...(scope?.claim.code || claims.data?.claim_codes
+        ? [graphAction(t, "research-references", () => openProjectAction("research-references"))]
+        : []),
+    ];
+  }
+
   function claimActions(id: string, link: FloatingOption, move: FloatingOption): FloatingGroup[] {
     const scope = graph?.claim.id === id ? graph : null;
     const target = scope ? goal : undefined;
@@ -522,6 +562,7 @@ export function Workbench({
           move,
         ],
       },
+      { options: researchActions(id, scope, unavailable) },
       { options: copyActions(target, unavailable) },
       {
         options: [
@@ -590,7 +631,8 @@ export function Workbench({
     : claims.data
       ? t("sidebar.connected", { count: mapClaims.length })
       : t("sidebar.connecting");
-  const actionsClaim = showReview || proofOpen ? graph?.claim : undefined;
+  // The selected claim's graph: dialogs opened from its context menu act on it even with details closed.
+  const actionsClaim = graph?.claim.id === claimId ? graph?.claim : undefined;
   const lean = goal?.reference;
   const lemmaPlanScope =
     actionsClaim?.lemma_plan_ready &&
@@ -661,17 +703,17 @@ export function Workbench({
               session={session}
               claimId={(projectAction === "proof-task" ? claimId : actionsClaim?.id) ?? null}
               claimCode={actionsClaim?.code}
-              claimCodesAvailable={Boolean(claims.data?.claim_codes)}
               lemmaPlanScope={lemmaPlanScope}
               claimTitle={actionsClaim?.title ?? ""}
               premiseReview={actionsClaim?.premise_review}
               premiseDialog={premiseDialog}
               projectAction={projectAction}
+              importFile={importFile}
               onProjectAction={openProjectAction}
-              onOpenPremises={(id) => setPremiseDialog({ id })}
               onClose={() => {
                 setPremiseDialog(null);
                 setProjectAction(null);
+                setImportFile(null);
               }}
               onPremiseRecorded={openRecorded}
               onRecorded={openRecorded}
@@ -708,7 +750,32 @@ export function Workbench({
               </div>
             )}
             <div className="workbench-surfaces" data-proof-open={proofOpen}>
-              <section className="graph-area project-map-area" inert={proofOpen}>
+              <section
+                className="graph-area project-map-area"
+                inert={proofOpen}
+                data-dropping={droppingFile || undefined}
+                onDragOver={(event) => {
+                  if (proofOpen || !draggingFiles(event)) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "copy";
+                  setDroppingFile(true);
+                }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDroppingFile(false);
+                }}
+                onDrop={(event) => {
+                  if (!draggingFiles(event)) return;
+                  event.preventDefault();
+                  setDroppingFile(false);
+                  const file = event.dataTransfer.files[0];
+                  if (file) importDropped(file);
+                }}
+              >
+                {droppingFile && (
+                  <p className="map-drop-release" aria-hidden="true">
+                    {t("mapDrop.release")}
+                  </p>
+                )}
                 <ProjectCanvas
                   claims={mapClaims}
                   claimProgress={claimProgress}
@@ -731,6 +798,7 @@ export function Workbench({
                   onLayout={applyCanvas}
                   layoutUnavailable={canvas.loading || Boolean(canvas.loadError)}
                   saving={canvas.saving}
+                  empty={<MapDrop onFile={importDropped} onNewTheorem={() => openProjectAction("add-theorem")} />}
                 />
               </section>
               {proofOpen && (

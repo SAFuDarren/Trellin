@@ -13,7 +13,7 @@ The graph and activity view require database revision `0069`. Local-model guidan
 
 ## Start a research project
 
-**Research actions → Organize with AI** and **Add theorem** are available before the first claim. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
+The project map's **+** button (**Add to project**), with **Paper, notes or code…** and **New theorem…**, is available before the first claim, and an empty map takes a dropped file. See [Project intake and theorem entry](project-intake.md) for local model setup and human review.
 
 ## Switch between the graph and Review
 
@@ -37,7 +37,7 @@ The panel shows the proof task state, selected model, reported model usage, open
 
 ## Verify local lemmas
 
-Select a claim with a confirmed Lean statement and choose **Research actions → Local lemmas**. The panel shows the exact destination and statement version. Paste a version 1 [structured lemma plan](lean-core.md#derive-and-reuse-local-lemmas) containing intermediate nodes, then choose **Verify lemma plan**. Use the same local Lean runtime and project database configuration as `lean derive`. The proof graph shows each verified lemma, including any that passed before a later node failed.
+Right-click a claim with a confirmed Lean statement on the project map and choose **Local lemmas**. The panel shows the exact destination and statement version. Paste a version 1 [structured lemma plan](lean-core.md#derive-and-reuse-local-lemmas) containing intermediate nodes, then choose **Verify lemma plan**. Use the same local Lean runtime and project database configuration as `lean derive`. The proof graph shows each verified lemma, including any that passed before a later node failed.
 
 For example, if the frozen scope assumes `True` and has the original goal `True ∧ True`, this plan derives an intermediate lemma directly from the premise.
 
@@ -51,7 +51,7 @@ Complete the frozen goal through the existing proof workflow.
 
 ## Propose a premise
 
-Choose **Research actions → Premises** in the selected Lean proof. Enter the proposed wording, its exact Lean proposition, the question to decide, and the expected impact. The pending item appears beside the current proof without adding a dependency. The interpretation review pauses new proof work on that scope. Reopen the project to continue the same review.
+Right-click the claim on the project map and choose **Premises**, or open a proposal from the inspector. Enter the proposed wording, its exact Lean proposition, the question to decide, and the expected impact. The pending item appears beside the current proof without adding a dependency. The interpretation review pauses new proof work on that scope. Reopen the project to continue the same review.
 
 Review the target, approved starting basis, and proposed premise before recording your reason. Reject the proposal to keep the current basis. Confirm the revised claim to approve the exact premise and freeze a separate claim with the same conclusion. The original claim retains its statement and proof history. Open the revised claim from the decision and use the ordinary [Lean statement review](lean-core.md) before proving it. Other pending interpretation questions must be resolved before confirming a revision. See [the condition workflow](research-goals.md#handle-a-questioned-condition).
 
@@ -133,7 +133,7 @@ eligible proof task, use **Queue proof note** once the panel shows an available
 recipient and explains how the note may be used. Saving a draft requires
 database revision `0082` or later.
 
-On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Use **Research actions → Research references** to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
+On database revision `0072` or later, a node reference such as `FLT-09` uses a saved claim prefix and a number assigned once. Right-click a claim and choose **Research references**, or find it in the command palette, to change a claim prefix or open a reference from your notes. The old prefix continues to resolve to the same claim and node. Choose an optional claim prefix when adding a goal by hand, or accept the program's default. Earlier databases show temporary graph labels until you run the normal workspace upgrade.
 
 A node whose recorded job is running shows the agent and the number of parallel jobs. The workbench also displays reasoning effort when the model attempt records it, for example `GPT-6.2 Sol xhigh`. A queued job shows a clock. The legend under the graph counts nodes by status and running or queued jobs. A claim-level marker covers work whose recorded job has no exact proof-node reference.
 

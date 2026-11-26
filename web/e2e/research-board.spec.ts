@@ -146,7 +146,7 @@ test("filters show as removable chips, search matches codes, and Display changes
   await expect(page.locator(".board-column")).not.toHaveCount(0);
 });
 
-test("New claim opens Add theorem", async ({ page }) => {
+test("New claim opens New theorem", async ({ page }) => {
   await board(page);
   await page.getByRole("button", { name: "New claim" }).click();
   await expect(page.getByRole("dialog").getByText("Destination · Current project graph")).toBeVisible();

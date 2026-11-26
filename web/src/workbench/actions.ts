@@ -8,6 +8,8 @@ type ActionDefinition = { label: string; icon: string; shortcut?: string; search
 const ACTIONS = {
   "add-theorem": { label: "projectEntry.addTheorem", icon: "add", shortcut: "Alt+N" },
   "organize-research": { label: "projectEntry.organize", icon: "organize" },
+  "lemma-plan": { label: "lemmaPlan.title", icon: "task" },
+  premises: { label: "premise.title", icon: "details" },
   "research-references": {
     label: "claimCodes.title",
     icon: "reference",
@@ -31,10 +33,23 @@ const ACTIONS = {
 type ActionId = keyof typeof ACTIONS;
 
 export type ProjectAction = "add-theorem" | "organize-research" | "research-references" | "proof-task";
+/** Dialogs the project map opens; local lemmas is reached only from a claim's context menu. */
+export type ProjectDialog = ProjectAction | "lemma-plan";
 export type ProjectActionRequest = { id: Exclude<ProjectAction, "proof-task"> } | { id: "proof-task"; claimId: string };
 
 export function graphActionLabel(t: TFunction, id: ActionId) {
   return t(ACTIONS[id].label);
+}
+
+const DIALOG_TITLES: Partial<Record<ActionId, string>> = {
+  "add-theorem": "projectEntry.addTheoremTitle",
+  "organize-research": "projectEntry.organizeTitle",
+};
+
+/** A dialog's heading: the action's label without the menu's trailing ellipsis. */
+export function graphDialogTitle(t: TFunction, id: ActionId) {
+  const title = DIALOG_TITLES[id];
+  return title ? t(title) : graphActionLabel(t, id);
 }
 
 export function graphActionShortcut(id: ActionId): string | undefined {

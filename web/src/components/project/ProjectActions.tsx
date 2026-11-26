@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { graphAction, graphActionLabel, type ProjectAction } from "../../workbench/actions";
+import { graphAction, graphDialogTitle, type ProjectAction, type ProjectDialog } from "../../workbench/actions";
 import type { PremiseReview } from "../../workbench/types";
-import { Menu, type FloatingOption } from "../FloatingControls";
-import { Chevron, WorkbenchIcon } from "../Icons";
+import { Menu } from "../FloatingControls";
+import { IconHint } from "../IconHint";
+import { WorkbenchIcon } from "../Icons";
 import { ClaimCodesPane } from "./ClaimCodesPane";
 import { IntakePane } from "./IntakePane";
 import { LemmaPlanPane, type LemmaPlanScope } from "./LemmaPlanPane";
@@ -12,26 +13,23 @@ import { ProofTaskPane } from "./ProofTaskPane";
 import { TheoremPane } from "./TheoremPane";
 import "../../styles/project-entry.css";
 
-const localCaptions = {
-  lemmas: "lemmaPlan.title",
-  premises: "premise.title",
-} as const;
+type Mode = ProjectDialog | "premises";
 
-type Mode = ProjectAction | keyof typeof localCaptions;
-
-/** Project actions and proof work scoped to the selected claim. */
+/**
+ * #353: the project map's one Add menu, and the dialogs it and a claim's context menu open.
+ * Claim-scoped work (lemmas, premises, proof task) is reached from the claim, not from here.
+ */
 export function ProjectActions({
   session,
   claimId,
   claimCode,
-  claimCodesAvailable,
   lemmaPlanScope,
   claimTitle,
   premiseReview,
   premiseDialog,
   projectAction,
+  importFile,
   onProjectAction,
-  onOpenPremises,
   onClose,
   onPremiseRecorded,
   onRecorded,
@@ -41,14 +39,14 @@ export function ProjectActions({
   session: string;
   claimId: string | null;
   claimCode?: string | null;
-  claimCodesAvailable: boolean;
   lemmaPlanScope: LemmaPlanScope | null;
   claimTitle: string;
   premiseReview?: PremiseReview;
   premiseDialog: { id?: string } | null;
-  projectAction: ProjectAction | null;
+  projectAction: ProjectDialog | null;
+  /** A file dropped on the map or chosen from its empty state, read into the import. */
+  importFile?: File | null;
   onProjectAction: (id: ProjectAction) => void;
-  onOpenPremises: (id?: string) => void;
   onClose: () => void;
   onPremiseRecorded: () => Promise<void>;
   onRecorded: (claimId?: string) => void | Promise<void>;
@@ -56,8 +54,7 @@ export function ProjectActions({
   onOpenReference: (claimId: string, nodeId: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const [showLemmas, setShowLemmas] = useState(false);
-  const mode: Mode | null = premiseDialog ? "premises" : (projectAction ?? (showLemmas ? "lemmas" : null));
+  const mode: Mode | null = premiseDialog ? "premises" : projectAction;
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useId();
 
@@ -65,64 +62,44 @@ export function ProjectActions({
     if (mode && dialog.current && !dialog.current.open) dialog.current.showModal();
   }, [mode]);
 
-  const addTheorem = graphAction(t, "add-theorem", () => onProjectAction("add-theorem"));
-  const researchActions: FloatingOption[] = [
-    graphAction(t, "organize-research", () => onProjectAction("organize-research")),
+  const addOptions = [
+    {
+      ...graphAction(t, "organize-research", () => onProjectAction("organize-research")),
+      detail: t("projectEntry.dropHint"),
+    },
+    graphAction(t, "add-theorem", () => onProjectAction("add-theorem")),
   ];
-  if (lemmaPlanScope)
-    researchActions.push({ id: "lemmas", label: t(localCaptions.lemmas), onSelect: () => setShowLemmas(true) });
-  if (premiseReview && (premiseReview.available || premiseReview.proposals.length > 0))
-    researchActions.push({ id: "premises", label: t(localCaptions.premises), onSelect: () => onOpenPremises() });
-  if (claimCode || claimCodesAvailable)
-    researchActions.push(graphAction(t, "research-references", () => onProjectAction("research-references")));
 
   return (
     <div className="project-actions">
-      <button
-        className="button primary project-add-theorem"
-        type="button"
-        aria-label={addTheorem.label}
-        title={addTheorem.label}
-        onClick={addTheorem.onSelect}
-      >
-        <WorkbenchIcon name="add" />
-        <span>{addTheorem.label}</span>
-      </button>
-      <Menu
-        label={t("canvasShell.researchActions")}
-        trigger={
-          <>
-            <WorkbenchIcon name="organize" />
-            <span>{t("canvasShell.researchActions")}</span>
-            <Chevron />
-          </>
-        }
-        triggerClassName="button workbench-actions-trigger"
-        className="workbench-actions-items"
-        placement="bottom-end"
-        groups={[{ options: researchActions }]}
-      />
-      <dialog
-        ref={dialog}
-        className="project-entry"
-        aria-labelledby={title}
-        onClose={() => {
-          setShowLemmas(false);
-          onClose();
-        }}
-      >
+      <IconHint label={t("projectEntry.addTo")}>
+        <Menu
+          label={t("projectEntry.addTo")}
+          trigger={<WorkbenchIcon name="add" />}
+          triggerClassName="button map-view-toggle project-add-trigger"
+          className="workbench-actions-items"
+          placement="bottom-end"
+          groups={[{ options: addOptions }]}
+        />
+      </IconHint>
+      <dialog ref={dialog} className="project-entry" aria-labelledby={title} onClose={onClose}>
         {mode && (
           <>
             <header className="project-entry-head">
-              <h2 id={title}>
-                {mode === "premises" || mode === "lemmas" ? t(localCaptions[mode]) : graphActionLabel(t, mode)}
-              </h2>
+              <h2 id={title}>{graphDialogTitle(t, mode)}</h2>
               <button className="button" type="button" onClick={() => dialog.current?.close()}>
                 {t("projectEntry.close")}
               </button>
             </header>
             <div className="project-entry-body">
-              {mode === "organize-research" && <IntakePane session={session} onRecorded={onRecorded} />}
+              {mode === "organize-research" && (
+                <IntakePane
+                  key={importFileKey(importFile)}
+                  session={session}
+                  file={importFile}
+                  onRecorded={onRecorded}
+                />
+              )}
               {mode === "add-theorem" && (
                 <TheoremPane
                   session={session}
@@ -137,7 +114,7 @@ export function ProjectActions({
                 />
               )}
               {mode === "proof-task" && claimId && <ProofTaskPane key={claimId} session={session} claimId={claimId} />}
-              {mode === "lemmas" &&
+              {mode === "lemma-plan" &&
                 (lemmaPlanScope ? (
                   <LemmaPlanPane key={lemmaPlanScope.statementId} session={session} scope={lemmaPlanScope} />
                 ) : (
@@ -176,4 +153,14 @@ export function ProjectActions({
       </dialog>
     </div>
   );
+}
+
+const fileKeys = new WeakMap<File, string>();
+let fileCount = 0;
+/** Remount the import for each new file so its title and text start from that file. */
+function importFileKey(file: File | null | undefined) {
+  if (!file) return "notes";
+  let key = fileKeys.get(file);
+  if (!key) fileKeys.set(file, (key = `file-${++fileCount}`));
+  return key;
 }

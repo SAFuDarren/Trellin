@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
@@ -15,6 +15,14 @@ import { ReviewFields } from "./ReviewFields";
 import { formalText, reviewIdentity, useReviewSigner } from "./review";
 
 const MAX_NOTES_BYTES = 18000;
+/** Text formats the import reads; PDF and other binaries wait for the material reader. */
+const TEXT_FILES = /\.(txt|md|markdown|tex|lean)$/i;
+const TEXT_ACCEPT = ".txt,.md,.markdown,.tex,.lean,text/plain,text/markdown";
+
+/** Whether a dropped or chosen file is one the import can read as text. */
+export function readableNotesFile(file: File) {
+  return TEXT_FILES.test(file.name) || file.type === "text/plain" || file.type === "text/markdown";
+}
 
 type Candidate = {
   id: string;
@@ -47,7 +55,16 @@ type ReleasePreview = {
 };
 type Decision = { action: "accept" | "omit"; reason: string; formal?: { lean: { proposition: string } } };
 
-export function IntakePane({ session, onRecorded }: { session: string; onRecorded: () => void }) {
+export function IntakePane({
+  session,
+  file,
+  onRecorded,
+}: {
+  session: string;
+  /** #353: a file dropped on the map; its text fills the notes and its name the title. */
+  file?: File | null;
+  onRecorded: () => void;
+}) {
   const { t } = useTranslation();
   const signer = useReviewSigner(session);
   const [notes, setNotes] = useState("");
@@ -112,20 +129,35 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
     },
   });
 
-  async function readFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!file) return;
+  const [title, setTitle] = useState(() => (file ? fileTitle(file) : t("projectEntry.intake.defaultTitle")));
+  async function load(source: File) {
     setFileError("");
-    if (file.size > MAX_NOTES_BYTES) {
+    if (!readableNotesFile(source)) {
+      setFileError(t("projectEntry.intake.unsupported"));
+      return;
+    }
+    if (source.size > MAX_NOTES_BYTES) {
       setFileError(t("projectEntry.intake.tooLarge"));
       return;
     }
     try {
-      setNotes(await file.text());
+      const text = await source.text();
+      if (text.includes("\u0000")) throw new Error("binary");
+      setNotes(text);
+      setTitle(fileTitle(source));
     } catch {
       setFileError(t("projectEntry.intake.fileError"));
     }
+  }
+  useEffect(() => {
+    if (file) void load(file);
+    // Read the dropped file once; the parent remounts this pane for another file.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
+  async function readFile(event: ChangeEvent<HTMLInputElement>) {
+    const source = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (source) await load(source);
   }
   function requestDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -238,7 +270,8 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
               {t("projectEntry.title")}
               <input
                 name="title"
-                defaultValue={t("projectEntry.intake.defaultTitle")}
+                value={title}
+                onChange={(event) => setTitle(event.currentTarget.value)}
                 maxLength={300}
                 required
                 disabled={working || Boolean(release)}
@@ -317,7 +350,7 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
             <input
               type="file"
               disabled={working || Boolean(release)}
-              accept=".txt,.md,.lean,text/plain,text/markdown"
+              accept={TEXT_ACCEPT}
               onChange={(event) => void readFile(event)}
             />
           </label>
@@ -391,4 +424,8 @@ export function IntakePane({ session, onRecorded }: { session: string; onRecorde
       )}
     </>
   );
+}
+
+function fileTitle(file: File) {
+  return file.name.replace(/\.[^.]+$/, "").slice(0, 300) || file.name.slice(0, 300);
 }

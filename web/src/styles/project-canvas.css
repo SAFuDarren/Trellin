@@ -45,10 +45,9 @@
   color: var(--ink);
 }
 
-.project-canvas-find {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* #353: tools at the start of the bar open their hint toward the canvas, not off its edge. */
+.project-canvas-tools > .map-view-control .map-view-hint {
+  inset-inline: 0 auto;
 }
 
 .map-view-toggles {
@@ -102,8 +101,13 @@
 }
 
 .map-view-control:hover .map-view-hint,
-.map-view-toggle:focus-visible + .map-view-hint {
+.map-view-control:has(.map-view-toggle:focus-visible) .map-view-hint {
   visibility: visible;
+}
+
+/* An open menu or picker replaces its hint. */
+.map-view-control:has([aria-haspopup][aria-expanded="true"]) .map-view-hint {
+  visibility: hidden;
 }
 
 .project-canvas-popover {

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { openAddEntry, THEOREM_ENTRY } from "./project-map";
 
 // Regression for #152: a fixed select height combined with vertical padding left
 // less room than one line of text, so the selected option was cut off.
@@ -58,16 +59,16 @@ async function openTeam(page: Page) {
   await page.locator("nav.rail").getByRole("link", { name: /^Team/ }).click();
 }
 
-test("Add theorem selects show their whole option and match the text fields", async ({ page }) => {
+test("New theorem selects show their whole option and match the text fields", async ({ page }) => {
   const errors = collectErrors(page);
   await page.route("**/api/theorems", (route) => route.fulfill({ json: { drafts: [] } }));
   await page.goto("/#session=fixture");
-  await page.getByRole("button", { name: "Add theorem" }).click();
+  await openAddEntry(page, THEOREM_ENTRY);
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Destination · Current project graph")).toBeVisible();
 
   const [kind] = await expectLegible(dialog);
-  if (!kind) throw new Error("No select in Add theorem");
+  if (!kind) throw new Error("No select in New theorem");
   expect(kind.label).toBe("Theorem to prove");
   // The dialog scales in (#163), so compare once both fields have settled.
   const title = dialog.getByLabel("Title", { exact: true });
