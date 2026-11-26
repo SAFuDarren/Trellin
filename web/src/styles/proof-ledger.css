@@ -1,0 +1,72 @@
+/* #356: a claim's verified ledger in the inspector. */
+.proof-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--hair);
+}
+.proof-ledger h3 {
+  margin: 0;
+  font-size: var(--type-section-title-size);
+  font-weight: var(--type-semibold);
+}
+.proof-ledger h4 {
+  margin: 6px 0 0;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+  font-weight: var(--type-semibold);
+}
+.proof-ledger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.proof-ledger-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-control);
+  background: var(--node);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+}
+button.proof-ledger-entry:hover {
+  background: var(--state-hover);
+}
+.proof-ledger-entry code {
+  font-family: var(--mono);
+  font-size: var(--type-meta-size);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.proof-ledger-entry small {
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+  overflow-wrap: anywhere;
+}
+.proof-ledger-status {
+  display: flex;
+  gap: 6px;
+  font-size: var(--type-control-size);
+  font-weight: var(--type-medium);
+}
+.proof-ledger-reason {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.proof-ledger-more {
+  margin: 0;
+  color: var(--sub);
+  font-size: var(--type-meta-size);
+}

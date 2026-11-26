@@ -7,6 +7,7 @@ import type {
   GraphEdge,
   GraphNode,
   GraphSnapshot,
+  ProofLedger,
   ImpactEntry,
   ImpactPreview,
 } from "./types";
@@ -39,6 +40,7 @@ export type Graph = {
   /** Durable codes from the server, or temporary labels on an older database. */
   codes: Map<string, string>;
   focusId: string | null;
+  ledger: ProofLedger | null;
 };
 
 function index(edges: Edge[]) {
@@ -131,6 +133,7 @@ export function buildGraph(snapshot: GraphSnapshot): Graph {
     evidenceAliases,
     statementId: snapshot.claim.statement_id ?? null,
     focusId: snapshot.focus_id ?? null,
+    ledger: snapshot.ledger ?? null,
     codes: nodeCodes(snapshot.claim, levels, nodes),
   };
 }

@@ -92,6 +92,10 @@ Opening a proof fits small graphs and starts large graphs at a readable zoom aro
 
 Select a node to read its full formula and Lean statement in the inspector. Running jobs appear as a spinner and count inside the node. With reduced motion enabled, the spinner stays still. The card outline marks selection. Hover over the activity badge or check the inspector for the recorded Agent and model. Open **Edge styles** to look up connection types. The footer shows labelled status counts. When the labels need more than two rows, open **Status** to read every count. Hover, focus or select a node to reveal its resize handle. Drag the handle or focus it and use the arrow keys.
 
+## Read the verified ledger
+
+When earlier proof rounds left something behind, the claim's inspector shows **Verified ledger** under the selected node. **Checked lemmas** lists each verified local lemma that is not a route's own implication, newest first, with the route that used it or **Not used yet** when a later round can still use it. **Tried routes** lists each route whose closing proof Lean rejected, whose obligation was refuted or that needs recheck, with the obligation where it stopped and the recorded reason. An entry whose node is on the graph selects it. The ledger reads the same records as the graph, and the next proof round receives the same lemmas and route failures, so the researcher and the model see one account. The ledger arranges verified records only; it approves nothing.
+
 ## Assign project work
 
 With database revision `0083`, open **Team → Agents** and choose **Assign task**. Give the agent an outcome and acceptance criteria. The workbench previews the selected agent, its model connection, the allowed operations, and the exact input. Confirm before starting. The project needs its configured scheduler login to dispatch work.

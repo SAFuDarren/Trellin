@@ -48,6 +48,27 @@ export type PremiseReview = {
   proposals: ProposedPremise[];
 };
 
+/** #356: what earlier proof rounds left behind, read from the same records as the graph. */
+export type ProofLedger = {
+  lemmas: {
+    lemma_id: string;
+    proposition: string;
+    verification_attempt_id: string | null;
+    recorded_at: string | null;
+    used_by: string[];
+  }[];
+  tried_routes: {
+    implication_id: string;
+    status: string;
+    obligations: string[];
+    open_obligation: string | null;
+    reason: string | null;
+    attempt_id: string | null;
+    recorded_at: string | null;
+  }[];
+  counts: { lemmas: number; tried_routes: number };
+};
+
 export type GraphSnapshot = {
   claim: {
     id: string;
@@ -63,6 +84,7 @@ export type GraphSnapshot = {
   nodes: GraphNode[];
   edges: GraphEdge[];
   blockers?: Blocker[];
+  ledger?: ProofLedger;
 };
 
 export type ImpactEntry = {

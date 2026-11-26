@@ -91,7 +91,9 @@ obligation versions before testing another ready route. It rechecks the current
 scope and runtime before proceeding; a context change or receipt commit error
 stops work. The archived report includes checked route transitions and model
 usage where reported. `research resume` surfaces the reason for a blocked route
-as part of the current research status.
+as part of the current research status. The workbench shows the same checked
+lemmas and failed routes in the claim's [verified ledger](proof-workbench.md#read-the-verified-ledger);
+the next round reads route failures through the same function.
 
 For supported formulas over a bounded Boolean scope, the worker evaluates every
 assignment after checking available reductions. It submits a structured decision

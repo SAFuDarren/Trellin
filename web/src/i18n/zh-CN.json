@@ -1994,5 +1994,24 @@
     "choose": "选择文件…",
     "newTheorem": "新定理…",
     "release": "松开即可导入"
+  },
+  "ledger": {
+    "title": "已验证台账",
+    "lemmas_one": "已核验的引理 · {{count}}",
+    "lemmas_other": "已核验的引理 · {{count}}",
+    "routes_one": "试过的路线 · {{count}}",
+    "routes_other": "试过的路线 · {{count}}",
+    "usedBy_one": "被路线 {{routes}} 使用",
+    "usedBy_other": "被路线 {{routes}} 使用",
+    "unused": "尚未使用，之后的轮次可以直接用",
+    "stuckAt": "卡在",
+    "more_one": "另有 {{count}} 项未显示",
+    "more_other": "另有 {{count}} 项未显示",
+    "status": {
+      "closure_rejected": "Lean 未通过收尾证明",
+      "refuted_obligation": "有一项义务被证伪",
+      "route_refuted": "路线被证伪",
+      "needs_recheck": "需要复核"
+    }
   }
 }
