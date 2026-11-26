@@ -442,8 +442,8 @@ test("Work shows review counts and the rail keeps Team and utilities reachable",
   expect(railBox?.height ?? 0).toBeGreaterThan(800);
   expect(sidebarBox?.x ?? 0).toBeGreaterThanOrEqual((railBox?.x ?? 0) + (railBox?.width ?? 0) - 1);
   await expect(railSpace(page, "Work")).toHaveAccessibleName(/2 waiting for you$/);
-  const review = page.locator("nav.section-nav").getByRole("link", { name: /^Review/ });
-  await expect(review.getByText("2", { exact: true })).toBeVisible();
+  // #345: Needs you and the rail badge count the same waiting items; Review keeps no count of its own.
+  await expect(page.locator("nav.section-nav .work-waiting")).toContainText("Needs you · 2");
   await expect(rail(page).getByLabel("2 running")).toBeVisible();
   const settings = await utilityButton(page).boundingBox();
   const bar = await rail(page).boundingBox();
@@ -461,7 +461,7 @@ test("approving a verified result records it and clears it from the inbox", asyn
   await page.getByRole("button", { name: "Record decision" }).click();
   await expect(page.locator(".page-notice")).toHaveText("Approved and recorded.");
   const review = page.locator("nav.section-nav").getByRole("link", { name: /^Review/ });
-  await expect(review.getByText("1", { exact: true })).toBeVisible();
+  await expect(page.locator("nav.section-nav .work-waiting")).toContainText("Needs you · 1");
   await expect(review).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".page-head h2")).not.toHaveText("reverseZeroAdd");
 });

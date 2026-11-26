@@ -84,7 +84,11 @@ test("a single footer result opens directly and records the decision through the
     await route.fulfill({ status: 201, json: { id: "decision-one", user_id: "fixture-user" } });
   });
   await page.goto("/#session=fixture");
-  await page.getByRole("link", { name: "1 to review", exact: true }).click();
+  // #345: a waiting result opens from Needs you; the status bar no longer counts it.
+  await page.evaluate(() => (location.hash = "claims"));
+  const waiting = page.locator(".waiting-row").filter({ hasText: resultName });
+  await waiting.hover();
+  await waiting.getByRole("link", { name: "Open page" }).click();
   await expectReview(page, EVIDENCE, resultName);
   await expect(page.getByLabel("Your name")).toHaveCount(0);
   await page.getByRole("radio", { name: "Approve", exact: true }).check();
@@ -97,7 +101,7 @@ test("a single footer result opens directly and records the decision through the
   await expect(page.getByText("Approved and recorded.", { exact: true })).toBeVisible();
   expect(decision).toEqual({ decision: "approve", reason: "The result proves the selected Lean statement." });
   expect(idempotency).toMatch(/^[a-f0-9-]{36}$/);
-  await expect(page.getByRole("link", { name: "1 to review", exact: true })).toHaveCount(0);
+  await expect(page.locator(".waiting-row").filter({ hasText: resultName })).toHaveCount(0);
 });
 
 test("the footer filters multiple reviews and names each result before opening its exact decision", async ({
@@ -132,9 +136,10 @@ test("the footer filters multiple reviews and names each result before opening i
   );
   await page.keyboard.press("Escape");
 
-  const count = page.getByRole("button", { name: "2 to review", exact: true });
-  await count.click();
+  // #345: the status bar opens Agent activity, whose Needs review filter lists both results.
+  await page.locator(".agent-dock-status").first().click();
   const activity = page.getByRole("region", { name: "Agent activity", exact: true });
+  await activity.getByRole("button", { name: "Needs review", exact: true }).click();
   await expect(activity.getByRole("button", { name: "Needs review", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",

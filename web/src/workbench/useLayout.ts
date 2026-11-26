@@ -36,7 +36,8 @@ export const LIMITS: Record<SizeKey, [number, number]> = {
   side: [180, 420],
   right: [280, 640],
   chat: [140, 640],
-  peek: [360, 960],
+  // #345: the floating window keeps a readable width and never takes the whole board.
+  peek: [420, 900],
 };
 
 function entries(value: unknown): [string, unknown][] {

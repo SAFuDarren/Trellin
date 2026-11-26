@@ -12,7 +12,6 @@ import {
 } from "../shell/agentChatGeometry";
 import { useConversationSending } from "../shell/ConversationEditors";
 import { href, type Route } from "../shell/route";
-import { reviewItemHref } from "../shell/reviewItems";
 import type { ActivityState, WorkspaceActivity } from "../shell/workspaceActivity";
 import { timeText } from "../workbench/text";
 import { AgentChatResizeHandles } from "./AgentChatResizeHandles";
@@ -99,9 +98,8 @@ export function AgentChatDock({
   const thread = threads.find(({ id }) => id === chosenId);
   const agent = agentsById.get(thread?.agent_id ?? "");
   const defaultRecipient = useStickyValue(defaultAgentId(threads, agents, i18n.language), String(newConversation));
-  const { running, queued, review, attention } = activity.counts;
-  const onlyReview =
-    review === 1 ? activity.rows.find((row) => row.source === "review" && row.state === "review") : undefined;
+  // #345: waiting items, reviews and failed runs among them, are counted once, in Needs you.
+  const { running, queued } = activity.counts;
 
   if (request && request !== handledRequest) {
     const anchored = "anchor" in request ? request : null;
@@ -397,36 +395,7 @@ export function AgentChatDock({
             {t("agentDock.queued", { count: queued })}
           </span>
         )}
-        {attention > 0 && (
-          <span>
-            <Mark tone="bad" />
-            {t("workspaceActivity.attention", { count: attention })}
-          </span>
-        )}
       </button>
-      {onlyReview?.source === "review" ? (
-        <a
-          className="agent-dock-status agent-dock-review"
-          href={reviewItemHref(onlyReview.item)}
-          onClick={(event) => {
-            if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) setView(null);
-          }}
-        >
-          <Mark tone="review" />
-          {t("workspaceActivity.toReview", { count: review })}
-        </a>
-      ) : review > 0 ? (
-        <button
-          type="button"
-          className="agent-dock-status agent-dock-review"
-          aria-controls={panelId}
-          aria-expanded={view === "activity" && activityOrigin.current !== activityLauncher.current}
-          onClick={(event) => openActivity("review", event.currentTarget)}
-        >
-          <Mark tone="review" />
-          {t("workspaceActivity.toReview", { count: review })}
-        </button>
-      ) : null}
       <button
         ref={launcher}
         className="agent-dock-launcher"

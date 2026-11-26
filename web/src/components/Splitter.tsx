@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { LIMITS, type SizeKey } from "../workbench/useLayout";
+import { DEFAULT_SIZES, LIMITS, type SizeKey } from "../workbench/useLayout";
 
 /** A draggable, keyboard-adjustable border between two panels. */
 export function Splitter({
@@ -77,6 +77,8 @@ export function Splitter({
       hidden={hidden}
       onPointerDown={startDrag}
       onKeyDown={onKeyDown}
+      // #345: a double-click puts the default width back.
+      onDoubleClick={() => onCommit(DEFAULT_SIZES[name])}
     />
   );
 }

@@ -2,7 +2,7 @@ import { useContext, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TeamAgent } from "../api/teamAgents";
 import { currentEntry, currentRoute, entryHref, SPACES } from "../shell/spaces";
-import { useWork, type WaitingItem, type WaitingKind } from "../shell/workContext";
+import { useWork, waitingKindCounts, type WaitingItem, type WaitingKind } from "../shell/workContext";
 import { href } from "../shell/route";
 import { timeText } from "../workbench/text";
 import { Chevron, WorkbenchIcon } from "./Icons";
@@ -154,7 +154,6 @@ function SectionHead({
 
 const VIEW_ICONS: Record<string, string> = {
   all: "work",
-  review: "review",
   running: "running",
   blocked: "blocked",
   advance: "advance",
@@ -176,6 +175,7 @@ export function WorkPanelSections({ pageGroups }: { pageGroups?: ReactNode }) {
   const spaceCounts = useContext(SpaceCounts);
   const [folded, toggle] = useFoldedSections();
   if (!work) return null;
+  const kinds = waitingKindCounts(work.waiting);
   const route = currentRoute();
   const current = currentEntry(route)?.key;
   const records = SPACES.find((space) => space.id === "work")!.entries.filter((entry) => entry.key !== "claims");
@@ -224,11 +224,11 @@ export function WorkPanelSections({ pageGroups }: { pageGroups?: ReactNode }) {
           open={open("waiting")}
           onToggle={() => toggle("waiting")}
           action={
-            work.waiting.length > 0 && (
+            work.shown.length > 0 && (
               <button
                 type="button"
                 className="work-section-link"
-                onClick={() => work.setPeek({ kind: "waiting", id: work.waiting[0]!.id, index: 0 })}
+                onClick={() => work.setPeek({ kind: "waiting", id: work.shown[0]!.id, index: 0 })}
               >
                 {t("workPanel.handleAll")}
               </button>
@@ -237,18 +237,39 @@ export function WorkPanelSections({ pageGroups }: { pageGroups?: ReactNode }) {
         />
         {open("waiting") && (
           <div id="work-section-waiting">
-            {work.waiting.length ? (
+            {kinds.length > 1 && (
+              <div className="work-waiting-filter" role="group" aria-label={t("workPanel.filterLabel")}>
+                <button
+                  type="button"
+                  aria-pressed={work.waitingFilter === null}
+                  onClick={() => work.setWaitingFilter(null)}
+                >
+                  {t("workPanel.filterAll", { count: work.waiting.length })}
+                </button>
+                {kinds.map(({ kind, count }) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    aria-pressed={work.waitingFilter === kind}
+                    onClick={() => work.setWaitingFilter(work.waitingFilter === kind ? null : kind)}
+                  >
+                    {t(`workPanel.filterKinds.${kind}`, { count })}
+                  </button>
+                ))}
+              </div>
+            )}
+            {work.shown.length ? (
               <ul role="list">
-                {work.waiting.slice(0, WAITING_ROWS).map((item, index) => (
+                {work.shown.slice(0, WAITING_ROWS).map((item, index) => (
                   <WaitingRow key={item.id} item={item} agents={work.agents} index={index} />
                 ))}
               </ul>
             ) : (
               <p className="nav-empty">{t("workPanel.nothingWaiting")}</p>
             )}
-            {work.waiting.length > WAITING_ROWS && (
+            {work.shown.length > WAITING_ROWS && (
               <a className="work-more" href={href("agent-work", "inbox")}>
-                {t("workPanel.more", { count: work.waiting.length - WAITING_ROWS })}
+                {t("workPanel.more", { count: work.shown.length - WAITING_ROWS })}
               </a>
             )}
           </div>

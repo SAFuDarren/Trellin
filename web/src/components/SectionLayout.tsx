@@ -68,7 +68,7 @@ export function SectionFrame({
   panel: ReactNode;
   children: ReactNode;
   chatThread?: boolean;
-  /** #326: a side panel beside the page, resized with its own border. */
+  /** #345: a window floating over the page, resized from its left edge. */
   overlay?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -95,25 +95,28 @@ export function SectionFrame({
           layout.update({ side: clampSize("side", width, layout.windowHeight) });
         }}
       />
-      <main className={chat ? "section-main chats-main" : "section-main"} tabIndex={-1}>
-        {children}
-      </main>
-      {overlay && (
-        <>
-          {/* #326: the side panel sits beside the page and takes room from it; drag the border to resize. */}
-          <Splitter
-            name="peek"
-            value={peek}
-            label={t("splitter.peek")}
-            onResize={(width) => setPeekDrag(clampSize("peek", width, layout.windowHeight))}
-            onCommit={(width) => {
-              setPeekDrag(undefined);
-              layout.update({ peek: clampSize("peek", width, layout.windowHeight) });
-            }}
-          />
-          {overlay}
-        </>
-      )}
+      {/* #345: the stage always wraps the page, so opening the floating window never remounts it. */}
+      <div className="section-stage" data-peek={Boolean(overlay)}>
+        <main className={chat ? "section-main chats-main" : "section-main"} tabIndex={-1}>
+          {children}
+        </main>
+        {overlay && (
+          <div className="work-peek-float">
+            {/* The window floats over the page, which keeps its layout; its left edge resizes it. */}
+            <Splitter
+              name="peek"
+              value={peek}
+              label={t("splitter.peek")}
+              onResize={(width) => setPeekDrag(clampSize("peek", width, layout.windowHeight))}
+              onCommit={(width) => {
+                setPeekDrag(undefined);
+                layout.update({ peek: clampSize("peek", width, layout.windowHeight) });
+              }}
+            />
+            {overlay}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

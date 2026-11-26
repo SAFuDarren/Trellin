@@ -201,7 +201,8 @@ test("utilities and direct review links work in a narrow Chinese window", async 
   await expect(page.locator(".page-head h2")).toHaveText("reverseZeroAdd");
   const review = page.locator("nav.section-nav").getByRole("link", { name: /^审阅/ });
   await expect(review).toHaveAttribute("aria-current", "page");
-  await expect(review.getByText("2", { exact: true })).toBeVisible();
+  // #345: Review keeps no count of its own; Needs you counts what waits.
+  await expect(page.locator("nav.section-nav .work-waiting")).toContainText("等你判断 · 2");
 
   await railSpace(page, "主页").click();
   await expect(page).toHaveURL(/#workbench$/);

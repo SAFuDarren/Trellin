@@ -81,11 +81,11 @@ export function visibleCards<T>(cards: readonly T[], limit: number, expanded: bo
   return { shown: cards.slice(0, limit), hidden: cards.length - limit };
 }
 
-export const CLAIM_VIEWS = ["all", "review", "running", "blocked", "advance"] as const;
+// #345: what waits for review is in Needs you, so there is no separate review view.
+export const CLAIM_VIEWS = ["all", "running", "blocked", "advance"] as const;
 export type ClaimView = (typeof CLAIM_VIEWS)[number];
 
 export type ClaimViewContext = {
-  reviews: ReadonlyMap<string, readonly unknown[]>;
   blocked: ReadonlyMap<string, number>;
   running: ReadonlyMap<string, number>;
   progress: ReadonlyMap<string, { canAdvance?: boolean }>;
@@ -93,7 +93,6 @@ export type ClaimViewContext = {
 
 /** Whether a claim belongs to a Work view; the panel counts and the Claims page filter use the same rule. */
 export function inClaimView(view: ClaimView, claimId: string, context: ClaimViewContext): boolean {
-  if (view === "review") return Boolean(context.reviews.get(claimId)?.length);
   if (view === "blocked") return (context.blocked.get(claimId) ?? 0) > 0;
   if (view === "running") return (context.running.get(claimId) ?? 0) > 0;
   // #342: open claims with nothing they rely on still unproved.

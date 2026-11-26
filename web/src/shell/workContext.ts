@@ -34,6 +34,19 @@ export function waitingItems(rows: readonly ActivityRow[], archived: ReadonlySet
     .map(({ row, kind }) => ({ id: row.id, kind, row, claimId: row.claimId }));
 }
 
+/** The kinds present in the waiting list, in a fixed order, with how many of each. */
+export const WAITING_KINDS: readonly WaitingKind[] = ["review", "confirm", "question", "failed", "delivery"];
+
+export function waitingKindCounts(items: readonly WaitingItem[]): { kind: WaitingKind; count: number }[] {
+  return WAITING_KINDS.map((kind) => ({ kind, count: items.filter((item) => item.kind === kind).length })).filter(
+    ({ count }) => count > 0,
+  );
+}
+
+export function shownWaiting(items: WaitingItem[], kind: WaitingKind | null): WaitingItem[] {
+  return kind ? items.filter((item) => item.kind === kind) : items;
+}
+
 export type PeekTarget =
   | { kind: "waiting"; id: string; index: number }
   | { kind: "claim"; id: string; order: string[] };
@@ -89,7 +102,13 @@ export type WorkClaim = { id: string; title: string | null; code: string };
 
 export type WorkContextValue = {
   agents: ReadonlyMap<string, TeamAgent>;
+  /** #345: everything waiting for the researcher. Every count of waiting items reads this list. */
   waiting: WaitingItem[];
+  /** The kind the Needs you list is narrowed to, or null for all. */
+  waitingFilter: WaitingKind | null;
+  setWaitingFilter: (kind: WaitingKind | null) => void;
+  /** The waiting items the panel lists and the floating window steps through. */
+  shown: WaitingItem[];
   views: WorkView[];
   pinned: WorkClaim[];
   isPinned: (claimId: string) => boolean;

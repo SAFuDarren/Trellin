@@ -46,15 +46,15 @@ export function WorkPeek(data: WorkPeekData) {
   const panel = useRef<HTMLElement>(null);
   const [notice, setNotice] = useState("");
   const target = work.peek!;
-  const waiting = target.kind === "waiting" ? resolveWaiting(work.waiting, target) : null;
+  const waiting = target.kind === "waiting" ? resolveWaiting(work.shown, target) : null;
   const position =
     target.kind === "waiting"
-      ? waiting && { index: waiting.index, total: work.waiting.length }
+      ? waiting && { index: waiting.index, total: work.shown.length }
       : target.order.includes(target.id)
         ? { index: target.order.indexOf(target.id), total: target.order.length }
         : null;
-  const previous = stepTarget(target, work.waiting, -1);
-  const next = stepTarget(target, work.waiting, 1);
+  const previous = stepTarget(target, work.shown, -1);
+  const next = stepTarget(target, work.shown, 1);
   const move = (to: PeekTarget | null) => {
     if (!to) return;
     setNotice("");

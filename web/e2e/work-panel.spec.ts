@@ -140,34 +140,23 @@ async function withLongLean(page: Page) {
   });
 }
 
-test("the side panel sits beside the board without covering it and keeps the width you drag it to", async ({
+test("a claim opens in a window floating over the board, which keeps its width and shows the claim beside it", async ({
   page,
 }) => {
   await openWork(page);
-  await page.locator(".lane-card-toggle").first().click();
-  const main = page.locator("main.section-main");
+  const board = page.locator(".research-lanes");
+  const before = (await board.boundingBox())!.width;
+  const card = page.locator(".lane-card").first();
+  await card.locator(".lane-card-toggle").click();
   await expect(peek(page)).toBeVisible();
-  const mainBox = (await main.boundingBox())!;
-  const peekBox = (await peek(page).boundingBox())!;
-  expect(mainBox.x + mainBox.width).toBeLessThanOrEqual(peekBox.x + 1);
-  expect(peekBox.width).toBeCloseTo(560, -1);
-
-  const border = page.getByRole("separator", { name: "Drag to resize the side panel" });
-  const handle = (await border.boundingBox())!;
-  await page.mouse.move(handle.x + handle.width / 2, handle.y + 200);
-  await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 - 100, handle.y + 200, { steps: 5 });
-  await page.mouse.up();
-  await expect.poll(async () => Math.round((await peek(page).boundingBox())!.width)).toBeGreaterThan(640);
-  await border.focus();
-  const before = (await peek(page).boundingBox())!.width;
-  await page.keyboard.press("ArrowLeft");
-  await expect.poll(async () => (await peek(page).boundingBox())!.width).toBeCloseTo(before + 16, 0);
-
-  const kept = (await peek(page).boundingBox())!.width;
-  await page.reload();
-  await page.locator(".lane-card-toggle").first().click();
-  await expect.poll(async () => (await peek(page).boundingBox())!.width).toBeCloseTo(kept, 0);
+  // #345: the board keeps its layout under the window; the opened claim is scrolled clear of it.
+  expect((await board.boundingBox())!.width).toBe(before);
+  const window = (await page.locator(".work-peek-float").boundingBox())!;
+  expect(window.width).toBeCloseTo(560, -1);
+  const opened = (await page.locator('.lane-card[data-open="true"]').boundingBox())!;
+  expect(opened.x + opened.width).toBeLessThanOrEqual(window.x);
+  await page.keyboard.press("Escape");
+  await expect(peek(page)).toHaveCount(0);
 });
 
 test("a long Lean statement stays inside its box in the panel and in a preview", async ({ page }) => {

@@ -225,19 +225,82 @@
 }
 
 /* The side panel sits beside the page and takes room from it, so nothing is covered; its border resizes it. */
+/* #345: the page and, while it is open, the window floating over it. */
+.section-stage {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+/* The window floats over the page below its header, so the header's search, filter and buttons stay usable and
+   the board keeps its layout. */
+.work-peek-float {
+  position: absolute;
+  top: 60px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  display: flex;
+  width: min(var(--peek-w), calc(100% - 16px));
+  overflow: hidden;
+  border: 1px solid var(--node-line);
+  border-radius: var(--radius-panel);
+  background: var(--main);
+  box-shadow: var(--elevation-float);
+}
+/* The left edge is the resize handle: a strip with a grip that shows on hover, focus and drag. */
+.work-peek-float > .splitter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  width: 10px;
+  margin: 0;
+  background: none;
+}
+.work-peek-float > .splitter::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 3px;
+  height: 40px;
+  border-radius: 2px;
+  background: var(--edge-soft);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--duration-base) var(--ease);
+}
+.work-peek-float:hover > .splitter::after,
+.work-peek-float > .splitter:focus-visible::after,
+.work-peek-float > .splitter[data-dragging="true"]::after {
+  opacity: 1;
+}
+.work-peek-float > .splitter:focus-visible::after,
+.work-peek-float > .splitter[data-dragging="true"]::after {
+  background: var(--live);
+}
+/* The board can scroll its cards out from under the window, and keeps the selected card beside it. */
+.section-stage[data-peek="true"] .research-lanes {
+  scroll-padding-inline-end: calc(var(--peek-w) + 24px);
+}
+.section-stage[data-peek="true"] .lanes-scroll {
+  padding-right: calc(var(--peek-w) + 24px);
+}
 .work-peek {
   position: relative;
   display: flex;
-  /* The panel keeps the width you gave it; the page beside it gives way and scrolls. */
-  flex: 0 0 var(--peek-w);
+  flex: 1 1 auto;
   flex-direction: column;
-  width: var(--peek-w);
-  min-width: 320px;
-  /* The page keeps at least a column of cards beside the panel. */
-  max-width: calc(100% - var(--side-w) - 300px);
-  border-left: 1px solid var(--hair);
-  background: var(--main);
+  min-width: 0;
   outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-peek-float > .splitter::after {
+    transition: none;
+  }
 }
 .work-peek-head {
   display: flex;
@@ -423,4 +486,31 @@
 }
 .work-peek-relation-status[data-status="proved"] {
   color: color-mix(in srgb, var(--good) 80%, var(--ink));
+}
+
+/* #345: narrow Needs you to one kind of waiting item. */
+.work-waiting-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 8px 6px;
+}
+.work-waiting-filter button {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--sub);
+  font: inherit;
+  font-size: var(--type-meta-size);
+  cursor: pointer;
+}
+.work-waiting-filter button:hover {
+  background: var(--state-hover);
+}
+.work-waiting-filter button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--pick);
+  color: var(--ink);
 }

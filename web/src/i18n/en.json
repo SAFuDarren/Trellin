@@ -760,7 +760,7 @@
     "side": "Resize navigation panel",
     "right": "Drag to resize the review column",
     "chat": "Drag to resize the conversation",
-    "peek": "Drag to resize the side panel"
+    "peek": "Drag to resize the window; double-click to reset"
   },
   "common": {
     "cancel": "Cancel",
@@ -1913,7 +1913,16 @@
     "pinned": "Pinned",
     "records": "Records",
     "foldGroups": "Fold {{name}} groups",
-    "unfoldGroups": "Show {{name}} groups"
+    "unfoldGroups": "Show {{name}} groups",
+    "filterLabel": "Show waiting items by kind",
+    "filterAll": "All {{count}}",
+    "filterKinds": {
+      "review": "To approve {{count}}",
+      "confirm": "To confirm {{count}}",
+      "question": "Questions {{count}}",
+      "failed": "Failed {{count}}",
+      "delivery": "Deliveries {{count}}"
+    }
   },
   "workPeek": {
     "title": "Item",
