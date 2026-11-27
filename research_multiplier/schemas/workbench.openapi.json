@@ -3,7 +3,7 @@
   "info": {
     "title": "Research Multiplier workbench API",
     "version": "1",
-    "description": "Local workbench contract for recent claims and Agent work lists."
+    "description": "Local workbench contract for recent claims and Agent work reads."
   },
   "paths": {
     "/api/v1/workspaces/{workspace_id}/claims": {
@@ -64,51 +64,62 @@
                     "available": { "type": "boolean" },
                     "items": {
                       "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "id", "mode", "title", "agent_id", "agent_name", "status", "created_at",
-                          "updated_at", "delivery_sha256", "predecessor_id", "error"
-                        ],
-                        "additionalProperties": false,
-                        "properties": {
-                          "id": { "type": "string", "format": "uuid" },
-                          "mode": { "enum": ["implement", "review", "draft"] },
-                          "title": { "type": "string" },
-                          "agent_id": { "type": ["string", "null"], "format": "uuid" },
-                          "agent_name": { "type": "string" },
-                          "status": {
-                            "enum": ["queued", "running", "interrupted", "blocked", "failed", "delivered", "accepted", "returned"]
-                          },
-                          "created_at": { "type": "string", "format": "date-time" },
-                          "updated_at": { "type": "string", "format": "date-time" },
-                          "delivery_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
-                          "predecessor_id": { "type": ["string", "null"], "format": "uuid" },
-                          "error": { "type": ["string", "null"] }
-                        }
-                      }
+                      "items": { "$ref": "./agent-work.schema.json#/$defs/TaskSummary" }
                     }
                   }
                 }
               }
             }
           },
-          "400": {
-            "description": "The Agent work list does not accept query parameters (agent_work.invalid_query).",
-            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
-            "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
-          },
+          "400": { "$ref": "#/components/responses/AgentWorkInvalidQuery" },
           "401": { "$ref": "#/components/responses/Unauthenticated" },
-          "403": {
-            "description": "Untrusted request (request.forbidden) or missing local researcher identity (agent_work.identity_required).",
-            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
-            "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+          "403": { "$ref": "#/components/responses/AgentWorkForbidden" },
+          "404": { "$ref": "#/components/responses/AgentWorkNotFound" },
+          "500": { "$ref": "#/components/responses/Failed" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/agent-work/{task_id}": {
+      "get": {
+        "operationId": "getAgentWorkTask",
+        "summary": "Read an Agent work task for the local researcher in the selected workspace",
+        "description": "Returns the same authorized task detail as GET /api/agent-work?task={task_id}, including instructions, acceptance criteria, and any recorded delivery and review. This read takes no query parameters.",
+        "security": [{ "LocalSession": [] }],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
           },
-          "404": {
-            "description": "Malformed or inaccessible workspace reference (agent_work.not_found).",
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized Agent work task detail.",
             "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
-            "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["task"],
+                  "additionalProperties": false,
+                  "properties": { "task": { "$ref": "./agent-work.schema.json#/$defs/TaskDetail" } }
+                }
+              }
+            }
           },
+          "400": { "$ref": "#/components/responses/AgentWorkInvalidQuery" },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/AgentWorkForbidden" },
+          "404": { "$ref": "#/components/responses/AgentWorkNotFound" },
+          "409": { "$ref": "#/components/responses/AgentWorkConflict" },
           "500": { "$ref": "#/components/responses/Failed" },
           "503": { "$ref": "#/components/responses/Unavailable" }
         }
@@ -127,6 +138,26 @@
       }
     },
     "responses": {
+      "AgentWorkInvalidQuery": {
+        "description": "Agent work reads do not accept query parameters (agent_work.invalid_query).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "AgentWorkForbidden": {
+        "description": "Untrusted request (request.forbidden) or missing local researcher identity (agent_work.identity_required).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "AgentWorkNotFound": {
+        "description": "Malformed or inaccessible workspace or task reference (agent_work.not_found).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "AgentWorkConflict": {
+        "description": "Agent work requires a database upgrade (agent_work.upgrade_required) or its recorded delivery is unavailable (agent_work.delivery_unavailable).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
       "InvalidQuery": {
         "description": "The recent claims pilot does not accept query parameters (claims.invalid_query).",
         "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },

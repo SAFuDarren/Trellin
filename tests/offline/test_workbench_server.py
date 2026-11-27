@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 from jsonschema import Draft202012Validator, FormatChecker
 import pytest
+from referencing import Registry, Resource
 
 from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError
@@ -469,11 +470,20 @@ def test_native_connections_are_discovered_and_selected_only_in_the_bound_sessio
     assert login == [("claude-code", str(executable))] * 2
 
 
-@pytest.mark.parametrize(("resource", "prefix"), [("claims", "claims"), ("agent-work", "agent_work")])
-def test_versioned_workspace_lists_reject_unauthorized_and_invalid_requests(server, monkeypatch, capsys,
-                                                                          resource, prefix):
-    workspace_id = "d42ca2f7-9288-47af-b7e5-1150e6df5304"
-    path = f"/api/v1/workspaces/{workspace_id}/{resource}"
+@pytest.mark.parametrize(("resource", "prefix", "is_detail"), [
+    ("claims", "claims", False),
+    ("agent-work", "agent_work", False),
+    ("agent-work", "agent_work", True),
+])
+def test_versioned_workspace_reads_reject_unauthorized_and_invalid_requests(server, monkeypatch, capsys,
+                                                                          resource, prefix, is_detail):
+    workspace_id = str(uuid4())
+    template = "/api/v1/workspaces/{workspace_id}/" + resource
+    path = template.format(workspace_id=workspace_id)
+    task_id = str(uuid4())
+    if is_detail:
+        template += "/{task_id}"
+        path += "/" + task_id
 
     def unexpected_read(*args):
         pytest.fail("A malformed or unauthorized request must not read the project's records.")
@@ -488,6 +498,8 @@ def test_versioned_workspace_lists_reject_unauthorized_and_invalid_requests(serv
         (path + "?", 400, f"{prefix}.invalid_query", {}),
         (path.replace(workspace_id, "bad-address"), 404, f"{prefix}.not_found", {}),
     )
+    if is_detail:
+        requests += ((path.replace(task_id, "bad-task"), 404, "agent_work.not_found", {}),)
     request_ids = set()
     for target, status, code, options in requests:
         response, content = request(server, "GET", target, **options)
@@ -500,7 +512,7 @@ def test_versioned_workspace_lists_reject_unauthorized_and_invalid_requests(serv
         record = json.loads(capsys.readouterr().err)
         assert record.pop("duration_ms") >= 0
         assert record == {
-            "route": "/api/v1/workspaces/{workspace_id}/" + resource, "status": status, "request_id": identifier,
+            "route": template, "status": status, "request_id": identifier,
         }
     assert len(request_ids) == len(requests)
 
@@ -572,21 +584,118 @@ def test_versioned_agent_work_matches_legacy_without_waking_worker(agent_work_po
     assert snapshot == {"items": json.loads(legacy)["tasks"], "next_cursor": None, "available": installed}
     assert [task["id"] for task in snapshot["items"]] == ([task_id] if installed else [])
 
-    schemas = files("research_multiplier").joinpath("schemas")
-    openapi = json.loads(schemas.joinpath("workbench.openapi.json").read_text(encoding="utf-8"))
-    contract = openapi["paths"][template]["get"]
-    schema = contract["responses"]["200"]["content"]["application/json"]["schema"]
-    Draft202012Validator(schema, format_checker=FormatChecker()).validate(snapshot)
+    _agent_work_response_schema(template).validate(snapshot)
 
     reads = sql_reads.copy()
     response, payload = request(server, "GET", template.format(workspace_id=uuid4()))
     assert response.status == 404
     error = json.loads(payload)
-    error_schema = json.loads(schemas.joinpath("error.schema.json").read_text(encoding="utf-8"))
+    error_schema = json.loads(files("research_multiplier").joinpath("schemas/error.schema.json").read_text())
     Draft202012Validator(error_schema).validate(error)
     assert error["error"]["code"] == "agent_work.not_found"
     assert error["error"]["request_id"] == response.getheader("X-Request-Id")
     assert sql_reads == reads
+
+
+def _agent_work_response_schema(template):
+    schemas = files("research_multiplier").joinpath("schemas")
+    openapi = json.loads(schemas.joinpath("workbench.openapi.json").read_text(encoding="utf-8"))
+    fields = json.loads(schemas.joinpath("agent-work.schema.json").read_text(encoding="utf-8"))
+    registry = Registry().with_resource(fields["$id"], Resource.from_contents(fields))
+    schema = openapi["paths"][template]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    return Draft202012Validator(
+        {"$id": "https://research-multiplier.dev/schemas/workbench.openapi.json", **schema},
+        registry=registry, format_checker=FormatChecker(),
+    )
+
+
+@pytest.mark.parametrize(("case", "status", "code"), [
+    ("found", 200, None),
+    ("missing", 404, "agent_work.not_found"),
+    ("older_schema", 409, "agent_work.upgrade_required"),
+])
+def test_versioned_agent_work_detail_matches_authorized_legacy_read(agent_work_polling, capsys, case, status, code):
+    server, store = agent_work_polling
+    store.workspace_id = uuid4()
+    task_id = uuid4()
+    date = "2026-01-01T00:00:00Z"
+    reads = []
+    item = {
+        "id": str(task_id), "spec": {
+            "mode": "draft", "title": "Fixture title", "agent_name": "Fixture agent", "agent_id": str(uuid4()),
+            "instructions": "Fixture instructions", "criteria": "Fixture criteria",
+        },
+        "state": "queued", "created_at": date, "updated_at": date, "attempt": None, "review": None,
+    }
+
+    def transaction(role, action, *, read_only):
+        assert role == "human" and read_only
+        return action()
+
+    def query(role, statement, *values):
+        assert role == "human"
+        reads.append(statement)
+        if "to_regprocedure" in statement:
+            return [{"installed": case != "older_schema"}]
+        assert case != "older_schema"
+        assert "SELECT rm.read_agent_work(" in statement and values == (task_id,)
+        return [{"result": item if case == "found" else None}]
+
+    def unexpected_wake():
+        pytest.fail("Reading a task must never wake its worker.")
+
+    store.transaction = transaction
+    store.query = query
+    server._wake_agent_work = unexpected_wake
+
+    template = "/api/v1/workspaces/{workspace_id}/agent-work/{task_id}"
+    path = template.format(workspace_id=store.workspace_id, task_id=task_id)
+    response, payload = request(server, "GET", path)
+    assert response.status == status
+    result = json.loads(payload)
+    identifier = response.getheader("X-Request-Id")
+    assert UUID(identifier)
+    assert response.getheader("Cache-Control") == "no-store"
+    record = json.loads(capsys.readouterr().err)
+    assert record.pop("duration_ms") >= 0
+    assert record == {"route": template, "status": status, "request_id": identifier}
+    if case == "found":
+        _agent_work_response_schema(template).validate(result)
+        legacy, content = request(server, "GET", f"/api/agent-work?task={task_id}")
+        assert legacy.status == 200
+        assert result == json.loads(content)
+        assert result["task"]["instructions"] == item["spec"]["instructions"]
+        assert result["task"]["criteria"] == item["spec"]["criteria"]
+        assert result["task"]["delivery"] is None
+    else:
+        assert result["error"]["code"] == code
+        assert result["error"]["request_id"] == identifier
+        assert "Fixture" not in payload.decode()
+
+    before = reads.copy()
+    response, payload = request(server, "GET", template.format(workspace_id=uuid4(), task_id=task_id))
+    assert response.status == 404
+    assert json.loads(payload)["error"]["code"] == "agent_work.not_found"
+    assert reads == before
+
+
+@pytest.mark.parametrize(("failure", "status", "code"), [
+    ("identity", 403, "agent_work.identity_required"),
+    ("unavailable", 503, "database.unavailable"),
+    ("deliveryUnavailable", 409, "agent_work.delivery_unavailable"),
+])
+def test_versioned_agent_work_detail_errors_redact_diagnostics(server, monkeypatch, capsys, failure, status, code):
+    def unavailable(*args):
+        raise workbench_agent_work.AgentWorkError(failure) from RuntimeError("private artifact details")
+
+    monkeypatch.setattr(server, "read", unavailable)
+    response, payload = request(server, "GET", f"/api/v1/workspaces/{uuid4()}/agent-work/{uuid4()}")
+    assert response.status == status
+    error = json.loads(payload)["error"]
+    assert error["code"] == code
+    assert error["request_id"] == response.getheader("X-Request-Id")
+    assert "private artifact details" not in payload.decode()
+    assert "private artifact details" not in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(("failure", "status", "code"), [

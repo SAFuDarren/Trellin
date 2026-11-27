@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-multiplier.dev/schemas/agent-work.schema.json",
+  "title": "Agent work task details",
+  "$ref": "#/$defs/TaskDetail",
+  "$defs": {
+    "TaskFields": {
+      "type": "object",
+      "required": [
+        "id", "mode", "title", "agent_id", "agent_name", "status", "created_at",
+        "updated_at", "delivery_sha256", "predecessor_id", "error"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "mode": { "enum": ["implement", "review", "draft"] },
+        "title": { "type": "string" },
+        "agent_id": { "type": ["string", "null"], "format": "uuid" },
+        "agent_name": { "type": "string" },
+        "status": {
+          "enum": ["queued", "running", "interrupted", "blocked", "failed", "delivered", "accepted", "returned"]
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "delivery_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "predecessor_id": { "type": ["string", "null"], "format": "uuid" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "TaskSummary": {
+      "$ref": "#/$defs/TaskFields",
+      "unevaluatedProperties": false
+    },
+    "TaskDetail": {
+      "allOf": [
+        { "$ref": "#/$defs/TaskFields" },
+        {
+          "required": [
+            "instructions", "criteria", "delivery", "base_revision", "checkout",
+            "predecessor_sha256", "review"
+          ],
+          "properties": {
+            "instructions": { "type": "string" },
+            "criteria": { "type": "string" },
+            "delivery": {
+              "type": ["object", "null"],
+              "required": ["kind", "summary", "body", "checks"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "enum": ["patch", "draft", "review"] },
+                "summary": { "type": "string" },
+                "body": { "type": "string" },
+                "checks": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "base_revision": { "type": ["string", "null"], "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+            "checkout": { "type": ["string", "null"] },
+            "predecessor_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+            "review": {
+              "type": ["object", "null"],
+              "required": ["id", "generation", "delivery_sha256", "decision", "reason", "reviewed_at"],
+              "additionalProperties": false,
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "generation": { "type": "integer", "minimum": 1 },
+                "delivery_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                "decision": { "enum": ["accept", "return"] },
+                "reason": { "type": "string" },
+                "reviewed_at": { "type": "string", "format": "date-time" }
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

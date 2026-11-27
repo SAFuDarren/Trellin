@@ -156,6 +156,8 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 
 同一份 OpenAPI 文档也涵盖只读接口 `GET /api/v1/workspaces/{workspace_id}/agent-work`。它在 `items` 中返回本地研究者的派工任务摘要，内容和排序与 `GET /api/agent-work` 一致。列表快照不分页，`next_cursor` 为 `null`。旧数据库未安装派工功能时，返回 `available: false` 和空列表。v1 接口要求本地会话和匹配的工作区，不接收查询参数，也不唤醒派工队列。
 
+`GET /api/v1/workspaces/{workspace_id}/agent-work/{task_id}` 在 `{task}` 中返回研究者有权读取的派工详情，响应与 `GET /api/agent-work?task={task_id}` 一致，包含任务指令、验收标准和已记录的交付与审核。工作区和任务 UUID 通过路径传入。任务缺失或不可访问时返回 404。数据库尚未安装派工功能或已记录的交付不可用时返回 409，并使用不同的错误码。读取要求本地会话，且不接收查询参数。
+
 ### 耗时操作
 
 预计超过一秒左右的操作返回 `202 Accepted` 和一个任务资源：`{"job": {"id": "…", "state": "queued"}}`。客户端通过事件或 `GET …/jobs/{id}` 跟进度。

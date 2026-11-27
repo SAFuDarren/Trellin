@@ -156,6 +156,8 @@ The compatibility route `POST /api/review` accepts `evidence_id`, `action`, and 
 
 The same OpenAPI document covers the read-only list at `GET /api/v1/workspaces/{workspace_id}/agent-work`. It returns the local researcher's task summaries in `items`, with the same data and order as `GET /api/agent-work`. The snapshot has no pagination and returns `next_cursor: null`. Older schemas without Agent work support return `available: false` and an empty list. The v1 list requires a local session and a matching workspace. It takes no query parameters and does not wake the Agent work queue.
 
+`GET /api/v1/workspaces/{workspace_id}/agent-work/{task_id}` returns the authorized researcher's task detail in `{task}`. The payload matches `GET /api/agent-work?task={task_id}` and includes the instructions, acceptance criteria, and any recorded delivery and review. The workspace and task are UUID path parameters. A missing or inaccessible task returns 404. An older database without Agent work support or an unavailable recorded delivery returns 409 with a distinct error code. Reads require the local session and take no query parameters.
+
 ### Long-running operations
 
 Operations that take more than about a second return `202 Accepted` with a job resource: `{"job": {"id": "…", "state": "queued"}}`. Clients follow progress through events or `GET …/jobs/{id}`.
