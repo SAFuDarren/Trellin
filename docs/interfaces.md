@@ -160,6 +160,8 @@ The same OpenAPI document covers the read-only list at `GET /api/v1/workspaces/{
 
 `GET /api/v1/workspaces/{workspace_id}/claims/{claim_id}/activity` returns the same proof activity, recorded guidance and proof draft availability as `GET /api/activity?claim={claim_id}`. It requires a local session and takes the workspace and frozen claim UUIDs from the path. It accepts no query parameters. A missing or inaccessible claim or workspace returns 404 with `claim_activity.not_found`. The read does not start a worker.
 
+`GET /api/v1/workspaces/{workspace_id}/claims/{claim_id}/graph` returns the same proof nodes, dependencies, blockers and verified ledger as `GET /api/graph?claim={claim_id}`. It requires a local session and takes the workspace and frozen claim UUIDs from the path. It accepts no query parameters. A missing or inaccessible claim or workspace returns 404 with `claim_graph.not_found`. The read does not start a worker.
+
 ### Long-running operations
 
 Operations that take more than about a second return `202 Accepted` with a job resource: `{"job": {"id": "…", "state": "queued"}}`. Clients follow progress through events or `GET …/jobs/{id}`.

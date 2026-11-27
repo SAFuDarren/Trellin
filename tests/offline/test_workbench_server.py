@@ -609,6 +609,77 @@ def _agent_work_response_schema(template):
     )
 
 
+def test_versioned_claim_graph_matches_legacy_and_checks_scope(agent_work_polling, monkeypatch, capsys):
+    server, store = agent_work_polling
+    store.workspace_id = uuid4()
+    claim, lemma = uuid4(), str(uuid4())
+    goal, checked = f"goal:{claim}", f"local-lemma:{lemma}"
+    graph = {
+        "claim": {"id": str(claim), "title": "Synthetic claim", "status": "open", "domain": "lean-core",
+                  "statement": "Synthetic statement.", "statement_id": None},
+        "focus_id": goal,
+        "nodes": [{"id": goal, "kind": "goal", "status": "open"},
+                  {"id": checked, "kind": "local_lemma", "status": "verified"}],
+        "edges": [{"source": checked, "target": goal, "kind": "actual"}],
+        "blockers": [],
+        "ledger": {
+            "lemmas": [{"lemma_id": lemma, "proposition": "True", "verification_attempt_id": None,
+                        "recorded_at": None, "used_by": []}],
+            "tried_routes": [], "counts": {"lemmas": 1, "tried_routes": 0},
+        },
+    }
+    reads = []
+
+    def transaction(role, action, *, read_only):
+        assert role == "human" and read_only
+        return action()
+
+    def snapshot(given_store, identifier):
+        assert given_store is store
+        reads.append(identifier)
+        if identifier != claim:
+            raise workbench_server.proof_graph.ClaimGraphNotFound("Internal detail about a missing claim.")
+        return graph
+
+    store.transaction = transaction
+    monkeypatch.setattr(workbench_server.workbench_premises, "graph", snapshot)
+    template = "/api/v1/workspaces/{workspace_id}/claims/{claim_id}/graph"
+    path = template.format(workspace_id=store.workspace_id, claim_id=claim)
+    response, payload = request(server, "GET", path)
+    assert response.status == 200
+    identifier = response.getheader("X-Request-Id")
+    assert UUID(identifier) and response.getheader("Cache-Control") == "no-store"
+    entry = json.loads(capsys.readouterr().err)
+    assert entry.pop("duration_ms") >= 0
+    assert entry == {"route": template, "status": 200, "request_id": identifier}
+    legacy, previous = request(server, "GET", f"/api/graph?claim={claim}")
+    assert legacy.status == 200 and json.loads(previous) == json.loads(payload) == graph
+    openapi = json.loads(files("research_multiplier").joinpath("schemas/workbench.openapi.json").read_text())
+    schema = openapi["paths"][template]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(graph)
+
+    for target, kwargs, status, code in (
+        (path, {"session": False}, 401, "request.unauthenticated"),
+        (path, {"headers": {"Origin": "https://example.org"}}, 403, "request.forbidden"),
+        (path + "?view=untrusted", {}, 400, "claim_graph.invalid_query"),
+        (template.format(workspace_id=uuid4(), claim_id=claim), {}, 404, "claim_graph.not_found"),
+        (template.format(workspace_id=store.workspace_id, claim_id=claim.hex), {}, 404, "claim_graph.not_found"),
+    ):
+        response, payload = request(server, "GET", target, **kwargs)
+        assert response.status == status
+        error = json.loads(payload)["error"]
+        assert error["code"] == code and error["request_id"] == response.getheader("X-Request-Id")
+    assert reads == [claim, claim]
+
+    absent = uuid4()
+    response, payload = request(server, "GET", template.format(workspace_id=store.workspace_id, claim_id=absent))
+    assert response.status == 404
+    assert json.loads(payload)["error"]["code"] == "claim_graph.not_found"
+    assert b"Internal detail" not in payload
+    assert reads == [claim, claim, absent]
+    assert "Synthetic" not in capsys.readouterr().err
+
+
 def test_versioned_claim_activity_matches_legacy_and_checks_scope(agent_work_polling, monkeypatch, capsys):
     server, store = agent_work_polling
     store.workspace_id = uuid4()
