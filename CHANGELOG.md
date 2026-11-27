@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.146
+
+- Provider failures no longer pause Lean proof routes as mathematical stalls. Resumed runs recover the correct stall count from existing checkpoints.
+
 ## 1.0.145
 
 - Add the workspace-scoped v1 Agent work task detail with its OpenAPI contract.
