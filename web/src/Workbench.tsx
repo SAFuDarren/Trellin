@@ -843,7 +843,10 @@ export function Workbench({
                         </p>
                       )}
                       {view === "impact" && (
-                        <div className="impact-bar">
+                        <div
+                          className="impact-bar"
+                          data-error={impact.isError && !impact.isFetching ? "true" : undefined}
+                        >
                           {graph.hypotheses.length > 0 && (
                             <>
                               <label htmlFor="premise-select">{t("impact.preview")}</label>
