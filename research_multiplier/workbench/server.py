@@ -183,6 +183,8 @@ _V1_ERRORS = {
     "events.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local user."),
     "claims.invalid_query": (HTTPStatus.BAD_REQUEST, "The recent claims list does not take parameters."),
     "claims.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace claims are unavailable."),
+    "claim_activity.invalid_query": (HTTPStatus.BAD_REQUEST, "Claim activity does not take query parameters."),
+    "claim_activity.not_found": (HTTPStatus.NOT_FOUND, "The requested claim activity is unavailable in this workspace."),
     "agent_work.invalid_query": (HTTPStatus.BAD_REQUEST, "Agent work reads do not take query parameters."),
     "agent_work.not_found": (HTTPStatus.NOT_FOUND, "The requested Agent work is unavailable in this workspace."),
     "agent_work.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local researcher."),
@@ -746,10 +748,15 @@ class _Handler(BaseHTTPRequestHandler):
             if resource == "agent-work":
                 if references:
                     self._get_workspace_read(workspace, resource, workbench_agent_work.task_detail,
-                                             task_id=references[0])
+                                             record_id=references[0], route_path="agent-work/{task_id}")
                 else:
                     self._get_workspace_read(workspace, resource, _agent_work_snapshot)
                 return
+        if (len(read_path) == 8 and read_path[3] == "workspaces"
+                and read_path[5] == "claims" and read_path[7] == "activity"):
+            self._get_workspace_read(read_path[4], "claim-activity", _activity,
+                                     record_id=read_path[6], route_path="claims/{claim_id}/activity")
+            return
         if not self._trusted():
             self._v1_error("request.forbidden")
             return
@@ -817,7 +824,7 @@ class _Handler(BaseHTTPRequestHandler):
             if not streaming:
                 self._v1_error("request.failed")
 
-    def _workspace_read_reply(self, workspace, resource, snapshot, *values, task_id=None):
+    def _workspace_read_reply(self, workspace, resource, snapshot, *values, record_id=None):
         if not self._trusted():
             return "request.forbidden", None
         if not self._authorized():
@@ -827,18 +834,18 @@ class _Handler(BaseHTTPRequestHandler):
             workspace_id = UUID(workspace)
             if str(workspace_id) != workspace.lower():
                 raise ValueError
-            if task_id is not None:
-                task = UUID(task_id)
-                if str(task) != task_id.lower():
+            if record_id is not None:
+                record = UUID(record_id)
+                if str(record) != record_id.lower():
                     raise ValueError
-                values = (task, *values)
+                values = (record, *values)
         except ValueError:
             return f"{prefix}.not_found", None
         if "?" in self.path or "#" in self.path:
             return f"{prefix}.invalid_query", None
         try:
             return None, self.server.read(_workspace_snapshot, workspace_id, snapshot, *values)
-        except _MissingWorkspace:
+        except (_MissingWorkspace, workbench_activity.ClaimActivityNotFound):
             return f"{prefix}.not_found", None
         except workbench_agent_work.AgentWorkError as error:
             code = {
@@ -855,13 +862,11 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception:
             return "request.failed", None
 
-    def _get_workspace_read(self, workspace, resource, snapshot, *values, task_id=None):
+    def _get_workspace_read(self, workspace, resource, snapshot, *values, record_id=None, route_path=None):
         start = time.monotonic()
-        code, payload = self._workspace_read_reply(workspace, resource, snapshot, *values, task_id=task_id)
+        code, payload = self._workspace_read_reply(workspace, resource, snapshot, *values, record_id=record_id)
         status = _V1_ERRORS[code][0] if code else HTTPStatus.OK
-        route = f"/api/v1/workspaces/{{workspace_id}}/{resource}"
-        if task_id is not None:
-            route += "/{task_id}"
+        route = f"/api/v1/workspaces/{{workspace_id}}/{route_path or resource}"
         entry = {"route": route, "status": status,
                  "request_id": self.request_id, "duration_ms": round((time.monotonic() - start) * 1000, 3)}
         with _ACCESS_LOG_LOCK:

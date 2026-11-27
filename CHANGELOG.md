@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.147
+
+- Add a read-only v1 endpoint for a claim's recorded proof activity and guidance.
+
 ## 1.0.146
 
 - Provider failures no longer pause Lean proof routes as mathematical stalls. Resumed runs recover the correct stall count from existing checkpoints.

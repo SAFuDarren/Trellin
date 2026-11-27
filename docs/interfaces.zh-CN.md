@@ -158,6 +158,8 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 
 `GET /api/v1/workspaces/{workspace_id}/agent-work/{task_id}` 在 `{task}` 中返回研究者有权读取的派工详情，响应与 `GET /api/agent-work?task={task_id}` 一致，包含任务指令、验收标准和已记录的交付与审核。工作区和任务 UUID 通过路径传入。任务缺失或不可访问时返回 404。数据库尚未安装派工功能或已记录的交付不可用时返回 409，并使用不同的错误码。读取要求本地会话，且不接收查询参数。
 
+`GET /api/v1/workspaces/{workspace_id}/claims/{claim_id}/activity` 与 `GET /api/activity?claim={claim_id}` 返回相同的证明活动、已记录的指导消息和证明草稿可用状态。接口要求本地会话，通过路径接收工作区与已冻结命题的 UUID，不接收查询参数。缺失或不可访问的命题、工作区均返回 404 和 `claim_activity.not_found`。读取不会启动 worker。
+
 ### 耗时操作
 
 预计超过一秒左右的操作返回 `202 Accepted` 和一个任务资源：`{"job": {"id": "…", "state": "queued"}}`。客户端通过事件或 `GET …/jobs/{id}` 跟进度。
