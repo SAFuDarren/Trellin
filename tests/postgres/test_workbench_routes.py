@@ -327,6 +327,19 @@ def test_proof_draft_reopens_and_is_consumed_only_by_exact_queue_request(workben
         assert saved["text"] == text
     assert not _request(server, "GET", activity)["guidance"]
 
+    endpoint = f"/api/v1/workspaces/{paths.workspace_id(server.workspace)}/research-issues/preview"
+    scope = {"title": "Inspect the synthetic assumption", "deliverable": "One recorded finding",
+             "acceptance_criteria": "Cite the checked assumption", "required_capabilities": ["verification.lean"]}
+    proposal = {**scope, "proof_note": {**note, "draft_revision": record["revision"]}}
+    expected = {"draft": {**proposal, "claim_id": claim, "question": text.strip()}}
+    assert _request(server, "POST", endpoint, body=proposal) == expected
+    inline = {**scope, "question": "Can the fixture assumption be weakened?", "claim_id": claim}
+    assert _request(server, "POST", endpoint, body=inline) == {"draft": {**inline, "proof_note": None}}
+    missing = _request(server, "POST", endpoint, body={**inline, "claim_id": str(uuid4())}, status=404)
+    assert missing["error"]["code"] == "research_issue.not_found"
+    assert _request(server, "GET", path) == {"draft": record}
+    assert not _request(server, "GET", activity)["guidance"]
+
     queue = {**note, "statement_id": statement, "request_id": str(uuid4()),
              "text": text, "draft_revision": record["revision"]}
     _request(server, "POST", "/api/guidance", body={**queue, "statement_id": str(uuid4())}, status=409)
@@ -337,6 +350,8 @@ def test_proof_draft_reopens_and_is_consumed_only_by_exact_queue_request(workben
 
     updated = _request(server, "POST", "/api/proof-drafts",
                        body={**note, "expected_revision": None, "text": text})["draft"]
+    stale = _request(server, "POST", endpoint, body=proposal, status=409)
+    assert stale["error"]["code"] == "research_issue.stale"
     repeated = _request(server, "POST", "/api/guidance", body=queue)
     assert repeated["id"] == receipt["id"] and repeated["draft_consumed"] is False
     assert _request(server, "GET", path) == {"draft": updated}

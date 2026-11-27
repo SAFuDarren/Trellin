@@ -162,6 +162,8 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 
 `GET /api/v1/workspaces/{workspace_id}/claims/{claim_id}/graph` 与 `GET /api/graph?claim={claim_id}` 返回相同的证明节点、依赖、阻塞原因和验证账本。接口要求本地会话，通过路径接收工作区与已冻结命题的 UUID，不接收查询参数。缺失或不可访问的命题、工作区均返回 404 和 `claim_graph.not_found`。读取不会启动 worker。
 
+`POST /api/v1/workspaces/{workspace_id}/research-issues/preview` 在 `{draft}` 中返回只读的工作议题草案。请求体包含 `title`、`deliverable`、`acceptance_criteria` 和 `required_capabilities`。问题可来自 `question`（可附已冻结的 `claim_id`），也可来自带 `claim_id`、`node_id` 和 `draft_revision` 的 `proof_note`。证明笔记按绑定研究者和指定版本读取。响应包含问题、排序后的唯一能力 ID 和适用的命题及笔记引用。接口要求本地会话、启动器来源和已绑定的工作区身份。找不到来源时返回 `research_issue.not_found`（404），笔记已编辑时返回 `research_issue.stale`（409）。预览不写入记录、不调用模型供应商，也不启动 worker。
+
 ### 耗时操作
 
 预计超过一秒左右的操作返回 `202 Accepted` 和一个任务资源：`{"job": {"id": "…", "state": "queued"}}`。客户端通过事件或 `GET …/jobs/{id}` 跟进度。

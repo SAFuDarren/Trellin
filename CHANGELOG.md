@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.149
+
+- Add a backend preview for preparing a Work issue draft from an inline research question or an exact saved private proof note.
+
 ## 1.0.148
 
 - Add a read-only v1 endpoint for a claim's proof graph and verified ledger.
