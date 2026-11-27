@@ -6,6 +6,11 @@ from research_multiplier.storage.lean_progress import ACTIVE_LEAN_POLICY_SQL
 
 _MAX_ACTIVITY = 60
 
+
+class ClaimActivityNotFound(ValueError):
+    """The selected workspace does not have this frozen claim."""
+
+
 _SNAPSHOT = f"""
 WITH selected AS MATERIALIZED (
     SELECT id, contract_sha256 FROM rm.claims
@@ -227,7 +232,7 @@ def snapshot(store, claim_id):
     """Report only durable job state and recorded outcomes for this frozen claim."""
     rows = store.query("human", _SNAPSHOT, claim_id)
     if not rows:
-        raise ValueError("No frozen research claim matches this ID.")
+        raise ClaimActivityNotFound("No frozen research claim matches this ID.")
     row, = rows
     claim = str(row["claim_id"])
     goal = f"goal:{claim}"

@@ -35,6 +35,90 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/claims/{claim_id}/activity": {
+      "get": {
+        "operationId": "getClaimActivity",
+        "summary": "Read proof activity on a claim in the selected workspace",
+        "description": "Returns the same authorized snapshot as GET /api/activity?claim={claim_id}, with current proof job state, recorded outcomes, guidance and proof draft availability. This local-session read takes no query parameters and does not start a worker.",
+        "security": [{ "LocalSession": [] }],
+        "parameters": [
+          { "name": "workspace_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "claim_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current claim activity and saved guidance.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["claim_id", "activity", "guidance", "guidance_available", "guidance_channels",
+                    "guidance_reason", "guidance_blocker", "proof_draft_available"],
+                  "properties": {
+                    "claim_id": { "type": "string", "format": "uuid" },
+                    "activity": {
+                      "type": "array",
+                      "maxItems": 60,
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "kind", "state", "text", "at", "node_id", "fallback_node_id"],
+                        "properties": {
+                          "id": { "type": "string" },
+                          "kind": { "type": "string" },
+                          "state": { "type": "string" },
+                          "text": { "type": "string" },
+                          "at": { "type": ["string", "null"], "format": "date-time" },
+                          "node_id": { "type": "string" },
+                          "fallback_node_id": { "type": "string" },
+                          "policy_id": { "type": "string", "format": "uuid" },
+                          "job_id": { "type": "string", "format": "uuid" },
+                          "statement_id": { "type": "string", "format": "uuid" },
+                          "attempt_id": { "type": "string", "format": "uuid" },
+                          "provider": { "type": "string" },
+                          "model": { "type": "string" },
+                          "effort": { "type": "string" }
+                        }
+                      }
+                    },
+                    "guidance": {
+                      "type": "array",
+                      "maxItems": 40,
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "node_id", "text", "created_at", "submitted_at", "attempt_id",
+                          "audience", "current_scope"],
+                        "properties": {
+                          "id": { "type": "string", "format": "uuid" },
+                          "node_id": { "type": "string" },
+                          "text": { "type": "string" },
+                          "created_at": { "type": "string", "format": "date-time" },
+                          "submitted_at": { "type": ["string", "null"], "format": "date-time" },
+                          "attempt_id": { "type": ["string", "null"], "format": "uuid" },
+                          "audience": { "type": "string" },
+                          "current_scope": { "type": "boolean" }
+                        }
+                      }
+                    },
+                    "guidance_available": { "type": "boolean" },
+                    "guidance_channels": { "type": "array", "items": { "type": "string" } },
+                    "guidance_reason": { "type": "string" },
+                    "guidance_blocker": { "type": ["string", "null"] },
+                    "proof_draft_available": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ClaimActivityInvalidQuery" },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/ClaimActivityNotFound" },
+          "500": { "$ref": "#/components/responses/Failed" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/agent-work": {
       "get": {
         "operationId": "listAgentWork",
@@ -138,6 +222,16 @@
       }
     },
     "responses": {
+      "ClaimActivityInvalidQuery": {
+        "description": "Claim activity does not accept query parameters (claim_activity.invalid_query).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "ClaimActivityNotFound": {
+        "description": "Malformed or inaccessible workspace or frozen claim (claim_activity.not_found).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
       "AgentWorkInvalidQuery": {
         "description": "Agent work reads do not accept query parameters (agent_work.invalid_query).",
         "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },

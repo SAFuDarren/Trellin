@@ -523,8 +523,21 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
     repeated = _request(server, "POST", "/api/guidance", body=note)
     assert saved["id"] == repeated["id"] == note["request_id"]
     _request(server, "POST", "/api/guidance", body={**note, "text": "Different content."}, status=409)
-    messages = _request(server, "GET", activity_path)["guidance"]
+    legacy_activity = _request(server, "GET", activity_path)
+    messages = legacy_activity["guidance"]
     assert [(item["id"], item["text"]) for item in messages] == [(note["request_id"], note["text"])]
+    workspace_id = paths.workspace_id(server.workspace)
+    template = "/api/v1/workspaces/{workspace_id}/claims/{claim_id}/activity"
+    endpoint = template.format(workspace_id=workspace_id, claim_id=claim_id)
+    versioned_activity = _request(server, "GET", endpoint)
+    assert versioned_activity == legacy_activity
+    openapi = json.loads(files("research_multiplier").joinpath("schemas/workbench.openapi.json").read_text())
+    schema = openapi["paths"][template]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(versioned_activity)
+    missing_activity = _request(
+        server, "GET", template.format(workspace_id=workspace_id, claim_id=uuid4()), status=404,
+    )
+    assert missing_activity["error"]["code"] == "claim_activity.not_found"
     threads = _request(server, "GET", "/api/threads")["threads"]
     thread = next(item for item in threads if item["claim_id"] == claim_id and item["node_id"] == goal["id"])
     assert any(event["kind"] == "guidance" and event["text"] == note["text"] for event in thread["events"])

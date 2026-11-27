@@ -158,6 +158,8 @@ The same OpenAPI document covers the read-only list at `GET /api/v1/workspaces/{
 
 `GET /api/v1/workspaces/{workspace_id}/agent-work/{task_id}` returns the authorized researcher's task detail in `{task}`. The payload matches `GET /api/agent-work?task={task_id}` and includes the instructions, acceptance criteria, and any recorded delivery and review. The workspace and task are UUID path parameters. A missing or inaccessible task returns 404. An older database without Agent work support or an unavailable recorded delivery returns 409 with a distinct error code. Reads require the local session and take no query parameters.
 
+`GET /api/v1/workspaces/{workspace_id}/claims/{claim_id}/activity` returns the same proof activity, recorded guidance and proof draft availability as `GET /api/activity?claim={claim_id}`. It requires a local session and takes the workspace and frozen claim UUIDs from the path. It accepts no query parameters. A missing or inaccessible claim or workspace returns 404 with `claim_activity.not_found`. The read does not start a worker.
+
 ### Long-running operations
 
 Operations that take more than about a second return `202 Accepted` with a job resource: `{"job": {"id": "…", "state": "queued"}}`. Clients follow progress through events or `GET …/jobs/{id}`.

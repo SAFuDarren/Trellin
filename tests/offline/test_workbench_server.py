@@ -609,6 +609,78 @@ def _agent_work_response_schema(template):
     )
 
 
+def test_versioned_claim_activity_matches_legacy_and_checks_scope(agent_work_polling, monkeypatch, capsys):
+    server, store = agent_work_polling
+    store.workspace_id = uuid4()
+    claim = uuid4()
+    goal = f"goal:{claim}"
+    template = "/api/v1/workspaces/{workspace_id}/claims/{claim_id}/activity"
+    path = template.format(workspace_id=store.workspace_id, claim_id=claim)
+    expected = {
+        "claim_id": str(claim),
+        "activity": [{
+            "id": f"worker:{uuid4()}", "kind": "worker", "state": "running",
+            "text": "Synthetic proof is running.", "at": None, "node_id": goal, "fallback_node_id": goal,
+        }],
+    }
+    reads = []
+
+    def transaction(role, action, *, read_only):
+        assert role == "human" and read_only
+        return action()
+
+    def snapshot(given_store, requested_claim):
+        assert given_store is store
+        reads.append(requested_claim)
+        if requested_claim != claim:
+            raise workbench_server.workbench_activity.ClaimActivityNotFound("Synthetic missing claim.")
+        return expected
+
+    store.transaction = transaction
+    monkeypatch.setattr(workbench_server.workbench_activity, "snapshot", snapshot)
+    monkeypatch.setattr(workbench_server.workbench_guidance, "activity", lambda *_: {
+        "guidance": [], "guidance_channels": [], "guidance_available": False,
+        "guidance_reason": "", "guidance_blocker": None,
+    })
+    monkeypatch.setattr(workbench_server.workbench_proof_drafts, "installed", lambda _: False)
+    monkeypatch.setattr(server, "_wake_agent_work", lambda: pytest.fail("Read woke an Agent."))
+
+    response, payload = request(server, "GET", path)
+    assert response.status == 200
+    identifier = response.getheader("X-Request-Id")
+    assert UUID(identifier)
+    assert response.getheader("Cache-Control") == "no-store"
+    entry = json.loads(capsys.readouterr().err)
+    assert entry.pop("duration_ms") >= 0
+    assert entry == {"route": template, "status": 200, "request_id": identifier}
+    legacy, legacy_payload = request(server, "GET", f"/api/activity?claim={claim}")
+    assert legacy.status == 200
+    assert json.loads(payload) == json.loads(legacy_payload)
+    openapi = json.loads(files("research_multiplier").joinpath("schemas/workbench.openapi.json").read_text())
+    schema = openapi["paths"][template]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(json.loads(payload))
+
+    for target, kwargs, status, code in (
+        (path, {"session": False}, 401, "request.unauthenticated"),
+        (path, {"headers": {"Origin": "https://example.org"}}, 403, "request.forbidden"),
+        (path + "?cursor=3", {}, 400, "claim_activity.invalid_query"),
+        (template.format(workspace_id=uuid4(), claim_id=claim), {}, 404, "claim_activity.not_found"),
+        (template.format(workspace_id=store.workspace_id, claim_id="invalid"), {}, 404, "claim_activity.not_found"),
+    ):
+        response, payload = request(server, "GET", target, **kwargs)
+        assert response.status == status
+        error = json.loads(payload)["error"]
+        assert error["code"] == code and error["request_id"] == response.getheader("X-Request-Id")
+    assert reads == [claim, claim]
+
+    absent = uuid4()
+    response, payload = request(server, "GET", template.format(workspace_id=store.workspace_id, claim_id=absent))
+    assert response.status == 404
+    assert json.loads(payload)["error"]["code"] == "claim_activity.not_found"
+    assert reads == [claim, claim, absent]
+    assert "Synthetic" not in capsys.readouterr().err
+
+
 @pytest.mark.parametrize(("case", "status", "code"), [
     ("found", 200, None),
     ("missing", 404, "agent_work.not_found"),
