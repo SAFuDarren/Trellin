@@ -609,6 +609,91 @@ def _agent_work_response_schema(template):
     )
 
 
+def test_versioned_research_issue_preview_uses_only_current_workspace_and_note(
+    agent_work_polling, monkeypatch, capsys,
+):
+    server, store = agent_work_polling
+    store.workspace_id = uuid4()
+    store.local_user = lambda: {"id": uuid4()}
+    claim, revision = uuid4(), uuid4()
+    node = f"goal:{claim}"
+    reads = []
+
+    def transaction(role, action, *, read_only):
+        assert role == "human" and read_only
+        return action()
+
+    def read_note(given_store, claim_id, node_id):
+        assert given_store is store
+        reads.append((claim_id, node_id))
+        draft = {"revision": revision, "text": "  Synthetic question from the private draft.  "}
+        return {"draft": draft if (claim_id, node_id) == (claim, node) else None}
+
+    store.transaction = transaction
+    monkeypatch.setattr(workbench_server.workbench_proof_drafts, "read", read_note)
+    template = "/api/v1/workspaces/{workspace_id}/research-issues/preview"
+    endpoint = template.format(workspace_id=store.workspace_id)
+    fields = {
+        "title": "  Synthetic direction  ", "deliverable": "A reproducible result.",
+        "acceptance_criteria": "Record the boundary conditions.",
+        "required_capabilities": ["verification.lean", "literature-review"],
+    }
+    source = {"claim_id": str(claim), "node_id": node, "draft_revision": str(revision)}
+    document = {**fields, "proof_note": source}
+    response, raw = request(server, "POST", endpoint, body=document)
+    assert response.status == 200 and response.getheader("Cache-Control") == "no-store"
+    request_id = response.getheader("X-Request-Id")
+    assert UUID(request_id)
+    expected = {"draft": {
+        **fields, "title": "Synthetic direction", "claim_id": str(claim), "proof_note": source,
+        "question": "Synthetic question from the private draft.",
+        "required_capabilities": ["literature-review", "verification.lean"],
+    }}
+    assert json.loads(raw) == expected
+    entry = json.loads(capsys.readouterr().err)
+    assert entry.pop("duration_ms") >= 0
+    assert entry == {"route": template, "status": 200, "request_id": request_id}
+    response, repeated = request(server, "POST", endpoint, body=document)
+    assert response.status == 200 and json.loads(repeated) == expected
+    response, inline = request(server, "POST", endpoint, body={**fields, "question": "An inline question."})
+    assert response.status == 200
+    assert json.loads(inline) == {"draft": {
+        **expected["draft"], "question": "An inline question.", "claim_id": None, "proof_note": None,
+    }}
+
+    openapi = json.loads(files("research_multiplier").joinpath("schemas/workbench.openapi.json").read_text())
+    operation = openapi["paths"][template]["post"]
+    input_schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    output_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    Draft202012Validator(input_schema, format_checker=FormatChecker()).validate(document)
+    Draft202012Validator(input_schema, format_checker=FormatChecker()).validate({**fields, "question": "Question."})
+    Draft202012Validator(output_schema, format_checker=FormatChecker()).validate(expected)
+
+    for path, body, options, status, code in (
+        (endpoint, document, {"session": False}, 401, "request.unauthenticated"),
+        (endpoint, document, {"origin": False}, 403, "request.forbidden"),
+        (endpoint + "?send=true", document, {}, 400, "research_issue.invalid"),
+        (endpoint, {**document, "question": "Two sources."}, {}, 400, "research_issue.invalid"),
+        (endpoint, {**document, "required_capabilities": ["bad capability"]}, {}, 400, "research_issue.invalid"),
+        (endpoint, {**document, "required_capabilities": ["repeat", "repeat"]}, {}, 400, "research_issue.invalid"),
+        (endpoint, {**document, "title": chr(0xD800)}, {}, 400, "research_issue.invalid"),
+        (template.format(workspace_id=uuid4()), document, {}, 404, "research_issue.not_found"),
+        (endpoint, {**document, "proof_note": {**source, "node_id": "wrong"}}, {}, 404, "research_issue.not_found"),
+        (endpoint, {**document, "proof_note": {**source, "draft_revision": str(uuid4())}}, {}, 409,
+         "research_issue.stale"),
+    ):
+        response, raw = request(server, "POST", path, body=body, **options)
+        assert response.status == status
+        error = json.loads(raw)["error"]
+        assert error["code"] == code and error["request_id"] == response.getheader("X-Request-Id")
+    assert reads == [(claim, node), (claim, node), (claim, "wrong"), (claim, node)]
+    store.local_user = lambda: None
+    response, raw = request(server, "POST", endpoint, body=document)
+    assert response.status == 403 and json.loads(raw)["error"]["code"] == "research_issue.identity_required"
+    log = capsys.readouterr().err
+    assert "Synthetic" not in log and str(claim) not in log and str(store.workspace_id) not in log
+
+
 def test_versioned_claim_graph_matches_legacy_and_checks_scope(agent_work_polling, monkeypatch, capsys):
     server, store = agent_work_polling
     store.workspace_id = uuid4()

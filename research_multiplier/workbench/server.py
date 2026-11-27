@@ -24,7 +24,8 @@ from research_multiplier.workflows import (claim_references, doctor, proof_graph
     research_progress, workbench_activity, workbench_agent_work, workbench_agents, workbench_automation,
     workbench_clarification, workbench_conversations, workbench_goal_review, workbench_guidance, workbench_intake,
     workbench_lemma_plans, workbench_library, workbench_premises, workbench_project_canvas, workbench_proof_drafts,
-    workbench_proof_tasks, workbench_review, workbench_sections, workbench_theorems, workspace_events)
+    workbench_proof_tasks, workbench_research_issues, workbench_review, workbench_sections, workbench_theorems,
+    workspace_events)
 
 
 # The interface is built from web/ into the package (docs/engineering.md); only its exact files are served.
@@ -187,6 +188,11 @@ _V1_ERRORS = {
     "claim_activity.not_found": (HTTPStatus.NOT_FOUND, "The requested claim activity is unavailable in this workspace."),
     "claim_graph.invalid_query": (HTTPStatus.BAD_REQUEST, "The claim graph does not take query parameters."),
     "claim_graph.not_found": (HTTPStatus.NOT_FOUND, "The requested claim graph is unavailable in this workspace."),
+    "research_issue.invalid": (HTTPStatus.BAD_REQUEST, "Supply a valid research direction and one question source."),
+    "research_issue.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local researcher."),
+    "research_issue.not_found": (HTTPStatus.NOT_FOUND, "The workspace or research source is unavailable."),
+    "research_issue.stale": (HTTPStatus.CONFLICT, "The proof note changed. Reopen its current draft."),
+    "research_issue.source_unavailable": (HTTPStatus.SERVICE_UNAVAILABLE, "Proof note storage is unavailable."),
     "agent_work.invalid_query": (HTTPStatus.BAD_REQUEST, "Agent work reads do not take query parameters."),
     "agent_work.not_found": (HTTPStatus.NOT_FOUND, "The requested Agent work is unavailable in this workspace."),
     "agent_work.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local researcher."),
@@ -869,8 +875,11 @@ class _Handler(BaseHTTPRequestHandler):
     def _get_workspace_read(self, workspace, resource, snapshot, *values, record_id=None, route_path=None):
         start = time.monotonic()
         code, payload = self._workspace_read_reply(workspace, resource, snapshot, *values, record_id=record_id)
-        status = _V1_ERRORS[code][0] if code else HTTPStatus.OK
         route = f"/api/v1/workspaces/{{workspace_id}}/{route_path or resource}"
+        self._v1_logged_reply(route, start, code, payload)
+
+    def _v1_logged_reply(self, route, start, code, payload):
+        status = _V1_ERRORS[code][0] if code else HTTPStatus.OK
         entry = {"route": route, "status": status,
                  "request_id": self.request_id, "duration_ms": round((time.monotonic() - start) * 1000, 3)}
         with _ACCESS_LOG_LOCK:
@@ -949,14 +958,51 @@ class _Handler(BaseHTTPRequestHandler):
             _LOG.error("Versioned workbench clarification failed (%s).", type(error).__name__)
             self._v1_error("request.failed")
 
+    def _v1_post_error(self):
+        if not self._trusted() or self.headers.get_all("Origin") != [self.server.origin]:
+            return "request.forbidden"
+        if not self._authorized():
+            return "request.unauthenticated"
+        return None
+
+    def _research_issue_preview_reply(self, workspace):
+        if code := self._v1_post_error():
+            return code, None
+        try:
+            workspace_id = UUID(workspace)
+            if str(workspace_id) != workspace:
+                raise ValueError
+        except ValueError:
+            return "research_issue.not_found", None
+        if "?" in self.path or "#" in self.path:
+            return "research_issue.invalid", None
+        try:
+            document = self._body(workbench_research_issues.MAX_REQUEST_BYTES)
+            return None, self.server.read(_workspace_snapshot, workspace_id, workbench_research_issues.preview, document)
+        except _BadRequest:
+            return "research_issue.invalid", None
+        except _MissingWorkspace:
+            return "research_issue.not_found", None
+        except workbench_research_issues.ResearchIssuePreviewError as error:
+            return str(error), None
+        except (DatabaseOperationError, ValueError):
+            return "database.unavailable", None
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            raise
+        except Exception:
+            return "request.failed", None
+
     def _post_v1(self):
         self.request_id = str(uuid4())
         try:
-            if not self._trusted() or self.headers.get_all("Origin") != [self.server.origin]:
-                self._v1_error("request.forbidden")
+            preview = self.path.split("?", 1)[0].split("#", 1)[0].split("/")
+            if len(preview) == 7 and preview[3] == "workspaces" and preview[5:] == ["research-issues", "preview"]:
+                start = time.monotonic()
+                code, payload = self._research_issue_preview_reply(preview[4])
+                self._v1_logged_reply("/api/v1/workspaces/{workspace_id}/research-issues/preview", start, code, payload)
                 return
-            if not self._authorized():
-                self._v1_error("request.unauthenticated")
+            if code := self._v1_post_error():
+                self._v1_error(code)
                 return
             path = self.path.split("/")
             if len(path) > 5 and path[3] == "workspaces" and path[5] == "clarifications":

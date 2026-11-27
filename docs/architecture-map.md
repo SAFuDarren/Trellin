@@ -18,7 +18,7 @@ flowchart TD
         workbench["workbench (4 modules)"]
     end
     subgraph layer_workflows["Workflows (A2)"]
-        workflows["workflows (59 modules)"]
+        workflows["workflows (60 modules)"]
     end
     subgraph layer_kernel["Kernel foundation (A1, A3)"]
         models["models (6 modules)"]
@@ -95,7 +95,7 @@ flowchart TD
 | `sources` | kernel | 3 | — | `cli`, `workflows` |
 | `storage` | kernel | 12 | `policy`, `protocol` | `cli`, `evaluations`, `models`, `policy`, `proof`, `workbench`, `workflows` |
 | `workbench` | entry | 4 | `cli`, `models`, `proof`, `storage`, `workflows` | `cli` |
-| `workflows` | workflows | 59 | `cli`, `domain_packages`, `evaluations`, `models`, `policy`, `proof`, `protocol`, `sources`, `storage` | `cli`, `evaluations`, `policy`, `proof`, `workbench` |
+| `workflows` | workflows | 60 | `cli`, `domain_packages`, `evaluations`, `models`, `policy`, `proof`, `protocol`, `sources`, `storage` | `cli`, `evaluations`, `policy`, `proof`, `workbench` |
 
 ## Enforced layering boundaries
 

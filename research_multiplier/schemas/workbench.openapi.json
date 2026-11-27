@@ -3,7 +3,7 @@
   "info": {
     "title": "Research Multiplier workbench API",
     "version": "1",
-    "description": "Local workbench contract for recent claims and Agent work reads."
+    "description": "Local workbench contract for claim views, Agent work reads and research issue previews."
   },
   "paths": {
     "/api/v1/workspaces/{workspace_id}/claims": {
@@ -259,6 +259,102 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/research-issues/preview": {
+      "post": {
+        "operationId": "previewResearchIssue",
+        "summary": "Prepare a research issue draft from a question or an exact private proof note",
+        "description": "Requires a bound local researcher, a local session and the launcher Origin. Accepts up to 65,536 UTF-8 JSON bytes and no query parameters. Reads the researcher's current proof note when specified. Preview makes no writes or provider calls.",
+        "security": [{ "LocalSession": [] }],
+        "parameters": [
+          { "name": "workspace_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["title", "deliverable", "acceptance_criteria", "required_capabilities"],
+                "oneOf": [
+                  { "required": ["question"], "not": { "required": ["proof_note"] } },
+                  { "required": ["proof_note"], "not": { "anyOf": [{ "required": ["question"] }, { "required": ["claim_id"] }] } }
+                ],
+                "properties": {
+                  "title": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S" },
+                  "question": { "type": "string", "minLength": 1, "maxLength": 6000, "pattern": "\\S" },
+                  "deliverable": { "type": "string", "minLength": 1, "maxLength": 2000, "pattern": "\\S" },
+                  "acceptance_criteria": { "type": "string", "minLength": 1, "maxLength": 4000, "pattern": "\\S" },
+                  "claim_id": { "type": "string", "format": "uuid" },
+                  "required_capabilities": {
+                    "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true,
+                    "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" }
+                  },
+                  "proof_note": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["claim_id", "node_id", "draft_revision"],
+                    "properties": {
+                      "claim_id": { "type": "string", "format": "uuid" },
+                      "node_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+                      "draft_revision": { "type": "string", "format": "uuid" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A normalized draft and the exact source revision, when sourced from a proof note. Capability IDs are sorted.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["draft"],
+                  "properties": {
+                    "draft": {
+                      "type": "object",
+                      "required": ["title", "question", "deliverable", "acceptance_criteria",
+                        "required_capabilities", "claim_id", "proof_note"],
+                      "properties": {
+                        "title": { "type": "string" },
+                        "question": { "type": "string" },
+                        "deliverable": { "type": "string" },
+                        "acceptance_criteria": { "type": "string" },
+                        "required_capabilities": {
+                          "type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true,
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" }
+                        },
+                        "claim_id": { "type": ["string", "null"], "format": "uuid" },
+                        "proof_note": {
+                          "type": ["object", "null"],
+                          "required": ["claim_id", "node_id", "draft_revision"],
+                          "properties": {
+                            "claim_id": { "type": "string", "format": "uuid" },
+                            "node_id": { "type": "string" },
+                            "draft_revision": { "type": "string", "format": "uuid" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ResearchIssueInvalid" },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/ResearchIssueForbidden" },
+          "404": { "$ref": "#/components/responses/ResearchIssueNotFound" },
+          "409": { "$ref": "#/components/responses/ResearchIssueStale" },
+          "500": { "$ref": "#/components/responses/Failed" },
+          "503": { "$ref": "#/components/responses/ResearchIssueUnavailable" }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/agent-work": {
       "get": {
         "operationId": "listAgentWork",
@@ -379,6 +475,31 @@
       },
       "ClaimGraphNotFound": {
         "description": "Malformed or inaccessible workspace or frozen claim (claim_graph.not_found).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "ResearchIssueInvalid": {
+        "description": "Invalid draft, source or query parameters (research_issue.invalid).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "ResearchIssueForbidden": {
+        "description": "Untrusted request (request.forbidden) or missing bound researcher (research_issue.identity_required).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "ResearchIssueNotFound": {
+        "description": "The workspace, claim, node or private note is absent or inaccessible (research_issue.not_found).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "ResearchIssueStale": {
+        "description": "The saved proof note has a different revision (research_issue.stale).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "ResearchIssueUnavailable": {
+        "description": "The workspace database (database.unavailable) or proof note storage (research_issue.source_unavailable) is unavailable.",
         "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
         "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
       },
