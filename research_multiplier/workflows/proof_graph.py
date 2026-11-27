@@ -6,6 +6,10 @@ from research_multiplier import general_lean, lean_parameters
 from research_multiplier.workflows import claim_references, proof_ledger
 
 
+class ClaimGraphNotFound(ValueError):
+    """The requested claim has no frozen graph."""
+
+
 _CURRENT_PACKET = """
     SELECT p.id, p.version, p.approved
     FROM rm.formalization_status p
@@ -480,7 +484,7 @@ def snapshot(store, claim_id, *, references=True, include_lemma_plan=False):
     """Project the selected frozen packet and its current Lean history in one snapshot."""
     rows = store.query("human", _GRAPH, claim_id)
     if not rows:
-        raise ValueError("No frozen research claim matches this ID.")
+        raise ClaimGraphNotFound("No frozen research claim matches this ID.")
     graph = _snapshot(rows[0])
     if include_lemma_plan:
         statement = rows[0]["lean"]

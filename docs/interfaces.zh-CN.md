@@ -160,6 +160,8 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 
 `GET /api/v1/workspaces/{workspace_id}/claims/{claim_id}/activity` 与 `GET /api/activity?claim={claim_id}` 返回相同的证明活动、已记录的指导消息和证明草稿可用状态。接口要求本地会话，通过路径接收工作区与已冻结命题的 UUID，不接收查询参数。缺失或不可访问的命题、工作区均返回 404 和 `claim_activity.not_found`。读取不会启动 worker。
 
+`GET /api/v1/workspaces/{workspace_id}/claims/{claim_id}/graph` 与 `GET /api/graph?claim={claim_id}` 返回相同的证明节点、依赖、阻塞原因和验证账本。接口要求本地会话，通过路径接收工作区与已冻结命题的 UUID，不接收查询参数。缺失或不可访问的命题、工作区均返回 404 和 `claim_graph.not_found`。读取不会启动 worker。
+
 ### 耗时操作
 
 预计超过一秒左右的操作返回 `202 Accepted` 和一个任务资源：`{"job": {"id": "…", "state": "queued"}}`。客户端通过事件或 `GET …/jobs/{id}` 跟进度。

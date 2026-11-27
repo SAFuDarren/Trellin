@@ -488,6 +488,18 @@ def test_workbench_api_reads_and_persists_project_records(workbench):
     assert renamed["claim"]["code"] == "REF35"
     rebuilt = {node["id"]: node["code"] for node in renamed["nodes"]}
     assert rebuilt == {node["id"]: f"REF35-{node['code'].split('-')[1]}" for node in graph["nodes"]}
+    graph_template = "/api/v1/workspaces/{workspace_id}/claims/{claim_id}/graph"
+    workspace_id = paths.workspace_id(server.workspace)
+    graph_endpoint = graph_template.format(workspace_id=workspace_id, claim_id=claim_id)
+    versioned_graph = _request(server, "GET", graph_endpoint)
+    assert versioned_graph == renamed
+    openapi = json.loads(files("research_multiplier").joinpath("schemas/workbench.openapi.json").read_text())
+    schema = openapi["paths"][graph_template]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(versioned_graph)
+    missing_graph = _request(
+        server, "GET", graph_template.format(workspace_id=workspace_id, claim_id=uuid4()), status=404,
+    )
+    assert missing_graph["error"]["code"] == "claim_graph.not_found"
     for lookup_code in (initial_code, rebuilt[goal["id"]]):
         assert _request(server, "GET", f"/api/claim-code?code={lookup_code}") == {
             "claim_id": claim_id, "node_id": goal["id"],

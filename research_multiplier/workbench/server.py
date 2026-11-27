@@ -185,6 +185,8 @@ _V1_ERRORS = {
     "claims.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace claims are unavailable."),
     "claim_activity.invalid_query": (HTTPStatus.BAD_REQUEST, "Claim activity does not take query parameters."),
     "claim_activity.not_found": (HTTPStatus.NOT_FOUND, "The requested claim activity is unavailable in this workspace."),
+    "claim_graph.invalid_query": (HTTPStatus.BAD_REQUEST, "The claim graph does not take query parameters."),
+    "claim_graph.not_found": (HTTPStatus.NOT_FOUND, "The requested claim graph is unavailable in this workspace."),
     "agent_work.invalid_query": (HTTPStatus.BAD_REQUEST, "Agent work reads do not take query parameters."),
     "agent_work.not_found": (HTTPStatus.NOT_FOUND, "The requested Agent work is unavailable in this workspace."),
     "agent_work.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local researcher."),
@@ -752,11 +754,13 @@ class _Handler(BaseHTTPRequestHandler):
                 else:
                     self._get_workspace_read(workspace, resource, _agent_work_snapshot)
                 return
-        if (len(read_path) == 8 and read_path[3] == "workspaces"
-                and read_path[5] == "claims" and read_path[7] == "activity"):
-            self._get_workspace_read(read_path[4], "claim-activity", _activity,
-                                     record_id=read_path[6], route_path="claims/{claim_id}/activity")
-            return
+        if len(read_path) == 8 and read_path[3] == "workspaces" and read_path[5] == "claims":
+            workspace, claim_id, view = read_path[4], read_path[6], read_path[7]
+            snapshot = {"activity": _activity, "graph": workbench_premises.graph}.get(view)
+            if snapshot is not None:
+                self._get_workspace_read(workspace, f"claim-{view}", snapshot,
+                                         record_id=claim_id, route_path=f"claims/{{claim_id}}/{view}")
+                return
         if not self._trusted():
             self._v1_error("request.forbidden")
             return
@@ -845,7 +849,7 @@ class _Handler(BaseHTTPRequestHandler):
             return f"{prefix}.invalid_query", None
         try:
             return None, self.server.read(_workspace_snapshot, workspace_id, snapshot, *values)
-        except (_MissingWorkspace, workbench_activity.ClaimActivityNotFound):
+        except (_MissingWorkspace, workbench_activity.ClaimActivityNotFound, proof_graph.ClaimGraphNotFound):
             return f"{prefix}.not_found", None
         except workbench_agent_work.AgentWorkError as error:
             code = {

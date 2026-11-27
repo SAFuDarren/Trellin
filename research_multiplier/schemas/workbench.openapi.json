@@ -119,6 +119,146 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/claims/{claim_id}/graph": {
+      "get": {
+        "operationId": "getClaimGraph",
+        "summary": "Read the proof graph of a frozen claim in the selected workspace",
+        "description": "Returns the same authorized snapshot as GET /api/graph?claim={claim_id}, with current proof nodes, dependencies, blockers and the verified ledger. This local-session read takes no query parameters and does not start a worker.",
+        "security": [{ "LocalSession": [] }],
+        "parameters": [
+          { "name": "workspace_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "claim_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current proof graph and its recorded assurance history.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["claim", "nodes", "edges", "focus_id", "blockers", "ledger"],
+                  "properties": {
+                    "claim": {
+                      "type": "object",
+                      "required": ["id", "title", "statement", "statement_id", "status", "domain"],
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "title": { "type": ["string", "null"] },
+                        "statement": { "type": ["string", "null"] },
+                        "statement_id": { "type": ["string", "null"], "format": "uuid" },
+                        "status": { "type": "string" },
+                        "domain": { "type": ["string", "null"] },
+                        "code": { "type": "string" },
+                        "lemma_plan_ready": { "type": "boolean" },
+                        "premise_review": { "type": "object" }
+                      }
+                    },
+                    "nodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "kind", "status"],
+                        "properties": {
+                          "id": { "type": "string" },
+                          "kind": { "type": "string" },
+                          "status": { "type": ["string", "null"] },
+                          "title": { "type": ["string", "null"] },
+                          "statement": { "type": ["string", "null"] },
+                          "formalization": { "type": ["string", "null"] },
+                          "verification_status": { "type": "string" },
+                          "reference": { "type": "object" },
+                          "code": { "type": "string" }
+                        }
+                      }
+                    },
+                    "edges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["source", "target", "kind"],
+                        "properties": {
+                          "source": { "type": "string" },
+                          "target": { "type": "string" },
+                          "kind": { "type": "string", "description": "Frozen scope, planned proof route or actual dependency." },
+                          "relation": { "type": "string" }
+                        }
+                      }
+                    },
+                    "focus_id": { "type": "string" },
+                    "blockers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["node_id", "kind", "reason"],
+                        "properties": {
+                          "node_id": { "type": "string" },
+                          "kind": { "type": "string" },
+                          "reason": { "type": "string" }
+                        }
+                      }
+                    },
+                    "ledger": {
+                      "type": "object",
+                      "required": ["lemmas", "tried_routes", "counts"],
+                      "properties": {
+                        "lemmas": {
+                          "type": "array",
+                          "maxItems": 40,
+                          "items": {
+                            "type": "object",
+                            "required": ["lemma_id", "proposition", "verification_attempt_id", "recorded_at", "used_by"],
+                            "properties": {
+                              "lemma_id": { "type": "string", "format": "uuid" },
+                              "proposition": { "type": "string" },
+                              "verification_attempt_id": { "type": ["string", "null"], "format": "uuid" },
+                              "recorded_at": { "type": ["string", "null"] },
+                              "used_by": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+                            }
+                          }
+                        },
+                        "tried_routes": {
+                          "type": "array",
+                          "maxItems": 16,
+                          "items": {
+                            "type": "object",
+                            "required": ["implication_id", "status", "obligations", "open_obligation", "reason", "attempt_id", "recorded_at"],
+                            "properties": {
+                              "implication_id": { "type": "string", "format": "uuid" },
+                              "status": { "type": "string" },
+                              "obligations": { "type": "array", "maxItems": 8, "items": { "type": "string" } },
+                              "open_obligation": { "type": ["string", "null"] },
+                              "reason": { "type": ["string", "null"] },
+                              "attempt_id": { "type": ["string", "null"], "format": "uuid" },
+                              "recorded_at": { "type": ["string", "null"] }
+                            }
+                          }
+                        },
+                        "counts": {
+                          "description": "Total counts before the display limits of the two arrays.",
+                          "type": "object",
+                          "required": ["lemmas", "tried_routes"],
+                          "properties": {
+                            "lemmas": { "type": "integer", "minimum": 0 },
+                            "tried_routes": { "type": "integer", "minimum": 0 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ClaimGraphInvalidQuery" },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/ClaimGraphNotFound" },
+          "500": { "$ref": "#/components/responses/Failed" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/agent-work": {
       "get": {
         "operationId": "listAgentWork",
@@ -229,6 +369,16 @@
       },
       "ClaimActivityNotFound": {
         "description": "Malformed or inaccessible workspace or frozen claim (claim_activity.not_found).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "ClaimGraphInvalidQuery": {
+        "description": "The proof graph does not accept query parameters (claim_graph.invalid_query).",
+        "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+        "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+      },
+      "ClaimGraphNotFound": {
+        "description": "Malformed or inaccessible workspace or frozen claim (claim_graph.not_found).",
         "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
         "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
       },
