@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.145
+
+- Add the workspace-scoped v1 Agent work task detail with its OpenAPI contract.
+
 ## 1.0.144
 
 - Add a read-only v1 Agent work list with a workspace-scoped OpenAPI contract.

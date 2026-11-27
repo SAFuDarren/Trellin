@@ -1,12 +1,15 @@
 """Exercise project work, its consent, and exact handoff through the Workbench server."""
 
 from contextlib import nullcontext
+from importlib.resources import files
+import json
 from subprocess import check_output
 from threading import Thread
 from time import monotonic, sleep
 from types import SimpleNamespace
 from uuid import uuid4
 
+from jsonschema import Draft202012Validator, FormatChecker
 import pytest
 
 from research_multiplier.model_adapters import ModelConfig
@@ -220,9 +223,17 @@ def test_workbench_pins_code_handoff_and_requires_a_human_decision(workbench, mo
         browser = Thread(target=restarted.serve_forever, daemon=True)
         browser.start()
         try:
-            assert _get(restarted, written["id"]) == written
-            assert _get(restarted, second["id"]) == accepted
-            assert _get(restarted, edited["id"]) == returned
+            schemas = files("research_multiplier").joinpath("schemas/agent-work.schema.json")
+            definitions = json.loads(schemas.read_text(encoding="utf-8"))
+            validator = Draft202012Validator(
+                {**definitions, "$ref": "#/$defs/TaskDetail"}, format_checker=FormatChecker(),
+            )
+            for saved in (first, written, accepted, returned):
+                task_id = saved["id"]
+                assert _get(restarted, task_id) == saved
+                detail = _request(restarted, "GET", f"/api/v1/workspaces/{workspace_id}/agent-work/{task_id}")
+                assert detail == {"task": saved}
+                validator.validate(detail["task"])
         finally:
             restarted.shutdown()
             browser.join()

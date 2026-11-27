@@ -183,9 +183,11 @@ _V1_ERRORS = {
     "events.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local user."),
     "claims.invalid_query": (HTTPStatus.BAD_REQUEST, "The recent claims list does not take parameters."),
     "claims.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace claims are unavailable."),
-    "agent_work.invalid_query": (HTTPStatus.BAD_REQUEST, "The Agent work list does not take parameters."),
-    "agent_work.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace Agent work is unavailable."),
+    "agent_work.invalid_query": (HTTPStatus.BAD_REQUEST, "Agent work reads do not take query parameters."),
+    "agent_work.not_found": (HTTPStatus.NOT_FOUND, "The requested Agent work is unavailable in this workspace."),
     "agent_work.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local researcher."),
+    "agent_work.upgrade_required": (HTTPStatus.CONFLICT, "Agent work requires an upgraded workspace database."),
+    "agent_work.delivery_unavailable": (HTTPStatus.CONFLICT, "The recorded Agent delivery is unavailable."),
 }
 
 
@@ -735,14 +737,18 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _get_v1(self):
         self.request_id = str(uuid4())
-        list_path = self.path.split("?", 1)[0].split("#", 1)[0].split("/")
-        if len(list_path) == 6 and list_path[3] == "workspaces":
-            workspace, resource = list_path[4:]
-            if resource == "claims":
-                self._get_workspace_list(workspace, resource, _claims_snapshot, self.server.claim_id)
+        read_path = self.path.split("?", 1)[0].split("#", 1)[0].split("/")
+        if len(read_path) in (6, 7) and read_path[3] == "workspaces":
+            workspace, resource, *references = read_path[4:]
+            if resource == "claims" and not references:
+                self._get_workspace_read(workspace, resource, _claims_snapshot, self.server.claim_id)
                 return
             if resource == "agent-work":
-                self._get_workspace_list(workspace, resource, _agent_work_snapshot)
+                if references:
+                    self._get_workspace_read(workspace, resource, workbench_agent_work.task_detail,
+                                             task_id=references[0])
+                else:
+                    self._get_workspace_read(workspace, resource, _agent_work_snapshot)
                 return
         if not self._trusted():
             self._v1_error("request.forbidden")
@@ -811,7 +817,7 @@ class _Handler(BaseHTTPRequestHandler):
             if not streaming:
                 self._v1_error("request.failed")
 
-    def _workspace_list_reply(self, workspace, resource, snapshot, *values):
+    def _workspace_read_reply(self, workspace, resource, snapshot, *values, task_id=None):
         if not self._trusted():
             return "request.forbidden", None
         if not self._authorized():
@@ -821,6 +827,11 @@ class _Handler(BaseHTTPRequestHandler):
             workspace_id = UUID(workspace)
             if str(workspace_id) != workspace.lower():
                 raise ValueError
+            if task_id is not None:
+                task = UUID(task_id)
+                if str(task) != task_id.lower():
+                    raise ValueError
+                values = (task, *values)
         except ValueError:
             return f"{prefix}.not_found", None
         if "?" in self.path or "#" in self.path:
@@ -832,6 +843,9 @@ class _Handler(BaseHTTPRequestHandler):
         except workbench_agent_work.AgentWorkError as error:
             code = {
                 "agentWork.identity": "agent_work.identity_required",
+                "agentWork.missing": "agent_work.not_found",
+                "agentWork.upgrade": "agent_work.upgrade_required",
+                "agentWork.deliveryUnavailable": "agent_work.delivery_unavailable",
                 "agentWork.unavailable": "database.unavailable",
             }.get(error.code, "request.failed")
             return code, None
@@ -841,11 +855,14 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception:
             return "request.failed", None
 
-    def _get_workspace_list(self, workspace, resource, snapshot, *values):
+    def _get_workspace_read(self, workspace, resource, snapshot, *values, task_id=None):
         start = time.monotonic()
-        code, payload = self._workspace_list_reply(workspace, resource, snapshot, *values)
+        code, payload = self._workspace_read_reply(workspace, resource, snapshot, *values, task_id=task_id)
         status = _V1_ERRORS[code][0] if code else HTTPStatus.OK
-        entry = {"route": f"/api/v1/workspaces/{{workspace_id}}/{resource}", "status": status,
+        route = f"/api/v1/workspaces/{{workspace_id}}/{resource}"
+        if task_id is not None:
+            route += "/{task_id}"
+        entry = {"route": route, "status": status,
                  "request_id": self.request_id, "duration_ms": round((time.monotonic() - start) * 1000, 3)}
         with _ACCESS_LOG_LOCK:
             print(json.dumps(entry, separators=(",", ":")), file=sys.stderr)
