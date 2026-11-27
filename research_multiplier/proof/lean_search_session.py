@@ -15,6 +15,7 @@ MAX_HISTORY_TEXT = 600
 MAX_ROUTE_ATTEMPTS = 32
 _STALLED = {"blocked", "rejected", "proof_search_blocked", "duplicate_candidate"}
 _RECOVERABLE_BUDGET = {"budget_blocked"}
+_UNUSABLE_PROPOSAL = {"proposal_failed", "budget_blocked", "proposal_unadmitted"}
 
 
 def restore(artifacts, reference, statement, rounds, *, include_routes=False):
@@ -84,8 +85,13 @@ def model_history(history, sustained):
 
 
 def _stalled(step):
-    return (step.get("status") in _STALLED | {"proposal_failed"}
-            or step.get("obligation_progress") == "unchanged")
+    status = step.get("status")
+    if status == "proposal_failed":
+        # Before typed failures, single-route ranking used this undifferentiated status.
+        return "failure_code" not in step and "route_checkpoint" not in step
+    if status in _UNUSABLE_PROPOSAL:
+        return False
+    return status in _STALLED or step.get("obligation_progress") == "unchanged"
 
 
 def obligation_progress(before, after):
@@ -222,10 +228,23 @@ def lane_history(history, identifier):
 
 
 def _lane_stalls(history, route):
-    lane = lane_history(history, route["implication_id"])
-    checkpoint = next((step["route_checkpoint"] for step in reversed(lane) if "route_checkpoint" in step), None)
+    checkpoint = None
+    stalled = 0
+    for step in lane_history(history, route["implication_id"]):
+        progress = step.get("route_checkpoint")
+        if progress is None:
+            continue
+        # Older runs recorded a checkpoint even if the provider returned no usable proposal.
+        usable = step["status"] not in _UNUSABLE_PROPOSAL
+        if checkpoint is None:
+            stalled = progress["stalled"] if usable else 0
+        else:
+            if progress["verified"] > checkpoint["verified"]:
+                stalled = 0
+            stalled = min(progress["stalled"], stalled + usable)
+        checkpoint = progress
     verified = sum(bool(item["lemma_id"]) for item in route["obligations"])
-    return checkpoint["stalled"] if checkpoint and verified <= checkpoint["verified"] else 0
+    return stalled if checkpoint and verified <= checkpoint["verified"] else 0
 
 
 def lane_checkpoint(history, before, after):

@@ -1199,7 +1199,6 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                 if prepared is not None:
                     [origin] = request["open_routes"]
                     current_lane = step, origin
-                    finish_lane(routes)
                 if attempt["return"]["finding"] == "no_result":
                     error = attempt["result"]
                     failure = error.get("failure", {}).get("code")
@@ -1211,13 +1210,15 @@ def search(statement_id, *, rounds=3, confirm_public=False, confirm_local=False,
                             continue
                         return _record(artifacts, statement_id, history, "budget_exhausted",
                                        reason="project_model_allowance", open_routes=_open_routes(routes), **native_fields)
-                    step.update(status="proposal_failed", reason=error["failure_reason"])
+                    step.update(status="proposal_failed", reason=error["failure_reason"],
+                                failure_code=failure or "no_usable_proposal")
                     if failure == "invalid_output":
                         step["feedback"] = "Return exactly one supported action using only listed IDs and no extra premises."
                         continue
                     if independent:
                         continue
                     return _record(artifacts, statement_id, history, "proposal_failed", **native_fields)
+                finish_lane(routes)
                 candidate = _model_candidate(attempt["result"], allowed,
                                              workbench_reply=allow_codex_guidance and _codex_guided(config, private, request))
                 if "workbench_reply" in candidate:
