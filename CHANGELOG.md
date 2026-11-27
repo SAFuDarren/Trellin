@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.143
+
+- The **If withdrawn** preview uses a neutral background when it is empty, loading, or ready. An error fetching the preview still uses the error background.
+
 ## 1.0.142
 
 - A claim's inspector shows its **Verified ledger**: checked lemmas that earlier proof rounds left behind, with the route that used each one or **Not used yet**, and **Tried routes**, the directions whose closing proof Lean rejected, whose obligation was refuted or that need recheck, with where each stopped and why. Entries on the graph select their node.

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { ImpactPreview } from "../src/workbench/types";
+import type { GraphSnapshot, ImpactPreview } from "../src/workbench/types";
 import { openDestination, railSpace, type Destination } from "./navigation";
 import { openProof } from "./project-map";
 
@@ -30,6 +30,18 @@ const rail = (page: Page) => page.locator("nav.rail");
 const railLink = (page: Page, name: string) => rail(page).getByRole("link", { name: new RegExp(`^${name}( |$)`) });
 
 const utilityButton = (page: Page) => rail(page).getByRole("link", { name: "Settings", exact: true });
+
+async function expectImpactBackground(bar: Locator, token: "--main" | "--crit-soft") {
+  const expected = await bar.evaluate((element, name) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = "var(" + name + ")";
+    element.append(probe);
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return color;
+  }, token);
+  await expect(bar).toHaveCSS("background-color", expected, { timeout: 1500 });
+}
 
 async function confirmImeCandidate(input: Locator) {
   await input.dispatchEvent("compositionstart");
@@ -100,6 +112,25 @@ test("selecting a node shows its details and conversation", async ({ page }) => 
   await expect(page.getByRole("region", { name: "Proof activity" }).getByRole("heading")).toHaveText("Whole claim");
 });
 
+test("a claim without an approved premise uses a neutral withdrawal preview", async ({ page }) => {
+  await page.route("**/api/graph?*", async (route) => {
+    const response = await route.fetch();
+    const graph = (await response.json()) as GraphSnapshot;
+    await route.fulfill({
+      response,
+      json: { ...graph, nodes: graph.nodes.filter(({ kind }) => kind === "goal"), edges: [] },
+    });
+  });
+  await open(page);
+  await page.getByRole("button", { name: "If withdrawn", exact: true }).click();
+  const bar = page.locator(".impact-bar");
+  await expect(bar).toContainText("This claim has no assumption to preview yet.");
+  await expect(bar.locator("select")).toHaveCount(0);
+  await expectImpactBackground(bar, "--main");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expectImpactBackground(bar, "--main");
+});
+
 test("the impact view previews what withdrawing an assumption affects", async ({ page }) => {
   await page.route("**/api/impact?*", async (route) => {
     const response = await route.fetch();
@@ -126,7 +157,10 @@ test("the impact view previews what withdrawing an assumption affects", async ({
   const summary = "4 affected · 1 premise previewed";
   await expect(inspector.getByRole("button", { name: "Proof task", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "If withdrawn" }).click();
-  await expect(page.locator(".impact-bar")).toContainText("Preview only");
+  const bar = page.locator(".impact-bar");
+  await expect(bar).toContainText("Preview only");
+  await expect(bar.getByRole("combobox")).toBeVisible();
+  await expectImpactBackground(bar, "--main");
   await expect(page.locator("#queue-title")).toHaveText("Would be affected");
   await expect(page.locator("#queue-count")).toHaveText(summary);
   await expect(page.locator(".legend-counts")).toContainText(summary);
@@ -153,12 +187,17 @@ test("the withdrawal preview shows counts only after a successful read, includin
   await open(page);
   const toggle = page.getByRole("button", { name: "If withdrawn", exact: true });
   await toggle.click();
-  await expect(page.locator(".impact-bar")).toContainText("Working out what depends on it");
+  const bar = page.locator(".impact-bar");
+  await expect(bar).toContainText("Working out what depends on it");
+  await expectImpactBackground(bar, "--main");
   await expect(page.locator("#queue-count")).toBeEmpty();
   await expect(page.locator(".legend-counts")).not.toContainText("premise previewed");
 
   finishFirstRead();
-  await expect(page.locator(".impact-bar")).toContainText("The preview is unavailable.");
+  await expect(bar).toContainText("The preview is unavailable.");
+  await expectImpactBackground(bar, "--crit-soft");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expectImpactBackground(bar, "--crit-soft");
   await expect(page.locator("#queue-count")).toBeEmpty();
   await expect(page.locator(".legend-counts")).not.toContainText("premise previewed");
 
@@ -166,6 +205,7 @@ test("the withdrawal preview shows counts only after a successful read, includin
   await page.getByRole("button", { name: "Proof", exact: true }).click();
   await toggle.click();
   const summary = "0 affected · 1 premise previewed";
+  await expectImpactBackground(bar, "--main");
   await expect(page.locator("#queue-count")).toHaveText(summary);
   await expect(page.locator(".legend-counts")).toContainText(summary);
 });
