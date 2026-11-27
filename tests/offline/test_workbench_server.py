@@ -3,11 +3,13 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext
 import http.client
+from importlib.resources import files
 import json
 import threading
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
+from jsonschema import Draft202012Validator, FormatChecker
 import pytest
 
 from research_multiplier.storage import paths
@@ -467,9 +469,11 @@ def test_native_connections_are_discovered_and_selected_only_in_the_bound_sessio
     assert login == [("claude-code", str(executable))] * 2
 
 
-def test_versioned_claims_rejects_unauthorized_and_invalid_requests(server, monkeypatch, capsys):
+@pytest.mark.parametrize(("resource", "prefix"), [("claims", "claims"), ("agent-work", "agent_work")])
+def test_versioned_workspace_lists_reject_unauthorized_and_invalid_requests(server, monkeypatch, capsys,
+                                                                          resource, prefix):
     workspace_id = "d42ca2f7-9288-47af-b7e5-1150e6df5304"
-    path = f"/api/v1/workspaces/{workspace_id}/claims"
+    path = f"/api/v1/workspaces/{workspace_id}/{resource}"
 
     def unexpected_read(*args):
         pytest.fail("A malformed or unauthorized request must not read the project's records.")
@@ -480,9 +484,9 @@ def test_versioned_claims_rejects_unauthorized_and_invalid_requests(server, monk
         (path, 401, "request.unauthenticated", {"headers": {"X-RM-Session": "wrong"}}),
         (path, 403, "request.forbidden", {"headers": {"Host": "foreign.example"}}),
         (path, 403, "request.forbidden", {"headers": {"Origin": "http://foreign.example"}}),
-        (path + "?limit=1", 400, "claims.invalid_query", {}),
-        (path + "?", 400, "claims.invalid_query", {}),
-        (path.replace(workspace_id, "bad-address"), 404, "claims.not_found", {}),
+        (path + "?limit=1", 400, f"{prefix}.invalid_query", {}),
+        (path + "?", 400, f"{prefix}.invalid_query", {}),
+        (path.replace(workspace_id, "bad-address"), 404, f"{prefix}.not_found", {}),
     )
     request_ids = set()
     for target, status, code, options in requests:
@@ -496,7 +500,7 @@ def test_versioned_claims_rejects_unauthorized_and_invalid_requests(server, monk
         record = json.loads(capsys.readouterr().err)
         assert record.pop("duration_ms") >= 0
         assert record == {
-            "route": "/api/v1/workspaces/{workspace_id}/claims", "status": status, "request_id": identifier,
+            "route": "/api/v1/workspaces/{workspace_id}/" + resource, "status": status, "request_id": identifier,
         }
     assert len(request_ids) == len(requests)
 
@@ -516,6 +520,91 @@ def test_versioned_claims_errors_redact_diagnostics(server, monkeypatch, capsys,
     assert response.status == status and b"private DSN fixture" not in content
     assert json.loads(content)["error"]["code"] == code
     assert "private DSN fixture" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("installed", [True, False])
+def test_versioned_agent_work_matches_legacy_without_waking_worker(agent_work_polling, capsys, installed):
+    server, store = agent_work_polling
+    store.workspace_id = uuid4()
+    task_id, agent_id = str(uuid4()), str(uuid4())
+    date = "2026-01-01T00:00:00Z"
+    sql_reads = []
+    wakeups = []
+
+    def transaction(role, action, *, read_only):
+        assert role == "human" and read_only
+        return action()
+
+    def query(role, statement):
+        assert role == "human"
+        sql_reads.append(statement)
+        if "to_regprocedure" in statement:
+            return [{"installed": installed}]
+        assert installed and "SELECT rm.list_agent_work()" in statement
+        return [{"result": [{
+            "id": task_id, "spec": {
+                "mode": "draft", "title": "Fixture title", "agent_name": "Fixture agent", "agent_id": agent_id,
+                "instructions": "Fixture instructions",
+            },
+            "state": "queued", "created_at": date, "updated_at": date, "attempt": None,
+        }]}]
+
+    store.transaction = transaction
+    store.query = query
+    server._wake_agent_work = lambda: wakeups.append(True)
+
+    template = "/api/v1/workspaces/{workspace_id}/agent-work"
+    path = template.format(workspace_id=store.workspace_id)
+    response, payload = request(server, "GET", path)
+    assert response.status == 200
+    assert not wakeups
+    identifier = response.getheader("X-Request-Id")
+    assert UUID(identifier)
+    assert response.getheader("Cache-Control") == "no-store"
+    record = json.loads(capsys.readouterr().err)
+    assert record.pop("duration_ms") >= 0
+    assert record == {"route": template, "status": 200, "request_id": identifier}
+
+    previous, legacy = request(server, "GET", "/api/agent-work")
+    assert previous.status == 200
+    assert len(wakeups) == int(installed)
+    snapshot = json.loads(payload)
+    assert snapshot == {"items": json.loads(legacy)["tasks"], "next_cursor": None, "available": installed}
+    assert [task["id"] for task in snapshot["items"]] == ([task_id] if installed else [])
+
+    schemas = files("research_multiplier").joinpath("schemas")
+    openapi = json.loads(schemas.joinpath("workbench.openapi.json").read_text(encoding="utf-8"))
+    contract = openapi["paths"][template]["get"]
+    schema = contract["responses"]["200"]["content"]["application/json"]["schema"]
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(snapshot)
+
+    reads = sql_reads.copy()
+    response, payload = request(server, "GET", template.format(workspace_id=uuid4()))
+    assert response.status == 404
+    error = json.loads(payload)
+    error_schema = json.loads(schemas.joinpath("error.schema.json").read_text(encoding="utf-8"))
+    Draft202012Validator(error_schema).validate(error)
+    assert error["error"]["code"] == "agent_work.not_found"
+    assert error["error"]["request_id"] == response.getheader("X-Request-Id")
+    assert sql_reads == reads
+
+
+@pytest.mark.parametrize(("failure", "status", "code"), [
+    ("agentWork.identity", 403, "agent_work.identity_required"),
+    ("agentWork.unavailable", 503, "database.unavailable"),
+])
+def test_versioned_agent_work_reports_safe_list_errors(server, monkeypatch, capsys, failure, status, code):
+    def unavailable(*args):
+        raise workbench_agent_work.AgentWorkError(failure.split(".")[1])
+
+    monkeypatch.setattr(server, "read", unavailable)
+    path = f"/api/v1/workspaces/{uuid4()}/agent-work"
+    response, payload = request(server, "GET", path)
+    assert response.status == status
+    error = json.loads(payload)["error"]
+    assert error["code"] == code
+    assert error["request_id"] == response.getheader("X-Request-Id")
+    assert failure not in payload.decode() and failure not in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("path", [
