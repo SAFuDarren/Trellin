@@ -154,6 +154,8 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 
 [工作台 OpenAPI 文档](../research_multiplier/schemas/workbench.openapi.json)的首个试点是 `GET /api/v1/workspaces/{workspace_id}/claims`。它与 `/api/claims` 使用同一份数据，最多返回最近的 100 条可见已冻结命题。试点期间不接收查询参数，`next_cursor` 始终为 `null`。响应包含启动器选中的 `claim_id`（未选中时为 `null`），支持稳定引用编号的工作区还会返回 `claim_codes: true`。调整 OpenAPI 类型后，在 `web/` 中运行 `pnpm gen:api`。前端类型检查会验证生成的类型与契约一致。
 
+同一份 OpenAPI 文档也涵盖只读接口 `GET /api/v1/workspaces/{workspace_id}/agent-work`。它在 `items` 中返回本地研究者的派工任务摘要，内容和排序与 `GET /api/agent-work` 一致。列表快照不分页，`next_cursor` 为 `null`。旧数据库未安装派工功能时，返回 `available: false` 和空列表。v1 接口要求本地会话和匹配的工作区，不接收查询参数，也不唤醒派工队列。
+
 ### 耗时操作
 
 预计超过一秒左右的操作返回 `202 Accepted` 和一个任务资源：`{"job": {"id": "…", "state": "queued"}}`。客户端通过事件或 `GET …/jobs/{id}` 跟进度。

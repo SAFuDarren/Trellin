@@ -35,7 +35,6 @@ _APP_TYPES = {
 _POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; "
            "connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 _LOG = logging.getLogger(__name__)
-_CLAIMS_ROUTE = "/api/v1/workspaces/{workspace_id}/claims"
 _ACCESS_LOG_LOCK = threading.Lock()
 _MAX_GUIDANCE_BYTES = 16_384
 _MAX_CLARIFICATION_BYTES = 64_000
@@ -184,6 +183,9 @@ _V1_ERRORS = {
     "events.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local user."),
     "claims.invalid_query": (HTTPStatus.BAD_REQUEST, "The recent claims list does not take parameters."),
     "claims.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace claims are unavailable."),
+    "agent_work.invalid_query": (HTTPStatus.BAD_REQUEST, "The Agent work list does not take parameters."),
+    "agent_work.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace Agent work is unavailable."),
+    "agent_work.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local researcher."),
 }
 
 
@@ -199,7 +201,7 @@ class _MissingSchema(ValueError):
     pass
 
 
-class _MissingClaimsWorkspace(ValueError):
+class _MissingWorkspace(ValueError):
     pass
 
 
@@ -500,10 +502,23 @@ def _activity(store, claim_id):
     }
 
 
-def _workspace_claims(store, workspace_id):
+def _workspace_snapshot(store, workspace_id, snapshot, *values):
     if store.workspace_id != workspace_id:
-        raise _MissingClaimsWorkspace
-    return proof_graph.claim_index(store)
+        raise _MissingWorkspace
+    return snapshot(store, *values)
+
+
+def _claims_snapshot(store, claim_id):
+    index = proof_graph.claim_index(store)
+    payload = {"items": index["claims"], "next_cursor": None, "claim_id": claim_id}
+    if "claim_codes" in index:
+        payload["claim_codes"] = index["claim_codes"]
+    return payload
+
+
+def _agent_work_snapshot(store):
+    snapshot = workbench_agent_work.list_tasks(store)
+    return {"items": snapshot["tasks"], "next_cursor": None, "available": snapshot["available"]}
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -720,10 +735,15 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _get_v1(self):
         self.request_id = str(uuid4())
-        claims_path = self.path.split("?", 1)[0].split("#", 1)[0].split("/")
-        if len(claims_path) == 6 and claims_path[3] == "workspaces" and claims_path[5] == "claims":
-            self._get_claims_v1(claims_path[4], "?" in self.path or "#" in self.path)
-            return
+        list_path = self.path.split("?", 1)[0].split("#", 1)[0].split("/")
+        if len(list_path) == 6 and list_path[3] == "workspaces":
+            workspace, resource = list_path[4:]
+            if resource == "claims":
+                self._get_workspace_list(workspace, resource, _claims_snapshot, self.server.claim_id)
+                return
+            if resource == "agent-work":
+                self._get_workspace_list(workspace, resource, _agent_work_snapshot)
+                return
         if not self._trusted():
             self._v1_error("request.forbidden")
             return
@@ -791,39 +811,42 @@ class _Handler(BaseHTTPRequestHandler):
             if not streaming:
                 self._v1_error("request.failed")
 
-    def _claims_v1_reply(self, workspace, has_arguments):
+    def _workspace_list_reply(self, workspace, resource, snapshot, *values):
         if not self._trusted():
             return "request.forbidden", None
         if not self._authorized():
             return "request.unauthenticated", None
+        prefix = resource.replace("-", "_")
         try:
             workspace_id = UUID(workspace)
             if str(workspace_id) != workspace.lower():
                 raise ValueError
         except ValueError:
-            return "claims.not_found", None
-        if has_arguments:
-            return "claims.invalid_query", None
+            return f"{prefix}.not_found", None
+        if "?" in self.path or "#" in self.path:
+            return f"{prefix}.invalid_query", None
         try:
-            index = self.server.read(_workspace_claims, workspace_id)
-        except _MissingClaimsWorkspace:
-            return "claims.not_found", None
+            return None, self.server.read(_workspace_snapshot, workspace_id, snapshot, *values)
+        except _MissingWorkspace:
+            return f"{prefix}.not_found", None
+        except workbench_agent_work.AgentWorkError as error:
+            code = {
+                "agentWork.identity": "agent_work.identity_required",
+                "agentWork.unavailable": "database.unavailable",
+            }.get(error.code, "request.failed")
+            return code, None
         except ValueError:
             # Store configuration and driver errors can contain sensitive connection details.
             return "database.unavailable", None
         except Exception:
             return "request.failed", None
-        payload = {"items": index["claims"], "next_cursor": None, "claim_id": self.server.claim_id}
-        if "claim_codes" in index:
-            payload["claim_codes"] = index["claim_codes"]
-        return None, payload
 
-    def _get_claims_v1(self, workspace, has_arguments):
+    def _get_workspace_list(self, workspace, resource, snapshot, *values):
         start = time.monotonic()
-        code, payload = self._claims_v1_reply(workspace, has_arguments)
+        code, payload = self._workspace_list_reply(workspace, resource, snapshot, *values)
         status = _V1_ERRORS[code][0] if code else HTTPStatus.OK
-        entry = {"route": _CLAIMS_ROUTE, "status": status, "request_id": self.request_id,
-                 "duration_ms": round((time.monotonic() - start) * 1000, 3)}
+        entry = {"route": f"/api/v1/workspaces/{{workspace_id}}/{resource}", "status": status,
+                 "request_id": self.request_id, "duration_ms": round((time.monotonic() - start) * 1000, 3)}
         with _ACCESS_LOG_LOCK:
             print(json.dumps(entry, separators=(",", ":")), file=sys.stderr)
         try:

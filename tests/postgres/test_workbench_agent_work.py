@@ -11,6 +11,7 @@ import pytest
 
 from research_multiplier.model_adapters import ModelConfig
 from research_multiplier.models.model_errors import ModelFailure
+from research_multiplier.storage import paths
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.server import WorkbenchServer
 from research_multiplier.workflows import workbench_agent_work
@@ -164,9 +165,13 @@ def test_workbench_pins_code_handoff_and_requires_a_human_decision(workbench, mo
     assert requests[1]["user"]["inputs"]["predecessor"]["delivery"] == first["delivery"]
     assert second["agent_name"] == "Reviewer"
     assert second["agent_id"] == employees[1]["id"]
-    assert {
-        task["id"]: task["agent_id"] for task in _request(server, "GET", _ROUTE)["tasks"]
-    } == {first["id"]: employees[0]["id"], second["id"]: employees[1]["id"]}
+    legacy = _request(server, "GET", _ROUTE)
+    workspace_id = paths.workspace_id(server.workspace)
+    versioned = _request(server, "GET", f"/api/v1/workspaces/{workspace_id}/agent-work")
+    assert versioned == {"items": legacy["tasks"], "next_cursor": None, "available": True}
+    assert {task["id"]: task["agent_id"] for task in versioned["items"]} == {
+        first["id"]: employees[0]["id"], second["id"]: employees[1]["id"],
+    }
     assert _get(server, first["id"])["status"] == "delivered"
     decision = {
         "task_id": second["id"], "action_id": str(uuid4()), "delivery_sha256": second["delivery_sha256"],

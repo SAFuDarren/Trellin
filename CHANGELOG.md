@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.144
+
+- Add a read-only v1 Agent work list with a workspace-scoped OpenAPI contract.
+
 ## 1.0.143
 
 - The **If withdrawn** preview uses a neutral background when it is empty, loading, or ready. An error fetching the preview still uses the error background.

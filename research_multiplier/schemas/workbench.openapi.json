@@ -3,7 +3,7 @@
   "info": {
     "title": "Research Multiplier workbench API",
     "version": "1",
-    "description": "Local workbench contract pilot covering the recent claims list."
+    "description": "Local workbench contract for recent claims and Agent work lists."
   },
   "paths": {
     "/api/v1/workspaces/{workspace_id}/claims": {
@@ -30,6 +30,85 @@
           "401": { "$ref": "#/components/responses/Unauthenticated" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/Failed" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/agent-work": {
+      "get": {
+        "operationId": "listAgentWork",
+        "summary": "List Agent work for the local researcher in the selected workspace",
+        "description": "Returns the same task summaries as GET /api/agent-work in a v1 list envelope, newest updates first, with task ID as a tie-breaker. Older databases without Agent work support return available=false and an empty list. This snapshot has no query parameters or pagination and does not start or wake a worker.",
+        "security": [{ "LocalSession": [] }],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent work list snapshot.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items", "next_cursor", "available"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "next_cursor": { "type": "null", "description": "Always null for the list snapshot." },
+                    "available": { "type": "boolean" },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id", "mode", "title", "agent_id", "agent_name", "status", "created_at",
+                          "updated_at", "delivery_sha256", "predecessor_id", "error"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": { "type": "string", "format": "uuid" },
+                          "mode": { "enum": ["implement", "review", "draft"] },
+                          "title": { "type": "string" },
+                          "agent_id": { "type": ["string", "null"], "format": "uuid" },
+                          "agent_name": { "type": "string" },
+                          "status": {
+                            "enum": ["queued", "running", "interrupted", "blocked", "failed", "delivered", "accepted", "returned"]
+                          },
+                          "created_at": { "type": "string", "format": "date-time" },
+                          "updated_at": { "type": "string", "format": "date-time" },
+                          "delivery_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+                          "predecessor_id": { "type": ["string", "null"], "format": "uuid" },
+                          "error": { "type": ["string", "null"] }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The Agent work list does not accept query parameters (agent_work.invalid_query).",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": {
+            "description": "Untrusted request (request.forbidden) or missing local researcher identity (agent_work.identity_required).",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+          },
+          "404": {
+            "description": "Malformed or inaccessible workspace reference (agent_work.not_found).",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "./error.schema.json" } } }
+          },
           "500": { "$ref": "#/components/responses/Failed" },
           "503": { "$ref": "#/components/responses/Unavailable" }
         }
