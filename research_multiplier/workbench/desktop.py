@@ -256,11 +256,33 @@ def _session(workspace_path, lifetime, output, *, select=False, library=None, ne
         return 0
 
 
+def _storage_request(*keys):
+    limit = 64 * 1024
+    try:
+        raw = sys.stdin.buffer.read(limit + 1)
+        if len(raw) > limit:
+            raise ValueError
+        document = json.loads(raw.decode("utf-8"))
+    except (OSError, ValueError, RecursionError):
+        raise LibraryError("storage-invalid") from None
+    if not isinstance(document, dict) or document.keys() != set(keys):
+        raise LibraryError("storage-invalid")
+    return document
+
+
 def _storage(library, args, output):
     if args == ["--storage-info"]:
         data = library.status()
     elif len(args) == 2 and args[0] == "--storage-resolve":
         data = {"workspace": str(library.resolve_project(args[1], verify_database=True))}
+    elif len(args) == 2 and args[0] == "--storage-source":
+        data = {"source": library.source_info(args[1])}
+    elif len(args) == 2 and args[0] == "--storage-rebind-source":
+        request = _storage_request("expected_root", "root")
+        data = {"source": library.rebind_source(args[1], request["expected_root"], request["root"])}
+    elif len(args) == 2 and args[0] == "--storage-check-source":
+        request = _storage_request("references")
+        data = {"source": library.check_source(args[1], request["references"])}
     elif len(args) == 2 and args[0] == "--storage-preview":
         plan = library.preview(args[1])
         data = {

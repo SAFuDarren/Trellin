@@ -16,6 +16,7 @@ from research_multiplier.storage.managed_workspaces import (
     publish_metadata, read_metadata, stored_absolute_path, uuid_text, workspace_marker, workspace_registration,
 )
 from research_multiplier.storage.project_archive import _fingerprint
+from research_multiplier.workflows.desktop_source import check_references
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace, inspect_folder
 
 
@@ -268,6 +269,10 @@ class Library:
                 if marker["anchor"] != self.anchor or marker["slot"] != workspace.name:
                     raise LibraryError("storage-invalid")
                 yield workspace, marker
+
+    def _source_matches(self, root, source):
+        return [(workspace, marker) for workspace, marker in self._managed_markers(root)
+                if marker["source_root"] is not None and _same_source(source, marker["source_root"])]
 
     def _rebuild_registry(self, root):
         """Rebuild a missing registry from managed workspaces' .trellin-managed.json markers (#285)."""
@@ -593,8 +598,7 @@ class Library:
         with self._locked():
             _separate_source(source, library_root(self.anchor))
             root, data = self._state(initialize=True, repair=True)
-            matches = [(workspace, marker) for workspace, marker in self._managed_markers(root)
-                       if marker["source_root"] is not None and _same_source(source, marker["source_root"])]
+            matches = self._source_matches(root, source)
             if len(matches) > 1:
                 raise LibraryError("storage-invalid")
             if matches:
@@ -607,6 +611,57 @@ class Library:
             except LibraryError:
                 name = "Research project"
             return self._create(root, data, name, str(uuid4()), source_root=source)
+
+    def _linked_source(self, root, data, identifier):
+        row = self._project_row(data, uuid_text(identifier))
+        if "slot" not in row:
+            raise LibraryError("storage-project")
+        workspace = self._registered_path(root, row)
+        marker = workspace_marker(workspace)
+        if marker is None or marker["source_root"] is None:
+            raise LibraryError("storage-project")
+        return workspace, row, marker["source_root"]
+
+    def source_info(self, identifier):
+        """Read the private binding of a single registered linked project."""
+        with self._locked(exclusive=False):
+            root, data = self._state()
+            _, row, source = self._linked_source(root, data, identifier)
+            return {"source_id": row["id"], "root": str(source)}
+
+    def rebind_source(self, identifier, expected_root, destination):
+        """Update the source address only after comparing the stored binding."""
+        expected = stored_absolute_path(expected_root)
+        if not isinstance(destination, str):
+            raise LibraryError("storage-invalid")
+        with self._locked():
+            root, data = self._state()
+            workspace, row, previous = self._linked_source(root, data, identifier)
+            if previous != expected:
+                raise LibraryError("storage-stale")
+            try:
+                source, existing = inspect_folder(destination)
+                if existing is not None or paths._workspace_above(source) is not None:
+                    raise ValueError
+            except (OSError, ValueError):
+                raise LibraryError("storage-destination") from None
+            _separate_source(source, self.anchor)
+            _separate_source(source, root)
+            matches = self._source_matches(root, source)
+            if any(path != workspace for path, _ in matches):
+                raise LibraryError("storage-destination")
+            if not matches:
+                self._write_managed_marker(workspace, row["slot"], row["name"], source_root=source)
+            else:
+                source = previous
+            return {"source_id": row["id"], "root": str(source)}
+
+    def check_source(self, identifier, references):
+        """Check selected references while the project's root binding is leased."""
+        with self._locked(exclusive=False):
+            root, data = self._state()
+            _, row, source = self._linked_source(root, data, identifier)
+            return {"source_id": row["id"], **check_references(source, references)}
 
     def register_external(self, path):
         workspace = canonical_path(path)

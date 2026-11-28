@@ -104,6 +104,20 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 Reference renders are in [images/desktop-status](images/desktop-status/).
 
+## Check a linked source through the launcher
+
+The private desktop launcher can inspect, rebind and check a registered linked folder by its project UUID. The reply uses its existing version-1 envelope. A file reference uses that UUID and its path relative to the source root. Absolute source paths stay in local app data and the private storage exchange.
+
+| Launcher arguments | UTF-8 JSON on standard input | Payload inside `source` |
+| --- | --- | --- |
+| `--storage-source PROJECT_UUID` | None | `source_id`, `root` |
+| `--storage-rebind-source PROJECT_UUID` | Object with `expected_root` and `root` | `source_id`, `root` |
+| `--storage-check-source PROJECT_UUID` | Object with `references`, an array of objects with `path` and optional prior `sha256` | `source_id`, `status`, `files` |
+
+Rebind after the researcher selects the replacement directory. Compare the exact saved path, even if that directory is offline, and update only the application marker. A stale request returns `storage-stale`. Reload the binding before a retry.
+
+Checks read a batch of up to 16 named regular files, at most 4 MiB per file, and return paths, status and available SHA-256 values. An unavailable or unstable source has an empty file list. A missing file in a reachable source has its own status. A change observed during a check returns `unstable` for a retry. The check follows no symbolic links and changes no original files. These commands are backend integration points for future desktop controls.
+
 ## Validate the signed build
 
 Use a fresh virtual environment outside the checkout and the app for the [installed-wheel compatibility suite](../tests/compat_validation/README.md). Install the wheel with the exact version declared in `tests/compat_validation/PACKAGE_VERSION` and keep test projects, databases and logs in disposable locations. The runner rejects a Python interpreter or package installed inside a macOS app before it starts the tests.
