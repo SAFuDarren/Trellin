@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from errno import ELOOP, ENOENT, ENOTDIR
 import hashlib
+from math import isfinite
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -60,6 +61,52 @@ def _directory(start, parts, *, parent=None):
         yield descriptor
     finally:
         os.close(descriptor)
+
+
+@contextmanager
+def _source_directory(root):
+    if not _DESCRIPTOR_IO or not root.is_absolute() or ".." in root.parts or "\x00" in str(root):
+        raise OSError("Source root is unavailable.")
+    with _directory(root.anchor, root.parts[1:]) as descriptor:
+        yield descriptor
+
+
+def _identity(descriptor):
+    info = os.fstat(descriptor)
+    if info.st_dev < 0 or info.st_ino <= 0:
+        return None
+    # Use macOS's st_birthtime, shared by supported CPython versions, so a
+    # Python upgrade does not change the representation of the same directory.
+    birth = getattr(info, "st_birthtime", None)
+    birth_ns = round(birth * 1_000_000_000) if birth is not None and isfinite(birth) and birth >= 0 else None
+    return {"device": info.st_dev, "inode": info.st_ino, "birth_time_ns": birth_ns}
+
+
+def source_identity(root: Path) -> dict | None:
+    """Capture a local directory identity without following its path's symlinks."""
+    try:
+        with _source_directory(root) as descriptor:
+            return _identity(descriptor)
+    except OSError:
+        return None
+
+
+def _descriptor_status(descriptor, expected):
+    current = _identity(descriptor)
+    if current is None:
+        return "unavailable"
+    if expected is None:
+        return "needs_confirmation"
+    return "available" if current == expected else "identity_changed"
+
+
+def source_status(root: Path, expected_identity: dict | None) -> str:
+    """Report whether the current directory matches the approved local identity."""
+    try:
+        with _source_directory(root) as descriptor:
+            return _descriptor_status(descriptor, expected_identity)
+    except OSError:
+        return "unavailable"
 
 
 def _version(info):
@@ -133,24 +180,16 @@ def _observe(root, path, previous):
     return {"path": name, "status": status, "sha256": digest}
 
 
-def _root_matches(root, expected):
-    try:
-        with _directory(root.anchor, root.parts[1:]) as current:
-            return os.path.samestat(expected, os.fstat(current))
-    except OSError:
-        return False
-
-
-def check_references(root: Path, references: object) -> dict:
+def check_references(root: Path, references: object, *, expected_identity: dict | None) -> dict:
     """Report bounded digest observations without persisting or returning file contents."""
     selected = _references(references)
-    if not _DESCRIPTOR_IO or not root.is_absolute() or ".." in root.parts or "\x00" in str(root):
-        return {"status": "unavailable", "files": []}
     try:
-        with _directory(root.anchor, root.parts[1:]) as descriptor:
-            identity = os.fstat(descriptor)
+        with _source_directory(root) as descriptor:
+            status = _descriptor_status(descriptor, expected_identity)
+            if status != "available":
+                return {"status": status, "files": []}
             files = [_observe(descriptor, path, previous) for path, previous in selected]
-            if not _root_matches(root, identity):
+            if source_status(root, expected_identity) != "available":
                 return {"status": "unstable", "files": []}
     except OSError:
         return {"status": "unavailable", "files": []}

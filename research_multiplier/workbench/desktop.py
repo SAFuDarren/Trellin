@@ -278,8 +278,10 @@ def _storage(library, args, output):
     elif len(args) == 2 and args[0] == "--storage-source":
         data = {"source": library.source_info(args[1])}
     elif len(args) == 2 and args[0] == "--storage-rebind-source":
-        request = _storage_request("expected_root", "root")
-        data = {"source": library.rebind_source(args[1], request["expected_root"], request["root"])}
+        request = _storage_request("expected_root", "root", "expected_revision")
+        data = {"source": library.rebind_source(
+            args[1], request["expected_root"], request["root"], expected_revision=request["expected_revision"],
+        )}
     elif len(args) == 2 and args[0] == "--storage-check-source":
         request = _storage_request("references")
         data = {"source": library.check_source(args[1], request["references"])}
