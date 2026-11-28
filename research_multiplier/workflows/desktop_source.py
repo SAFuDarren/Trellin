@@ -8,8 +8,10 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import time
 
 from research_multiplier.storage.managed_workspaces import LibraryError
+from research_multiplier.workflows import desktop_pdf
 
 
 MAX_FILE_CHECKS = 16
@@ -176,34 +178,54 @@ def _verify_file(root, path, expected):
     raise _ObservationError("unstable")
 
 
-def preview_text_files(descriptor, selected, byte_budget):
+def preview_files(descriptor, selected, byte_budget, *, pdf_worker):
     """Read explicit files against one open root, then settle each successful name."""
     files = []
     observed = []
+    raw_pdf_budget = desktop_pdf.MAX_RAW_BYTES
+    deadline = time.monotonic() + desktop_pdf.EXTRACTION_SECONDS
     for path, previous in selected:
         row = {"path": path.as_posix()}
         files.append(row)
         suffix = path.suffix.casefold()
-        if suffix not in {".txt", ".md", ".markdown", ".tex", ".lean"}:
-            row["status"] = "pdf_deferred" if suffix == ".pdf" else "unsupported"
+        is_pdf = suffix == ".pdf"
+        if is_pdf and pdf_worker is None:
+            row["status"] = "pdf_unavailable"
+            continue
+        if not is_pdf and suffix not in {".txt", ".md", ".markdown", ".tex", ".lean"}:
+            row["status"] = "unsupported"
             continue
         try:
+            if is_pdf and time.monotonic() >= deadline:
+                raise _ObservationError("pdf_timeout")
+            if is_pdf and byte_budget == 0:
+                raise _ObservationError("pdf_text_limit")
             with _regular_file(descriptor, path) as (file, info):
-                if info.st_size > byte_budget:
+                if info.st_size > (raw_pdf_budget if is_pdf else byte_budget):
                     raise _ObservationError("too_large")
-                byte_budget -= info.st_size
+                if is_pdf:
+                    raw_pdf_budget -= info.st_size
+                else:
+                    byte_budget -= info.st_size
                 raw = b"".join(_file_chunks(file, info.st_size))
                 if os.read(file, 1) or _version(os.fstat(file)) != _version(info):
                     raise _ObservationError("unstable")
                 digest = hashlib.sha256(raw).hexdigest()
                 if previous is not None and previous != digest:
                     raise _ObservationError("changed")
+            if is_pdf:
+                result, used = desktop_pdf.extract(pdf_worker, raw, byte_budget, deadline)
+                row.update(result)
+                byte_budget -= used
+            else:
                 text = raw.decode("utf-8")
                 if any((ord(ch) < 32 and ch not in "\t\r\n\v\f") or ch == "\x7f" for ch in text):
                     raise _ObservationError("binary")
                 if not text.removeprefix("\ufeff").strip():
                     raise _ObservationError("empty")
-            row.update(status="available", text=text, sha256=digest)
+                row.update(status="available", text=text)
+            if row["status"] == "available":
+                row["sha256"] = digest
             observed.append((path, info, row))
         except UnicodeDecodeError:
             row["status"] = "invalid_utf8"

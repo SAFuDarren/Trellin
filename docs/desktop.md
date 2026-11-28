@@ -115,9 +115,13 @@ The native launcher has two private one-shot commands for the future project int
 
 A non-null `workspace` names an existing workspace candidate at the selected folder or its legacy `Trellin` child. Use the normal reopen flow to validate the workspace. A null value allows text preview. Preview checks the selected directory identity and workspace markers again before returning. A root failure or malformed request returns a fixed error code and no files.
 
-Choose up to 16 distinct relative paths. TXT, Markdown (`.md`, `.markdown`), TeX and Lean files must be ordinary UTF-8 text files. An `available` result includes the relative path, the exact text (including its original line endings) and the SHA-256 of the original bytes. Reads share an 18,000-byte budget in request order. Files that cannot fit are skipped in full. Bytes read still count when decoding or digest checks fail.
+Choose up to 16 distinct relative paths. TXT, Markdown (`.md`, `.markdown`), TeX and Lean files must be ordinary UTF-8 text files. An `available` text result includes the relative path, the exact text (including its original line endings) and the SHA-256 of the original bytes. A file that cannot fit the remaining text budget is skipped in full. Bytes read for a text file still count when decoding or digest checks fail.
 
-Other file results contain only `path` and `status`. A PDF reports `pdf_deferred` without opening it. Other statuses are `unsupported`, `missing`, `inaccessible`, `too_large`, `invalid_utf8`, `binary`, `empty`, `changed` (expected digest mismatch) and `unstable` (changed during the read). Intake reads only explicitly requested material. It does not scan the folder, create a project, update the library or call a model.
+The macOS application previews a text-bearing PDF with the bundled PDFKit helper. A successful PDF result returns `path`, `sha256` of the original PDF bytes, `page_count`, `pages_included_through`, and `pages`. Each entry in `pages` contains the original 1-based physical `page` and its extracted `text`. Pages with no extractable text do not appear in the array. When `pages_included_through` is less than `page_count`, the preview covers only that prefix of the document. A page is included in full or omitted.
+
+Each request caps PDF reads at 16 MiB in total and the PDF extraction deadline at ten seconds. PDF documents above 128 pages are reported separately. Extracted PDF text and selected text files share the 18,000-byte text budget. A PDF error is a `path` and a fixed `status`, such as `pdf_no_text` for a scanned PDF, `pdf_locked`, `pdf_invalid`, `pdf_page_limit`, `pdf_text_limit`, `pdf_timeout`, or `pdf_unavailable` when the helper cannot be used. For unreadable material, paste selected text or continue manually in the existing intake flow.
+
+Filesystem and text failures return the existing `unsupported`, `missing`, `inaccessible`, `too_large`, `invalid_utf8`, `binary`, `empty`, `changed`, or `unstable` status. Intake reads only explicitly requested material. It does not scan the folder, create a project, update the library or call a model.
 
 ## Check a linked source through the launcher
 

@@ -117,9 +117,13 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 若 `workspace` 非空，所选目录本身或其旧版 `Trellin` 子目录含有工作区标记，调用方应走正常的重新打开流程核验工作区。空值表示可预览文本。预览返回前会再次核对目录身份和工作区标记。目录校验失败或请求格式有误时，只返回固定错误代码，省略文件列表。
 
-一次最多选择 16 个不同的相对路径。支持 UTF-8 的普通 TXT、Markdown（`.md`、`.markdown`）、TeX 和 Lean 文件。`available` 结果保留相对路径、原始文本（包括原有换行符）和原始字节的 SHA-256。文件按请求顺序共享 18,000 字节的读取限额。超过剩余额度的文件整份跳过。解码或摘要校验失败时，已读取的字节仍计入限额。
+一次最多选择 16 个不同的相对路径。支持 UTF-8 的普通 TXT、Markdown（`.md`、`.markdown`）、TeX 和 Lean 文件。`available` 的文本结果包含相对路径、原始文本（包括原有换行符）和原始字节的 SHA-256。超过剩余文本限额的文件整份跳过。文本文件解码或摘要校验失败时，已读取的字节仍计入限额。
 
-其余文件结果只含 `path` 和 `status`。PDF 返回 `pdf_deferred`，不打开文件。其他状态包括 `unsupported`、`missing`、`inaccessible`、`too_large`、`invalid_utf8`、`binary`、`empty`、`changed`（与预期摘要不符）和 `unstable`（读取期间发生变化）。导入预览仅读取明确选择的资料，不扫描文件夹，不创建项目、更新库或调用模型。
+macOS 应用使用包内的 PDFKit 辅助程序预览有文本层的 PDF。成功结果包含 `path`、原始 PDF 字节的 `sha256`、`page_count`、`pages_included_through` 和 `pages`。`pages` 的每项包含从 1 开始的物理页码 `page` 和提取的 `text`。无法提取文本的页面不出现在数组中。`pages_included_through` 小于 `page_count` 时，预览只覆盖此前的页面。每页文本整页纳入或省略。
+
+每次请求最多读取 16 MiB 的 PDF 原始字节，提取总时限为十秒。超过 128 页的 PDF 会单独提示。PDF 提取的文本与文本文件共享 18,000 字节限额。PDF 失败结果仅含 `path` 和固定 `status`，如扫描件的 `pdf_no_text`、`pdf_locked`、`pdf_invalid`、`pdf_page_limit`、`pdf_text_limit`、`pdf_timeout`，以及辅助程序无法使用时的 `pdf_unavailable`。材料无法读取时，可在现有导入流程粘贴选定文本或手动继续。
+
+文件系统和文本失败沿用 `unsupported`、`missing`、`inaccessible`、`too_large`、`invalid_utf8`、`binary`、`empty`、`changed` 或 `unstable` 状态。导入预览仅读取明确选择的资料，不扫描文件夹，不创建项目、更新库或调用模型。
 
 ## 通过启动器核对已绑定的原目录
 

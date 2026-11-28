@@ -85,7 +85,7 @@ app="$stage/Trellin.app"
 resources="$app/Contents/Resources"
 source="$stage/source"
 wheels="$stage/wheels"
-mkdir -p "$resources" "$app/Contents/MacOS" "$source" "$wheels"
+mkdir -p "$resources" "$app/Contents/MacOS" "$app/Contents/Helpers" "$source" "$wheels"
 
 # Build from the working source, excluding ignored files and unrelated fixtures.
 # This keeps setuptools build and egg-info files outside the checkout.
@@ -147,6 +147,10 @@ cp "$desktop/packaging/Info.plist" "$app/Contents/Info.plist"
 xcrun swiftc -O -target arm64-apple-macos15.0 -module-cache-path "$stage/swift-modules" \
     -o "$app/Contents/MacOS/Trellin" "${swift_sources[@]}"
 
+pdf_helper="$app/Contents/Helpers/trellin-pdf-preview"
+xcrun swiftc -O -parse-as-library -target arm64-apple-macos15.0 -module-cache-path "$stage/swift-modules" \
+    -o "$pdf_helper" "$desktop/Helpers/PDFPreview.swift"
+codesign --force --sign - --timestamp=none "$pdf_helper"
 codesign --force --sign - --timestamp=none "$app"
 codesign --verify --deep --strict "$app"
 mv -n "$app" "$output/"

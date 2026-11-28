@@ -6,7 +6,7 @@ import stat
 
 from research_multiplier.storage import paths
 from research_multiplier.storage.managed_workspaces import LibraryError, _stored_source_identity, stored_absolute_path
-from research_multiplier.workflows import desktop_source as source
+from research_multiplier.workflows import desktop_pdf, desktop_source as source
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, resolve_selected_folder
 from research_multiplier.workflows.intake import MAX_MODEL_NOTES_BYTES
 
@@ -73,7 +73,7 @@ def inspect(location):
         raise LibraryError(error.args[0]) from None
 
 
-def preview(location, identity, references):
+def preview(location, identity, references, *, pdf_worker=None):
     if not isinstance(location, str) or not location.isprintable():
         raise LibraryError("storage-invalid")
     root = stored_absolute_path(location)
@@ -82,4 +82,6 @@ def preview(location, identity, references):
     with _selected_root(root, expected=identity) as (descriptor, _, workspace):
         if workspace is not None:
             raise LibraryError("workspace-occupied")
-        return source.preview_text_files(descriptor, selected, MAX_MODEL_NOTES_BYTES)
+        if pdf_worker is None and any(path.suffix.casefold() == ".pdf" for path, _ in selected):
+            pdf_worker = desktop_pdf.bundled_extractor()
+        return source.preview_files(descriptor, selected, MAX_MODEL_NOTES_BYTES, pdf_worker=pdf_worker)
