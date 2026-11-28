@@ -139,6 +139,12 @@ The checker revalidates the observed paths at the end of the batch without hashi
 
 To repair a missing path, the researcher chooses an untracked candidate in the same linked root. The checker verifies its digest against the recorded version and verifies the original path is still missing. A successful repair keeps the reference ID and hash. It updates only the locator path and revision. A stale request should reload the source and locator before retrying.
 
+### Background source observations
+
+The native workbench observes only its current linked project's registered locators. It samples up to 16 paths per pass, about once per second while the project is open. The first pass through the locators compares their current hashes with the recorded versions. Later passes hash files whose metadata changed and retry unstable observations. Reopening catches changes still present from when the app was closed. The observer closes with the native session.
+
+The authenticated local workbench can read the current snapshot at `GET /api/source-observations`. An inactive or rechecking source has no file observations. Each complete observation lists the source binding revision and registered reference IDs with their recorded and observed digests where available. Its generation changes when the session's published snapshot changes. The reply contains no file paths or contents. The observer leaves the research directory and accepted hashes intact.
+
 ## Validate the signed build
 
 Use a fresh virtual environment outside the checkout and the app for the [installed-wheel compatibility suite](../tests/compat_validation/README.md). Install the wheel with the exact version declared in `tests/compat_validation/PACKAGE_VERSION` and keep test projects, databases and logs in disposable locations. The runner rejects a Python interpreter or package installed inside a macOS app before it starts the tests.

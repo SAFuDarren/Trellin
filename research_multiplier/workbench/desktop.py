@@ -10,10 +10,11 @@ from threading import Thread
 from uuid import UUID
 
 from research_multiplier.storage import credentials, paths
-from research_multiplier.storage.managed_workspaces import uuid_text, workspace_registration
+from research_multiplier.storage.managed_workspaces import uuid_text, workspace_marker, workspace_registration
 from research_multiplier.storage.postgres import DatabaseOperationError
 
 from research_multiplier.workflows import release_updates
+from research_multiplier.workflows.desktop_source_watch import SourceObserver
 from research_multiplier.workflows.desktop_library import Library, LibraryError
 from research_multiplier.workflows.desktop_workspace import (
     WorkspaceCreationError, WorkspaceUpgradeError, upgrade_project_database,
@@ -215,6 +216,9 @@ def _session(workspace_path, lifetime, output, *, select=False, library=None, ne
                         # Older projects can still open if the app library is offline.
                         project = None
                 if project is not None:
+                    marker = workspace_marker(server.workspace)
+                    if marker is not None and marker["source_root"] is not None:
+                        server.source_observer = resources.enter_context(SourceObserver(library, project["id"]))
                     selection["name"] = project["name"]
                     selection["project_id"] = project["id"]
                     if hasattr(library, "remember_project"):

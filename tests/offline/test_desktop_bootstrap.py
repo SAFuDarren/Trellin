@@ -1,5 +1,7 @@
 """Verify Trellin's startup protocol and child-process lifetime."""
 
+from contextlib import contextmanager
+from hashlib import sha256
 from http.client import HTTPConnection
 from io import BytesIO, StringIO
 import json
@@ -8,6 +10,7 @@ from pathlib import Path
 from queue import SimpleQueue
 import sys
 from threading import Event, Thread
+from time import monotonic, sleep
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
@@ -17,7 +20,7 @@ from research_multiplier.storage import credentials, paths
 from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workbench import desktop
 from research_multiplier.workbench.server import _MissingSchema
-from research_multiplier.workflows import desktop_workspace
+from research_multiplier.workflows import desktop_library, desktop_source, desktop_workspace
 from research_multiplier.workflows.desktop_library import LibraryError
 
 
@@ -195,6 +198,186 @@ def test_local_session_uses_selected_workspace_and_drains_on_parent_disconnect(m
             release.set()
             parent.close()
             process.join(timeout=5)
+
+
+@pytest.fixture
+def observation_library(monkeypatch, tmp_path):
+    monkeypatch.setenv("RM_TRELLIN_HOME", str(tmp_path / "app support"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "credentials"))
+    for key in credentials.KEYS:
+        monkeypatch.setenv(key, "")
+
+    def create(workspace, *, minimal=False):
+        assert minimal
+        workspace = paths.initialize_workspace(workspace, minimal=minimal)
+        paths.bind_database(workspace, uuid4())
+        _save_login(workspace, RM_HUMAN_DSN="service=fixture-human")
+        return workspace
+
+    def read(server, action):
+        assert action is desktop._check_schema
+        assert paths.database_id(server.workspace) is not None
+        assert os.environ["RM_HUMAN_DSN"] == "service=fixture-human"
+
+    monkeypatch.setattr(desktop_library, "create_workspace", create)
+    monkeypatch.setattr(desktop.WorkbenchServer, "read", read)
+    return desktop_library.Library()
+
+
+@contextmanager
+def _desktop_http_session(project):
+    lifetime, parent = _pipe()
+    replies, output = _pipe()
+    completed = []
+    with lifetime, parent, replies, output, open(output.fileno(), "w", closefd=False) as text_output:
+        process = Thread(target=lambda: completed.append(
+            desktop.run(None, lifetime, text_output, library=desktop_library.Library(), project_id=project),
+        ), daemon=True)
+        process.start()
+        try:
+            reply = _read_ready(replies)
+            assert reply["status"] == "ready" and reply["project_id"] == str(project)
+            url = urlsplit(reply["url"])
+            yield url.port, parse_qs(url.fragment)["session"][0]
+        finally:
+            parent.close()
+            process.join(timeout=5)
+    assert not process.is_alive(), "Trellin did not stop after native launcher disconnect."
+    assert completed == [0]
+
+
+_SOURCE_OBSERVATIONS = "/api/source-observations"
+
+
+def _wait_for_source_observation(port, session, ready):
+    deadline = monotonic() + 8
+    while True:
+        code, body = _request(port, _SOURCE_OBSERVATIONS, session)
+        assert code == 200
+        result = json.loads(body)
+        if ready(result):
+            return result
+        if monotonic() >= deadline:
+            pytest.fail(f"The workbench did not observe the expected source state: {result}")
+        sleep(0.05)
+
+
+def test_linked_source_observation_tracks_native_session_and_recovers_closed_edits(
+    monkeypatch, observation_library, tmp_path,
+):
+    source = tmp_path / "research"
+    source.mkdir()
+    paper = source / "paper.md"
+    notes = source / "untracked.md"
+    initial = b"Accepted paper"
+    paper.write_bytes(initial)
+    paper.chmod(0o640)
+    notes.write_bytes(b"Untracked notes")
+    workspace = observation_library.open_folder(source)
+    project = paths.workspace_id(workspace)
+    binding = observation_library.source_info(str(project))
+    expected_digest = sha256(initial).hexdigest()
+    tracked = observation_library.track_source_reference(
+        str(project), paper.name, expected_revision=binding["revision"],
+    )["reference"]
+    assert tracked["sha256"] == expected_digest
+    initial_inode = paper.stat().st_ino
+    approved_root_inode = source.stat().st_ino
+    hash_file = desktop_source._hash_file
+    open_file = desktop_source._regular_file
+    run_observer = desktop.SourceObserver._run
+    digests = []
+    opened = set()
+    observed = Event()
+    stopped = SimpleQueue()
+
+    def record_digest(descriptor, size):
+        digest = hash_file(descriptor, size)
+        digests.append(os.fstat(descriptor).st_ino)
+        return digest
+
+    def record_open(root, path):
+        opened.add((os.fstat(root).st_ino, path.as_posix()))
+        observed.set()
+        return open_file(root, path)
+
+    def record_observer_stop(observer):
+        try:
+            run_observer(observer)
+        finally:
+            stopped.put(observer)
+
+    def atomically_save(contents):
+        stage = paper.with_suffix(".tmp")
+        stage.write_bytes(contents)
+        stage.chmod(0o640)
+        stage.replace(paper)
+
+    def observed_file(port, session, status, contents):
+        expected = {"reference_id": tracked["id"], "recorded_sha256": expected_digest, "status": status,
+                    "sha256": sha256(contents).hexdigest()}
+        result = _wait_for_source_observation(port, session, lambda reply: reply["files"] == [expected])
+        assert set(result) == {"source_id", "revision", "status", "files", "generation"}
+        assert (result["source_id"], result["revision"], result["status"]) == (
+            str(project), binding["revision"], "available",
+        )
+        assert isinstance(result["generation"], int)
+        return result
+
+    monkeypatch.setattr(desktop_source, "_hash_file", record_digest)
+    monkeypatch.setattr(desktop_source, "_regular_file", record_open)
+    monkeypatch.setattr(desktop.SourceObserver, "_run", record_observer_stop)
+    changed = b"Saved while the workbench was running"
+    with _desktop_http_session(project) as (port, session):
+        assert _request(port, _SOURCE_OBSERVATIONS)[0] == 403
+        baseline = observed_file(port, session, "unchanged", initial)
+        notes.write_bytes(b"An unrelated change")
+        observed.clear()
+        assert observed.wait(5), "The active observer did not run after an unrelated edit."
+        assert observed_file(port, session, "unchanged", initial) == baseline
+        assert digests == [initial_inode]
+        atomically_save(changed)
+        saved_inode = paper.stat().st_ino
+        update = observed_file(port, session, "changed", changed)
+        assert update["generation"] > baseline["generation"]
+        assert digests == [initial_inode, saved_inode]
+        assert sorted(entry.name for entry in source.iterdir()) == [paper.name, notes.name]
+        assert paper.read_bytes() == changed and paper.stat().st_mode & 0o777 == 0o640
+        assert notes.read_bytes() == b"An unrelated change"
+
+        displaced = source.rename(tmp_path / "displaced")
+        source.mkdir()
+        paper.write_bytes(b"Another project at the old address")
+        blocked = _wait_for_source_observation(port, session, lambda reply: reply["status"] == "identity_changed")
+        assert blocked["generation"] > update["generation"]
+        assert blocked["files"] == []
+        assert digests == [initial_inode, saved_inode]
+        assert paper.read_bytes() == b"Another project at the old address"
+
+    first_observer = stopped.get(timeout=2)
+    source.rename(tmp_path / "replacement")
+    displaced.rename(source)
+    saved_offline = b"Saved while the workbench was closed"
+    atomically_save(saved_offline)
+    offline_inode = paper.stat().st_ino
+    assert digests == [initial_inode, saved_inode]
+    with _desktop_http_session(project) as (port, session):
+        observed_file(port, session, "changed", saved_offline)
+        assert digests == [initial_inode, saved_inode, offline_inode]
+    assert stopped.get(timeout=2) is not first_observer
+    assert opened == {(approved_root_inode, paper.name)}
+    assert observation_library.list_source_references(str(project))["references"] == [tracked]
+    assert paper.read_bytes() == saved_offline and paper.stat().st_mode & 0o777 == 0o640
+
+
+def test_unlinked_native_workbench_reports_inactive_source_observation(observation_library):
+    workspace = observation_library.create("Independent project")
+    with _desktop_http_session(paths.workspace_id(workspace)) as (port, session):
+        code, body = _request(port, _SOURCE_OBSERVATIONS, session)
+        assert code == 200
+        assert json.loads(body) == {
+            "status": "inactive", "source_id": None, "revision": None, "files": [], "generation": 0,
+        }
 
 
 def test_run_resolves_a_moved_managed_project_before_starting_server(monkeypatch, tmp_path):

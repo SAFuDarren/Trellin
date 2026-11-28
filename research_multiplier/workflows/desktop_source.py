@@ -171,14 +171,15 @@ def _verify_file(root, path, expected):
     raise _ObservationError("unstable")
 
 
-def _observe(root, path, previous):
+def _observe(root, path, previous, *, cached=None):
     name = path.as_posix()
     try:
         with _regular_file(root, path) as (descriptor, info):
             if info.st_size > _MAX_FILE_BYTES:
                 raise _ObservationError("too_large")
-            digest = _hash_file(descriptor, info.st_size)
-            if _version(info) != _version(os.fstat(descriptor)):
+            version = _version(info)
+            digest = cached[1] if cached is not None and cached[0] == version else _hash_file(descriptor, info.st_size)
+            if version != _version(os.fstat(descriptor)):
                 raise _ObservationError("unstable")
     except _ObservationError as error:
         return {"path": name, "status": str(error)}, None
@@ -204,21 +205,36 @@ def _settled_observation(root, path, observation):
     return report
 
 
-def check_references(root: Path, references: object, *, expected_identity: dict | None) -> dict:
-    """Report bounded digest observations without persisting or returning file contents."""
+def _root_failure(status, cache):
+    if cache is not None:
+        cache.clear()
+    return {"status": status, "files": []}
+
+
+def check_references(root: Path, references: object, *, expected_identity: dict | None, cache: dict | None = None) -> dict:
+    """Report verified digests, optionally reusing a monitor's in-memory observations."""
     selected = _references(references)
     try:
         with _source_directory(root) as descriptor:
             status = _descriptor_status(descriptor, expected_identity)
             if status != "available":
-                return {"status": status, "files": []}
-            observations = [_observe(descriptor, path, previous) for path, previous in selected]
+                return _root_failure(status, cache)
+            observations = [
+                _observe(descriptor, path, previous, cached=cache.get(path.as_posix()) if cache is not None else None)
+                for path, previous in selected
+            ]
             # A later observation can overlap with an editor finishing an
             # earlier save. Recheck the names without hashing again.
             files = [_settled_observation(descriptor, path, observation)
                      for (path, _), observation in zip(selected, observations, strict=True)]
             if source_status(root, expected_identity) != "available":
-                return {"status": "unstable", "files": []}
+                return _root_failure("unstable", cache)
     except OSError:
-        return {"status": "unavailable", "files": []}
+        return _root_failure("unavailable", cache)
+    if cache is not None:
+        for report, (_, info) in zip(files, observations, strict=True):
+            if info is not None and "sha256" in report:
+                cache[report["path"]] = (_version(info), report["sha256"])
+            else:
+                cache.pop(report["path"], None)
     return {"status": "available", "files": files}
