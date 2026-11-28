@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.152
+
+- Verify the saved identity of a linked folder before checking references. Older projects still open, and their linked source can be confirmed through the local rebind operation.
+
 ## 1.0.151
 
 - Add local backend operations to rebind a linked research folder and verify selected file references by hash. The original files stay under the researcher's control.

@@ -110,13 +110,17 @@ The private desktop launcher can inspect, rebind and check a registered linked f
 
 | Launcher arguments | UTF-8 JSON on standard input | Payload inside `source` |
 | --- | --- | --- |
-| `--storage-source PROJECT_UUID` | None | `source_id`, `root` |
-| `--storage-rebind-source PROJECT_UUID` | Object with `expected_root` and `root` | `source_id`, `root` |
+| `--storage-source PROJECT_UUID` | None | `source_id`, `root`, `revision`, `status` |
+| `--storage-rebind-source PROJECT_UUID` | Object with `expected_root`, `expected_revision` and `root` | `source_id`, `root`, `revision`, `status` |
 | `--storage-check-source PROJECT_UUID` | Object with `references`, an array of objects with `path` and optional prior `sha256` | `source_id`, `status`, `files` |
 
-Rebind after the researcher selects the replacement directory. Compare the exact saved path, even if that directory is offline, and update only the application marker. A stale request returns `storage-stale`. Reload the binding before a retry.
+Rebind after the researcher selects the replacement directory. Submit the saved path and revision from the source reply, even if that directory is offline. A stale request returns `storage-stale`. Reload the binding before a retry. A repeat confirmation for the current directory keeps its revision. Replacing the directory at the same path requires a new explicit confirmation.
 
-Checks read a batch of up to 16 named regular files, at most 4 MiB per file, and return paths, status and available SHA-256 values. An unavailable or unstable source has an empty file list. A missing file in a reachable source has its own status. A change observed during a check returns `unstable` for a retry. The check follows no symbolic links and changes no original files. These commands are backend integration points for future desktop controls.
+The checker compares the saved local filesystem identity with the opened directory before reading any referenced file. The source reports `identity_changed` for a mismatch, `unavailable` if the directory cannot be opened, and `needs_confirmation` for a readable legacy binding without an identity. The project can still reopen in these states. The identity is local to this device and filesystem. Remounting or moving to another volume can require explicit confirmation.
+
+Confirming a source updates its managed binding marker. Trellin 1.0.151 cannot open the updated marker. To return to that version, restore the matching pre-upgrade application data and project backup.
+
+Checks read a batch of up to 16 named regular files, at most 4 MiB per file, and return paths, status and available SHA-256 values. A source that is unavailable, unconfirmed, mismatched or unstable has an empty file list. A missing file in a reachable source has its own status. A change observed during a check returns `unstable` for a retry. The check follows no symbolic links and changes no original files. These commands are backend integration points for future desktop controls.
 
 ## Validate the signed build
 

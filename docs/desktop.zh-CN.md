@@ -112,13 +112,17 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 | 启动器参数 | 标准输入的 UTF-8 JSON | `source` 中返回的字段 |
 | --- | --- | --- |
-| `--storage-source PROJECT_UUID` | 无 | `source_id`、`root` |
-| `--storage-rebind-source PROJECT_UUID` | 含 `expected_root` 和 `root` 的对象 | `source_id`、`root` |
+| `--storage-source PROJECT_UUID` | 无 | `source_id`、`root`、`revision`、`status` |
+| `--storage-rebind-source PROJECT_UUID` | 含 `expected_root`、`expected_revision` 和 `root` 的对象 | `source_id`、`root`、`revision`、`status` |
 | `--storage-check-source PROJECT_UUID` | 含 `references` 的对象，数组元素包含 `path` 和可选的上次 `sha256` | `source_id`、`status`、`files` |
 
-用户选定替换目录后，按此前保存的准确路径比较并更新应用标记，原目录离线时也可操作。请求引用的旧绑定已变化时，返回 `storage-stale`，应重新读取绑定再重试。
+用户选定替换目录后，提交来源返回中的已保存路径和版本，原目录离线时也可操作。请求引用的旧绑定已变化时，返回 `storage-stale`，应重新读取绑定再重试。重复确认当前目录时保留绑定版本。同一路径被另一个目录占用时，需要重新显式确认。
 
-一次核对最多读取 16 个明确指定的普通文件，每个文件最多 4 MiB，返回路径、状态和已取得的 SHA-256。原目录不可用或核对期间不稳定时，文件列表为空；可访问的原目录中缺失单个文件时，会单独报告。核对发现文件正在变化时返回 `unstable`，供调用方重试。核对过程拒绝符号链接，保留原文件内容和目录结构。这些命令供后续桌面界面对接。
+核对在读取文件前，先比对打开的目录与保存的本机文件系统身份。身份不符时返回 `identity_changed`，目录打不开时返回 `unavailable`，能打开但缺少身份的旧绑定返回 `needs_confirmation`。课题在这些状态下仍可重开。身份只适用于本机文件系统，重新挂载或跨卷移动可能需要显式确认。
+
+确认来源会更新应用管理区中的绑定标记。Trellin 1.0.151 无法打开更新后的标记。如需回到该版本，恢复升级前配套的应用数据和课题备份。
+
+一次核对最多读取 16 个明确指定的普通文件，每个文件最多 4 MiB，返回路径、状态和已取得的 SHA-256。原目录不可用、尚未确认、身份不符或核对期间不稳定时，文件列表为空。可访问的原目录中缺失单个文件时，会单独报告。核对发现文件正在变化时返回 `unstable`，供调用方重试。核对过程拒绝符号链接，保留原文件内容和目录结构。这些命令供后续桌面界面对接。
 
 ## 核验签名构建
 

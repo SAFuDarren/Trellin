@@ -111,7 +111,18 @@ def library_root(anchor, *, required=False):
 
 
 _MANAGED_REQUIRED = {"format_version", "anchor", "slot"}
-_MANAGED_OPTIONAL = {"name", "default", "source_root"}
+_SOURCE_IDENTITY_KEYS = {"device", "inode", "birth_time_ns"}
+_MANAGED_OPTIONAL = {"name", "default", "source_root", "source_identity", "source_revision"}
+
+
+def _stored_source_identity(value):
+    if not isinstance(value, dict) or value.keys() != _SOURCE_IDENTITY_KEYS:
+        raise LibraryError("storage-invalid")
+    device, inode, birth = value["device"], value["inode"], value["birth_time_ns"]
+    if (type(device) is not int or device < 0 or type(inode) is not int or inode <= 0
+            or (birth is not None and (type(birth) is not int or birth < 0))):
+        raise LibraryError("storage-invalid")
+    return value
 
 
 def workspace_marker(workspace):
@@ -137,7 +148,16 @@ def workspace_marker(workspace):
     source_root = stored_absolute_path(marker["source_root"]) if "source_root" in marker else None
     if default and source_root is not None:
         raise LibraryError("storage-invalid")
-    return {"anchor": anchor, "slot": slot, "name": name, "default": default, "source_root": source_root}
+    source_identity, source_revision = None, None
+    if keys & {"source_identity", "source_revision"}:
+        if source_root is None or not {"source_identity", "source_revision"} <= keys:
+            raise LibraryError("storage-invalid")
+        source_identity = _stored_source_identity(marker["source_identity"])
+        source_revision = uuid_text(marker["source_revision"])
+    return {
+        "anchor": anchor, "slot": slot, "name": name, "default": default,
+        "source_root": source_root, "source_identity": source_identity, "source_revision": source_revision,
+    }
 
 
 def workspace_registration(workspace):

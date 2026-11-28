@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -15,7 +15,7 @@ from research_multiplier.cli import main
 from research_multiplier.storage import paths
 from research_multiplier.storage.managed_workspaces import LOCATION_FILE, MANAGED_FILE, LibraryError, workspace_registration
 from research_multiplier.workbench import desktop
-from research_multiplier.workflows import desktop_library
+from research_multiplier.workflows import desktop_library, desktop_source
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError
 
 
@@ -526,6 +526,16 @@ def _storage_source_command(monkeypatch, capsys, flag, project, request=None):
     return result, json.loads(capsys.readouterr().out)
 
 
+def _expect_storage_source(result, project, folder, status="available"):
+    code, reply = result
+    assert code == 0
+    revision = reply["source"]["revision"]
+    assert str(UUID(revision)) == revision
+    expected = {"source_id": project, "root": str(folder), "status": status, "revision": revision}
+    assert reply == {"version": 1, "status": "ready", "source": expected}
+    return expected
+
+
 def _folder_snapshot(root):
     return {
         entry.relative_to(root): (entry.stat().st_mode, entry.read_bytes() if entry.is_file() else None)
@@ -587,6 +597,7 @@ def test_linked_folder_binding_survives_library_lifecycle(library, tmp_path):
     workspace = library.open_folder(source)
     identifier = str(paths.workspace_id(workspace))
     database = paths.database_id(workspace)
+    binding = library.source_info(identifier)
     root = workspace.parent.parent
     library.rename(identifier, "Renamed research")
     library.unregister(identifier)
@@ -604,6 +615,7 @@ def test_linked_folder_binding_survives_library_lifecycle(library, tmp_path):
     relocated = target / "Workspaces" / workspace.name
     assert desktop_library.Library().open_folder(source) == relocated
     assert desktop_library.Library().resolve_project(identifier) == relocated
+    assert desktop_library.Library().source_info(identifier) == binding
     assert paths.database_id(relocated) == database
     assert not list(source.iterdir())
 
@@ -631,28 +643,34 @@ def test_native_source_rebind_preserves_project_identity_and_both_folders(monkey
     def command(flag, request=None):
         return _storage_source_command(monkeypatch, capsys, flag, project, request)
 
-    def ready(folder):
-        return (0, {"version": 1, "status": "ready", "source": {"source_id": project, "root": str(folder)}})
-
-    assert command("--storage-source") == ready(original)
-    assert command("--storage-rebind-source", {"expected_root": str(original), "root": str(replacement)}) == ready(
-        replacement,
+    initial = _expect_storage_source(command("--storage-source"), project, original)
+    request = {"expected_root": str(original), "root": str(replacement)}
+    assert command("--storage-rebind-source", request) == (
+        2, {"version": 1, "status": "error", "code": "storage-invalid"},
     )
+    request["expected_revision"] = initial["revision"]
+    rebound = _expect_storage_source(command("--storage-rebind-source", request), project, replacement)
+    assert rebound["revision"] != initial["revision"]
     assert {folder: _folder_snapshot(folder) for folder in before} == before
 
     relocated = replacement.rename(tmp_path / "relocated")
-    assert command("--storage-source") == ready(replacement)
-    assert command("--storage-rebind-source", {"expected_root": str(replacement), "root": str(relocated)}) == ready(
-        relocated,
-    )
+    unavailable = _expect_storage_source(command("--storage-source"), project, replacement, "unavailable")
+    assert unavailable["revision"] == rebound["revision"]
+    moved = _expect_storage_source(command("--storage-rebind-source", {
+        "expected_root": str(replacement), "root": str(relocated), "expected_revision": rebound["revision"],
+    }), project, relocated)
+    assert moved["revision"] != rebound["revision"]
     assert not replacement.exists()
     assert _folder_snapshot(relocated) == before[replacement]
     assert _folder_snapshot(original) == before[original]
-    assert json.loads(marker.read_text()) == {**original_marker, "source_root": str(relocated)}
+    updated_marker = json.loads(marker.read_text())
+    assert updated_marker["source_root"] == str(relocated)
+    assert updated_marker["source_revision"] == moved["revision"]
+    assert all(updated_marker[key] == original_marker[key] for key in ("anchor", "slot", "name", "default"))
 
     (workspace.parent.parent / "registry.json").unlink()
     assert [row["id"] for row in desktop_library.Library().status()["projects"]] == [project]
-    assert command("--storage-source") == ready(relocated)
+    assert _expect_storage_source(command("--storage-source"), project, relocated) == moved
     assert desktop_library.Library().resolve_project(project, verify_database=True) == workspace
     assert _select_folder(desktop_library.Library(), relocated) == (0, selection)
     assert paths.database_id(workspace) == database
@@ -669,6 +687,7 @@ def test_source_rebind_rejects_invalid_destination_without_changes(library, tmp_
     (original / "notes.md").write_bytes(b"Source notes")
     workspace = library.open_folder(original)
     project = str(paths.workspace_id(workspace))
+    before = library.source_info(project)
     expected_root = original
     target = tmp_path / "replacement"
     if problem == "app ancestor":
@@ -693,8 +712,8 @@ def test_source_rebind_rejects_invalid_destination_without_changes(library, tmp_
     folders = {folder: _folder_snapshot(folder) for folder in (original, target)}
     code = "storage-stale" if problem == "stale" else "storage-destination"
     with pytest.raises(LibraryError, match=f"^{code}$"):
-        library.rebind_source(project, str(expected_root), str(target))
-    assert library.source_info(project) == {"source_id": project, "root": str(original)}
+        library.rebind_source(project, str(expected_root), str(target), expected_revision=before["revision"])
+    assert library.source_info(project) == before
     assert marker.read_bytes() == previous_marker
     assert registry.read_bytes() == previous_registry
     assert {folder: _folder_snapshot(folder) for folder in folders} == folders
@@ -708,6 +727,7 @@ def test_source_rebind_retains_the_original_binding_after_failed_publication(mon
         (folder / "paper.md").write_text(folder.name)
     workspace = library.open_folder(original)
     project = str(paths.workspace_id(workspace))
+    binding = library.source_info(project)
     marker = workspace / MANAGED_FILE
     previous_marker = marker.read_bytes()
     before = {folder: _folder_snapshot(folder) for folder in (original, target)}
@@ -722,9 +742,9 @@ def test_source_rebind_retains_the_original_binding_after_failed_publication(mon
 
     monkeypatch.setattr(desktop_library, "publish_metadata", fail_marker)
     with pytest.raises(LibraryError, match="^storage-unavailable$"):
-        library.rebind_source(project, str(original), str(target))
+        library.rebind_source(project, str(original), str(target), expected_revision=binding["revision"])
     assert attempts == [str(target)]
-    assert library.source_info(project) == {"source_id": project, "root": str(original)}
+    assert library.source_info(project) == binding
     assert marker.read_bytes() == previous_marker
     assert {folder: _folder_snapshot(folder) for folder in before} == before
 
@@ -758,6 +778,125 @@ def test_native_source_check_reports_external_saves_and_deletion(monkeypatch, ca
     source.rmdir()
     check("unavailable")
     assert not source.exists()
+
+
+def _unexpected_source_read(*_, **_kwargs):
+    pytest.fail("Source verification attempted to open a referenced file without a confirmed root.")
+
+
+def test_same_path_replacement_keeps_project_available_but_blocks_file_reads(monkeypatch, capsys, library, tmp_path):
+    opened = _stub_desktop_open(monkeypatch, tmp_path)
+    source = tmp_path / "research"
+    source.mkdir()
+    old_contents = b"Original research"
+    new_contents = b"Different research at the same path"
+    (source / "paper.md").write_bytes(old_contents)
+    code, selection = _select_folder(library, source)
+    assert code == 0
+    workspace = Path(selection["workspace"])
+    project = selection["project_id"]
+    database = paths.database_id(workspace)
+    binding = library.source_info(project)
+    reference = {"path": "paper.md", "sha256": sha256(old_contents).hexdigest()}
+    marker = workspace / MANAGED_FILE
+    old_marker = marker.read_bytes()
+
+    displaced = source.rename(tmp_path / "original")
+    source.mkdir()
+    (source / "paper.md").write_bytes(new_contents)
+    folders = {folder: _folder_snapshot(folder) for folder in (source, displaced)}
+
+    with monkeypatch.context() as blocked:
+        blocked.setattr(desktop_source, "_regular_file", _unexpected_source_read)
+        assert library.source_info(project) == {**binding, "status": "identity_changed"}
+        assert _storage_source_command(monkeypatch, capsys, "--storage-check-source", project, {
+            "references": [reference],
+        }) == (0, {
+            "version": 1, "status": "ready",
+            "source": {"source_id": project, "status": "identity_changed", "files": []},
+        })
+        output = StringIO()
+        assert desktop.run(None, BytesIO(), output, library=library, project_id=UUID(project)) == 0
+        assert json.loads(output.getvalue()) == selection
+        assert _select_folder(library, source) == (0, selection)
+    assert opened == [workspace, workspace, workspace]
+    assert marker.read_bytes() == old_marker
+
+    def confirm(revision):
+        return library.rebind_source(project, str(source), str(source), expected_revision=revision)
+
+    confirmed = confirm(binding["revision"])
+    assert confirmed["revision"] != binding["revision"]
+    assert confirmed == {**binding, "revision": confirmed["revision"]}
+    confirmed_marker = marker.read_bytes()
+    assert confirm(confirmed["revision"]) == confirmed
+    with pytest.raises(LibraryError, match="^storage-stale$"):
+        confirm(binding["revision"])
+    assert marker.read_bytes() == confirmed_marker
+    assert library.check_source(project, [reference]) == {
+        "source_id": project, "status": "available",
+        "files": [{"path": reference["path"], "status": "changed", "sha256": sha256(new_contents).hexdigest()}],
+    }
+    assert paths.database_id(workspace) == database
+    assert list(workspace.parent.iterdir()) == [workspace]
+    assert {folder: _folder_snapshot(folder) for folder in folders} == folders
+
+
+def test_legacy_linked_marker_requires_explicit_confirmation(monkeypatch, library, tmp_path):
+    source = tmp_path / "research"
+    source.mkdir()
+    contents = b"Old research"
+    (source / "paper.md").write_bytes(contents)
+    workspace = library.open_folder(source)
+    project = str(paths.workspace_id(workspace))
+    marker = workspace / MANAGED_FILE
+    old_document = json.loads(marker.read_text())
+    del old_document["source_identity"]
+    del old_document["source_revision"]
+    marker.write_text(json.dumps(old_document))
+    old_marker = marker.read_bytes()
+    before = _folder_snapshot(source)
+    reference = {"path": "paper.md", "sha256": sha256(contents).hexdigest()}
+
+    with monkeypatch.context() as blocked:
+        blocked.setattr(desktop_source, "_regular_file", _unexpected_source_read)
+        binding = library.source_info(project)
+        assert binding == {
+            "source_id": project, "root": str(source), "revision": str(UUID(binding["revision"])),
+            "status": "needs_confirmation",
+        }
+        assert desktop_library.Library().source_info(project) == binding
+        assert library.check_source(project, [reference]) == {
+            "source_id": project, "status": "needs_confirmation", "files": [],
+        }
+        assert desktop_library.Library().open_folder(source) == workspace
+    assert marker.read_bytes() == old_marker
+
+    confirmed = library.rebind_source(project, str(source), str(source), expected_revision=binding["revision"])
+    assert confirmed["revision"] != binding["revision"]
+    assert confirmed == {**binding, "status": "available", "revision": confirmed["revision"]}
+    assert library.check_source(project, [reference]) == {
+        "source_id": project, "status": "available", "files": [{**reference, "status": "unchanged"}],
+    }
+    assert _folder_snapshot(source) == before
+
+
+def test_source_returns_to_a_previous_root_without_reusing_its_revision(library, tmp_path):
+    original = tmp_path / "original"
+    replacement = tmp_path / "replacement"
+    original.mkdir()
+    replacement.mkdir()
+    workspace = library.open_folder(original)
+    project = str(paths.workspace_id(workspace))
+    binding = library.source_info(project)
+
+    moved = library.rebind_source(project, str(original), str(replacement), expected_revision=binding["revision"])
+    returned = library.rebind_source(project, str(replacement), str(original), expected_revision=moved["revision"])
+    assert returned == {**binding, "revision": returned["revision"]}
+    assert len({binding["revision"], moved["revision"], returned["revision"]}) == 3
+    with pytest.raises(LibraryError, match="^storage-stale$"):
+        library.rebind_source(project, str(original), str(replacement), expected_revision=binding["revision"])
+    assert library.source_info(project) == returned
 
 
 def test_linked_folder_reuses_workspace_after_interrupted_registry_publication(monkeypatch, library, tmp_path):

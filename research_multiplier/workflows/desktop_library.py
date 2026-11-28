@@ -16,7 +16,7 @@ from research_multiplier.storage.managed_workspaces import (
     publish_metadata, read_metadata, stored_absolute_path, uuid_text, workspace_marker, workspace_registration,
 )
 from research_multiplier.storage.project_archive import _fingerprint
-from research_multiplier.workflows.desktop_source import check_references
+from research_multiplier.workflows.desktop_source import check_references, source_identity, source_status
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace, inspect_folder
 
 
@@ -64,6 +64,17 @@ def _same_source(source, saved):
         with suppress(OSError):
             return source.samefile(saved)
     return False
+
+
+def _new_source_binding(root, identity):
+    return {"source_root": root, "source_identity": identity, "source_revision": str(uuid4())}
+
+
+def _source_reply(identifier, binding, status):
+    return {
+        "source_id": identifier, "root": str(binding["source_root"]),
+        "revision": binding["source_revision"] or identifier, "status": status,
+    }
 
 
 def _project_markers(workspace):
@@ -252,12 +263,15 @@ class Library:
         except OSError:
             raise LibraryError("storage-unavailable") from None
 
-    def _write_managed_marker(self, workspace, slot, name, *, default=False, source_root=None):
+    def _write_managed_marker(self, workspace, slot, name, *, default=False, binding=None):
         document = {"anchor": str(self.anchor), "slot": slot, "name": name, "default": bool(default)}
-        if source_root is None and (existing := workspace_marker(workspace)) is not None:
-            source_root = existing["source_root"]
-        if source_root is not None:
-            document["source_root"] = str(source_root)
+        if binding is None:
+            binding = workspace_marker(workspace)
+        if binding is not None and binding["source_root"] is not None:
+            document["source_root"] = str(binding["source_root"])
+            if binding["source_identity"] is not None:
+                document["source_identity"] = binding["source_identity"]
+                document["source_revision"] = binding["source_revision"]
         publish_metadata(workspace / MANAGED_FILE, document)
 
     def _managed_markers(self, root):
@@ -529,7 +543,7 @@ class Library:
             _name(entry["name"])
         return dict(projects)
 
-    def _create(self, root, data, name, slot, *, default=False, source_root=None):
+    def _create(self, root, data, name, slot, *, default=False, binding=None):
         workspace = root / "Workspaces" / slot
         if workspace.exists() or workspace.is_symlink():
             # Recover a completed but unpublished default after an interrupted start.
@@ -545,7 +559,7 @@ class Library:
             except WorkspaceCreationError as error:
                 raise LibraryError(str(error)) from None
             identifier, database = _project_markers(workspace)
-        self._write_managed_marker(workspace, slot, name, default=default, source_root=source_root)
+        self._write_managed_marker(workspace, slot, name, default=default, binding=binding)
         data["projects"].append({"id": identifier, "database": database, "name": name, "slot": slot})
         if default:
             data["default_id"] = identifier
@@ -610,7 +624,10 @@ class Library:
                 name = _name(source.name)
             except LibraryError:
                 name = "Research project"
-            return self._create(root, data, name, str(uuid4()), source_root=source)
+            identity = source_identity(source)
+            if identity is None:
+                raise LibraryError("storage-destination")
+            return self._create(root, data, name, str(uuid4()), binding=_new_source_binding(source, identity))
 
     def _linked_source(self, root, data, identifier):
         row = self._project_row(data, uuid_text(identifier))
@@ -620,24 +637,27 @@ class Library:
         marker = workspace_marker(workspace)
         if marker is None or marker["source_root"] is None:
             raise LibraryError("storage-project")
-        return workspace, row, marker["source_root"]
+        return workspace, row, marker
 
     def source_info(self, identifier):
         """Read the private binding of a single registered linked project."""
         with self._locked(exclusive=False):
             root, data = self._state()
-            _, row, source = self._linked_source(root, data, identifier)
-            return {"source_id": row["id"], "root": str(source)}
+            _, row, binding = self._linked_source(root, data, identifier)
+            status = source_status(binding["source_root"], binding["source_identity"])
+            return _source_reply(row["id"], binding, status)
 
-    def rebind_source(self, identifier, expected_root, destination):
-        """Update the source address only after comparing the stored binding."""
+    def rebind_source(self, identifier, expected_root, destination, *, expected_revision):
+        """Update the source only after comparing the previously observed binding."""
         expected = stored_absolute_path(expected_root)
+        revision = uuid_text(expected_revision)
         if not isinstance(destination, str):
             raise LibraryError("storage-invalid")
         with self._locked():
             root, data = self._state()
-            workspace, row, previous = self._linked_source(root, data, identifier)
-            if previous != expected:
+            workspace, row, binding = self._linked_source(root, data, identifier)
+            previous = binding["source_root"]
+            if previous != expected or (binding["source_revision"] or row["id"]) != revision:
                 raise LibraryError("storage-stale")
             try:
                 source, existing = inspect_folder(destination)
@@ -650,18 +670,26 @@ class Library:
             matches = self._source_matches(root, source)
             if any(path != workspace for path, _ in matches):
                 raise LibraryError("storage-destination")
-            if not matches:
-                self._write_managed_marker(workspace, row["slot"], row["name"], source_root=source)
-            else:
+            identity = source_identity(source)
+            if identity is None:
+                raise LibraryError("storage-destination")
+            if matches:
                 source = previous
-            return {"source_id": row["id"], "root": str(source)}
+                if identity == binding["source_identity"]:
+                    return _source_reply(row["id"], binding, "available")
+            binding = _new_source_binding(source, identity)
+            self._write_managed_marker(workspace, row["slot"], row["name"], binding=binding)
+            return _source_reply(row["id"], binding, "available")
 
     def check_source(self, identifier, references):
         """Check selected references while the project's root binding is leased."""
         with self._locked(exclusive=False):
             root, data = self._state()
-            _, row, source = self._linked_source(root, data, identifier)
-            return {"source_id": row["id"], **check_references(source, references)}
+            _, row, binding = self._linked_source(root, data, identifier)
+            report = check_references(
+                binding["source_root"], references, expected_identity=binding["source_identity"],
+            )
+            return {"source_id": row["id"], **report}
 
     def register_external(self, path):
         workspace = canonical_path(path)
