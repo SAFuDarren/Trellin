@@ -106,6 +106,20 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 参考效果图见 [images/desktop-status](images/desktop-status/)。
 
+## 通过启动器核对已绑定的原目录
+
+桌面启动器的私有存储命令按项目 UUID 查看、重新绑定和核对原目录，沿用版本 1 的返回格式。文件引用由该 UUID 和相对于原目录的路径组成。绝对路径只用于本机应用数据和私有存储交换。
+
+| 启动器参数 | 标准输入的 UTF-8 JSON | `source` 中返回的字段 |
+| --- | --- | --- |
+| `--storage-source PROJECT_UUID` | 无 | `source_id`、`root` |
+| `--storage-rebind-source PROJECT_UUID` | 含 `expected_root` 和 `root` 的对象 | `source_id`、`root` |
+| `--storage-check-source PROJECT_UUID` | 含 `references` 的对象，数组元素包含 `path` 和可选的上次 `sha256` | `source_id`、`status`、`files` |
+
+用户选定替换目录后，按此前保存的准确路径比较并更新应用标记，原目录离线时也可操作。请求引用的旧绑定已变化时，返回 `storage-stale`，应重新读取绑定再重试。
+
+一次核对最多读取 16 个明确指定的普通文件，每个文件最多 4 MiB，返回路径、状态和已取得的 SHA-256。原目录不可用或核对期间不稳定时，文件列表为空；可访问的原目录中缺失单个文件时，会单独报告。核对发现文件正在变化时返回 `unstable`，供调用方重试。核对过程拒绝符号链接，保留原文件内容和目录结构。这些命令供后续桌面界面对接。
+
 ## 核验签名构建
 
 在软件目录和 App 之外新建虚拟环境，运行[已安装 wheel 的兼容回归](../tests/compat_validation/README.md)。安装与 `tests/compat_validation/PACKAGE_VERSION` 一致的 wheel，课题、数据库和日志都使用临时位置。若 Python 或软件包来自 macOS App 内部，回归入口会在启动测试前拒绝执行。

@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.151
+
+- Add local backend operations to rebind a linked research folder and verify selected file references by hash. The original files stay under the researcher's control.
+
 ## 1.0.150
 
 - Opening an ordinary research folder links it to a workspace in the Trellin library. The same folder reopens that project, and existing workspaces continue to open at their registered locations.
