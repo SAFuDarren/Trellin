@@ -104,6 +104,21 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 Reference renders are in [images/desktop-status](images/desktop-status/).
 
+## Preview selected sources before creating a project
+
+The native launcher has two private one-shot commands for the future project intake screen. Each accepts one UTF-8 JSON object on standard input (up to 64 KiB) and returns a version 1 JSON reply on standard output. Only the native caller receives the local path, directory identity and preview text.
+
+| Launcher flag | JSON input | Ready reply |
+| --- | --- | --- |
+| `--intake-inspect` | `{"root":"<absolute directory from the native picker>"}` | `selection` contains the canonical `root`, its local `identity`, and `workspace` |
+| `--intake-preview` | The returned `root` and `identity`, plus `references` (an ordered list of objects with `path` and optional expected `sha256`) | `files` contains one result per requested relative path |
+
+A non-null `workspace` names an existing workspace candidate at the selected folder or its legacy `Trellin` child. Use the normal reopen flow to validate the workspace. A null value allows text preview. Preview checks the selected directory identity and workspace markers again before returning. A root failure or malformed request returns a fixed error code and no files.
+
+Choose up to 16 distinct relative paths. TXT, Markdown (`.md`, `.markdown`), TeX and Lean files must be ordinary UTF-8 text files. An `available` result includes the relative path, the exact text (including its original line endings) and the SHA-256 of the original bytes. Reads share an 18,000-byte budget in request order. Files that cannot fit are skipped in full. Bytes read still count when decoding or digest checks fail.
+
+Other file results contain only `path` and `status`. A PDF reports `pdf_deferred` without opening it. Other statuses are `unsupported`, `missing`, `inaccessible`, `too_large`, `invalid_utf8`, `binary`, `empty`, `changed` (expected digest mismatch) and `unstable` (changed during the read). Intake reads only explicitly requested material. It does not scan the folder, create a project, update the library or call a model.
+
 ## Check a linked source through the launcher
 
 The private desktop launcher can inspect, rebind and check a registered linked folder by its project UUID. The reply uses its existing version-1 envelope. A file reference uses that UUID and its path relative to the source root. Absolute source paths stay in local app data and the private storage exchange.

@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.158
+
+- Add a read-only native intake preflight for explicitly selected text files before project creation. Return local source provenance and report unreadable or changed inputs.
+
 ## 1.0.157
 
 - Reduce idle shutdown waits in offline Workbench HTTP fixtures.
