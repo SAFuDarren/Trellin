@@ -13,10 +13,10 @@ from research_multiplier.protocol.serialization import fingerprint
 from research_multiplier.storage import credentials, paths
 from research_multiplier.storage.managed_workspaces import (
     LibraryError, LOCATION_FILE, MANAGED_FILE, application_home, canonical_path, library_lock, library_root,
-    publish_metadata, read_metadata, uuid_text, workspace_marker, workspace_registration,
+    publish_metadata, read_metadata, stored_absolute_path, uuid_text, workspace_marker, workspace_registration,
 )
 from research_multiplier.storage.project_archive import _fingerprint
-from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace
+from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace, inspect_folder
 
 
 _REGISTRY = "registry.json"
@@ -49,13 +49,20 @@ def _workspace_path(root, row):
     return Path(row["path"]) if "path" in row else root / "Workspaces" / row["slot"]
 
 
-def _external_path(value):
-    if not isinstance(value, str) or "\x00" in value:
-        raise LibraryError("storage-invalid")
-    path = Path(value)
-    if not path.is_absolute() or ".." in path.parts or str(path) != value:
-        raise LibraryError("storage-invalid")
-    return path
+def _separate_source(source, data_root):
+    if (any(_same_source(source, parent) for parent in (data_root, *data_root.parents))
+            or any(_same_source(data_root, parent) for parent in (source, *source.parents))):
+        raise LibraryError("storage-destination")
+
+
+def _same_source(source, saved):
+    if source == saved:
+        return True
+    if str(source).casefold() == str(saved).casefold():
+        # Path.resolve can preserve spelling on a case-insensitive volume.
+        with suppress(OSError):
+            return source.samefile(saved)
+    return False
 
 
 def _project_markers(workspace):
@@ -244,11 +251,23 @@ class Library:
         except OSError:
             raise LibraryError("storage-unavailable") from None
 
-    def _write_managed_marker(self, workspace, slot, name, *, default=False):
-        publish_metadata(
-            workspace / MANAGED_FILE,
-            {"anchor": str(self.anchor), "slot": slot, "name": name, "default": bool(default)},
-        )
+    def _write_managed_marker(self, workspace, slot, name, *, default=False, source_root=None):
+        document = {"anchor": str(self.anchor), "slot": slot, "name": name, "default": bool(default)}
+        if source_root is None and (existing := workspace_marker(workspace)) is not None:
+            source_root = existing["source_root"]
+        if source_root is not None:
+            document["source_root"] = str(source_root)
+        publish_metadata(workspace / MANAGED_FILE, document)
+
+    def _managed_markers(self, root):
+        for workspace in (root / "Workspaces").iterdir():
+            if not stat.S_ISDIR(workspace.lstat().st_mode):
+                continue
+            marker = workspace_marker(workspace)
+            if marker is not None:
+                if marker["anchor"] != self.anchor or marker["slot"] != workspace.name:
+                    raise LibraryError("storage-invalid")
+                yield workspace, marker
 
     def _rebuild_registry(self, root):
         """Rebuild a missing registry from managed workspaces' .trellin-managed.json markers (#285)."""
@@ -258,32 +277,25 @@ class Library:
         removed = self._removed(root)
         discovered = []
         seen_ids = set()
-        for entry in sorted(projects_dir.iterdir(), key=lambda item: item.name):
-            info = entry.lstat()
-            if not stat.S_ISDIR(info.st_mode):
-                continue
-            marker = workspace_marker(entry)
-            if marker is None:
-                continue
-            if marker["anchor"] != self.anchor or marker["slot"] != entry.name:
-                raise LibraryError("storage-invalid")
+        for entry, marker in self._managed_markers(root):
             if marker["slot"] in removed:
                 continue
             identifier, database = _project_markers(entry)
             if identifier in seen_ids:
                 raise LibraryError("storage-invalid")
             seen_ids.add(identifier)
-            discovered.append((info.st_mtime_ns, marker["slot"], marker, identifier, database))
+            discovered.append((entry.lstat().st_mtime_ns, marker["slot"], marker, identifier, database))
 
         default_item = None
-        if discovered:
-            flagged = [item for item in discovered if item[2]["default"]]
+        default_candidates = [item for item in discovered if item[2]["source_root"] is None]
+        if default_candidates:
+            flagged = [item for item in default_candidates if item[2]["default"]]
             if flagged:
                 named = [item for item in flagged if item[2]["name"] in (DEFAULT_NAME, _LEGACY_DEFAULT_NAME)]
                 default_item = min(named or flagged, key=lambda item: (item[0], item[1]))
             else:
-                named = [item for item in discovered if item[2]["name"] in (DEFAULT_NAME, _LEGACY_DEFAULT_NAME)]
-                default_item = named[0] if len(named) == 1 else min(discovered, key=lambda item: (item[0], item[1]))
+                named = [item for item in default_candidates if item[2]["name"] in (DEFAULT_NAME, _LEGACY_DEFAULT_NAME)]
+                default_item = named[0] if len(named) == 1 else min(default_candidates, key=lambda item: (item[0], item[1]))
 
         ordered = sorted(discovered, key=lambda item: (item is not default_item, item[0], item[1]))
         projects = []
@@ -361,7 +373,7 @@ class Library:
                     raise LibraryError("storage-invalid")
                 slots.add(slot)
             else:
-                path = _external_path(row["path"])
+                path = stored_absolute_path(row["path"])
                 if path.is_relative_to(root) or path in external:
                     raise LibraryError("storage-invalid")
                 external.add(path)
@@ -512,7 +524,7 @@ class Library:
             _name(entry["name"])
         return dict(projects)
 
-    def _create(self, root, data, name, slot, *, default=False):
+    def _create(self, root, data, name, slot, *, default=False, source_root=None):
         workspace = root / "Workspaces" / slot
         if workspace.exists() or workspace.is_symlink():
             # Recover a completed but unpublished default after an interrupted start.
@@ -528,7 +540,7 @@ class Library:
             except WorkspaceCreationError as error:
                 raise LibraryError(str(error)) from None
             identifier, database = _project_markers(workspace)
-        self._write_managed_marker(workspace, slot, name, default=default)
+        self._write_managed_marker(workspace, slot, name, default=default, source_root=source_root)
         data["projects"].append({"id": identifier, "database": database, "name": name, "slot": slot})
         if default:
             data["default_id"] = identifier
@@ -571,6 +583,30 @@ class Library:
         with self._locked():
             root, data = self._state(initialize=True, repair=True)
             return self._create(root, data, name, str(uuid4()))
+
+    def open_folder(self, location):
+        """Open a known workspace or bind an ordinary directory to an app-owned one."""
+        source, existing = inspect_folder(location)
+        if existing is not None:
+            return self.resolve_existing(existing)
+        _separate_source(source, self.anchor)
+        with self._locked():
+            _separate_source(source, library_root(self.anchor))
+            root, data = self._state(initialize=True, repair=True)
+            matches = [(workspace, marker) for workspace, marker in self._managed_markers(root)
+                       if marker["source_root"] is not None and _same_source(source, marker["source_root"])]
+            if len(matches) > 1:
+                raise LibraryError("storage-invalid")
+            if matches:
+                workspace, marker = matches[0]
+                registration = marker["anchor"], marker["slot"]
+                self._restore_managed(root, data, workspace, registration)
+                return self._registered_path(root, self._managed_row(data, workspace, registration))
+            try:
+                name = _name(source.name)
+            except LibraryError:
+                name = "Research project"
+            return self._create(root, data, name, str(uuid4()), source_root=source)
 
     def register_external(self, path):
         workspace = canonical_path(path)
@@ -644,27 +680,37 @@ class Library:
             return workspace
         with self._locked():
             root, data = self._state(repair=True)
-            self._restore_removed(root, data, workspace, registration)
+            self._restore_managed(root, data, workspace, registration)
             row = self._managed_row(data, workspace, registration)
             return self._registered_path(root, row)
 
-    def _restore_removed(self, root, data, workspace, registration):
-        """Opening a removed project's folder puts it back in the list under its last name."""
+    def _restore_managed(self, root, data, workspace, registration):
+        """Restore a removed project or finish publishing an already provisioned linked folder."""
         anchor, slot = registration
         if anchor != self.anchor or any(row.get("slot") == slot for row in data["projects"]):
             return
         removed = self._removed(root)
         entry = removed.get(slot)
-        if entry is None or workspace != canonical_path(root / "Workspaces" / slot):
+        if workspace != root / "Workspaces" / slot:
             return
+        if entry is None:
+            marker = workspace_marker(workspace)
+            if marker is None or marker["source_root"] is None:
+                return
         identifier, database = _project_markers(workspace)
-        if identifier != entry["id"] or any(row["id"] == identifier for row in data["projects"]):
+        if (entry is not None and identifier != entry["id"]) or any(row["id"] == identifier for row in data["projects"]):
             raise LibraryError("storage-verification")
-        self._write_managed_marker(workspace, slot, entry["name"], default=False)
-        data["projects"].append({"id": identifier, "database": database, "name": entry["name"], "slot": slot})
+        if entry is not None:
+            name = entry["name"]
+            self._write_managed_marker(workspace, slot, name)
+        else:
+            name = _name(marker["name"])
+            _check_binding(workspace, {"id": identifier, "database": database})
+        data["projects"].append({"id": identifier, "database": database, "name": name, "slot": slot})
         publish_metadata(root / _REGISTRY, data)
-        del removed[slot]
-        publish_metadata(root / _REMOVED, {"projects": removed})
+        if entry is not None:
+            del removed[slot]
+            publish_metadata(root / _REMOVED, {"projects": removed})
 
     def _describe_in_state(self, root, data, path, registration):
         if registration is not None:
@@ -685,12 +731,14 @@ class Library:
             root, data = self._state(repair=True)
             return self._describe_in_state(root, data, path, registration)
 
-    @staticmethod
-    def _preview(root, target, data, inventory):
+    def _preview(self, root, target, data, inventory):
         files, directories = inventory
         projects = [row for row in data["projects"] if "slot" in row]
         if any(Path(row["path"]).is_relative_to(target) for row in data["projects"] if "path" in row):
             raise LibraryError("storage-destination")
+        for _, marker in self._managed_markers(root):
+            if marker["source_root"] is not None:
+                _separate_source(marker["source_root"], target)
         return {
             "source": str(root), "destination": str(target), "files": len(files),
             "bytes": sum(record["bytes"] for record in files.values()), "project_count": len(projects),

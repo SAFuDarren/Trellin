@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.150
+
+- Opening an ordinary research folder links it to a workspace in the Trellin library. The same folder reopens that project, and existing workspaces continue to open at their registered locations.
+
 ## 1.0.149
 
 - Add a backend preview for preparing a Work issue draft from an inline research question or an exact saved private proof note.
