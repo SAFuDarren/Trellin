@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.159
+
+- Preview selected PDF text through the macOS launcher with physical page numbers, the original file digest and explicit extraction limits.
+
 ## 1.0.158
 
 - Add a read-only native intake preflight for explicitly selected text files before project creation. Return local source provenance and report unreadable or changed inputs.

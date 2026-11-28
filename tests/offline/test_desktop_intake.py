@@ -109,7 +109,7 @@ def test_launcher_returns_only_available_material_and_applies_aggregate_cap(sour
     request = _request(_command("inspect", {"root": str(source)})["selection"], *names)
     files = _command("preview", request)["files"]
     statuses = ["invalid_utf8", "too_large", "available", "too_large", "unsupported", "unsupported", "unsupported",
-                "missing", "pdf_deferred", "unsupported"]
+                "missing", "pdf_unavailable", "unsupported"]
     for name, status, row in zip(names, statuses, files, strict=True):
         if status == "available":
             assert row["text"] == "a" * (MAX_MODEL_NOTES_BYTES - 1)
@@ -209,7 +209,7 @@ def test_later_read_can_invalidate_earlier_file_or_entire_preview(source, monkey
         assert files[1]["text"] == "second"
 
 
-def test_unreadable_file_and_deferred_pdf_do_not_expose_content(source, monkeypatch):
+def test_unreadable_file_and_unavailable_pdf_do_not_expose_content(source, monkeypatch):
     selection = desktop_intake.inspect(str(source))
     opened = []
 
@@ -220,7 +220,7 @@ def test_unreadable_file_and_deferred_pdf_do_not_expose_content(source, monkeypa
     monkeypatch.setattr(desktop_source, "_regular_file", denied)
     files = desktop_intake.preview(str(source), selection["identity"], [{"path": "book.PDF"}, {"path": "note.md"}])
     assert opened == ["note.md"]
-    assert files == [{"path": "book.PDF", "status": "pdf_deferred"}, {"path": "note.md", "status": "inaccessible"}]
+    assert files == [{"path": "book.PDF", "status": "pdf_unavailable"}, {"path": "note.md", "status": "inaccessible"}]
 
 
 @pytest.mark.skipif(os.geteuid() == 0 if hasattr(os, "geteuid") else True, reason="Requires ordinary POSIX permissions.")
