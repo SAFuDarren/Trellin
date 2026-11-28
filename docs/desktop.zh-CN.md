@@ -124,6 +124,23 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 一次核对最多读取 16 个明确指定的普通文件，每个文件最多 4 MiB，返回路径、状态和已取得的 SHA-256。原目录不可用、尚未确认、身份不符或核对期间不稳定时，文件列表为空。可访问的原目录中缺失单个文件时，会单独报告。核对发现文件正在变化时返回 `unstable`，供调用方重试。核对过程拒绝符号链接，保留原文件内容和目录结构。这些命令供后续桌面界面对接。
 
+### 核对和修复已登记的文件引用
+
+登记文件时保存一条本机引用，包含稳定的 `id`、`revision`、相对 `path` 和记录的 `sha256`。一个托管工作区通过一份应用数据记录最多 128 条引用。引用随应用库迁移，属于本机定位状态，不进入可移植的科研归档。
+
+| 启动器参数 | 标准输入的 UTF-8 JSON | `source` 中返回的字段 |
+| --- | --- | --- |
+| `--storage-list-source-references PROJECT_UUID` | 无 | `source_id`、`revision`、`references` |
+| `--storage-track-source-reference PROJECT_UUID` | 含 `path` 和 `expected_revision` 的对象 | `source_id`、`revision`、`reference` |
+| `--storage-check-source-references PROJECT_UUID` | 含 `reference_ids` 的对象，数组最多 16 个不重复的 UUID | `source_id`、`revision`、`status`、`files` |
+| `--storage-repair-source-reference PROJECT_UUID` | 含 `reference_id`、`expected_revision`、`expected_reference_revision` 和选定 `path` 的对象 | `source_id`、`revision`、`reference` |
+
+外层 `revision` 标识来源绑定版本，引用里的 `revision` 标识保存的文件位置版本。重复登记同一路径时沿用原摘要。成功的核对结果同时给出当前观察、`reference_id` 和 `recorded_sha256`，保留之前记录的摘要。核对由调用触发，来源不可用、未确认或身份不符时不读取引用文件。
+
+核对结束前会再比对已观察路径的文件状态，无需重复读取文件内容。之后发生的修改会在下一次核对时反映。
+
+修复缺失路径时，研究者在同一来源选择一个尚未登记的文件。核对确认候选文件的摘要与原版本相同，并确认旧路径仍缺失。修复保留引用 ID 和摘要，只更新引用路径和版本。请求已过期时，应读回当前来源和引用再重试。
+
 ## 核验签名构建
 
 在软件目录和 App 之外新建虚拟环境，运行[已安装 wheel 的兼容回归](../tests/compat_validation/README.md)。安装与 `tests/compat_validation/PACKAGE_VERSION` 一致的 wheel，课题、数据库和日志都使用临时位置。若 Python 或软件包来自 macOS App 内部，回归入口会在启动测试前拒绝执行。

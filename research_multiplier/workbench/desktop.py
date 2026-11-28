@@ -285,6 +285,22 @@ def _storage(library, args, output):
     elif len(args) == 2 and args[0] == "--storage-check-source":
         request = _storage_request("references")
         data = {"source": library.check_source(args[1], request["references"])}
+    elif len(args) == 2 and args[0] == "--storage-list-source-references":
+        data = {"source": library.list_source_references(args[1])}
+    elif len(args) == 2 and args[0] == "--storage-track-source-reference":
+        request = _storage_request("expected_revision", "path")
+        data = {"source": library.track_source_reference(
+            args[1], request["path"], expected_revision=request["expected_revision"],
+        )}
+    elif len(args) == 2 and args[0] == "--storage-check-source-references":
+        request = _storage_request("reference_ids")
+        data = {"source": library.check_source_references(args[1], request["reference_ids"])}
+    elif len(args) == 2 and args[0] == "--storage-repair-source-reference":
+        request = _storage_request("expected_revision", "reference_id", "expected_reference_revision", "path")
+        data = {"source": library.repair_source_reference(
+            args[1], request["reference_id"], request["path"], expected_revision=request["expected_revision"],
+            expected_reference_revision=request["expected_reference_revision"],
+        )}
     elif len(args) == 2 and args[0] == "--storage-preview":
         plan = library.preview(args[1])
         data = {

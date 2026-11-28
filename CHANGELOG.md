@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.153
+
+- Track selected linked-source references locally. Check external changes after reopening and repair missing paths to an explicitly chosen file matching the recorded hash.
+
 ## 1.0.152
 
 - Verify the saved identity of a linked folder before checking references. Older projects still open, and their linked source can be confirmed through the local rebind operation.

@@ -122,6 +122,23 @@ Confirming a source updates its managed binding marker. Trellin 1.0.151 cannot o
 
 Checks read a batch of up to 16 named regular files, at most 4 MiB per file, and return paths, status and available SHA-256 values. A source that is unavailable, unconfirmed, mismatched or unstable has an empty file list. A missing file in a reachable source has its own status. A change observed during a check returns `unstable` for a retry. The check follows no symbolic links and changes no original files. These commands are backend integration points for future desktop controls.
 
+### Check and repair tracked file references
+
+Tracking records one local locator with its stable `id`, `revision`, relative `path` and recorded `sha256`. A workspace keeps up to 128 locators in one app-owned metadata file. They move with the application library. They are local navigation state and do not enter portable research archives.
+
+| Launcher arguments | UTF-8 JSON on standard input | Payload inside `source` |
+| --- | --- | --- |
+| `--storage-list-source-references PROJECT_UUID` | None | `source_id`, `revision`, `references` |
+| `--storage-track-source-reference PROJECT_UUID` | Object with `path` and `expected_revision` | `source_id`, `revision`, `reference` |
+| `--storage-check-source-references PROJECT_UUID` | Object with up to 16 distinct UUIDs in `reference_ids` | `source_id`, `revision`, `status`, `files` |
+| `--storage-repair-source-reference PROJECT_UUID` | Object with `reference_id`, `expected_revision`, `expected_reference_revision` and the selected `path` | `source_id`, `revision`, `reference` |
+
+The top-level `revision` identifies the source binding. The locator's `revision` identifies the saved path. Tracking an already recorded path keeps its original hash. Each successful check reports the current observation alongside `reference_id` and `recorded_sha256`. It leaves the recorded hash untouched. A check runs when requested and reports an unavailable, unconfirmed or mismatched source without opening its files.
+
+The checker revalidates the observed paths at the end of the batch without hashing them again. Edits made after that observation appear in the next check.
+
+To repair a missing path, the researcher chooses an untracked candidate in the same linked root. The checker verifies its digest against the recorded version and verifies the original path is still missing. A successful repair keeps the reference ID and hash. It updates only the locator path and revision. A stale request should reload the source and locator before retrying.
+
 ## Validate the signed build
 
 Use a fresh virtual environment outside the checkout and the app for the [installed-wheel compatibility suite](../tests/compat_validation/README.md). Install the wheel with the exact version declared in `tests/compat_validation/PACKAGE_VERSION` and keep test projects, databases and logs in disposable locations. The runner rejects a Python interpreter or package installed inside a macOS app before it starts the tests.

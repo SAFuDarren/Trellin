@@ -12,7 +12,7 @@ import stat
 from research_multiplier.storage.managed_workspaces import LibraryError
 
 
-_MAX_FILES = 16
+MAX_FILE_CHECKS = 16
 _MAX_FILE_BYTES = 4 * 1024 * 1024
 _MAX_PATH_BYTES = 4096
 _CHUNK_BYTES = 64 * 1024
@@ -25,26 +25,36 @@ _DESCRIPTOR_IO = (
 )
 
 
+def validate_reference_path(name: object) -> PurePosixPath:
+    if (not isinstance(name, str) or not name.isprintable() or "\\" in name
+            or len(name) > _MAX_PATH_BYTES or len(name.encode("utf-8")) > _MAX_PATH_BYTES):
+        raise LibraryError("storage-invalid")
+    path = PurePosixPath(name)
+    if (not path.parts or path.is_absolute() or path.as_posix() != name
+            or any(part.casefold() in {"..", ".git"} for part in path.parts)):
+        raise LibraryError("storage-invalid")
+    return path
+
+
+def validate_reference_sha256(value: object) -> str:
+    if not isinstance(value, str) or not _SHA256.fullmatch(value):
+        raise LibraryError("storage-invalid")
+    return value
+
+
 def _references(document):
-    if not isinstance(document, list) or not 1 <= len(document) <= _MAX_FILES:
+    if not isinstance(document, list) or not 1 <= len(document) <= MAX_FILE_CHECKS:
         raise LibraryError("storage-invalid")
     seen = set()
     references = []
     for item in document:
         if not isinstance(item, dict) or item.keys() not in ({"path"}, {"path", "sha256"}):
             raise LibraryError("storage-invalid")
-        name = item["path"]
-        if (not isinstance(name, str) or not name.isprintable() or "\\" in name
-                or len(name) > _MAX_PATH_BYTES or len(name.encode("utf-8")) > _MAX_PATH_BYTES):
+        path = validate_reference_path(item["path"])
+        if path in seen:
             raise LibraryError("storage-invalid")
-        path = PurePosixPath(name)
-        if (not path.parts or path.is_absolute() or path.as_posix() != name or name in seen
-                or any(part.casefold() in {"..", ".git"} for part in path.parts)):
-            raise LibraryError("storage-invalid")
-        previous = item.get("sha256")
-        if "sha256" in item and (not isinstance(previous, str) or not _SHA256.fullmatch(previous)):
-            raise LibraryError("storage-invalid")
-        seen.add(name)
+        previous = validate_reference_sha256(item["sha256"]) if "sha256" in item else None
+        seen.add(path)
         references.append((path, previous))
     return references
 
@@ -170,14 +180,28 @@ def _observe(root, path, previous):
             digest = _hash_file(descriptor, info.st_size)
             if _version(info) != _version(os.fstat(descriptor)):
                 raise _ObservationError("unstable")
-            _verify_file(root, path, info)
     except _ObservationError as error:
-        return {"path": name, "status": str(error)}
+        return {"path": name, "status": str(error)}, None
     except OSError as error:
         status = {ENOENT: "missing", ENOTDIR: "unsupported", ELOOP: "unsupported"}.get(error.errno, "inaccessible")
-        return {"path": name, "status": status}
+        return {"path": name, "status": status}, None
     status = "available" if previous is None else ("unchanged" if digest == previous else "changed")
-    return {"path": name, "status": status, "sha256": digest}
+    return {"path": name, "status": status, "sha256": digest}, info
+
+
+def _settled_observation(root, path, observation):
+    report, info = observation
+    try:
+        if info is not None:
+            _verify_file(root, path, info)
+        elif report["status"] == "missing":
+            with _regular_file(root, path):
+                raise _ObservationError("unstable")
+    except FileNotFoundError:
+        return report
+    except (OSError, _ObservationError):
+        return {"path": report["path"], "status": "unstable"}
+    return report
 
 
 def check_references(root: Path, references: object, *, expected_identity: dict | None) -> dict:
@@ -188,7 +212,11 @@ def check_references(root: Path, references: object, *, expected_identity: dict 
             status = _descriptor_status(descriptor, expected_identity)
             if status != "available":
                 return {"status": status, "files": []}
-            files = [_observe(descriptor, path, previous) for path, previous in selected]
+            observations = [_observe(descriptor, path, previous) for path, previous in selected]
+            # A later observation can overlap with an editor finishing an
+            # earlier save. Recheck the names without hashing again.
+            files = [_settled_observation(descriptor, path, observation)
+                     for (path, _), observation in zip(selected, observations, strict=True)]
             if source_status(root, expected_identity) != "available":
                 return {"status": "unstable", "files": []}
     except OSError:
