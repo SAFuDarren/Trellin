@@ -11,10 +11,10 @@ class ClaimActivityNotFound(ValueError):
     """The selected workspace does not have this frozen claim."""
 
 
-_SNAPSHOT = f"""
+_CLAIM_ACTIVITY = """
 WITH selected AS MATERIALIZED (
     SELECT id, contract_sha256 FROM rm.claims
-    WHERE id = %s::uuid AND contract_sha256 IS NOT NULL
+    WHERE id = {claim_id} AND contract_sha256 IS NOT NULL
 ),
 jobs AS (
     SELECT j.id, t.kind, t.enqueued_at, a.submitted_at, t.cancelled_at, t.finding, t.failure_code,
@@ -40,7 +40,7 @@ jobs AS (
 ),
 policies AS MATERIALIZED (
     SELECT p.id, p.policy #>> '{{lean,statement_id}}' AS statement_id,
-           {ACTIVE_LEAN_POLICY_SQL} AS running
+           {active_policy} AS running
     FROM selected JOIN rm.research_progress_status p
       ON (p.claim_id,p.contract_sha256) = (selected.id,selected.contract_sha256)
     WHERE p.policy ? 'lean' AND p.approved_at IS NOT NULL
@@ -72,6 +72,17 @@ SELECT selected.id AS claim_id,
        coalesce((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.recorded_at DESC) FROM passes p), '[]'::jsonb) AS passes,
        coalesce((SELECT jsonb_agg(to_jsonb(o)) FROM obligations o), '[]'::jsonb) AS obligations
 FROM selected
+"""
+
+_SNAPSHOT = _CLAIM_ACTIVITY.format(claim_id="%s::uuid", active_policy=ACTIVE_LEAN_POLICY_SQL)
+# Keep the job, policy and pass limits inside the per-claim read.
+_SNAPSHOTS = """
+SELECT activity.*
+FROM unnest(%s::uuid[]) WITH ORDINALITY AS requested(id, position)
+CROSS JOIN LATERAL (
+""" + _CLAIM_ACTIVITY.format(claim_id="requested.id", active_policy=ACTIVE_LEAN_POLICY_SQL) + """
+) activity
+ORDER BY requested.position
 """
 
 _JOB_KINDS = {
@@ -228,12 +239,7 @@ def _pass_events(passage, goal, obligations):
                      node=_target(attempt, goal, obligations), goal=goal, policy_id=policy_id, attempt_id=attempt_id)
 
 
-def snapshot(store, claim_id):
-    """Report only durable job state and recorded outcomes for this frozen claim."""
-    rows = store.query("human", _SNAPSHOT, claim_id)
-    if not rows:
-        raise ClaimActivityNotFound("No frozen research claim matches this ID.")
-    row, = rows
+def _snapshot(row):
     claim = str(row["claim_id"])
     goal = f"goal:{claim}"
     obligations = {(str(item["implication_id"]), item["proposition"]): item["position"]
@@ -249,3 +255,26 @@ def snapshot(store, claim_id):
     for event in activity:
         unique.setdefault(event["id"], event)
     return {"claim_id": claim, "activity": list(unique.values())[:_MAX_ACTIVITY]}
+
+
+def snapshots(store, claim_ids):
+    """Report durable activity for the selected frozen claims."""
+    if not claim_ids:
+        return {}
+    activity = {}
+    for row in store.query("human", _SNAPSHOTS, list(claim_ids)):
+        try:
+            snapshot = _snapshot(row)
+        except ValueError:
+            continue
+        activity[snapshot["claim_id"]] = snapshot
+    return activity
+
+
+def snapshot(store, claim_id):
+    """Report only durable job state and recorded outcomes for this frozen claim."""
+    rows = store.query("human", _SNAPSHOT, claim_id)
+    if not rows:
+        raise ClaimActivityNotFound("No frozen research claim matches this ID.")
+    row, = rows
+    return _snapshot(row)

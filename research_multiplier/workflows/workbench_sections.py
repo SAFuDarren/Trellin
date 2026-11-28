@@ -212,38 +212,38 @@ def progress(store):
 _NODE_FIELDS = ("id", "kind", "title", "citation", "proposition", "formula", "status")
 
 
-def _nodes(store, claim_id):
-    try:
-        graph = proof_graph.snapshot(store, claim_id)
-    except ValueError:
-        return {}
-    return {node["id"]: {key: node[key] for key in _NODE_FIELDS if key in node} for node in graph["nodes"]}
-
-
 def threads(store):
     """Group recorded model replies, verifier feedback and researcher guidance by the graph node they concern."""
-    found = []
-    for claim in proof_graph.claims(store)[:_MAX_THREAD_CLAIMS]:
-        try:
-            events = workbench_activity.snapshot(store, claim["id"])["activity"]
-        except ValueError:
+    claims = proof_graph.claims(store, limit=_MAX_THREAD_CLAIMS)
+    activity = workbench_activity.snapshots(store, [claim["id"] for claim in claims])
+    guidance = workbench_guidance.history(store, list(activity))
+    grouped = []
+    for claim in claims:
+        snapshot = activity.get(claim["id"])
+        if snapshot is None:
             continue
-        guidance = workbench_guidance.activity(store, claim["id"]).get("guidance", [])
         by_node = {}
-        for event in events:
+        for event in snapshot["activity"]:
             if event["kind"] not in _CONVERSATION_KINDS:
                 continue
             if event["kind"] == "model" and event["state"] not in {"running", "queued", "waiting_retry"}:
                 continue
             by_node.setdefault(event["node_id"], []).append(event)
-        for note in guidance:
+        for note in guidance.get(claim["id"], ()):
             by_node.setdefault(note["node_id"], []).append({
                 "id": f"guidance:{note['id']}", "kind": "guidance", "state": "recorded", "text": note["text"],
                 "at": note.get("submitted_at") or note["created_at"], "audience": note.get("audience", "local"),
                 "node_id": note["node_id"]})
-        if not by_node:
-            continue
-        nodes = _nodes(store, claim["id"])
+        if by_node:
+            grouped.append((claim, by_node))
+
+    graphs = proof_graph.snapshots(store, [claim["id"] for claim, _ in grouped])
+    found = []
+    for claim, by_node in grouped:
+        nodes = {
+            node["id"]: {key: node[key] for key in _NODE_FIELDS if key in node}
+            for node in graphs.get(claim["id"], {}).get("nodes", ())
+        }
         for node_id, items in by_node.items():
             items.sort(key=lambda event: str(event.get("at") or ""))
             live = [event for event in items if event["kind"] == "model"]

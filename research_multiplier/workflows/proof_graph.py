@@ -28,7 +28,7 @@ selected AS (
     SELECT claim.id, claim.title, claim.statement, claim.domain, claim.contract_snapshot, status.status
     FROM rm.claims claim
     JOIN rm.claim_foundation_status status ON status.id = claim.id
-    WHERE claim.id = %s::uuid AND claim.contract_sha256 IS NOT NULL
+    WHERE claim.id = {claim_id} AND claim.contract_sha256 IS NOT NULL
 ),
 packet AS (
     SELECT current_packet.* FROM selected claim CROSS JOIN LATERAL (""" + _CURRENT_PACKET + """) current_packet
@@ -38,8 +38,7 @@ statement AS (
 )
 """
 
-_GRAPH = """
-WITH """ + _ANCHOR + """,
+_GRAPH_DETAILS = """,
 frozen AS MATERIALIZED (
     SELECT basis.* FROM packet CROSS JOIN LATERAL rm.proof_graph_frozen_basis(packet.id) basis
 ),
@@ -104,8 +103,18 @@ SELECT selected.id, selected.title, selected.statement, selected.domain, selecte
 FROM selected
 """
 
+_GRAPH = "WITH " + _ANCHOR.format(claim_id="%s::uuid") + _GRAPH_DETAILS
+_GRAPHS = """
+SELECT graph.*
+FROM unnest(%s::uuid[]) WITH ORDINALITY AS requested(id, position)
+CROSS JOIN LATERAL (
+    WITH """ + _ANCHOR.format(claim_id="requested.id") + _GRAPH_DETAILS + """
+) graph
+ORDER BY requested.position
+"""
+
 _IMPACT = """
-WITH RECURSIVE """ + _ANCHOR + """,
+WITH RECURSIVE """ + _ANCHOR.format(claim_id="%s::uuid") + """,
 affected AS MATERIALIZED (
     SELECT a.* FROM packet
     CROSS JOIN LATERAL rm.proof_graph_basis_impact(packet.id, %s::uuid) a
@@ -425,9 +434,9 @@ _CANVAS_CLAIMS = "SELECT " + _CLAIM_COLUMNS + """,
 """ + _CLAIMS_VISIBLE + _CLAIM_ORDER
 
 
-def claims(store):
+def claims(store, *, limit=100):
     """List the most recent frozen workspace claims."""
-    return store.query("human", _VISIBLE_CLAIMS + _CLAIM_ORDER + " LIMIT 100")
+    return store.query("human", _VISIBLE_CLAIMS + _CLAIM_ORDER + " LIMIT %s", limit)
 
 
 def canvas_claim_index(store):
@@ -462,11 +471,12 @@ def _atlas_node(node):
 
 def atlas(store, limit=40):
     """Summarize the recorded nodes and dependencies of recent claims for the workspace overview."""
+    recent = claims(store)[:limit]
+    graphs = snapshots(store, [claim["id"] for claim in recent])
     overview = []
-    for claim in claims(store)[:limit]:
-        try:
-            graph = snapshot(store, claim["id"], references=False)
-        except ValueError:
+    for claim in recent:
+        graph = graphs.get(claim["id"])
+        if graph is None:
             continue
         nodes = graph["nodes"]
         overview.append({
@@ -478,6 +488,20 @@ def atlas(store, limit=40):
             "blocked": len({blocker["node_id"] for blocker in graph["blockers"]}),
         })
     return {"claims": overview}
+
+
+def snapshots(store, claim_ids):
+    """Project graphs for the selected claims without fetching saved claim codes."""
+    if not claim_ids:
+        return {}
+    graphs = {}
+    for row in store.query("human", _GRAPHS, list(claim_ids)):
+        try:
+            graph = _snapshot(row)
+        except ValueError:
+            continue
+        graphs[str(row["id"])] = graph
+    return graphs
 
 
 def snapshot(store, claim_id, *, references=True, include_lemma_plan=False):

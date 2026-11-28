@@ -14,16 +14,16 @@ _BLOCKERS = {
 }
 
 
+_GUIDANCE_SCHEMA = "to_regprocedure('rm.pending_workbench_guidance(uuid)') IS NOT NULL"
+_CODEX_SCHEMA = "to_regprocedure('rm.released_workbench_guidance(uuid,uuid[])') IS NOT NULL"
+
+
 def installed(store, role):
-    return store.query(role, """
-        SELECT to_regprocedure('rm.pending_workbench_guidance(uuid)') IS NOT NULL AS installed
-    """)[0]["installed"]
+    return store.query(role, f"SELECT {_GUIDANCE_SCHEMA} AS installed")[0]["installed"]
 
 
 def _codex_installed(store, role):
-    return store.query(role, """
-        SELECT to_regprocedure('rm.released_workbench_guidance(uuid,uuid[])') IS NOT NULL AS installed
-    """)[0]["installed"]
+    return store.query(role, f"SELECT {_CODEX_SCHEMA} AS installed")[0]["installed"]
 
 
 def connected_installed(store, role):
@@ -71,22 +71,49 @@ def _response(rows, channels, blocker):
             "guidance_reason": _BLOCKERS.get(blocker, ""), "guidance_blocker": blocker}
 
 
+_RECENT_NOTES = """
+    SELECT n.id, n.node_id, n.text, n.created_at, s.submitted_at, s.attempt_id, {audience}{scope}
+    FROM rm.workbench_guidance n
+    LEFT JOIN rm.workbench_guidance_submissions s ON s.guidance_id = n.id
+    WHERE n.claim_id = {claim_id}
+    ORDER BY n.created_at DESC, n.id DESC
+    LIMIT 40
+"""
+
+
+def _recent_notes(codex_schema, claim_id, *, include_scope=False):
+    audience = "n.audience" if codex_schema else "'local'::text AS audience"
+    scope = ", n.statement_id IS NOT DISTINCT FROM %s::uuid AS current_scope" if include_scope else ""
+    return _RECENT_NOTES.format(audience=audience, scope=scope, claim_id=claim_id)
+
+
+def history(store, claim_ids):
+    """Read each claim's recent guidance, including notes attached to earlier scopes."""
+    if not claim_ids:
+        return {}
+    [schema] = store.query("human", f"SELECT {_GUIDANCE_SCHEMA} AS installed, {_CODEX_SCHEMA} AS codex")
+    if not schema["installed"]:
+        return {}
+    sql = """
+        SELECT requested.id AS claim_id, notes.*
+        FROM unnest(%s::uuid[]) WITH ORDINALITY AS requested(id, position)
+        CROSS JOIN LATERAL (""" + _recent_notes(schema["codex"], "requested.id") + """) notes
+        ORDER BY requested.position, notes.created_at DESC, notes.id DESC
+    """
+    by_claim = {}
+    for note in store.query("human", sql, list(claim_ids)):
+        by_claim.setdefault(str(note["claim_id"]), []).append(note)
+    return by_claim
+
+
 def activity(store, claim_id):
     if not installed(store, "human"):
         return _response([], [], "schema")
     anchor = _anchor(store, claim_id)
     codex_schema = _codex_installed(store, "human")
     channels, blocker = _availability(store, anchor, codex_schema)
-    audience = "n.audience" if codex_schema else "'local'::text AS audience"
-    rows = store.query("human", f"""
-        SELECT n.id, n.node_id, n.text, n.created_at, s.submitted_at, s.attempt_id, {audience},
-               n.statement_id IS NOT DISTINCT FROM %s::uuid AS current_scope
-        FROM rm.workbench_guidance n
-        LEFT JOIN rm.workbench_guidance_submissions s ON s.guidance_id = n.id
-        WHERE n.claim_id = %s
-        ORDER BY n.created_at DESC, n.id DESC
-        LIMIT 40
-    """, anchor["id"] if anchor else None, claim_id)
+    rows = store.query("human", _recent_notes(codex_schema, "%s", include_scope=True),
+                       anchor["id"] if anchor else None, claim_id)
     return _response(rows, channels, blocker)
 
 
