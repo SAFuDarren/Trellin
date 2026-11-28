@@ -510,6 +510,124 @@ def test_deleted_registry_and_lock_file_rebuild_all_managed_projects(library, tm
     assert (incomplete / "keep.txt").read_text() == "Pending"
 
 
+def _select_folder(library, folder):
+    output = StringIO()
+    code = desktop.run(str(folder), BytesIO(), output, select=True, library=library)
+    return code, json.loads(output.getvalue())
+
+
+def test_native_folder_selection_binds_existing_files_without_changing_them(monkeypatch, library, tmp_path):
+    opened = _stub_desktop_open(monkeypatch, tmp_path)
+    source = tmp_path / "research"
+    child = source / "Trellin"
+    child.mkdir(parents=True)
+    notes = source / "notes.md"
+    notes.write_bytes(b"Original research notes")
+    report = child / "draft.txt"
+    report.write_bytes(b"User-owned folder")
+    before = {path.relative_to(source): path.lstat().st_mode for path in source.rglob("*")}
+    alias = tmp_path / "source alias"
+    alias.symlink_to(source, target_is_directory=True)
+
+    code, first = _select_folder(library, source)
+    assert code == 0 and first["status"] == "ready"
+    workspace = Path(first["workspace"])
+    assert workspace.parent == library.anchor / "Library" / "Workspaces"
+    assert first["project_id"] == str(paths.workspace_id(workspace))
+    assert paths.database_id(workspace) is not None
+    assert _select_folder(desktop_library.Library(), alias) == (0, first)
+
+    output = StringIO()
+    assert desktop.run(None, BytesIO(), output, library=desktop_library.Library(),
+                       project_id=paths.workspace_id(workspace)) == 0
+    assert json.loads(output.getvalue()) == first
+    assert opened == [workspace, workspace, workspace]
+    assert [project["id"] for project in library.status()["projects"]] == [first["project_id"]]
+    assert {path.relative_to(source): path.lstat().st_mode for path in source.rglob("*")} == before
+    assert notes.read_bytes() == b"Original research notes"
+    assert report.read_bytes() == b"User-owned folder"
+
+
+def test_native_folder_selection_reuses_initialized_legacy_workspace(monkeypatch, library, tmp_path):
+    opened = _stub_desktop_open(monkeypatch, tmp_path)
+    workspace = paths.initialize_workspace(tmp_path / "old research" / "Trellin")
+    database = uuid4()
+    paths.bind_database(workspace, database)
+
+    code, first = _select_folder(library, workspace.parent)
+    assert code == 0 and first["workspace"] == str(workspace)
+    assert first["project_id"] == str(paths.workspace_id(workspace))
+    assert _select_folder(desktop_library.Library(), workspace) == (0, first)
+    assert opened == [workspace, workspace]
+    assert paths.database_id(workspace) == database
+    assert not (workspace / MANAGED_FILE).exists()
+    assert not list((library.anchor / "Library" / "Workspaces").iterdir())
+
+
+def test_linked_folder_binding_survives_library_lifecycle(library, tmp_path):
+    source = tmp_path / "research"
+    source.mkdir()
+    workspace = library.open_folder(source)
+    identifier = str(paths.workspace_id(workspace))
+    database = paths.database_id(workspace)
+    root = workspace.parent.parent
+    library.rename(identifier, "Renamed research")
+    library.unregister(identifier)
+    assert not library.status()["projects"]
+    assert desktop_library.Library().open_folder(source) == workspace
+
+    (root / "registry.json").unlink()
+    recovered = desktop_library.Library().status()
+    assert recovered["default_id"] is None
+    assert [(row["id"], row["name"]) for row in recovered["projects"]] == [(identifier, "Renamed research")]
+    assert library.open_folder(source) == workspace
+
+    target = tmp_path / "relocated library"
+    library.move(target, library.preview(target)["sha256"])
+    relocated = target / "Workspaces" / workspace.name
+    assert desktop_library.Library().open_folder(source) == relocated
+    assert desktop_library.Library().resolve_project(identifier) == relocated
+    assert paths.database_id(relocated) == database
+    assert not list(source.iterdir())
+
+
+def test_linked_folder_reuses_workspace_after_interrupted_registry_publication(monkeypatch, library, tmp_path):
+    source = tmp_path / "research"
+    source.mkdir()
+    publish = desktop_library.publish_metadata
+    root = library.anchor / "Library"
+    interrupted = []
+
+    def interrupt(path, document):
+        if path == root / "registry.json" and document["projects"] and not interrupted:
+            (workspace,) = (root / "Workspaces").iterdir()
+            assert workspace_registration(workspace) is not None
+            interrupted.append(workspace)
+            raise OSError("Interrupted registry write")
+        return publish(path, document)
+
+    monkeypatch.setattr(desktop_library, "publish_metadata", interrupt)
+    with pytest.raises(LibraryError, match="storage-unavailable"):
+        library.open_folder(source)
+    (workspace,) = interrupted
+    assert desktop_library.Library().open_folder(source) == workspace
+    assert list((root / "Workspaces").iterdir()) == [workspace]
+    assert [row["id"] for row in library.status()["projects"]] == [str(paths.workspace_id(workspace))]
+    assert not list(source.iterdir())
+
+
+def test_folder_selection_does_not_initialize_library_inside_source(monkeypatch, library, tmp_path):
+    opened = _stub_desktop_open(monkeypatch, tmp_path)
+    source = library.anchor.parent
+    assert not library.anchor.exists()
+
+    assert _select_folder(library, source) == (
+        2, {"version": 1, "status": "error", "code": "storage-destination"},
+    )
+    assert not library.anchor.exists()
+    assert not opened
+
+
 def test_deleted_registry_rebuilds_legacy_three_field_markers(library):
     default = library.open_default()
     other = library.create("Legacy named")

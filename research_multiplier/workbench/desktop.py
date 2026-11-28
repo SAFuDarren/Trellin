@@ -16,7 +16,7 @@ from research_multiplier.storage.postgres import DatabaseOperationError
 from research_multiplier.workflows import release_updates
 from research_multiplier.workflows.desktop_library import Library, LibraryError
 from research_multiplier.workflows.desktop_workspace import (
-    WorkspaceCreationError, WorkspaceUpgradeError, select_workspace, upgrade_project_database,
+    WorkspaceCreationError, WorkspaceUpgradeError, upgrade_project_database,
 )
 
 from .server import _SCHEMA_SQLSTATES, WorkbenchServer, _check_schema, _MissingAssets, _MissingSchema
@@ -189,9 +189,8 @@ def _session(workspace_path, lifetime, output, *, select=False, library=None, ne
         elif library is not None and workspace_path is None:
             workspace_path = library.open_default()
         elif select:
-            workspace_path = select_workspace(workspace_path)
-            if library is not None:
-                workspace_path = library.resolve_existing(workspace_path)
+            library = library or Library()
+            workspace_path = library.open_folder(workspace_path)
         elif library is not None:
             workspace_path = library.resolve_existing(workspace_path)
     except WorkspaceCreationError as error:

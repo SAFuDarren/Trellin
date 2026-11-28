@@ -322,17 +322,17 @@ def test_a_project_that_cannot_be_reopened_opens_the_library_instead(monkeypatch
         assert reply == {"version": 1, "status": "error", "code": code}
 
 
-def test_a_folder_the_researcher_chose_does_not_fall_back(monkeypatch, tmp_path):
+def test_a_folder_the_researcher_chose_does_not_fall_back(tmp_path):
     class Library:
         anchor = tmp_path
 
-        def resolve_existing(self, path):
+        def open_folder(self, path):
+            assert Path(path) == tmp_path
             raise LibraryError("storage-project")
 
         def open_default(self):
             pytest.fail("A chosen folder that cannot open must be reported, not replaced.")
 
-    monkeypatch.setattr(desktop, "select_workspace", lambda path: Path(path))
     output = StringIO()
     assert desktop.run(str(tmp_path), BytesIO(), output, select=True, library=Library()) == 2
     assert json.loads(output.getvalue()) == {"version": 1, "status": "error", "code": "storage-project"}

@@ -79,6 +79,16 @@ def canonical_path(value):
         raise LibraryError("storage-invalid") from None
 
 
+def stored_absolute_path(value):
+    """Decode a saved path without following links or requiring the target online."""
+    if not isinstance(value, str) or "\x00" in value:
+        raise LibraryError("storage-invalid")
+    path = Path(value)
+    if not path.is_absolute() or ".." in path.parts or str(path) != value:
+        raise LibraryError("storage-invalid")
+    return path
+
+
 def application_home(anchor=None):
     if anchor is None:
         anchor = os.environ.get("RM_TRELLIN_HOME") or Path.home() / "Library" / "Application Support" / "Trellin"
@@ -101,7 +111,7 @@ def library_root(anchor, *, required=False):
 
 
 _MANAGED_REQUIRED = {"format_version", "anchor", "slot"}
-_MANAGED_OPTIONAL = {"name", "default"}
+_MANAGED_OPTIONAL = {"name", "default", "source_root"}
 
 
 def workspace_marker(workspace):
@@ -124,7 +134,10 @@ def workspace_marker(workspace):
     default = marker.get("default", False)
     if type(default) is not bool:
         raise LibraryError("storage-invalid")
-    return {"anchor": anchor, "slot": slot, "name": name, "default": default}
+    source_root = stored_absolute_path(marker["source_root"]) if "source_root" in marker else None
+    if default and source_root is not None:
+        raise LibraryError("storage-invalid")
+    return {"anchor": anchor, "slot": slot, "name": name, "default": default, "source_root": source_root}
 
 
 def workspace_registration(workspace):

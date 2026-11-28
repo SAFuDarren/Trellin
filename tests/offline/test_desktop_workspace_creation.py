@@ -13,11 +13,22 @@ import pytest
 
 from research_multiplier.storage import credentials, paths, postgres
 from research_multiplier.workbench import desktop
-from research_multiplier.workflows import desktop_workspace
+from research_multiplier.workflows import desktop_library, desktop_workspace
 from research_multiplier.workflows.setup import Setup, SetupError
 
 
 pytestmark = pytest.mark.offline
+
+
+@pytest.fixture
+def folder_selection(monkeypatch, tmp_path):
+    root = tmp_path.resolve()
+    source = root / "新课题"
+    source.mkdir()
+    app_home = root / "app support"
+    monkeypatch.setenv("RM_TRELLIN_HOME", str(app_home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(root / "config"))
+    return source, app_home / "Library" / "Workspaces"
 
 
 def _launch(path, *, select=True):
@@ -60,49 +71,57 @@ def test_creation_refuses_existing_folders_aliases_and_nested_workspaces(monkeyp
 
 @pytest.mark.parametrize(("socket", "port"), [("localhost", "5432"), ("/tmp", "0"), ("/tmp", "65536"),
                                                ("/tmp,/elsewhere", "5432"), ("/tmp", " 5432")])
-def test_creation_refuses_nonlocal_or_invalid_postgres_target(monkeypatch, tmp_path, socket, port):
+def test_creation_refuses_nonlocal_or_invalid_postgres_target(monkeypatch, folder_selection, socket, port):
     monkeypatch.setenv("RM_DESKTOP_PG_SOCKET", socket)
     monkeypatch.setenv("RM_DESKTOP_PG_PORT", port)
-    parent = tmp_path.resolve()
-    destination = parent / "Trellin"
-    assert _launch(parent) == _error("create-postgres")
-    assert not destination.exists()
+    source, managed_projects = folder_selection
+    assert _launch(source) == _error("create-postgres")
+    assert not list(source.iterdir())
+    assert not list(managed_projects.iterdir())
 
 
-def test_creation_preflights_exact_postgres_target_before_writing(monkeypatch, tmp_path):
-    parent = tmp_path.resolve()
-    socket = parent / "PostgreSQL Socket"
+def test_creation_preflights_exact_postgres_target_before_writing(monkeypatch, folder_selection):
+    source, managed_projects = folder_selection
+    socket = source.parent / "PostgreSQL Socket"
     socket.mkdir()
     monkeypatch.setenv("RM_DESKTOP_PG_SOCKET", str(socket))
     monkeypatch.setenv("RM_DESKTOP_PG_PORT", "55432")
     monkeypatch.setenv("PGHOSTADDR", "example.invalid")
     monkeypatch.setenv("RM_ADMIN_DSN", "service=other")
     monkeypatch.setenv("RM_HUMAN_DSN", "service=other-human")
-    destination = parent / "Trellin"
+    observed = {}
 
     def connect(setup):
-        assert (setup.host, setup.port) == (str(socket), 55432)
-        assert not setup.interactive and not setup.assume_yes and setup.skip_lean
-        assert all(key not in os.environ for key in ("PGHOSTADDR", "RM_ADMIN_DSN", "RM_HUMAN_DSN"))
+        observed["target"] = (setup.host, setup.port)
+        observed["setup_options"] = (setup.interactive, setup.assume_yes, setup.skip_lean)
+        observed["inherited_variables"] = {"PGHOSTADDR", "RM_ADMIN_DSN", "RM_HUMAN_DSN"}.intersection(os.environ)
+        observed["workspace_parent"] = setup.workspace.parent
         return nullcontext()
 
-    def check(*_):
-        assert not destination.exists()
+    def check(setup, _):
+        observed["workspace_exists_before_preflight"] = setup.workspace.exists()
+        observed["source_entries_before_preflight"] = list(source.iterdir())
         raise SetupError("Private server error")
 
     monkeypatch.setattr(desktop_workspace._DesktopSetup, "admin_connection", connect)
     monkeypatch.setattr(desktop_workspace._DesktopSetup, "check_server", check)
-    assert _launch(parent) == _error("create-postgres")
-    assert not destination.exists()
+    assert _launch(source) == _error("create-postgres")
+    assert observed == {
+        "target": (str(socket), 55432),
+        "setup_options": (False, False, True),
+        "inherited_variables": set(),
+        "workspace_parent": managed_projects,
+        "workspace_exists_before_preflight": False,
+        "source_entries_before_preflight": [],
+    }
+    assert not list(source.iterdir())
+    assert not list(managed_projects.iterdir())
 
 
-def test_selection_creates_once_and_opens_the_resolved_workspace(monkeypatch, tmp_path):
-    parent = tmp_path.resolve() / "新课题"
-    parent.mkdir()
-    notes = parent / "research.md"
+def test_selection_creates_once_and_opens_the_resolved_workspace(monkeypatch, folder_selection):
+    source, managed_projects = folder_selection
+    notes = source / "research.md"
     notes.write_text("Existing research")
-    destination = parent / "Trellin"
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     monkeypatch.setenv("RM_HUMAN_DSN", "service=other")
     values = {"RM_HUMAN_DSN": "service=new-human"}
     database_id = UUID(int=1234)
@@ -110,25 +129,24 @@ def test_selection_creates_once_and_opens_the_resolved_workspace(monkeypatch, tm
 
     @contextmanager
     def fresh(setup, _):
-        assert setup.workspace == destination and paths.workspace_id(destination)
-        provisions.append(destination)
+        assert setup.workspace.parent == managed_projects
+        assert str(UUID(setup.workspace.name)) == setup.workspace.name
+        assert paths.workspace_id(setup.workspace)
+        provisions.append(setup.workspace)
         yield values
 
     def bind(workspace):
-        assert workspace == paths.active_workspace() == destination
+        assert workspace == paths.active_workspace() == provisions[-1]
         assert os.environ["RM_HUMAN_DSN"] == values["RM_HUMAN_DSN"]
         paths.bind_database(workspace, database_id)
 
-    ready = {"version": 1, "status": "ready", "url": "local", "warnings": [], "workspace": str(destination)}
-    server = SimpleNamespace(workspace=destination, launch_url="local", shutdown=lambda: None,
-                             serve_forever=lambda **_: None)
-
     def open_bound(workspace, _, *, expected_project):
         assert expected_project is None
-        assert Path(workspace) == destination
+        assert Path(workspace) == provisions[0]
         assert paths.database_id(workspace) == database_id
         assert credentials.read(paths.workspace_id(workspace)) == values
-        return server
+        return SimpleNamespace(workspace=Path(workspace), launch_url="local", shutdown=lambda: None,
+                               serve_forever=lambda **_: None)
 
     monkeypatch.setattr(desktop_workspace._DesktopSetup, "admin_connection", lambda _: nullcontext())
     monkeypatch.setattr(desktop_workspace._DesktopSetup, "check_server", lambda *args: None)
@@ -136,48 +154,43 @@ def test_selection_creates_once_and_opens_the_resolved_workspace(monkeypatch, tm
     monkeypatch.setattr(postgres, "bind_workspace", bind)
     monkeypatch.setattr(desktop, "_open", open_bound)
     monkeypatch.setattr(desktop.shutil, "which", lambda _: "/installed/lean")
-    assert _launch(parent) == (0, ready)
-    assert _launch(parent) == (0, ready)
-    assert _launch(destination) == (0, ready)
-    ready.pop("workspace")
+    result = _launch(source)
+    destination, = provisions
+    ready = {"version": 1, "status": "ready", "url": "local", "warnings": []}
+    selected = {**ready, "workspace": str(destination), "name": source.name,
+                "project_id": str(paths.workspace_id(destination))}
+    assert result == (0, selected)
+    assert _launch(source) == (0, selected)
+    assert _launch(destination) == (0, selected)
     assert _launch(destination, select=False) == (0, ready)
     assert provisions == [destination]
+    assert list(source.iterdir()) == [notes]
     assert notes.read_text() == "Existing research"
     assert (destination / "AGENTS.md").is_file()
     assert not (destination / "Trellin").exists()
 
 
-@pytest.mark.parametrize("kind", ["directory", "file", "symlink", "broken symlink", "invalid workspace"])
-def test_selection_refuses_an_occupied_trellin_child(monkeypatch, tmp_path, kind):
-    parent = tmp_path / "research"
-    parent.mkdir()
-    child = parent / "Trellin"
-    if kind == "file":
-        child.write_text("Preserve this file")
-    elif kind == "symlink":
-        other_workspace = paths.initialize_workspace(tmp_path / "elsewhere")
+@pytest.mark.parametrize("kind", ["symlink", "invalid workspace"])
+def test_selection_refuses_an_unsafe_legacy_workspace(monkeypatch, folder_selection, kind):
+    source, _ = folder_selection
+    child = source / "Trellin"
+    if kind == "symlink":
+        other_workspace = paths.initialize_workspace(source.parent / "elsewhere")
         child.symlink_to(other_workspace, target_is_directory=True)
-    elif kind == "broken symlink":
-        child.symlink_to(tmp_path / "missing", target_is_directory=True)
     else:
         child.mkdir()
         (child / "notes.md").write_text("Preserve this directory")
-        if kind == "invalid workspace":
-            (child / paths.WORKSPACE_FILE).write_text("invalid marker")
+        (child / paths.WORKSPACE_FILE).write_text("invalid marker")
 
-    def unexpected(*_):
+    def unexpected(*_, **_kwargs):
         pytest.fail("A blocked path attempted to open or create a workspace.")
 
     monkeypatch.setattr(desktop, "_open", unexpected)
-    monkeypatch.setattr(desktop_workspace, "create_workspace", unexpected)
-    before = {path.name for path in child.iterdir()} if child.is_dir() else None
-    assert _launch(parent) == _error("workspace-occupied")
-    if child.is_dir():
-        assert {path.name for path in child.iterdir()} == before
-    if kind == "file":
-        assert child.read_text() == "Preserve this file"
-    if kind.endswith("symlink"):
-        assert child.is_symlink()
+    monkeypatch.setattr(desktop_library, "create_workspace", unexpected)
+    before = {path.name for path in child.iterdir()}
+    assert _launch(source) == _error("workspace-occupied")
+    assert {path.name for path in child.iterdir()} == before
+    assert child.is_symlink() == (kind == "symlink")
 
 
 def test_unflagged_open_does_not_search_or_create_a_child(monkeypatch, tmp_path):
@@ -189,7 +202,7 @@ def test_unflagged_open_does_not_search_or_create_a_child(monkeypatch, tmp_path)
     def unexpected(*_):
         pytest.fail("A restored path entered the folder-selection workflow.")
 
-    monkeypatch.setattr(desktop_workspace, "select_workspace", unexpected)
+    monkeypatch.setattr(desktop_library.Library, "open_folder", unexpected)
     assert _launch(parent, select=False) == _error("workspace")
     assert _launch(other_parent, select=False) == _error("workspace")
     assert not (other_parent / "Trellin").exists()
