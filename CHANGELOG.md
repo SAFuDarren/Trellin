@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.160
+
+- Generate a local project draft before creation, with source-grounded items and suggested dependencies.
+
 ## 1.0.159
 
 - Preview selected PDF text through the macOS launcher with physical page numbers, the original file digest and explicit extraction limits.

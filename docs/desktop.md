@@ -106,12 +106,14 @@ Reference renders are in [images/desktop-status](images/desktop-status/).
 
 ## Preview selected sources before creating a project
 
-The native launcher has two private one-shot commands for the future project intake screen. Each accepts one UTF-8 JSON object on standard input (up to 64 KiB) and returns a version 1 JSON reply on standard output. Only the native caller receives the local path, directory identity and preview text.
+The native launcher has private one-shot commands for the future project intake screen. Where specified, a command accepts one UTF-8 JSON object on standard input (up to 64 KiB). Replies on standard output use version 1. Only the native caller receives the local path, directory identity and source provenance.
 
 | Launcher flag | JSON input | Ready reply |
 | --- | --- | --- |
 | `--intake-inspect` | `{"root":"<absolute directory from the native picker>"}` | `selection` contains the canonical `root`, its local `identity`, and `workspace` |
 | `--intake-preview` | The returned `root` and `identity`, plus `references` (an ordered list of objects with `path` and optional expected `sha256`) | `files` contains one result per requested relative path |
+| `--intake-models` | None | `models` lists eligible on-device Ollama model names |
+| `--intake-draft` | The inspected `root` and `identity`, the explicitly chosen `model`, and `references` with each selected `path` and its previously previewed `sha256` | `draft` contains an editable proposal with source evidence |
 
 A non-null `workspace` names an existing workspace candidate at the selected folder or its legacy `Trellin` child. Use the normal reopen flow to validate the workspace. A null value allows text preview. Preview checks the selected directory identity and workspace markers again before returning. A root failure or malformed request returns a fixed error code and no files.
 
@@ -121,7 +123,15 @@ The macOS application previews a text-bearing PDF with the bundled PDFKit helper
 
 Each request caps PDF reads at 16 MiB in total and the PDF extraction deadline at ten seconds. PDF documents above 128 pages are reported separately. Extracted PDF text and selected text files share the 18,000-byte text budget. A PDF error is a `path` and a fixed `status`, such as `pdf_no_text` for a scanned PDF, `pdf_locked`, `pdf_invalid`, `pdf_page_limit`, `pdf_text_limit`, `pdf_timeout`, or `pdf_unavailable` when the helper cannot be used. For unreadable material, paste selected text or continue manually in the existing intake flow.
 
-Filesystem and text failures return the existing `unsupported`, `missing`, `inaccessible`, `too_large`, `invalid_utf8`, `binary`, `empty`, `changed`, or `unstable` status. Intake reads only explicitly requested material. It does not scan the folder, create a project, update the library or call a model.
+Filesystem and text failures return the existing `unsupported`, `missing`, `inaccessible`, `too_large`, `invalid_utf8`, `binary`, `empty`, `changed`, or `unstable` status. Source inspection and preview read only explicitly selected material and do not call a model.
+
+### Generate an on-device draft
+
+Use the preview digests for exactly the files the researcher chooses to include. A changed, unstable, unavailable or unreadable selected file stops the draft before completion is requested. The model receives only the selected passage text and opaque identifiers, while paths, raw file digests and physical PDF page numbers are kept in the private launcher. Model discovery and completion reuse the existing on-device Ollama selection.
+
+The transient `draft` returns a suggested `title`, `question`, `sources`, `items` and `links`. Each item keeps its editable `label` separate from the exact `source.quote`, with the source's relative path, raw digest and physical `page` when applicable. Sources retain partial PDF coverage. A `suggested_dependency` link points from an item to its suggested prerequisite. Draft items and links are proposals for review. Generation does not create or update a project, store model transcripts or take a budget reservation from an open project.
+
+Model selection, completion or response validation can return `intake-model-unavailable`, `intake-model-failed` or `intake-model-output`. Review the input or choose another local model. Failure replies omit source passages and provider diagnostics.
 
 ## Check a linked source through the launcher
 

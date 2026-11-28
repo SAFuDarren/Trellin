@@ -162,15 +162,21 @@ def _save_draft(store, data, **model):
         raise IntakeError("intake.invalid_input") from None
 
 
-def draft(store, document):
-    _shape(document, _INTAKE_FIELDS | {"model"})
-    _, data = _draft_data(document, "restricted")
-    name = _text(document["model"], 249)
+def resolve_local_model(name):
+    """Verify the selected installed model and its exact on-device completion route."""
+    name = _text(name, 249)
     if not any(_candidate(row) == name for row in _catalog()):
         raise IntakeError("intake.model_unavailable")
     config = _model_config(name)
     if config is None:
         raise IntakeError("intake.model_unavailable")
+    return config
+
+
+def draft(store, document):
+    _shape(document, _INTAKE_FIELDS | {"model"})
+    _, data = _draft_data(document, "restricted")
+    config = resolve_local_model(document["model"])
     return _save_draft(store, data, confirm_local=True, model_config=config)
 
 
