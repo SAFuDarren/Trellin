@@ -355,6 +355,338 @@
         }
       }
     },
+    "/api/v1/workspaces/{workspace_id}/research-issues": {
+      "get": {
+        "operationId": "listResearchIssues",
+        "summary": "Read offered research Work and its current input status",
+        "description": "Requires a bound local researcher and local session. Returns up to 100 of that researcher's most recent offers. Known changed or missing linked inputs require recheck. Unobservable inputs are separate. This list accepts no query parameters and does not change any stored offer, review or file.",
+        "security": [
+          {
+            "LocalSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Research Work list snapshot.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "direction",
+                          "inputs",
+                          "created_at",
+                          "input_status"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "direction": {
+                            "$ref": "#/paths/~1api~1v1~1workspaces~1{workspace_id}~1research-issues~1preview/post/responses/200/content/application~1json/schema/properties/draft"
+                          },
+                          "inputs": {
+                            "type": "array",
+                            "maxItems": 16,
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "source_id",
+                                "reference_id",
+                                "sha256"
+                              ],
+                              "properties": {
+                                "source_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "reference_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{64}$"
+                                }
+                              }
+                            }
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "input_status": {
+                            "type": "string",
+                            "enum": [
+                              "ready",
+                              "needs_recheck",
+                              "source_unavailable"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ResearchIssueInvalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/ResearchIssueForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ResearchIssueNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/Failed"
+          },
+          "503": {
+            "description": "The research Work schema or workspace database is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "offerResearchIssue",
+        "summary": "Persist a research Work offer with exact linked-file inputs",
+        "description": "Requires a bound local researcher, local session and the launcher Origin. A new offer verifies the specified registered file versions. Offering grants no execution and starts no provider call. Repeating an unchanged request with its UUID returns the original offer.",
+        "security": [
+          {
+            "LocalSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "direction"
+                ],
+                "properties": {
+                  "direction": {
+                    "$ref": "#/paths/~1api~1v1~1workspaces~1{workspace_id}~1research-issues~1preview/post/requestBody/content/application~1json/schema"
+                  },
+                  "inputs": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "reference_id",
+                        "sha256"
+                      ],
+                      "properties": {
+                        "reference_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "An immutable Work offer.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "issue"
+                  ],
+                  "properties": {
+                    "issue": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "direction",
+                        "inputs",
+                        "created_at"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "direction": {
+                          "$ref": "#/paths/~1api~1v1~1workspaces~1{workspace_id}~1research-issues~1preview/post/responses/200/content/application~1json/schema/properties/draft"
+                        },
+                        "inputs": {
+                          "type": "array",
+                          "maxItems": 16,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "source_id",
+                              "reference_id",
+                              "sha256"
+                            ],
+                            "properties": {
+                              "source_id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "reference_id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "sha256": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ResearchIssueInvalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/ResearchIssueForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/ResearchIssueNotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/Failed"
+          },
+          "503": {
+            "description": "The research Work schema or workspace database is unavailable.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A stale note or input, unavailable input, or conflicting idempotency key.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workspaces/{workspace_id}/agent-work": {
       "get": {
         "operationId": "listAgentWork",

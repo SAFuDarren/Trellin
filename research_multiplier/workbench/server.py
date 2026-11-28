@@ -18,6 +18,7 @@ from research_multiplier.cli._output import json_default
 from research_multiplier.models import connections
 from research_multiplier.proof.lean_watch import LakeWatch
 from research_multiplier.storage import paths
+from research_multiplier.storage.managed_workspaces import LibraryError, uuid_text
 from research_multiplier.storage.postgres import DatabaseOperationError, Store
 from research_multiplier.workbench.runtime_updates import RuntimeUpdates
 from research_multiplier.workflows import (claim_references, doctor, proof_graph, release_updates,
@@ -175,7 +176,7 @@ _V1_ERRORS = {
     "clarification.scope": (HTTPStatus.FORBIDDEN, "Confirm the required scope for this model request."),
     "clarification.busy": (HTTPStatus.CONFLICT, "A process is already preparing the clarification."),
     "clarification.prepare_failed": (HTTPStatus.CONFLICT, "Preparation failed. The recorded answers are available to retry."),
-    "idempotency.conflict": (HTTPStatus.CONFLICT, "This request key was already used for a different review."),
+    "idempotency.conflict": (HTTPStatus.CONFLICT, "This request key was already used for a different request."),
     "database.unavailable": (HTTPStatus.SERVICE_UNAVAILABLE, "The selected research database is unavailable."),
     "request.failed": (HTTPStatus.INTERNAL_SERVER_ERROR, "Could not complete the workbench request."),
     "events.not_found": (HTTPStatus.NOT_FOUND, "The requested workspace event stream is unavailable."),
@@ -188,7 +189,11 @@ _V1_ERRORS = {
     "claim_activity.not_found": (HTTPStatus.NOT_FOUND, "The requested claim activity is unavailable in this workspace."),
     "claim_graph.invalid_query": (HTTPStatus.BAD_REQUEST, "The claim graph does not take query parameters."),
     "claim_graph.not_found": (HTTPStatus.NOT_FOUND, "The requested claim graph is unavailable in this workspace."),
-    "research_issue.invalid": (HTTPStatus.BAD_REQUEST, "Supply a valid research direction and one question source."),
+    "research_issue.invalid": (HTTPStatus.BAD_REQUEST, "Check the research direction and any selected file references."),
+    "research_issue.invalid_query": (HTTPStatus.BAD_REQUEST, "Research Work reads do not take query parameters."),
+    "research_issue.input_changed": (HTTPStatus.CONFLICT, "A selected input is missing or has a different version."),
+    "research_issue.input_unavailable": (HTTPStatus.CONFLICT, "The selected source input cannot be verified."),
+    "research_issue.storage_unavailable": (HTTPStatus.SERVICE_UNAVAILABLE, "Use Back up and upgrade for this project to enable research Work."),
     "research_issue.identity_required": (HTTPStatus.FORBIDDEN, "Bind the workspace to resolve a local researcher."),
     "research_issue.not_found": (HTTPStatus.NOT_FOUND, "The workspace or research source is unavailable."),
     "research_issue.stale": (HTTPStatus.CONFLICT, "The proof note changed. Reopen its current draft."),
@@ -312,6 +317,19 @@ class WorkbenchServer(ThreadingHTTPServer):
     def write(self, action, *values):
         with paths.use_workspace(self.workspace, strict=True), Store() as store:
             return store.transaction("human", lambda: action(store, *values))
+
+    def _offer_source_inputs(self, reference_ids):
+        if self.source_observer is None:
+            raise workbench_research_issues.ResearchIssuePreviewError("research_issue.input_unavailable")
+        try:
+            return self.source_observer.verified_inputs(reference_ids)
+        except LibraryError:
+            raise workbench_research_issues.ResearchIssuePreviewError("research_issue.input_unavailable") from None
+
+    def _research_work_snapshot(self, store):
+        observations = self.source_observer.current_snapshot() if self.source_observer is not None else None
+        records = workbench_research_issues.list_offers(store, observations)
+        return {"items": records["issues"], "next_cursor": None}
 
     def verify_lemma_plan(self, document):
         if self.closing.is_set() or not self._lemma_plan_lock.acquire(blocking=False):
@@ -761,6 +779,9 @@ class _Handler(BaseHTTPRequestHandler):
             if resource == "claims" and not references:
                 self._get_workspace_read(workspace, resource, _claims_snapshot, self.server.claim_id)
                 return
+            if resource == "research-issues" and not references:
+                self._get_workspace_read(workspace, resource, self.server._research_work_snapshot)
+                return
             if resource == "agent-work":
                 if references:
                     self._get_workspace_read(workspace, resource, workbench_agent_work.task_detail,
@@ -847,7 +868,7 @@ class _Handler(BaseHTTPRequestHandler):
             return "request.forbidden", None
         if not self._authorized():
             return "request.unauthenticated", None
-        prefix = resource.replace("-", "_")
+        prefix = "research_issue" if resource == "research-issues" else resource.replace("-", "_")
         try:
             workspace_id = UUID(workspace)
             if str(workspace_id) != workspace.lower():
@@ -865,6 +886,8 @@ class _Handler(BaseHTTPRequestHandler):
             return None, self.server.read(_workspace_snapshot, workspace_id, snapshot, *values)
         except (_MissingWorkspace, workbench_activity.ClaimActivityNotFound, proof_graph.ClaimGraphNotFound):
             return f"{prefix}.not_found", None
+        except workbench_research_issues.ResearchIssuePreviewError as error:
+            return str(error), None
         except workbench_agent_work.AgentWorkError as error:
             code = {
                 "agentWork.identity": "agent_work.identity_required",
@@ -886,8 +909,8 @@ class _Handler(BaseHTTPRequestHandler):
         route = f"/api/v1/workspaces/{{workspace_id}}/{route_path or resource}"
         self._v1_logged_reply(route, start, code, payload)
 
-    def _v1_logged_reply(self, route, start, code, payload):
-        status = _V1_ERRORS[code][0] if code else HTTPStatus.OK
+    def _v1_logged_reply(self, route, start, code, payload, *, success=HTTPStatus.OK):
+        status = _V1_ERRORS[code][0] if code else success
         entry = {"route": route, "status": status,
                  "request_id": self.request_id, "duration_ms": round((time.monotonic() - start) * 1000, 3)}
         with _ACCESS_LOG_LOCK:
@@ -973,7 +996,7 @@ class _Handler(BaseHTTPRequestHandler):
             return "request.unauthenticated"
         return None
 
-    def _research_issue_preview_reply(self, workspace):
+    def _research_issue_reply(self, workspace, *, offer=False):
         if code := self._v1_post_error():
             return code, None
         try:
@@ -986,13 +1009,24 @@ class _Handler(BaseHTTPRequestHandler):
             return "research_issue.invalid", None
         try:
             document = self._body(workbench_research_issues.MAX_REQUEST_BYTES)
-            return None, self.server.read(_workspace_snapshot, workspace_id, workbench_research_issues.preview, document)
-        except _BadRequest:
+            if not offer:
+                return None, self.server.read(_workspace_snapshot, workspace_id, workbench_research_issues.preview, document)
+            keys = self.headers.get_all("Idempotency-Key", ())
+            if len(keys) != 1 or uuid_text(keys[0]) != keys[0]:
+                return "research_issue.invalid", None
+            if not isinstance(document, dict) or document.keys() not in ({"direction"}, {"direction", "inputs"}):
+                return "research_issue.invalid", None
+            return None, self.server.write(
+                _workspace_snapshot, workspace_id, workbench_research_issues.offer,
+                {"offer_id": keys[0], **document}, self.server._offer_source_inputs,
+            )
+        except (_BadRequest, LibraryError):
             return "research_issue.invalid", None
         except _MissingWorkspace:
             return "research_issue.not_found", None
         except workbench_research_issues.ResearchIssuePreviewError as error:
-            return str(error), None
+            code = str(error)
+            return ("idempotency.conflict" if code == "research_issue.conflict" else code), None
         except (DatabaseOperationError, ValueError):
             return "database.unavailable", None
         except (BrokenPipeError, ConnectionResetError, TimeoutError):
@@ -1003,11 +1037,15 @@ class _Handler(BaseHTTPRequestHandler):
     def _post_v1(self):
         self.request_id = str(uuid4())
         try:
-            preview = self.path.split("?", 1)[0].split("#", 1)[0].split("/")
-            if len(preview) == 7 and preview[3] == "workspaces" and preview[5:] == ["research-issues", "preview"]:
+            research = self.path.split("?", 1)[0].split("#", 1)[0].split("/")
+            if len(research) in (6, 7) and research[3] == "workspaces" and research[5:] in (
+                ["research-issues"], ["research-issues", "preview"],
+            ):
                 start = time.monotonic()
-                code, payload = self._research_issue_preview_reply(preview[4])
-                self._v1_logged_reply("/api/v1/workspaces/{workspace_id}/research-issues/preview", start, code, payload)
+                offer = len(research) == 6
+                route = "/api/v1/workspaces/{workspace_id}/research-issues" + ("" if offer else "/preview")
+                code, payload = self._research_issue_reply(research[4], offer=offer)
+                self._v1_logged_reply(route, start, code, payload, success=HTTPStatus.CREATED if offer else HTTPStatus.OK)
                 return
             if code := self._v1_post_error():
                 self._v1_error(code)

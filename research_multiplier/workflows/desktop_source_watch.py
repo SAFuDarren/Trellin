@@ -21,6 +21,7 @@ class SourceObserver:
         self._lock = Lock()
         self._worker = Thread(target=self._run, name="trellin-source-observer", daemon=True)
         self._scope = None
+        self._published_scope = None
         self._cache = {}
         self._results = {}
         self._offset = 0
@@ -44,6 +45,36 @@ class SourceObserver:
         with self._lock:
             return deepcopy(self._snapshot)
 
+    def verified_inputs(self, reference_ids):
+        """Independently check file digests when explicitly pinning work inputs."""
+        return self._library.check_source_references(self._project, reference_ids)
+
+    def current_snapshot(self):
+        """Use only observations for the currently registered source and locators."""
+        current = None
+
+        def compare(revision, binding, records):
+            nonlocal current
+            scope = self._catalog(revision, records)
+            with self._lock:
+                if self._stop.is_set() or self._published_scope != scope:
+                    return
+                if self._snapshot["status"] != "available":
+                    return
+                observed = deepcopy(self._snapshot)
+            if source_status(binding["source_root"], binding["source_identity"]) == "available":
+                current = observed
+
+        try:
+            self._library.observe_source_references(self._project, compare)
+        except LibraryError:
+            return None
+        return current
+
+    @staticmethod
+    def _catalog(revision, records):
+        return revision, tuple((record["id"], record["revision"]) for record in records)
+
     def _result(self, status, revision, files):
         return {"source_id": self._project, "revision": revision, "status": status, "files": files}
 
@@ -52,6 +83,7 @@ class SourceObserver:
         with self._lock:
             if self._stop.is_set():
                 return
+            self._published_scope = self._scope
             current = self._snapshot
             if result != {key: current[key] for key in result}:
                 self._snapshot = result | {"generation": current["generation"] + 1}
@@ -76,7 +108,7 @@ class SourceObserver:
     def _sample(self, revision, binding, records):
         if self._stop.is_set():
             return
-        scope = revision, tuple((record["id"], record["revision"]) for record in records)
+        scope = self._catalog(revision, records)
         if scope != self._scope:
             self._scope = scope
             self._clear()
