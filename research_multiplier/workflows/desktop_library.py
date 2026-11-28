@@ -16,6 +16,7 @@ from research_multiplier.storage.managed_workspaces import (
     publish_metadata, read_metadata, stored_absolute_path, uuid_text, workspace_marker, workspace_registration,
 )
 from research_multiplier.storage.project_archive import _fingerprint
+from research_multiplier.workflows import desktop_references
 from research_multiplier.workflows.desktop_source import check_references, source_identity, source_status
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace, inspect_folder
 
@@ -70,10 +71,21 @@ def _new_source_binding(root, identity):
     return {"source_root": root, "source_identity": identity, "source_revision": str(uuid4())}
 
 
+def _source_revision(identifier, binding):
+    return binding["source_revision"] or identifier
+
+
+def _require_source_revision(identifier, binding, expected):
+    revision = _source_revision(identifier, binding)
+    if revision != uuid_text(expected):
+        raise LibraryError("storage-stale")
+    return revision
+
+
 def _source_reply(identifier, binding, status):
     return {
         "source_id": identifier, "root": str(binding["source_root"]),
-        "revision": binding["source_revision"] or identifier, "status": status,
+        "revision": _source_revision(identifier, binding), "status": status,
     }
 
 
@@ -639,25 +651,30 @@ class Library:
             raise LibraryError("storage-project")
         return workspace, row, marker
 
+    @contextmanager
+    def _lease_linked_source(self, identifier, *, exclusive=False):
+        with self._locked(exclusive=exclusive):
+            root, data = self._state()
+            workspace, row, binding = self._linked_source(root, data, identifier)
+            yield workspace, row["id"], binding
+
     def source_info(self, identifier):
         """Read the private binding of a single registered linked project."""
-        with self._locked(exclusive=False):
-            root, data = self._state()
-            _, row, binding = self._linked_source(root, data, identifier)
+        with self._lease_linked_source(identifier) as (_, project_id, binding):
             status = source_status(binding["source_root"], binding["source_identity"])
-            return _source_reply(row["id"], binding, status)
+            return _source_reply(project_id, binding, status)
 
     def rebind_source(self, identifier, expected_root, destination, *, expected_revision):
         """Update the source only after comparing the previously observed binding."""
         expected = stored_absolute_path(expected_root)
-        revision = uuid_text(expected_revision)
         if not isinstance(destination, str):
             raise LibraryError("storage-invalid")
         with self._locked():
             root, data = self._state()
             workspace, row, binding = self._linked_source(root, data, identifier)
             previous = binding["source_root"]
-            if previous != expected or (binding["source_revision"] or row["id"]) != revision:
+            _require_source_revision(row["id"], binding, expected_revision)
+            if previous != expected:
                 raise LibraryError("storage-stale")
             try:
                 source, existing = inspect_folder(destination)
@@ -683,13 +700,35 @@ class Library:
 
     def check_source(self, identifier, references):
         """Check selected references while the project's root binding is leased."""
-        with self._locked(exclusive=False):
-            root, data = self._state()
-            _, row, binding = self._linked_source(root, data, identifier)
+        with self._lease_linked_source(identifier) as (_, project_id, binding):
             report = check_references(
                 binding["source_root"], references, expected_identity=binding["source_identity"],
             )
-            return {"source_id": row["id"], **report}
+            return {"source_id": project_id, **report}
+
+    def list_source_references(self, identifier):
+        with self._lease_linked_source(identifier) as (workspace, project_id, binding):
+            return {
+                "source_id": project_id, "revision": _source_revision(project_id, binding),
+                "references": desktop_references.list_references(workspace),
+            }
+
+    def track_source_reference(self, identifier, path, *, expected_revision):
+        with self._lease_linked_source(identifier, exclusive=True) as (workspace, project_id, binding):
+            revision = _require_source_revision(project_id, binding, expected_revision)
+            reference = desktop_references.track_reference(workspace, binding, path)
+            return {"source_id": project_id, "revision": revision, "reference": reference}
+
+    def check_source_references(self, identifier, reference_ids):
+        with self._lease_linked_source(identifier) as (workspace, project_id, binding):
+            report = desktop_references.check_tracked_references(workspace, binding, reference_ids)
+            return {"source_id": project_id, "revision": _source_revision(project_id, binding), **report}
+
+    def repair_source_reference(self, identifier, reference_id, path, *, expected_revision, expected_reference_revision):
+        with self._lease_linked_source(identifier, exclusive=True) as (workspace, project_id, binding):
+            revision = _require_source_revision(project_id, binding, expected_revision)
+            reference = desktop_references.repair_reference(workspace, binding, reference_id, expected_reference_revision, path)
+            return {"source_id": project_id, "revision": revision, "reference": reference}
 
     def register_external(self, path):
         workspace = canonical_path(path)

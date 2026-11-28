@@ -15,7 +15,7 @@ from research_multiplier.cli import main
 from research_multiplier.storage import paths
 from research_multiplier.storage.managed_workspaces import LOCATION_FILE, MANAGED_FILE, LibraryError, workspace_registration
 from research_multiplier.workbench import desktop
-from research_multiplier.workflows import desktop_library, desktop_source
+from research_multiplier.workflows import desktop_library, desktop_references, desktop_source
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError
 
 
@@ -526,6 +526,21 @@ def _storage_source_command(monkeypatch, capsys, flag, project, request=None):
     return result, json.loads(capsys.readouterr().out)
 
 
+def _source_reference_process(operation, project, request=None):
+    process = subprocess.run(
+        [sys.executable, "-m", "research_multiplier.workbench.desktop", f"--storage-{operation}", project],
+        cwd=Path(__file__).resolve().parents[2],
+        input=json.dumps(request) if request is not None else "",
+        capture_output=True, text=True, check=False, timeout=15,
+    )
+    assert not process.stderr
+    return process.returncode, json.loads(process.stdout)
+
+
+def _source_reference_reply(source):
+    return 0, {"version": 1, "status": "ready", "source": source}
+
+
 def _expect_storage_source(result, project, folder, status="available"):
     code, reply = result
     assert code == 0
@@ -897,6 +912,189 @@ def test_source_returns_to_a_previous_root_without_reusing_its_revision(library,
     with pytest.raises(LibraryError, match="^storage-stale$"):
         library.rebind_source(project, str(original), str(replacement), expected_revision=binding["revision"])
     assert library.source_info(project) == returned
+
+
+def test_native_tracked_reference_survives_process_restart_atomic_save_and_rename(library, tmp_path):
+    source = tmp_path / "research"
+    source.mkdir()
+    paper = source / "paper.md"
+    paper.write_bytes(b"Original accepted paper")
+    paper.chmod(0o640)
+    workspace = library.open_folder(source)
+    project = str(paths.workspace_id(workspace))
+    binding = library.source_info(project)
+    revision = binding["revision"]
+    digest = sha256(paper.read_bytes()).hexdigest()
+    source_header = {"source_id": project, "revision": revision}
+    before_tracking = _folder_snapshot(workspace)
+    before_source = _folder_snapshot(source)
+
+    def command(operation, request=None):
+        return _source_reference_process(operation, project, request)
+
+    assert command("list-source-references") == _source_reference_reply({**source_header, "references": []})
+    assert _folder_snapshot(workspace) == before_tracking
+    track = {"expected_revision": revision, "path": paper.name}
+    result = command("track-source-reference", track)
+    record = result[1]["source"]["reference"]
+    assert result == _source_reference_reply({**source_header, "reference": {
+        "id": str(UUID(record["id"])), "revision": str(UUID(record["revision"])), "path": paper.name, "sha256": digest,
+    }})
+    assert _folder_snapshot(source) == before_source
+    assert command("list-source-references") == _source_reference_reply({**source_header, "references": [record]})
+
+    def check(file_status, *, path=paper.name, **observed):
+        assert command("check-source-references", {"reference_ids": [record["id"]]}) == _source_reference_reply({
+            **source_header,
+            "status": "available",
+            "files": [{"reference_id": record["id"], "path": path, "status": file_status, "recorded_sha256": digest,
+                       **observed}],
+        })
+
+    check("unchanged", sha256=digest)
+    draft = source / "editor-save.tmp"
+    draft.write_bytes(b"An external atomic save")
+    draft.chmod(0o640)
+    draft.replace(paper)
+    changed = _folder_snapshot(source)
+    check("changed", sha256=sha256(paper.read_bytes()).hexdigest())
+    assert command("track-source-reference", track) == result
+    assert command("list-source-references") == _source_reference_reply({**source_header, "references": [record]})
+    assert _folder_snapshot(source) == changed
+
+    paper.write_bytes(b"Original accepted paper")
+    renamed = paper.rename(source / "renamed.md")
+    before_repair = _folder_snapshot(source)
+    check("missing")
+    repair = {"expected_revision": revision, "reference_id": record["id"],
+              "expected_reference_revision": record["revision"], "path": renamed.name}
+    result = command("repair-source-reference", repair)
+    repaired = result[1]["source"]["reference"]
+    assert result == _source_reference_reply({**source_header, "reference": {
+        **record, "revision": str(UUID(repaired["revision"])), "path": renamed.name,
+    }})
+    assert repaired["revision"] != record["revision"]
+    assert command("repair-source-reference", {**repair, "expected_reference_revision": repaired["revision"]}) == result
+    assert command("repair-source-reference", {**repair, "path": paper.name}) == (
+        2, {"version": 1, "status": "error", "code": "storage-stale"},
+    )
+    assert command("list-source-references") == _source_reference_reply({**source_header, "references": [repaired]})
+    check("unchanged", path=renamed.name, sha256=digest)
+    assert _folder_snapshot(source) == before_repair
+
+
+def test_tracked_references_wait_for_source_confirmation_and_follow_library_move(
+    monkeypatch, capsys, library, tmp_path,
+):
+    source = tmp_path / "research"
+    source.mkdir()
+    paper = source / "paper.md"
+    paper.write_bytes(b"Accepted content")
+    paper.chmod(0o640)
+    workspace = library.open_folder(source)
+    project = str(paths.workspace_id(workspace))
+    database = paths.database_id(workspace)
+    binding = library.source_info(project)
+
+    def command(operation, request=None):
+        return _source_reference_process(operation, project, request)
+
+    track = {"expected_revision": binding["revision"], "path": paper.name}
+    result = command("track-source-reference", track)
+    record = result[1]["source"]["reference"]
+    displaced = source.rename(tmp_path / "displaced")
+    source.mkdir()
+    paper.write_bytes(b"Different file at the old address")
+    folders = {folder: _folder_snapshot(folder) for folder in (source, displaced)}
+    check = {"reference_ids": [record["id"]]}
+    with monkeypatch.context() as blocked:
+        blocked.setattr(desktop_source, "_regular_file", _unexpected_source_read)
+        assert _storage_source_command(monkeypatch, capsys, "--storage-check-source-references", project, check) == (
+            _source_reference_reply({
+                "source_id": project, "revision": binding["revision"], "status": "identity_changed", "files": [],
+            })
+        )
+
+    rebound = library.rebind_source(project, str(source), str(displaced), expected_revision=binding["revision"])
+    assert command("track-source-reference", track) == (
+        2, {"version": 1, "status": "error", "code": "storage-stale"},
+    )
+    new_library = tmp_path / "relocated library"
+    library.move(new_library, library.preview(new_library)["sha256"])
+    relocated = desktop_library.Library().resolve_project(project, verify_database=True)
+    assert relocated == new_library / "Workspaces" / workspace.name
+    assert paths.database_id(relocated) == database
+    header = {"source_id": project, "revision": rebound["revision"]}
+    assert command("list-source-references") == _source_reference_reply({**header, "references": [record]})
+    assert command("check-source-references", check) == _source_reference_reply({
+        **header, "status": "available",
+        "files": [{"reference_id": record["id"], "path": paper.name, "status": "unchanged",
+                   "recorded_sha256": record["sha256"], "sha256": record["sha256"]}],
+    })
+    assert {folder: _folder_snapshot(folder) for folder in folders} == folders
+
+
+def test_native_reference_repair_publication_failure_keeps_old_locator(monkeypatch, capsys, library, tmp_path):
+    source = tmp_path / "research"
+    source.mkdir()
+    paper = source / "paper.md"
+    paper.write_bytes(b"Contents to verify")
+    workspace = library.open_folder(source)
+    project = str(paths.workspace_id(workspace))
+    revision = library.source_info(project)["revision"]
+    result = _source_reference_process("track-source-reference", project, {
+        "expected_revision": revision, "path": paper.name,
+    })
+    assert result[0] == 0
+    record = result[1]["source"]["reference"]
+    renamed = paper.rename(source / "renamed.md")
+    before = _folder_snapshot(source)
+    metadata = workspace / desktop_references.REFERENCES_FILE
+    previous = metadata.read_bytes()
+    attempts = []
+    publish = desktop_references.publish_metadata
+
+    def fail_metadata(path, document):
+        if path == metadata:
+            attempts.extend(document["references"])
+            raise OSError("Interrupted locator write")
+        return publish(path, document)
+
+    monkeypatch.setattr(desktop_references, "publish_metadata", fail_metadata)
+    assert _storage_source_command(monkeypatch, capsys, "--storage-repair-source-reference", project, {
+        "expected_revision": revision, "reference_id": record["id"],
+        "expected_reference_revision": record["revision"], "path": renamed.name,
+    }) == (2, {"version": 1, "status": "error", "code": "storage-unavailable"})
+    attempted, = attempts
+    assert attempted == {**record, "path": renamed.name, "revision": attempted["revision"]}
+    assert attempted["revision"] != record["revision"]
+    assert _source_reference_process("list-source-references", project) == _source_reference_reply({
+        "source_id": project, "revision": revision, "references": [record],
+    })
+    assert metadata.read_bytes() == previous
+    assert _folder_snapshot(source) == before
+
+
+@pytest.mark.parametrize("kind", ["app managed", "legacy external"])
+def test_native_reference_commands_leave_projects_without_sources_open(monkeypatch, library, tmp_path, kind):
+    opened = _stub_desktop_open(monkeypatch, tmp_path)
+    if kind == "legacy external":
+        workspace = paths.initialize_workspace(tmp_path / "legacy")
+        paths.bind_database(workspace, uuid4())
+        library.register_external(workspace)
+    else:
+        workspace = library.create("Managed project")
+    identifier = paths.workspace_id(workspace)
+    before = _folder_snapshot(workspace)
+
+    assert _source_reference_process("list-source-references", str(identifier)) == (
+        2, {"version": 1, "status": "error", "code": "storage-project"},
+    )
+    output = StringIO()
+    assert desktop.run(None, BytesIO(), output, library=library, project_id=identifier) == 0
+    assert json.loads(output.getvalue())["project_id"] == str(identifier)
+    assert opened == [workspace]
+    assert _folder_snapshot(workspace) == before
 
 
 def test_linked_folder_reuses_workspace_after_interrupted_registry_publication(monkeypatch, library, tmp_path):
