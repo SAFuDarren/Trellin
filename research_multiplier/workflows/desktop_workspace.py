@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import stat
 import sys
 import unicodedata
 
@@ -74,15 +75,26 @@ class _DesktopSetup(Setup):
         pass
 
 
-def inspect_folder(location):
-    """Return the chosen directory and an existing workspace, if one is recognizable."""
+def resolve_selected_folder(location):
+    """Return the canonical picker path and the directory identity observed at selection."""
     try:
         selected = Path(location)
         if not selected.is_absolute() or ".." in selected.parts:
             raise ValueError
+        picked = selected.stat()
         parent = selected.resolve(strict=True)
-        if not parent.is_dir():
+        if not stat.S_ISDIR(picked.st_mode) or not os.path.samestat(picked, parent.stat()):
             raise ValueError
+    except (OSError, RuntimeError, ValueError):
+        raise WorkspaceCreationError("workspace") from None
+
+    return parent, picked
+
+
+def inspect_folder(location):
+    """Return the chosen directory and an existing workspace, if one is recognizable."""
+    parent, _ = resolve_selected_folder(location)
+    try:
         marker = parent / paths.WORKSPACE_FILE
         if marker.exists() or marker.is_symlink():
             # An explicitly selected workspace must pass the normal open checks.

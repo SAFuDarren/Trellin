@@ -106,6 +106,21 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 参考效果图见 [images/desktop-status](images/desktop-status/)。
 
+## 创建项目前预览选定资料
+
+原生启动器提供两条私有的一次性命令，供后续项目导入界面使用。每条命令从标准输入接收一个 UTF-8 JSON 对象，上限为 64 KiB，通过标准输出返回版本 1 的 JSON 响应。只有原生调用方接收本机路径、目录身份和预览文本。
+
+| 启动器参数 | JSON 输入 | 成功响应 |
+| --- | --- | --- |
+| `--intake-inspect` | `{"root":"<原生选择器选中的绝对目录>"}` | `selection` 包含规范化后的 `root`、本机目录 `identity` 和 `workspace` |
+| `--intake-preview` | 上一步返回的 `root` 和 `identity`，以及按选择顺序排列的 `references`，每项含 `path` 和可选的预期 `sha256` | `files` 按顺序返回各相对路径的结果 |
+
+若 `workspace` 非空，所选目录本身或其旧版 `Trellin` 子目录含有工作区标记，调用方应走正常的重新打开流程核验工作区。空值表示可预览文本。预览返回前会再次核对目录身份和工作区标记。目录校验失败或请求格式有误时，只返回固定错误代码，省略文件列表。
+
+一次最多选择 16 个不同的相对路径。支持 UTF-8 的普通 TXT、Markdown（`.md`、`.markdown`）、TeX 和 Lean 文件。`available` 结果保留相对路径、原始文本（包括原有换行符）和原始字节的 SHA-256。文件按请求顺序共享 18,000 字节的读取限额。超过剩余额度的文件整份跳过。解码或摘要校验失败时，已读取的字节仍计入限额。
+
+其余文件结果只含 `path` 和 `status`。PDF 返回 `pdf_deferred`，不打开文件。其他状态包括 `unsupported`、`missing`、`inaccessible`、`too_large`、`invalid_utf8`、`binary`、`empty`、`changed`（与预期摘要不符）和 `unstable`（读取期间发生变化）。导入预览仅读取明确选择的资料，不扫描文件夹，不创建项目、更新库或调用模型。
+
 ## 通过启动器核对已绑定的原目录
 
 桌面启动器的私有存储命令按项目 UUID 查看、重新绑定和核对原目录，沿用版本 1 的返回格式。文件引用由该 UUID 和相对于原目录的路径组成。绝对路径只用于本机应用数据和私有存储交换。

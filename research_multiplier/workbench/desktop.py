@@ -13,7 +13,7 @@ from research_multiplier.storage import credentials, paths
 from research_multiplier.storage.managed_workspaces import uuid_text, workspace_marker, workspace_registration
 from research_multiplier.storage.postgres import DatabaseOperationError
 
-from research_multiplier.workflows import release_updates
+from research_multiplier.workflows import desktop_intake, release_updates
 from research_multiplier.workflows.desktop_source_watch import SourceObserver
 from research_multiplier.workflows.desktop_library import Library, LibraryError
 from research_multiplier.workflows.desktop_workspace import (
@@ -260,13 +260,20 @@ def _session(workspace_path, lifetime, output, *, select=False, library=None, ne
         return 0
 
 
-def _storage_request(*keys):
+def _unique_request_keys(pairs):
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        raise ValueError
+    return result
+
+
+def _storage_request(*keys, unique=False):
     limit = 64 * 1024
     try:
         raw = sys.stdin.buffer.read(limit + 1)
         if len(raw) > limit:
             raise ValueError
-        document = json.loads(raw.decode("utf-8"))
+        document = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_request_keys if unique else None)
     except (OSError, ValueError, RecursionError):
         raise LibraryError("storage-invalid") from None
     if not isinstance(document, dict) or document.keys() != set(keys):
@@ -330,6 +337,16 @@ def _storage(library, args, output):
 def main():
     args = sys.argv[1:]
     try:
+        if args == ["--intake-inspect"]:
+            request = _storage_request("root", unique=True)
+            _reply(sys.stdout, "ready", selection=desktop_intake.inspect(request["root"]))
+            return 0
+        if args == ["--intake-preview"]:
+            request = _storage_request("root", "identity", "references", unique=True)
+            _reply(sys.stdout, "ready", files=desktop_intake.preview(
+                request["root"], request["identity"], request["references"],
+            ))
+            return 0
         if len(args) == 2 and args[0] == "--upgrade-project":
             return _upgrade_project(args[1], sys.stdout)
         if args and args[0].startswith("--storage-"):

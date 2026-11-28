@@ -42,7 +42,7 @@ def validate_reference_sha256(value: object) -> str:
     return value
 
 
-def _references(document):
+def validate_references(document):
     if not isinstance(document, list) or not 1 <= len(document) <= MAX_FILE_CHECKS:
         raise LibraryError("storage-invalid")
     seen = set()
@@ -148,14 +148,19 @@ def _regular_file(root, path):
             os.close(descriptor)
 
 
-def _hash_file(descriptor, size):
-    digest = hashlib.sha256()
+def _file_chunks(descriptor, size):
     while size:
         chunk = os.read(descriptor, min(size, _CHUNK_BYTES))
         if not chunk:
             raise _ObservationError("unstable")
-        digest.update(chunk)
         size -= len(chunk)
+        yield chunk
+
+
+def _hash_file(descriptor, size):
+    digest = hashlib.sha256()
+    for chunk in _file_chunks(descriptor, size):
+        digest.update(chunk)
     return digest.hexdigest()
 
 
@@ -169,6 +174,52 @@ def _verify_file(root, path, expected):
     except (OSError, _ObservationError):
         pass
     raise _ObservationError("unstable")
+
+
+def preview_text_files(descriptor, selected, byte_budget):
+    """Read explicit files against one open root, then settle each successful name."""
+    files = []
+    observed = []
+    for path, previous in selected:
+        row = {"path": path.as_posix()}
+        files.append(row)
+        suffix = path.suffix.casefold()
+        if suffix not in {".txt", ".md", ".markdown", ".tex", ".lean"}:
+            row["status"] = "pdf_deferred" if suffix == ".pdf" else "unsupported"
+            continue
+        try:
+            with _regular_file(descriptor, path) as (file, info):
+                if info.st_size > byte_budget:
+                    raise _ObservationError("too_large")
+                byte_budget -= info.st_size
+                raw = b"".join(_file_chunks(file, info.st_size))
+                if os.read(file, 1) or _version(os.fstat(file)) != _version(info):
+                    raise _ObservationError("unstable")
+                digest = hashlib.sha256(raw).hexdigest()
+                if previous is not None and previous != digest:
+                    raise _ObservationError("changed")
+                text = raw.decode("utf-8")
+                if any((ord(ch) < 32 and ch not in "\t\r\n\v\f") or ch == "\x7f" for ch in text):
+                    raise _ObservationError("binary")
+                if not text.removeprefix("\ufeff").strip():
+                    raise _ObservationError("empty")
+            row.update(status="available", text=text, sha256=digest)
+            observed.append((path, info, row))
+        except UnicodeDecodeError:
+            row["status"] = "invalid_utf8"
+        except _ObservationError as error:
+            row["status"] = str(error)
+        except OSError as error:
+            row["status"] = {ENOENT: "missing", ENOTDIR: "unsupported", ELOOP: "unsupported"}.get(
+                error.errno, "inaccessible",
+            )
+    for path, info, row in observed:
+        try:
+            _verify_file(descriptor, path, info)
+        except _ObservationError:
+            row.clear()
+            row.update(path=path.as_posix(), status="unstable")
+    return files
 
 
 def _observe(root, path, previous, *, cached=None):
@@ -213,7 +264,7 @@ def _root_failure(status, cache):
 
 def check_references(root: Path, references: object, *, expected_identity: dict | None, cache: dict | None = None) -> dict:
     """Report verified digests, optionally reusing a monitor's in-memory observations."""
-    selected = _references(references)
+    selected = validate_references(references)
     try:
         with _source_directory(root) as descriptor:
             status = _descriptor_status(descriptor, expected_identity)
