@@ -173,7 +173,7 @@ def test_offer_authentication_immutability_and_concurrent_replay(project):
 
 def test_offer_exact_proof_note_and_retry_after_edit(project):
     with Store() as store:
-        claim = frozen_claim(store, "Offer note fixture", "True")
+        claim = frozen_claim(store, "Offer note fixture", "True ∧ True")
         node = "goal:" + claim
         saved = workbench_proof_drafts.save(store, UUID(claim), node, None, "  Private fixture note.  ")["draft"]
     direction = {key: val for key, val in DIRECTION.items() if key != "question"}
