@@ -106,7 +106,7 @@ Reference renders are in [images/desktop-status](images/desktop-status/).
 
 ## Preview selected sources before creating a project
 
-The native launcher has private one-shot commands for the future project intake screen. Where specified, a command accepts one UTF-8 JSON object on standard input (up to 64 KiB). Replies on standard output use version 1. Only the native caller receives the local path, directory identity and source provenance.
+The native launcher has private one-shot commands for the future project intake screen. Where specified, a command accepts one UTF-8 JSON object on standard input. The limit is 64 KiB, or 256 KiB for confirmation. Replies on standard output use version 1. Only the native caller receives the local path, directory identity and source provenance.
 
 | Launcher flag | JSON input | Ready reply |
 | --- | --- | --- |
@@ -114,6 +114,8 @@ The native launcher has private one-shot commands for the future project intake 
 | `--intake-preview` | The returned `root` and `identity`, plus `references` (an ordered list of objects with `path` and optional expected `sha256`) | `files` contains one result per requested relative path |
 | `--intake-models` | None | `models` lists eligible on-device Ollama model names |
 | `--intake-draft` | The inspected `root` and `identity`, the explicitly chosen `model`, and `references` with each selected `path` and its previously previewed `sha256` | `draft` contains an editable proposal with source evidence |
+| `--intake-confirm` | `operation_id` (canonical UUID), `mode` (`folder` or `paper`), the inspected `root` and `identity`, and the edited `draft` | `project` identifies the registered managed project |
+| `--intake-read PROJECT_ID` | None | `draft` is the saved proposal for that project |
 
 A non-null `workspace` names an existing workspace candidate at the selected folder or its legacy `Trellin` child. Use the normal reopen flow to validate the workspace. A null value allows text preview. Preview checks the selected directory identity and workspace markers again before returning. A root failure or malformed request returns a fixed error code and no files.
 
@@ -132,6 +134,14 @@ Use the preview digests for exactly the files the researcher chooses to include.
 The transient `draft` returns a suggested `title`, `question`, `sources`, `items` and `links`. Each item keeps its editable `label` separate from the exact `source.quote`, with the source's relative path, raw digest and physical `page` when applicable. Sources retain partial PDF coverage. A `suggested_dependency` link points from an item to its suggested prerequisite. Draft items and links are proposals for review. Generation does not create or update a project, store model transcripts or take a budget reservation from an open project.
 
 Model selection, completion or response validation can return `intake-model-unavailable`, `intake-model-failed` or `intake-model-output`. Review the input or choose another local model. Failure replies omit source passages and provider diagnostics.
+
+### Confirm the draft and reopen the project
+
+Send confirmation only after the researcher reviews and edits the proposal. The draft title must be a valid project name of at most 120 characters. The `paper` mode accepts one selected PDF and leaves its parent free for other paper projects. The `folder` mode associates the selected directory with the project. An association that already belongs to an existing project returns `workspace-occupied`. To reopen that existing project, use the normal folder flow.
+
+On the first confirmation, the launcher rechecks the selected source hashes and each item's exact quote at its recorded location. The accepted proposal is saved as `inputs/project-intake.json` before the project is published in the library. It travels with project backup and restore. The proposal preserves the edited labels and suggested dependencies for review. Only relative source paths appear inside this project input.
+
+Reuse the same operation UUID and request if the reply was interrupted. A completed retry returns the same registered project even after a source is edited or is offline. Reusing the UUID for different content returns `storage-stale`. For an interrupted publication, the launcher can recover from the app-owned reserved slot. An intentionally removed project is restored only through the existing reopen flow. Use the returned ID with the normal registered-project launcher and `--intake-read` to recover the accepted draft.
 
 ## Check a linked source through the launcher
 

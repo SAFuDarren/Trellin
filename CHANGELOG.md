@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.161
+
+- Confirm a source-checked proposal into a managed project, retain the accepted draft for reopening, and resume the same project on confirmation retry.
+
 ## 1.0.160
 
 - Generate a local project draft before creation, with source-grounded items and suggested dependencies.
