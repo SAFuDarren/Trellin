@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.157
+
+- Reduce idle shutdown waits in offline Workbench HTTP fixtures.
+
 ## 1.0.156
 
 - Batch Workbench Threads and Atlas database reads while preserving per-claim activity, notes and graph limits.
