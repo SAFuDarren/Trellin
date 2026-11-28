@@ -39,7 +39,7 @@ def _document(value):
     return json.dumps(value).encode()
 
 
-def _approved_statement(*, title=TITLE, sensitivity="restricted"):
+def _approved_statement(*, title=TITLE, sensitivity="restricted", premise=None):
     target = _document({
         "title": title,
         "domain": "lean-core",
@@ -49,7 +49,9 @@ def _approved_statement(*, title=TITLE, sensitivity="restricted"):
     })
     starting_basis = _document({"items": [{
         "kind": "hypothesis",
-        "natural": "The fixture assumes True." if sensitivity == "restricted" else "The public fixture uses True.",
+        "natural": premise or (
+            "The fixture assumes True." if sensitivity == "restricted" else "The public fixture uses True."
+        ),
         "formal": {"lean": {"proposition": "True"}},
     }]})
     with Store() as store:
