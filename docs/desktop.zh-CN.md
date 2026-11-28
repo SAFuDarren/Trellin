@@ -108,12 +108,14 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 ## 创建项目前预览选定资料
 
-原生启动器提供两条私有的一次性命令，供后续项目导入界面使用。每条命令从标准输入接收一个 UTF-8 JSON 对象，上限为 64 KiB，通过标准输出返回版本 1 的 JSON 响应。只有原生调用方接收本机路径、目录身份和预览文本。
+原生启动器提供私有的一次性命令，供后续项目导入界面使用。表中注明需要输入的命令从标准输入接收一个 UTF-8 JSON 对象，上限为 64 KiB。标准输出使用版本 1 的 JSON 响应。只有原生调用方接收本机路径、目录身份和原文出处。
 
 | 启动器参数 | JSON 输入 | 成功响应 |
 | --- | --- | --- |
 | `--intake-inspect` | `{"root":"<原生选择器选中的绝对目录>"}` | `selection` 包含规范化后的 `root`、本机目录 `identity` 和 `workspace` |
 | `--intake-preview` | 上一步返回的 `root` 和 `identity`，以及按选择顺序排列的 `references`，每项含 `path` 和可选的预期 `sha256` | `files` 按顺序返回各相对路径的结果 |
+| `--intake-models` | 无 | `models` 列出可在本机运行的 Ollama 模型名称 |
+| `--intake-draft` | 检查所得的 `root` 和 `identity`、明确选择的 `model`，以及每项均含 `path` 和预览所得 `sha256` 的 `references` | `draft` 返回带原文证据的可编辑草稿 |
 
 若 `workspace` 非空，所选目录本身或其旧版 `Trellin` 子目录含有工作区标记，调用方应走正常的重新打开流程核验工作区。空值表示可预览文本。预览返回前会再次核对目录身份和工作区标记。目录校验失败或请求格式有误时，只返回固定错误代码，省略文件列表。
 
@@ -123,7 +125,15 @@ macOS 应用使用包内的 PDFKit 辅助程序预览有文本层的 PDF。成�
 
 每次请求最多读取 16 MiB 的 PDF 原始字节，提取总时限为十秒。超过 128 页的 PDF 会单独提示。PDF 提取的文本与文本文件共享 18,000 字节限额。PDF 失败结果仅含 `path` 和固定 `status`，如扫描件的 `pdf_no_text`、`pdf_locked`、`pdf_invalid`、`pdf_page_limit`、`pdf_text_limit`、`pdf_timeout`，以及辅助程序无法使用时的 `pdf_unavailable`。材料无法读取时，可在现有导入流程粘贴选定文本或手动继续。
 
-文件系统和文本失败沿用 `unsupported`、`missing`、`inaccessible`、`too_large`、`invalid_utf8`、`binary`、`empty`、`changed` 或 `unstable` 状态。导入预览仅读取明确选择的资料，不扫描文件夹，不创建项目、更新库或调用模型。
+文件系统和文本失败沿用 `unsupported`、`missing`、`inaccessible`、`too_large`、`invalid_utf8`、`binary`、`empty`、`changed` 或 `unstable` 状态。资料检查和预览仅读取明确选择的资料，不调用模型。
+
+### 在本机生成草稿
+
+按用户确认的文件选择提交各份预览摘要。所选文件发生改动、读取不稳定、不可用或无法读取时，会在请求推理前停止。本机模型仅接收选中的段落文本和不透明标识符。路径、原始文件摘要和 PDF 物理页码留在私有启动器。模型发现和推理复用现有的本机 Ollama 选择流程。
+
+临时 `draft` 返回建议的 `title`、`question`、`sources`、`items` 和 `links`。每项的可编辑标题 `label` 与逐字出处 `source.quote` 分开，出处还记录文件相对路径、原始摘要和适用时的物理 `page`。来源保留 PDF 的部分预览范围。`suggested_dependency` 从图项指向建议的前置图项。草稿条目及关系供研究者审核。生成过程不创建或更新项目、不保存模型对话，也不占用已打开项目的预算。
+
+模型选择、推理或回复校验失败时，可返回 `intake-model-unavailable`、`intake-model-failed` 或 `intake-model-output`。可以检查输入或选择另一个本机模型。失败回复省略原文和模型服务诊断。
 
 ## 通过启动器核对已绑定的原目录
 

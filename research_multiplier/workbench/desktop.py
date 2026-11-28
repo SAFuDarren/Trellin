@@ -13,7 +13,7 @@ from research_multiplier.storage import credentials, paths
 from research_multiplier.storage.managed_workspaces import uuid_text, workspace_marker, workspace_registration
 from research_multiplier.storage.postgres import DatabaseOperationError
 
-from research_multiplier.workflows import desktop_intake, release_updates
+from research_multiplier.workflows import desktop_intake, desktop_intake_draft, release_updates, workbench_intake
 from research_multiplier.workflows.desktop_source_watch import SourceObserver
 from research_multiplier.workflows.desktop_library import Library, LibraryError
 from research_multiplier.workflows.desktop_workspace import (
@@ -346,6 +346,13 @@ def main():
             _reply(sys.stdout, "ready", files=desktop_intake.preview(
                 request["root"], request["identity"], request["references"],
             ))
+            return 0
+        if args == ["--intake-models"]:
+            _reply(sys.stdout, "ready", **workbench_intake.models())
+            return 0
+        if args == ["--intake-draft"]:
+            request = _storage_request("root", "identity", "references", "model", unique=True)
+            _reply(sys.stdout, "ready", draft=desktop_intake_draft.draft(**request))
             return 0
         if len(args) == 2 and args[0] == "--upgrade-project":
             return _upgrade_project(args[1], sys.stdout)

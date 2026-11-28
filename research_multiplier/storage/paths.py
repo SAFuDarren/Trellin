@@ -16,6 +16,7 @@ WORKSPACE_ID_FILE = ".research-multiplier-workspace-id"
 DATABASE_FILE = ".research-multiplier-database"
 LOCAL_USER_FILE = ".research-multiplier-local-user-id"
 _ACTIVE_WORKSPACE = ContextVar("research_multiplier_workspace", default=None)
+_NO_WORKSPACE = object()
 _STRICT_WORKSPACE = ContextVar("research_multiplier_strict_workspace", default=False)
 _PACKAGE_PARENT = Path(__file__).resolve().parents[2]
 WORKSPACE_DIRECTORIES = ("inputs", "runs", "objects", "exports", "backups", "evaluation", "lean-project")
@@ -98,6 +99,8 @@ def _workspace_above(location):
 
 def active_workspace():
     explicit = _ACTIVE_WORKSPACE.get()
+    if explicit is _NO_WORKSPACE:
+        return None
     if explicit is not None:
         return explicit
     configured = os.environ.get("RM_DATA_ROOT")
@@ -107,6 +110,16 @@ def active_workspace():
             return workspace_details(root)
         return None
     return _workspace_above(Path.cwd())
+
+
+@contextmanager
+def without_workspace():
+    """Suppress explicit, environment and cwd workspace discovery for a transient operation."""
+    token = _ACTIVE_WORKSPACE.set(_NO_WORKSPACE)
+    try:
+        yield
+    finally:
+        _ACTIVE_WORKSPACE.reset(token)
 
 
 def strict_workspace():
