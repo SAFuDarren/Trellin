@@ -267,8 +267,7 @@ def _unique_request_keys(pairs):
     return result
 
 
-def _storage_request(*keys, unique=False):
-    limit = 64 * 1024
+def _storage_request(*keys, unique=False, limit=64 * 1024):
     try:
         raw = sys.stdin.buffer.read(limit + 1)
         if len(raw) > limit:
@@ -353,6 +352,14 @@ def main():
         if args == ["--intake-draft"]:
             request = _storage_request("root", "identity", "references", "model", unique=True)
             _reply(sys.stdout, "ready", draft=desktop_intake_draft.draft(**request))
+            return 0
+        if args == ["--intake-confirm"]:
+            request = _storage_request("operation_id", "mode", "root", "identity", "draft",
+                                       unique=True, limit=256 * 1024)
+            _reply(sys.stdout, "ready", project=Library().confirm_intake(**request))
+            return 0
+        if len(args) == 2 and args[0] == "--intake-read":
+            _reply(sys.stdout, "ready", draft=Library().read_intake(args[1]))
             return 0
         if len(args) == 2 and args[0] == "--upgrade-project":
             return _upgrade_project(args[1], sys.stdout)

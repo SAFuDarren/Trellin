@@ -7,6 +7,7 @@ import sys
 import unicodedata
 
 from research_multiplier.storage import credentials, migrate, paths, project_archive
+from research_multiplier.storage.managed_workspaces import LibraryError
 from research_multiplier.workflows import agent_guide, workbench_research_issues
 from research_multiplier.workflows.setup import Setup
 
@@ -153,7 +154,7 @@ def _local_endpoint():
     return socket, int(port)
 
 
-def create_workspace(location, *, minimal=False):
+def create_workspace(location, *, minimal=False, before_commit=None):
     """Provision and bind a new leaf directory, leaving an existing project untouched."""
     try:
         destination = _new_destination(location)
@@ -197,7 +198,16 @@ def create_workspace(location, *, minimal=False):
                 with paths.use_workspace(destination, strict=True):
                     os.environ.update(values)
                     bind_workspace(destination)
+                if before_commit is not None:
+                    try:
+                        before_commit()
+                    except LibraryError as error:
+                        # Propagate the fixed intake rejection through the provisioning
+                        # rollback while database and logins are still owned by this attempt.
+                        raise WorkspaceCreationError(error.code) from None
                 credentials.write(workspace_id, values)
+        except WorkspaceCreationError:
+            raise
         except Exception:
             # Keep an incomplete folder intact. A subsequent Create must use a
             # different destination, and startup still requires a valid binding.

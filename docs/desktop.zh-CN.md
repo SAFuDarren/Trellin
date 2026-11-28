@@ -108,7 +108,7 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 
 ## 创建项目前预览选定资料
 
-原生启动器提供私有的一次性命令，供后续项目导入界面使用。表中注明需要输入的命令从标准输入接收一个 UTF-8 JSON 对象，上限为 64 KiB。标准输出使用版本 1 的 JSON 响应。只有原生调用方接收本机路径、目录身份和原文出处。
+原生启动器提供私有的一次性命令，供后续项目导入界面使用。表中注明需要输入的命令从标准输入接收一个 UTF-8 JSON 对象。一般上限为 64 KiB，确认请求上限为 256 KiB。标准输出使用版本 1 的 JSON 响应。只有原生调用方接收本机路径、目录身份和原文出处。
 
 | 启动器参数 | JSON 输入 | 成功响应 |
 | --- | --- | --- |
@@ -116,6 +116,8 @@ desktop/macos/tests/render-status-screens.sh /absolute/path/to/renders zh-Hans
 | `--intake-preview` | 上一步返回的 `root` 和 `identity`，以及按选择顺序排列的 `references`，每项含 `path` 和可选的预期 `sha256` | `files` 按顺序返回各相对路径的结果 |
 | `--intake-models` | 无 | `models` 列出可在本机运行的 Ollama 模型名称 |
 | `--intake-draft` | 检查所得的 `root` 和 `identity`、明确选择的 `model`，以及每项均含 `path` 和预览所得 `sha256` 的 `references` | `draft` 返回带原文证据的可编辑草稿 |
+| `--intake-confirm` | `operation_id`（规范 UUID）、`mode`（`folder` 或 `paper`）、检查所得的 `root` 和 `identity`，以及编辑后的 `draft` | `project` 标识已登记的托管项目 |
+| `--intake-read PROJECT_ID` | 无 | `draft` 是项目中已保存的草稿 |
 
 若 `workspace` 非空，所选目录本身或其旧版 `Trellin` 子目录含有工作区标记，调用方应走正常的重新打开流程核验工作区。空值表示可预览文本。预览返回前会再次核对目录身份和工作区标记。目录校验失败或请求格式有误时，只返回固定错误代码，省略文件列表。
 
@@ -134,6 +136,14 @@ macOS 应用使用包内的 PDFKit 辅助程序预览有文本层的 PDF。成�
 临时 `draft` 返回建议的 `title`、`question`、`sources`、`items` 和 `links`。每项的可编辑标题 `label` 与逐字出处 `source.quote` 分开，出处还记录文件相对路径、原始摘要和适用时的物理 `page`。来源保留 PDF 的部分预览范围。`suggested_dependency` 从图项指向建议的前置图项。草稿条目及关系供研究者审核。生成过程不创建或更新项目、不保存模型对话，也不占用已打开项目的预算。
 
 模型选择、推理或回复校验失败时，可返回 `intake-model-unavailable`、`intake-model-failed` 或 `intake-model-output`。可以检查输入或选择另一个本机模型。失败回复省略原文和模型服务诊断。
+
+### 确认草稿并重新打开项目
+
+研究者审核和编辑草稿后再提交确认。草稿标题用作项目名，上限为 120 字符。`paper` 模式接收一篇选定的 PDF，同一目录仍可建其他论文项目。`folder` 模式将所选目录关联到项目。目录已被其他项目关联时返回 `workspace-occupied`，可从现有的目录打开流程重开该项目。
+
+首次确认时，启动器重新核对选定文件的摘要，以及每条原文是否仍在记录的位置。确认后的草图在项目登记前保存到 `inputs/project-intake.json`，项目备份与恢复会带上这份输入。草图保留编辑后的标题和建议依赖关系，供后续审核。项目输入中的来源路径使用相对路径。
+
+答复中断时，用同一个操作 UUID 和原请求重试。已确认的操作仍返回同一项目，包括在来源被编辑或离线之后。同一 UUID 提交不同内容会返回 `storage-stale`。登记过程中断时，启动器可从应用管理的预留槽位恢复。主动移出列表的项目由现有重开流程处理。通过返回的 ID，可以打开已登记项目并用 `--intake-read` 读回确认的草图。
 
 ## 通过启动器核对已绑定的原目录
 

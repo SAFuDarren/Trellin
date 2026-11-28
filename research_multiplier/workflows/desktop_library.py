@@ -12,11 +12,11 @@ from uuid import uuid4
 from research_multiplier.protocol.serialization import fingerprint
 from research_multiplier.storage import credentials, paths
 from research_multiplier.storage.managed_workspaces import (
-    LibraryError, LOCATION_FILE, MANAGED_FILE, application_home, canonical_path, library_lock, library_root,
+    LibraryError, LOCATION_FILE, MANAGED_FILE, _stored_source_identity, application_home, canonical_path, library_lock, library_root,
     publish_metadata, read_metadata, stored_absolute_path, uuid_text, workspace_marker, workspace_registration,
 )
 from research_multiplier.storage.project_archive import _fingerprint
-from research_multiplier.workflows import desktop_references
+from research_multiplier.workflows import desktop_intake_confirm as intake_confirm, desktop_references
 from research_multiplier.workflows.desktop_source import check_references, source_identity, source_status
 from research_multiplier.workflows.desktop_workspace import WorkspaceCreationError, create_workspace, inspect_folder
 
@@ -318,7 +318,11 @@ class Library:
             discovered.append((entry.lstat().st_mtime_ns, marker["slot"], marker, identifier, database))
 
         default_item = None
-        default_candidates = [item for item in discovered if item[2]["source_root"] is None]
+        # A paper project intentionally has no linked folder. It is always a named
+        # intake, including when a registry is rebuilt before the first default exists.
+        default_candidates = [item for item in discovered if item[2]["source_root"] is None
+                              and (item[2]["default"] or not (root / "Workspaces" / item[1] /
+                                                              "inputs" / "project-intake.json").exists())]
         if default_candidates:
             flagged = [item for item in default_candidates if item[2]["default"]]
             if flagged:
@@ -615,6 +619,108 @@ class Library:
             root, data = self._state(initialize=True, repair=True)
             return self._create(root, data, name, str(uuid4()))
 
+    def confirm_intake(self, *, operation_id, mode, root, identity, draft):
+        operation_id = uuid_text(operation_id)
+        source = stored_absolute_path(root)
+        identity = _stored_source_identity(identity)
+        request_hash = intake_confirm.digest({"mode": mode, "root": root, "identity": identity, "draft": draft})
+        _separate_source(source, self.anchor)
+        with self._locked():
+            library = library_root(self.anchor)
+            receipt = library / f".trellin-intake-{operation_id}.json"
+            slot = intake_confirm.reserved_slot(receipt, request_hash, mode, source, identity)
+            if slot is None:
+                _separate_source(source, library)
+            library, state = self._state(initialize=True, repair=True)
+            if slot and slot in self._removed(library):
+                raise LibraryError("storage-project")
+            row = next((row for row in state["projects"] if slot and row.get("slot") == slot), None)
+            if row is not None:
+                workspace = self._registered_path(library, row)
+                _directory(workspace)
+                stored = intake_confirm.stored(workspace)
+                if stored is None or intake_confirm.digest(stored) != intake_confirm.digest(draft):
+                    raise LibraryError("storage-verification")
+                return self._project(library, row)
+
+            pins = intake_confirm.references(draft, mode)
+            name = _name(draft["title"])
+            if mode == "folder" and any(marker["slot"] != slot for _, marker in self._source_matches(library, source)):
+                raise LibraryError("workspace-occupied")
+            workspace = library / "Workspaces" / slot if slot else None
+            stored = marker = None
+            if workspace is not None and (workspace.exists() or workspace.is_symlink()):
+                _directory(workspace)
+                stored = intake_confirm.stored(workspace)
+                marker = workspace_marker(workspace)
+                if stored is not None and intake_confirm.digest(stored) != intake_confirm.digest(draft):
+                    raise LibraryError("storage-verification")
+                if marker is not None and (stored is None or marker["anchor"] != self.anchor or marker["slot"] != slot
+                                           or marker["name"] != name or marker["default"]
+                                           or marker["source_root"] != (source if mode == "folder" else None)
+                                           or marker["source_identity"] != (identity if mode == "folder" else None)):
+                    raise LibraryError("storage-verification")
+                if not self._provisioned_intake(workspace):
+                    if stored is not None:
+                        raise LibraryError("storage-database")
+                    # An interrupted provisioning may have created a directory or database.
+                    # Leave it intact; only an unused slot can be provisioned again.
+                    slot = None
+            if stored is None:
+                # Only accepted proposals can replay when the library moved beside their source.
+                _separate_source(source, library)
+                intake_confirm.verify(source, identity, draft, pins)
+            if slot is None:
+                slot = intake_confirm.reserve(receipt, request_hash, mode, source, identity)
+                workspace = library / "Workspaces" / slot
+            creating = not workspace.exists()
+            if creating:
+                try:
+                    create_workspace(workspace, minimal=True,
+                                     before_commit=lambda: intake_confirm.settle(source, identity, pins))
+                except WorkspaceCreationError as error:
+                    raise LibraryError(str(error)) from None
+            identifier, database = _project_markers(workspace)
+            row = {"id": identifier, "database": database, "slot": slot, "name": name}
+            if any(item["id"] == identifier for item in state["projects"]):
+                raise LibraryError("storage-verification")
+            if not creating:
+                _check_binding(workspace, row)
+                if stored is None:
+                    intake_confirm.settle(source, identity, pins)
+            if stored is None:
+                intake_confirm.publish(workspace, draft)
+            if marker is None:
+                binding = _new_source_binding(source, identity) if mode == "folder" else None
+                self._write_managed_marker(workspace, slot, name, binding=binding)
+            state["projects"].append(row)
+            publish_metadata(library / _REGISTRY, state)
+            return self._project(library, row)
+
+    @staticmethod
+    def _provisioned_intake(workspace):
+        try:
+            identifier, _ = _project_markers(workspace)
+        except LibraryError:
+            return False
+        try:
+            saved = credentials.read(identifier)
+        except (OSError, ValueError):
+            raise LibraryError("storage-database") from None
+        return saved is not None and all(saved.get(key) for key in credentials.KEYS)
+
+    def read_intake(self, identifier):
+        with self._reading_state() as (root, state):
+            row = self._project_row(state, uuid_text(identifier))
+            if "slot" not in row:
+                raise LibraryError("storage-project")
+            workspace = self._registered_path(root, row)
+            _directory(workspace)
+            draft = intake_confirm.stored(workspace)
+            if draft is None:
+                raise LibraryError("storage-project")
+            return draft
+
     def open_folder(self, location):
         """Open a known workspace or bind an ordinary directory to an app-owned one."""
         source, existing = inspect_folder(location)
@@ -782,13 +888,18 @@ class Library:
             _check_binding(workspace, row)
         return workspace
 
-    def resolve_project(self, identifier, *, verify_database=False):
+    @contextmanager
+    def _reading_state(self):
         with self._locked(exclusive=False):
             root = library_root(self.anchor, required=True)
             if (root / _REGISTRY).exists():
-                return self._resolve_in_state(root, self._read(root), identifier, verify_database=verify_database)
+                yield root, self._read(root)
+                return
         with self._locked():
-            root, data = self._state(repair=True)
+            yield self._state(repair=True)
+
+    def resolve_project(self, identifier, *, verify_database=False):
+        with self._reading_state() as (root, data):
             return self._resolve_in_state(root, data, identifier, verify_database=verify_database)
 
     def _managed_row(self, data, workspace, registration):
