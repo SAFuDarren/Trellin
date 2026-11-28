@@ -23,14 +23,24 @@ from research_multiplier.workflows import release_updates, workbench_agent_work,
 pytestmark = pytest.mark.offline
 
 
+@contextmanager
+def _serve(instance):
+    thread = threading.Thread(
+        target=instance.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True,
+    )
+    thread.start()
+    try:
+        yield
+    finally:
+        instance.shutdown()
+        thread.join(timeout=2)
+        assert not thread.is_alive(), "Workbench fixture server did not stop"
+
+
 @pytest.fixture
 def server(tmp_path):
-    instance = WorkbenchServer(tmp_path, port=0)
-    thread = threading.Thread(target=instance.serve_forever, daemon=True)
-    thread.start()
-    yield instance
-    instance.shutdown()
-    instance.server_close()
+    with WorkbenchServer(tmp_path, port=0) as instance, _serve(instance):
+        yield instance
 
 
 @pytest.fixture
@@ -193,13 +203,8 @@ def request(server, method, path, *, body=None, headers=None, session=True, orig
 def _profile_server(workspace, connections):
     with WorkbenchServer(workspace, port=0) as instance:
         instance.connections = SimpleNamespace(list=lambda: list(connections))
-        thread = threading.Thread(target=instance.serve_forever, daemon=True)
-        thread.start()
-        try:
+        with _serve(instance):
             yield instance
-        finally:
-            instance.shutdown()
-            thread.join()
 
 
 def test_team_agent_settings_are_scoped_to_the_local_project(tmp_path, monkeypatch):
