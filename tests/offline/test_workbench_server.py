@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext
+from datetime import datetime, timezone
 import http.client
 from importlib.resources import files
 import json
@@ -692,6 +693,107 @@ def test_versioned_research_issue_preview_uses_only_current_workspace_and_note(
     assert response.status == 403 and json.loads(raw)["error"]["code"] == "research_issue.identity_required"
     log = capsys.readouterr().err
     assert "Synthetic" not in log and str(claim) not in log and str(store.workspace_id) not in log
+
+
+def test_versioned_research_offers_validate_and_project_trusted_source(agent_work_polling, capsys):
+    server, store = agent_work_polling
+    store.workspace_id = uuid4()
+    store.local_user = lambda: {"id": uuid4()}
+    workspace, offer, reference = str(store.workspace_id), str(uuid4()), str(uuid4())
+    template = "/api/v1/workspaces/{workspace_id}/research-issues"
+    endpoint = template.format(workspace_id=workspace)
+    digest = "a" * 64
+    offers = {}
+    reads = []
+    transactions = []
+    report = {
+        "source_id": workspace, "revision": str(uuid4()), "status": "available",
+        "files": [{"reference_id": reference, "status": "unchanged", "sha256": digest}],
+    }
+
+    def query(role, statement, *args):
+        assert role == "human"
+        if "to_regprocedure" in statement:
+            return [{"installed": True}]
+        if "pg_advisory_xact_lock" in statement:
+            return []
+        if "rm.offer_research_issue" in statement:
+            identifier, direction, inputs = args[1:]
+            offers[identifier] = {
+                "id": identifier, "direction": direction, "inputs": inputs,
+                "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
+            }
+            return []
+        assert "rm.read_research_offers" in statement
+        identifier = args[1]
+        return [offers[identifier]] if identifier in offers else list(offers.values()) if identifier is None else []
+
+    def transaction(role, action, *, read_only=False):
+        assert role == "human"
+        transactions.append(read_only)
+        return action()
+
+    def verified_inputs(reference_ids):
+        reads.append(reference_ids)
+        return report
+
+    store.query, store.transaction, store.json = query, transaction, lambda value: value
+    observer = SimpleNamespace(verified_inputs=verified_inputs, current_snapshot=lambda: report)
+    server.source_observer = observer
+    document = {
+        "direction": {"title": "Synthetic direction", "question": "Which input changed?", "deliverable": "A result.",
+                      "acceptance_criteria": "Cite the fixture.", "required_capabilities": ["file.read"]},
+        "inputs": [{"reference_id": reference, "sha256": digest}],
+    }
+    headers = {"Idempotency-Key": offer}
+    for path, body, options, status, code in (
+        (endpoint, document, {}, 400, "research_issue.invalid"),
+        (endpoint, document, {"headers": {"Idempotency-Key": offer.upper()}}, 400, "research_issue.invalid"),
+        (endpoint, {**document, "observations": report}, {"headers": headers}, 400, "research_issue.invalid"),
+        (endpoint, document, {"headers": headers, "session": False}, 401, "request.unauthenticated"),
+        (endpoint, document, {"headers": headers, "origin": False}, 403, "request.forbidden"),
+        (template.format(workspace_id=uuid4()), document, {"headers": headers}, 404, "research_issue.not_found"),
+    ):
+        response, data = request(server, "POST", path, body=body, **options)
+        assert (response.status, json.loads(data)["error"]["code"]) == (status, code)
+    assert not reads and not offers
+
+    response, raw = request(server, "POST", endpoint, body=document, headers=headers)
+    assert response.status == 201
+    saved = json.loads(raw)
+    assert saved["issue"]["id"] == offer
+    assert saved["issue"]["inputs"] == [{"source_id": workspace, **document["inputs"][0]}]
+    report["files"][0].update(status="changed", sha256="b" * 64)
+    response, replay = request(server, "POST", endpoint, body=document, headers=headers)
+    assert response.status == 201 and json.loads(replay) == saved
+    response, raw = request(server, "POST", endpoint, body={**document, "inputs": []}, headers=headers)
+    assert response.status == 409 and json.loads(raw)["error"]["code"] == "idempotency.conflict"
+    assert reads == [[reference]]
+
+    response, raw = request(server, "GET", endpoint)
+    assert response.status == 200
+    projected = json.loads(raw)
+    assert projected == {"items": [{**saved["issue"], "input_status": "needs_recheck"}], "next_cursor": None}
+    observer.current_snapshot = lambda: None
+    response, raw = request(server, "GET", endpoint)
+    assert response.status == 200 and json.loads(raw)["items"][0]["input_status"] == "source_unavailable"
+    response, raw = request(server, "GET", endpoint + "?page=2")
+    assert response.status == 400 and json.loads(raw)["error"]["code"] == "research_issue.invalid_query"
+    response, raw = request(server, "GET", template.format(workspace_id=uuid4()))
+    assert response.status == 404 and json.loads(raw)["error"]["code"] == "research_issue.not_found"
+    assert transactions.count(True) == 3
+
+    openapi = json.loads(files("research_multiplier").joinpath("schemas/workbench.openapi.json").read_text())
+    operation = "#/paths/~1api~1v1~1workspaces~1{workspace_id}~1research-issues"
+    for pointer, value in (
+        ("/post/requestBody", document),
+        ("/post/responses/201", saved),
+        ("/get/responses/200", projected),
+    ):
+        schema = {"paths": openapi["paths"], "$ref": operation + pointer + "/content/application~1json/schema"}
+        Draft202012Validator(schema, format_checker=FormatChecker()).validate(value)
+    log = capsys.readouterr().err
+    assert "Synthetic" not in log and all(token not in log for token in (workspace, offer, reference, digest))
 
 
 def test_versioned_claim_graph_matches_legacy_and_checks_scope(agent_work_polling, monkeypatch, capsys):

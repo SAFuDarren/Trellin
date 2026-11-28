@@ -164,6 +164,10 @@ v1 草案，P1.2 完成时转为稳定。P1.2 生成的 OpenAPI 文档必须遵�
 
 `POST /api/v1/workspaces/{workspace_id}/research-issues/preview` 在 `{draft}` 中返回只读的工作议题草案。请求体包含 `title`、`deliverable`、`acceptance_criteria` 和 `required_capabilities`。问题可来自 `question`（可附已冻结的 `claim_id`），也可来自带 `claim_id`、`node_id` 和 `draft_revision` 的 `proof_note`。证明笔记按绑定研究者和指定版本读取。响应包含问题、排序后的唯一能力 ID 和适用的命题及笔记引用。接口要求本地会话、启动器来源和已绑定的工作区身份。找不到来源时返回 `research_issue.not_found`（404），笔记已编辑时返回 `research_issue.stale`（409）。预览不写入记录、不调用模型供应商，也不启动 worker。
 
+`POST /api/v1/workspaces/{workspace_id}/research-issues` 显式保存不可变的 Work 议题。`direction` 沿用预览请求格式。可选的 `inputs` 包含已登记引用的 `reference_id` 和预期 `sha256`。新议题会核验当前绑定来源中的文件摘要。相同的正文和 `Idempotency-Key` 返回原议题。该操作不会请求模型或授予执行权限。本机工作台核验文件身份与内容，PostgreSQL 约束作者和工作区并保存凭据。请通过工作台核验和提交文件版本。创建和列表接口要求 0085 版数据库，已有项目可通过「备份并升级」启用。
+
+认证后的 `GET /api/v1/workspaces/{workspace_id}/research-issues` 在 `items` 返回已绑定研究者最近 100 条议题，`next_cursor` 为 `null`。每条议题的 `input_status` 为 `ready`、文件确认变化或缺失后的 `needs_recheck`，或者当前无法观测时的 `source_unavailable`。比对以各议题保存的输入摘要为准，只读取当前观察状态，保留原议题和历史审核。
+
 ### 耗时操作
 
 预计超过一秒左右的操作返回 `202 Accepted` 和一个任务资源：`{"job": {"id": "…", "state": "queued"}}`。客户端通过事件或 `GET …/jobs/{id}` 跟进度。

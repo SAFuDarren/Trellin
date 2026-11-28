@@ -6,11 +6,11 @@ import sys
 import unicodedata
 
 from research_multiplier.storage import credentials, migrate, paths, project_archive
-from research_multiplier.workflows import agent_guide, workbench_agent_work
+from research_multiplier.workflows import agent_guide, workbench_research_issues
 from research_multiplier.workflows.setup import Setup
 
 
-_WORKBENCH_REVISION = "0084"
+_WORKBENCH_REVISION = "0085"
 _UPGRADABLE_REVISIONS = frozenset(f"{revision:04d}" for revision in range(70, int(_WORKBENCH_REVISION)))
 
 
@@ -28,7 +28,7 @@ def _upgrade_status(dsn, workspace):
     from research_multiplier.storage.postgres import Store
 
     with Store() as store:
-        installed = workbench_agent_work.installed(store)
+        installed = workbench_research_issues.installed(store)
     expected = paths.database_id(workspace), paths.workspace_id(workspace)
     with psycopg.connect(dsn, connect_timeout=5, options="-c default_transaction_read_only=on -c statement_timeout=10000") as connection:
         state = connection.execute("""

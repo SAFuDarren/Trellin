@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.155
+
+- Save private research Work offers with verified linked-file digests. The local Work API reports when a recorded input needs recheck and preserves prior offers and reviews. Existing projects can enable this with Back up and upgrade to database revision 0085.
+
 ## 1.0.154
 
 - Observe registered linked-file references during a native desktop session and recheck their current contents after reopening. Expose the current local observation to the authenticated workbench.

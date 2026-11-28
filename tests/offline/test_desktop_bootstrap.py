@@ -290,6 +290,7 @@ def test_linked_source_observation_tracks_native_session_and_recovers_closed_edi
     opened = set()
     observed = Event()
     stopped = SimpleQueue()
+    observers = []
 
     def record_digest(descriptor, size):
         digest = hash_file(descriptor, size)
@@ -302,6 +303,7 @@ def test_linked_source_observation_tracks_native_session_and_recovers_closed_edi
         return open_file(root, path)
 
     def record_observer_stop(observer):
+        observers.append(observer)
         try:
             run_observer(observer)
         finally:
@@ -331,16 +333,18 @@ def test_linked_source_observation_tracks_native_session_and_recovers_closed_edi
     with _desktop_http_session(project) as (port, session):
         assert _request(port, _SOURCE_OBSERVATIONS)[0] == 403
         baseline = observed_file(port, session, "unchanged", initial)
+        assert observers[-1].current_snapshot() == baseline
+        assert observers[-1].verified_inputs([tracked["id"]])["files"][0]["sha256"] == expected_digest
         notes.write_bytes(b"An unrelated change")
         observed.clear()
         assert observed.wait(5), "The active observer did not run after an unrelated edit."
         assert observed_file(port, session, "unchanged", initial) == baseline
-        assert digests == [initial_inode]
+        assert digests == [initial_inode, initial_inode]
         atomically_save(changed)
         saved_inode = paper.stat().st_ino
         update = observed_file(port, session, "changed", changed)
         assert update["generation"] > baseline["generation"]
-        assert digests == [initial_inode, saved_inode]
+        assert digests == [initial_inode, initial_inode, saved_inode]
         assert sorted(entry.name for entry in source.iterdir()) == [paper.name, notes.name]
         assert paper.read_bytes() == changed and paper.stat().st_mode & 0o777 == 0o640
         assert notes.read_bytes() == b"An unrelated change"
@@ -348,10 +352,11 @@ def test_linked_source_observation_tracks_native_session_and_recovers_closed_edi
         displaced = source.rename(tmp_path / "displaced")
         source.mkdir()
         paper.write_bytes(b"Another project at the old address")
+        assert observers[-1].current_snapshot() is None
         blocked = _wait_for_source_observation(port, session, lambda reply: reply["status"] == "identity_changed")
         assert blocked["generation"] > update["generation"]
         assert blocked["files"] == []
-        assert digests == [initial_inode, saved_inode]
+        assert digests == [initial_inode, initial_inode, saved_inode]
         assert paper.read_bytes() == b"Another project at the old address"
 
     first_observer = stopped.get(timeout=2)
@@ -360,10 +365,11 @@ def test_linked_source_observation_tracks_native_session_and_recovers_closed_edi
     saved_offline = b"Saved while the workbench was closed"
     atomically_save(saved_offline)
     offline_inode = paper.stat().st_ino
-    assert digests == [initial_inode, saved_inode]
+    assert digests == [initial_inode, initial_inode, saved_inode]
     with _desktop_http_session(project) as (port, session):
-        observed_file(port, session, "changed", saved_offline)
-        assert digests == [initial_inode, saved_inode, offline_inode]
+        resumed = observed_file(port, session, "changed", saved_offline)
+        assert observers[-1].current_snapshot() == resumed
+        assert digests == [initial_inode, initial_inode, saved_inode, offline_inode]
     assert stopped.get(timeout=2) is not first_observer
     assert opened == {(approved_root_inode, paper.name)}
     assert observation_library.list_source_references(str(project))["references"] == [tracked]
@@ -562,7 +568,7 @@ def test_project_upgrade_does_not_run_migration_without_a_verified_backup(
 
     monkeypatch.setattr(desktop_workspace, "_upgrade_status", status)
     monkeypatch.setattr(desktop_workspace.migrate, "migration_url", lambda dsn: dsn)
-    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0084")
+    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0085")
     monkeypatch.setattr(desktop_workspace.migrate, "upgrade", migration)
     monkeypatch.setattr(desktop_workspace.project_archive, "backup", lambda: {"directory": "/fixture/archive"})
     monkeypatch.setattr(desktop_workspace.project_archive, fails_at, backup_failure)
@@ -573,22 +579,22 @@ def test_project_upgrade_does_not_run_migration_without_a_verified_backup(
     assert json.loads(captured.out) == {"version": 1, "status": "error", "code": "upgrade-backup"}
 
 
-def test_project_upgrade_from_proof_drafts_adds_agent_work_after_backup(monkeypatch, bound_workspace):
+def test_project_upgrade_from_agent_work_adds_offers_after_backup(monkeypatch, bound_workspace):
     owner = "postgresql://selected/fixture"
     monkeypatch.setenv("RM_MIGRATION_DSN", owner)
-    states = iter([("0082", False), ("0084", True)])
+    states = iter([("0084", False), ("0085", True)])
     monkeypatch.setattr(desktop_workspace, "_upgrade_status", lambda *_: next(states))
     monkeypatch.setattr(desktop_workspace.migrate, "migration_url", lambda dsn: dsn)
-    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0084")
+    monkeypatch.setattr(desktop_workspace.migrate, "migration_head", lambda: "0085")
     steps = []
 
     def verify(archive):
         assert archive == "/fixture/archive"
         steps.append("verified")
-        return {"schema_revision": "0082", "database_id": str(paths.database_id(bound_workspace))}
+        return {"schema_revision": "0084", "database_id": str(paths.database_id(bound_workspace))}
 
     def migrate(dsn, target):
-        assert (dsn, target) == (owner, "0084")
+        assert (dsn, target) == (owner, "0085")
         steps.append("upgraded")
 
     monkeypatch.setattr(desktop_workspace.project_archive, "backup", lambda: {"directory": "/fixture/archive"})
