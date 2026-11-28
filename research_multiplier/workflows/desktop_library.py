@@ -724,6 +724,11 @@ class Library:
             report = desktop_references.check_tracked_references(workspace, binding, reference_ids)
             return {"source_id": project_id, "revision": _source_revision(project_id, binding), **report}
 
+    def observe_source_references(self, identifier, sample):
+        """Sample the current source and locator catalog under one short read lease."""
+        with self._lease_linked_source(identifier) as (workspace, project_id, binding):
+            sample(_source_revision(project_id, binding), binding, desktop_references.list_references(workspace))
+
     def repair_source_reference(self, identifier, reference_id, path, *, expected_revision, expected_reference_revision):
         with self._lease_linked_source(identifier, exclusive=True) as (workspace, project_id, binding):
             revision = _require_source_revision(project_id, binding, expected_revision)

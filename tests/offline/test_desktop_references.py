@@ -263,12 +263,12 @@ def test_repair_rechecks_candidate_after_observing_missing_original(linked, monk
     candidate = original.rename(root / "candidate")
     observe = desktop_source._observe
 
-    def save_during_batch(descriptor, path, previous):
+    def save_during_batch(descriptor, path, previous, *, cached=None):
         if path.name == "original":
             replacement = root / "editor-save"
             replacement.write_bytes(b"replacement")
             replacement.replace(candidate)
-        return observe(descriptor, path, previous)
+        return observe(descriptor, path, previous, cached=cached)
 
     monkeypatch.setattr(desktop_source, "_observe", save_during_batch)
     with pytest.raises(LibraryError, match="storage-verification"):

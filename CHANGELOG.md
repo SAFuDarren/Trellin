@@ -1,5 +1,9 @@
 # Changes
 
+## 1.0.154
+
+- Observe registered linked-file references during a native desktop session and recheck their current contents after reopening. Expose the current local observation to the authenticated workbench.
+
 ## 1.0.153
 
 - Track selected linked-source references locally. Check external changes after reopening and repair missing paths to an explicitly chosen file matching the recorded hash.

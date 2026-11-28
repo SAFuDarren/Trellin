@@ -253,3 +253,137 @@ def test_source_gate_blocks_file_open_without_matching_identity(tmp_path, monkey
     assert desktop_source.check_references(root, [{"path": "draft.txt"}], expected_identity=identity) == {
         "status": status, "files": [],
     }
+
+
+def test_monitor_digest_cache_reuses_only_the_same_file_version(tmp_path, monkeypatch):
+    root = tmp_path.resolve()
+    file = root / "draft.txt"
+    file.write_bytes(b"first")
+    identity = desktop_source.source_identity(root)
+    cache = {}
+    reads = []
+    read = os.read
+
+    def record_read(descriptor, size):
+        reads.append(size)
+        return read(descriptor, size)
+
+    monkeypatch.setattr(desktop_source.os, "read", record_read)
+    first = sha256(b"first").hexdigest()
+    selected = [{"path": file.name, "sha256": first}]
+    assert desktop_source.check_references(root, selected, expected_identity=identity, cache=cache)["files"] == [
+        {"path": file.name, "status": "unchanged", "sha256": first},
+    ]
+    assert reads == [5]
+    assert cache[file.name][1] == first
+
+    assert desktop_source.check_references(root, selected, expected_identity=identity, cache=cache)["files"][0] == {
+        "path": file.name, "status": "unchanged", "sha256": first,
+    }
+    assert reads == [5]
+
+    info = file.stat()
+    os.utime(file, ns=(info.st_atime_ns, info.st_mtime_ns + 2_000_000_000))
+    assert desktop_source.check_references(root, selected, expected_identity=identity, cache=cache)["files"][0] == {
+        "path": file.name, "status": "unchanged", "sha256": first,
+    }
+    assert reads == [5, 5]
+
+    replacement = root / "editor-save"
+    replacement.write_bytes(b"other")
+    info = file.stat()
+    os.utime(replacement, ns=(info.st_atime_ns, info.st_mtime_ns))
+    replacement.replace(file)
+    changed = sha256(b"other").hexdigest()
+    assert desktop_source.check_references(root, selected, expected_identity=identity, cache=cache)["files"][0] == {
+        "path": file.name, "status": "changed", "sha256": changed,
+    }
+    assert reads == [5, 5, 5]
+    assert cache[file.name][1] == changed
+
+    # Explicit verification never reuses the monitor's observations.
+    assert desktop_source.check_references(root, selected, expected_identity=identity)["files"][0]["sha256"] == changed
+    assert reads == [5, 5, 5, 5]
+
+
+def test_cached_observation_rechecks_name_and_discards_unstable_entry(tmp_path, monkeypatch):
+    root = tmp_path.resolve()
+    identity = desktop_source.source_identity(root)
+    draft = root / "draft.txt"
+    draft.write_bytes(b"first")
+    (root / "other.txt").write_bytes(b"retained cache")
+    cache = {}
+    selected = [{"path": draft.name}]
+    desktop_source.check_references(
+        root, [*selected, {"path": "other.txt"}], expected_identity=identity, cache=cache,
+    )
+    observe = desktop_source._observe
+
+    def replace_after_reusing_digest(descriptor, path, previous, *, cached=None):
+        assert cached == cache[draft.name]
+        result = observe(descriptor, path, previous, cached=cached)
+        replacement = root / "editor-save"
+        replacement.write_bytes(b"changed")
+        replacement.replace(draft)
+        return result
+
+    monkeypatch.setattr(desktop_source, "_observe", replace_after_reusing_digest)
+    assert desktop_source.check_references(root, selected, expected_identity=identity, cache=cache) == {
+        "status": "available", "files": [{"path": draft.name, "status": "unstable"}],
+    }
+    assert list(cache) == ["other.txt"]
+
+
+@pytest.mark.parametrize("status", ["identity_changed", "unavailable", "needs_confirmation"])
+def test_monitor_forgets_cached_hashes_before_checking_another_root(tmp_path, status):
+    root = tmp_path.resolve() / "source"
+    root.mkdir()
+    file = root / "draft.txt"
+    file.write_bytes(b"approved")
+    identity = desktop_source.source_identity(root)
+    cache = {}
+    selected = [{"path": file.name}]
+    desktop_source.check_references(root, selected, expected_identity=identity, cache=cache)
+    assert cache
+
+    if status != "needs_confirmation":
+        root.rename(root.with_name("moved"))
+    if status != "unavailable":
+        root.mkdir(exist_ok=True)
+        file.write_bytes(b"replacement")
+    expected = None if status == "needs_confirmation" else identity
+    assert desktop_source.check_references(root, selected, expected_identity=expected, cache=cache) == {
+        "status": status, "files": [],
+    }
+    assert cache == {}
+
+    if status != "unavailable":
+        rebound = desktop_source.source_identity(root)
+        assert desktop_source.check_references(root, selected, expected_identity=rebound, cache=cache) == {
+            "status": "available",
+            "files": [{"path": file.name, "status": "available", "sha256": sha256(b"replacement").hexdigest()}],
+        }
+        assert cache[file.name][1] == sha256(b"replacement").hexdigest()
+
+
+def test_monitor_does_not_cache_an_observation_after_root_changes_during_check(tmp_path, monkeypatch):
+    root = tmp_path.resolve() / "source"
+    root.mkdir()
+    (root / "draft.txt").write_bytes(b"first")
+    (root / "other.txt").write_bytes(b"already cached")
+    identity = desktop_source.source_identity(root)
+    cache = {}
+    desktop_source.check_references(root, [{"path": "other.txt"}], expected_identity=identity, cache=cache)
+    hash_file = desktop_source._hash_file
+
+    def replace_root_after_hashing(descriptor, size):
+        digest = hash_file(descriptor, size)
+        root.rename(root.with_name("moved"))
+        root.mkdir()
+        return digest
+
+    monkeypatch.setattr(desktop_source, "_hash_file", replace_root_after_hashing)
+    assert desktop_source.check_references(
+        root, [{"path": "draft.txt"}], expected_identity=identity, cache=cache,
+    ) == {"status": "unstable", "files": []}
+    assert cache == {}

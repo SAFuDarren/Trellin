@@ -286,6 +286,7 @@ class WorkbenchServer(ThreadingHTTPServer):
         self._proof_task_lock = threading.Lock()
         self._lemma_plan_lock = threading.Lock()
         self.closing = threading.Event()
+        self.source_observer = None
         self._running_policy = None
         self._failed_policy = None
         self.runtime_updates = RuntimeUpdates(self._local_proof_worker)
@@ -582,6 +583,13 @@ class _Handler(BaseHTTPRequestHandler):
                 and secrets.compare_digest(tokens[0], self.server.session))
 
     def _read_api(self, route):
+        if route.path == "/api/source-observations":
+            if route.query:
+                raise _BadRequest("This endpoint does not take parameters.")
+            observer = self.server.source_observer
+            if observer is None:
+                return {"source_id": None, "revision": None, "status": "inactive", "files": [], "generation": 0}
+            return observer.snapshot()
         if route.path == "/api/release-updates":
             if route.query:
                 raise _BadRequest("This endpoint does not take parameters.")
